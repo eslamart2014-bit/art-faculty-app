@@ -32,31 +32,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  // Camera state
-  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
-  const [cameraIndex, setCameraIndex] = useState(0);
-
-  useEffect(() => {
-    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-      navigator.mediaDevices.enumerateDevices().then(devices => {
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        setCameraDevices(videoDevices);
-        if (videoDevices.length > 0) {
-          setCameraIndex(videoDevices.length - 1);
-          setSelectedCameraId(videoDevices[videoDevices.length - 1].deviceId);
-        }
-      });
-    }
-  }, []);
-
-  const switchCamera = () => {
-    if (cameraDevices.length > 1) {
-      const nextIndex = (cameraIndex + 1) % cameraDevices.length;
-      setCameraIndex(nextIndex);
-      setSelectedCameraId(cameraDevices[nextIndex].deviceId);
-    }
-  };
+  // Camera handled by QRScanner component
 
   const [saving, setSaving] = useState(false);
 
@@ -938,7 +914,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.9)", zIndex: 130, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "15px", background: "#1e1e1e", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", direction: "rtl" }}>
             <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📸 ماسح الحضور الذكي</h3>
-            {cameraDevices.length > 1 && <button onClick={switchCamera} style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: "8px", color: "#fff", fontSize: "14px", padding: "5px 10px", cursor: "pointer", marginRight: "auto", marginLeft: "15px" }}>🔄 تبديل الكاميرا</button>}
+            
             <button onClick={closeCameraScanner} style={{ background: "none", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}>✕</button>
           </div>
           

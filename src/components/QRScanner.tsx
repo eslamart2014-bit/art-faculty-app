@@ -1,56 +1,68 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import React, { useEffect, useRef } from "react";
+
+declare global {
+  interface Window {
+    Html5Qrcode: any;
+  }
+}
 
 export default function QRScanner({ onScan }: { onScan: (result: string) => void }) {
-  const [errorMsg, setErrorMsg] = useState("");
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  
-  // Use a unique ID in case of multiple renders, though it shouldn't happen here
-  const regionId = useRef(`qr-${Math.random().toString(36).substr(2, 9)}`).current;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scannerRef = useRef<any>(null);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
 
   useEffect(() => {
-    let isMounted = true;
-    
-    // Slight delay to ensure the DOM is fully painted
-    const timer = setTimeout(() => {
-      if (!isMounted) return;
-      
-      const scanner = new Html5Qrcode(regionId);
-      scannerRef.current = scanner;
+    // Dynamically load html5-qrcode from CDN to avoid SSR issues
+    if (typeof window === 'undefined') return;
 
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        (decodedText) => {
-          if (isMounted) onScan(decodedText);
-        },
-        (error) => {
-          // Ignore frame errors
-        }
-      ).catch(err => {
-        console.error("Camera error:", err);
-        if (isMounted) setErrorMsg("خطأ في تشغيل الكاميرا: " + (err.message || err));
-      });
-    }, 100);
+    const id = "qr-scanner-" + Math.random().toString(36).slice(2);
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.width = '100%';
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+      containerRef.current.appendChild(div);
+    }
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-      if (scannerRef.current && scannerRef.current.isScanning) {
-        scannerRef.current.stop().catch(console.error);
+    const startScanner = () => {
+      if (!window.Html5Qrcode) return;
+      try {
+        const scanner = new window.Html5Qrcode(id);
+        scannerRef.current = scanner;
+        scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (text: string) => { onScanRef.current(text); },
+          () => {}
+        ).catch(console.error);
+      } catch (e) {
+        console.error('Scanner init error:', e);
       }
     };
-  }, [onScan, regionId]);
+
+    if (window.Html5Qrcode) {
+      setTimeout(startScanner, 100);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+      script.onload = () => setTimeout(startScanner, 100);
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      if (scannerRef.current) {
+        try {
+          if (scannerRef.current.isScanning) {
+            scannerRef.current.stop().catch(() => {});
+          }
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <div id={regionId} style={{ width: "100%", minHeight: "250px" }}></div>
-      {errorMsg && (
-        <div style={{ position: "absolute", top: "10px", left: "10px", right: "10px", background: "rgba(255,0,0,0.8)", color: "white", padding: "10px", borderRadius: "5px", zIndex: 10, fontSize: "12px", textAlign: "center" }}>
-          {errorMsg}
-        </div>
-      )}
-    </div>
+    <div ref={containerRef} style={{ width: "100%", minHeight: "280px", background: "#000" }} />
   );
 }

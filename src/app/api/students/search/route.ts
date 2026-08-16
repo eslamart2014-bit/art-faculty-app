@@ -3,41 +3,49 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// Use anon key (public) since students table is readable by all
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-  const level = searchParams.get('level');
+  const query = searchParams.get('q') || '';
+  const level = searchParams.get('level') || '';
 
-  if (!query || query.length < 2) {
-    return NextResponse.json({ error: 'يرجى كتابة حرفين على الأقل' }, { status: 400 });
+  if (!query || query.trim().length < 2) {
+    return NextResponse.json({ students: [] });
   }
 
   try {
+    const trimmed = query.trim();
     let dbQuery = supabaseAdmin
       .from('students')
       .select('id, full_name, student_code, academic_year, section');
-      
-    if (!isNaN(Number(query))) {
-      dbQuery = dbQuery.or(`student_code.eq.${query},full_name.ilike.%${query}%`);
+
+    // If numeric - search by student code
+    if (/^\d+$/.test(trimmed)) {
+      dbQuery = dbQuery.eq('student_code', trimmed);
     } else {
-      dbQuery = dbQuery.ilike('full_name', `%${query}%`);
+      // Search by name
+      dbQuery = dbQuery.ilike('full_name', `%${trimmed}%`);
     }
 
-    if (level && level !== 'الكل') {
-      const cleanLevel = level.replace('الفرقة ', '');
-      dbQuery = dbQuery.ilike('academic_year', `%${cleanLevel}%`);
+    // Apply level filter if set (and not "الكل")
+    if (level && level !== 'الكل' && level !== '') {
+      dbQuery = dbQuery.ilike('academic_year', `%${level.replace('السنة ', '')}%`);
     }
 
-    const { data, error } = await dbQuery.limit(20);
+    const { data, error } = await dbQuery.limit(30);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Search error:', error);
+      return NextResponse.json({ error: error.message, students: [] }, { status: 500 });
+    }
 
-    return NextResponse.json({ students: data });
+    return NextResponse.json({ students: data || [] });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Search exception:', err);
+    return NextResponse.json({ error: err.message, students: [] }, { status: 500 });
   }
 }
