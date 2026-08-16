@@ -1,16 +1,30 @@
-require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabaseUrl = 'https://zyjwxzkxkwkkpfdipmoc.supabase.co';
+const supabaseKey = 'sb_publishable_icyal0PmeqMePWyzT9QJuA_mqezDg3f';
 
-async function run() {
-  const query = "احمد";
-  const { data, error } = await supabase
-    .from('students')
-    .select('id, full_name, student_code, academic_year, section')
-    .or(`full_name.ilike.%${query}%,student_code.ilike.%${query}%`)
-    .limit(10);
-  console.log("Error:", error);
-  console.log("Data:", data);
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function testSearch(query) {
+  console.log('Testing search for:', query);
+  
+  let dbQuery = supabase.from('students').select('id, full_name, student_code, academic_year, section');
+  
+  if (/^\d+$/.test(query.trim())) {
+    dbQuery = dbQuery.eq('student_code', query.trim());
+  } else {
+    dbQuery = dbQuery.ilike('full_name', `%${query.trim()}%`);
+  }
+  
+  const { data, error } = await dbQuery.limit(5);
+  
+  if (error) {
+    console.error('ERROR:', JSON.stringify(error, null, 2));
+  } else {
+    console.log('RESULTS:', data?.length, 'students found');
+    if (data && data.length > 0) console.log('First:', data[0]);
+  }
 }
-run();
+
+// Test with a name that likely exists
+testSearch('ا').then(() => testSearch('1'));

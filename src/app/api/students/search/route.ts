@@ -3,49 +3,57 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-// Use anon key (public) since students table is readable by all
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q') || '';
-  const level = searchParams.get('level') || '';
+  const query = (searchParams.get('q') || '').trim();
+  const level = (searchParams.get('level') || '').trim();
 
-  if (!query || query.trim().length < 2) {
+  if (!query || query.length < 2) {
     return NextResponse.json({ students: [] });
   }
 
+  // Use anon key - students table is public readable
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ error: 'Missing env vars', students: [] }, { status: 500 });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    const trimmed = query.trim();
-    let dbQuery = supabaseAdmin
+    let dbQuery = supabase
       .from('students')
       .select('id, full_name, student_code, academic_year, section');
 
-    // If numeric - search by student code
-    if (/^\d+$/.test(trimmed)) {
-      dbQuery = dbQuery.eq('student_code', trimmed);
+    if (/^\d+$/.test(query)) {
+      // Numeric search: match student_code that contains the query
+      // e.g. searching "1" matches "001", "011", "100", "1" etc.
+      dbQuery = dbQuery.ilike('student_code', `%${query}%`);
     } else {
-      // Search by name
-      dbQuery = dbQuery.ilike('full_name', `%${trimmed}%`);
+      // Name search
+      dbQuery = dbQuery.ilike('full_name', `%${query}%`);
     }
 
-    // Apply level filter if set (and not "الكل")
+    // Apply level filter
     if (level && level !== 'الكل' && level !== '') {
-      dbQuery = dbQuery.ilike('academic_year', `%${level.replace('السنة ', '')}%`);
+      const levelNum = level.replace('السنة ', '').trim();
+      dbQuery = dbQuery.ilike('academic_year', `%${levelNum}%`);
     }
 
     const { data, error } = await dbQuery.limit(30);
 
     if (error) {
-      console.error('Search error:', error);
+      console.error('Supabase error:', error);
       return NextResponse.json({ error: error.message, students: [] }, { status: 500 });
     }
 
     return NextResponse.json({ students: data || [] });
   } catch (err: any) {
-    console.error('Search exception:', err);
+    console.error('Search error:', err);
     return NextResponse.json({ error: err.message, students: [] }, { status: 500 });
   }
 }
