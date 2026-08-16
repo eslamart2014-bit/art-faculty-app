@@ -128,7 +128,7 @@ export default function SettingsMenu({
           }}
         >
           <div style={{ fontSize: "12px", color: "#888", fontWeight: "bold" }}>
-            📌 الإصدار الحالي: <span style={{ color: "#2196F3" }}>v6.0.0</span>
+            📌 الإصدار الحالي: <span style={{ color: "#2196F3" }}>v1.2</span>
           </div>
         </div>
       </div>
