@@ -53,19 +53,45 @@ export default function StudentPortal() {
   const searchStudents = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/students/search?q=${encodeURIComponent(searchQuery)}&level=${encodeURIComponent(level)}`);
+      const SUPABASE_URL = 'https://zyjwxzkxkwkkpfdipmoc.supabase.co';
+      const ANON_KEY = 'sb_publishable_icyal0PmeqMePWyzT9QJuA_mqezDg3f';
+      const trimmed = searchQuery.trim();
+
+      let filterParam = '';
+      if (/^\d+$/.test(trimmed)) {
+        filterParam = `student_code=ilike.*${trimmed}*`;
+      } else {
+        filterParam = `full_name=ilike.*${encodeURIComponent(trimmed)}*`;
+      }
+
+      let url = `${SUPABASE_URL}/rest/v1/students?select=id,full_name,student_code,academic_year,section&${filterParam}&limit=30`;
+
+      if (level && level !== 'الكل') {
+        const levelMap: Record<string, string> = {
+          'الفرقة الأولى': 'الأول', 'الفرقة الثانية': 'الثاني',
+          'الفرقة الثالثة': 'الثالث', 'الفرقة الرابعة': 'الرابع'
+        };
+        const mapped = levelMap[level] || level;
+        url += `&academic_year=ilike.*${encodeURIComponent(mapped)}*`;
+      }
+
+      const res = await fetch(url, {
+        headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+      });
       const data = await res.json();
-      if (data.students) {
-        setStudents(data.students);
-        if (data.students.length > 0) {
-          trackEvent('search', level); // track search with the selected level filter
-        }
+      if (Array.isArray(data)) {
+        setStudents(data);
+        if (data.length > 0) trackEvent('search', level);
+      } else {
+        setStudents([]);
       }
     } catch (err) {
       console.error(err);
+      setStudents([]);
     }
     setLoading(false);
   };
+
 
   if (selectedStudent) {
     return (
