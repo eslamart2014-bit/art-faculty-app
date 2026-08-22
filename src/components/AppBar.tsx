@@ -12,6 +12,9 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
   const [timeStr, setTimeStr] = useState<string>("");
   const [dateStr, setDateStr] = useState<string>("");
 
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -34,22 +37,41 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
     updateTime();
     const interval = setInterval(updateTime, 60000);
 
-    // SW Registration and Version Check
+    // Register service worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.error('Service Worker registration failed: ', err);
-      });
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
 
+    // Force update check
     const checkVersion = async () => {
       try {
         const res = await fetch('/version.json?t=' + Date.now());
         const data = await res.json();
-        const currentVersion = localStorage.getItem('appVersion');
-        if (currentVersion && currentVersion !== data.version) {
-          alert('تم تحديث النظام إلى إصدار جديد! (' + data.version + ')\nيرجى إعادة تحميل الصفحة.');
+        const stored = localStorage.getItem('appVersion');
+        if (stored && stored !== data.version) {
+          // NEW VERSION DETECTED - force update!
+          setShowUpdateBanner(true);
+          let progress = 0;
+          const interval = setInterval(() => {
+            progress += 5;
+            setUpdateProgress(progress);
+            if (progress >= 100) {
+              clearInterval(interval);
+              // Clear all caches and reload
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then(reg => {
+                  reg.active?.postMessage('CLEAR_CACHE');
+                });
+              }
+              caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).finally(() => {
+                localStorage.setItem('appVersion', data.version);
+                window.location.reload();
+              });
+            }
+          }, 80); // 80ms * 20 steps = ~1.6 seconds total
+        } else {
+          localStorage.setItem('appVersion', data.version);
         }
-        localStorage.setItem('appVersion', data.version);
       } catch (err) {
         console.error('Version check failed:', err);
       }
@@ -59,8 +81,36 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
     return () => clearInterval(interval);
   }, []);
 
+
   return (
-    <div
+    <>
+      {/* Force Update Banner */}
+      {showUpdateBanner && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.92)", zIndex: 99999,
+          display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
+          direction: "rtl"
+        }}>
+          <div style={{ fontSize: "50px", marginBottom: "20px" }}>🔄</div>
+          <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
+            جاري تحديث التطبيق...
+          </div>
+          <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "30px" }}>
+            يرجى الانتظار لحظة واحدة
+          </div>
+          <div style={{ width: "80%", maxWidth: "300px", background: "#333", borderRadius: "10px", height: "12px", overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: "10px",
+              background: "linear-gradient(90deg, #2196F3, #4CAF50)",
+              width: updateProgress + "%",
+              transition: "width 0.08s linear"
+            }} />
+          </div>
+          <div style={{ color: "#4CAF50", marginTop: "12px", fontSize: "13px" }}>{updateProgress}%</div>
+        </div>
+      )}
+      <div
       style={{
         display: "flex",
         justifyContent: "space-between",
@@ -142,5 +192,6 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
         </button>
       </div>
     </div>
+    </>
   );
 }

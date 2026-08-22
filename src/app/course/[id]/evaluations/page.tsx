@@ -681,22 +681,47 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
             {/* QUICK GRADE PANEL */}
             {activeScannedStudent && selectedProject && (
-              <div style={{ background: "#2d2d2d", borderBottom: "3px solid #FF9800", padding: "15px", borderRadius: "10px", marginTop: "10px", animation: "slideUp 0.3s" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #444", paddingBottom: "10px", marginBottom: "15px" }}>
-                  <div>
-                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px" }}>{activeScannedStudent.full_name}</div>
-                    <div style={{ color: "#aaa", fontSize: "12px" }}>المشروع: {selectedProject.name} | السكشن: {activeScannedStudent.section}</div>
+              <div style={{ background: "#1a2a1a", border: "2px solid #4CAF50", padding: "12px", borderRadius: "10px", marginTop: "10px" }}>
+                {/* Student Info Row */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "15px", marginBottom: "2px" }}>{activeScannedStudent.full_name}</div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ background: "#2196F3", color: "#fff", borderRadius: "5px", padding: "2px 8px", fontSize: "11px" }}>س: {activeScannedStudent.section}</span>
+                      <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 8px", fontSize: "11px" }}>حضور: {activeScannedStudent.attCount} مرة</span>
+                      <span style={{ background: "#555", color: "#fff", borderRadius: "5px", padding: "2px 8px", fontSize: "11px" }}>Max: {selectedProject.max_score}</span>
+                    </div>
                   </div>
-                  <button onClick={handleCancelActiveStudent} style={{ background: "#ffebee", color: "#d32f2f", border: "none", padding: "5px 15px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>إلغاء ✕</button>
+                  <button onClick={handleCancelActiveStudent} style={{
+                    background: "rgba(244,67,54,0.2)", color: "#f44336", border: "1px solid #f44336",
+                    borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "bold",
+                    cursor: "pointer", width: "auto", margin: 0, flexShrink: 0
+                  }}>✕ إلغاء</button>
                 </div>
-                
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "5px", maxHeight: "160px", overflowY: "auto", paddingRight: "5px" }}>
+
+                {/* Grade buttons */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: selectedProject.max_score <= 30 ? "repeat(8, 1fr)" : "repeat(5, 1fr)",
+                  gap: "4px", maxHeight: "150px", overflowY: "auto"
+                }}>
                   {getQuickGrades(selectedProject.max_score).map(g => (
-                    <button key={g} onClick={() => handleSelectGradeForActiveStudent(g)} style={{ background: "#2196F3", border: "none", color: "#fff", padding: "10px 0", borderRadius: "6px", fontSize: "16px", fontWeight: "bold" }}>
+                    <button key={g} onClick={() => handleSelectGradeForActiveStudent(g)} style={{
+                      background: g === 0 ? "#333" : g >= selectedProject.max_score * 0.8 ? "#4CAF50" : g >= selectedProject.max_score * 0.5 ? "#2196F3" : "#FF9800",
+                      border: "none", color: "#fff",
+                      padding: selectedProject.max_score <= 30 ? "8px 0" : "10px 0",
+                      borderRadius: "6px",
+                      fontSize: selectedProject.max_score <= 30 ? "13px" : "15px",
+                      fontWeight: "bold", cursor: "pointer", margin: 0, width: "auto"
+                    }}>
                       {g}
                     </button>
                   ))}
-                  <button onClick={() => { const q = prompt(`أدخل درجة مخصصة (0-${selectedProject.max_score})`); if(q && !isNaN(Number(q))) handleSelectGradeForActiveStudent(Number(q)); }} style={{ background: "#333", border: "none", color: "#fff", padding: "10px 0", borderRadius: "6px", fontSize: "14px", gridColumn: "span 5" }}>درجة مخصصة / كسر</button>
+                  <button onClick={() => { const q = prompt(`درجة مخصصة (0-${selectedProject.max_score})`); if(q && !isNaN(Number(q))) handleSelectGradeForActiveStudent(Number(q)); }} style={{
+                    background: "#444", border: "none", color: "#aaa", padding: "8px 0",
+                    borderRadius: "6px", fontSize: "11px", gridColumn: selectedProject.max_score <= 30 ? "span 8" : "span 5",
+                    cursor: "pointer", margin: 0, width: "auto"
+                  }}>✏️ درجة مخصصة / كسر</button>
                 </div>
               </div>
             )}
