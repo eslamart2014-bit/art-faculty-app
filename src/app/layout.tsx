@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
+import MaintenanceGuard from "@/components/MaintenanceGuard";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
 export const metadata: Metadata = {
   title: "نظام التربية الفنية",
-  description: "نظام إدارة المتابعة الأكاديمية والغياب",
+  description: "نظام إدارة الحضور والتقييمات للتربية الفنية",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon-192.png",
@@ -38,7 +39,9 @@ export default function RootLayout({
       </head>
       <body className={cairo.className}>
         <div className="app-container">
-          {children}
+          <MaintenanceGuard>
+            {children}
+          </MaintenanceGuard>
         </div>
       </body>
     </html>

@@ -17,6 +17,8 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   const [term1Start, setTerm1Start] = useState("");
   const [term2Start, setTerm2Start] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isMaintenance, setIsMaintenance] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
   
   // Analytics state
   const [analytics, setAnalytics] = useState<any[]>([]);
@@ -51,6 +53,8 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
     if (data) {
       if (data.term1_start) setTerm1Start(data.term1_start);
       if (data.term2_start) setTerm2Start(data.term2_start);
+      if (data.is_maintenance_mode !== undefined) setIsMaintenance(data.is_maintenance_mode);
+      if (data.maintenance_message) setMaintenanceMessage(data.maintenance_message);
     }
     setLoading(false);
   };
@@ -91,7 +95,30 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
     if (error) {
       alert("حدث خطأ أثناء الحفظ");
     } else {
-      alert("تم حفظ تواريخ الفصول الدراسية بنجاح!");
+      alert("تم الحفظ بنجاح!");
+    }
+    setLoading(false);
+  };
+
+  const toggleMaintenance = async (newState: boolean) => {
+    const confirmMsg = newState 
+      ? "تنبيه خطير: هل أنت متأكد من تفعيل وضع الصيانة؟ سيتم حجب التطبيق عن جميع المستخدمين فوراً ولن يتمكنوا من الدخول حتى تقوم بتعطيله." 
+      : "هل أنت متأكد من إنهاء وضع الصيانة؟ سيعود التطبيق للعمل طبيعياً لدى الجميع فوراً.";
+    if (!confirm(confirmMsg)) return;
+
+    setLoading(true);
+    const { error } = await supabase.from("system_settings").upsert({
+      id: 1,
+      is_maintenance_mode: newState,
+      maintenance_message: maintenanceMessage || "التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار...",
+      updated_at: new Date().toISOString()
+    });
+
+    if (!error) {
+      setIsMaintenance(newState);
+      alert(newState ? "تم تفعيل وضع الصيانة بنجاح. التطبيق محجوب الآن." : "تم إنهاء وضع الصيانة بنجاح.");
+    } else {
+      alert("حدث خطأ أثناء تغيير وضع الصيانة");
     }
     setLoading(false);
   };
@@ -238,6 +265,39 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
         {/* Study Settings Tab */}
         {activeTab === "study" && (
           <div>
+            <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #333", marginBottom: "20px" }}>
+              <h3 style={{ color: "#fff", marginTop: 0 }}>🚨 وضع الصيانة (Maintenance Mode)</h3>
+              <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "15px" }}>
+                تفعيل وضع الصيانة سيؤدي إلى إخراج جميع المستخدمين فوراً ولن يتمكنوا من الدخول حتى تقوم بتعطيله.
+              </p>
+              
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "15px" }}>
+                <input 
+                  type="text" 
+                  value={maintenanceMessage} 
+                  onChange={e => setMaintenanceMessage(e.target.value)}
+                  placeholder="الرسالة التي ستظهر للمستخدمين..."
+                  style={{ flex: 1, padding: "10px", background: "#333", border: "1px solid #555", color: "#fff", borderRadius: "5px" }}
+                />
+                <button 
+                  onClick={() => toggleMaintenance(!isMaintenance)}
+                  style={{ 
+                    padding: "10px 20px", 
+                    background: isMaintenance ? "#f44336" : "#4CAF50", 
+                    color: "#fff", 
+                    border: "none", 
+                    borderRadius: "5px", 
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap"
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? "جاري..." : isMaintenance ? "إلغاء وضع الصيانة" : "تفعيل وضع الصيانة"}
+                </button>
+              </div>
+            </div>
+
             <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #333", marginBottom: "20px" }}>
               <p style={{ color: "#aaa", fontSize: "14px", marginTop: 0, marginBottom: "20px" }}>
                 قم بتحديد تواريخ بداية كل ترم. سيقوم النظام بحساب رقم الأسبوع تلقائياً بناءً على هذه التواريخ ودمجها في التقارير (PDF).
