@@ -287,7 +287,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     }
 
     vibrateError(); // Small alert pattern
-    const confirmAdd = window.confirm(`الطالب (${globalStudent.full_name}) مقيد بفرقة أخرى وليس مسجلاً كطالب تخلفات.\nهل تود ضمه كطالب تخلفات الآن؟`);
+    const confirmAdd = window.confirm(`الطالب (${globalStudent.full_name}) مقيد بفرقة ${globalStudent.academic_year} - سكشن ${globalStudent.section} وهو غير مدرج في قوائم هذا المقرر.\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
       const updatedMakeup = [...(course.makeup_students || []), globalStudent.id];
@@ -306,16 +306,23 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const checkStudentLocalOrGlobal = async (code: string) => {
     const isMakeup = course.makeup_students && course.makeup_students.length > 0;
     
-    let query = supabase.from("students").select("*").eq("student_code", code);
-    if (isMakeup) {
-      query = query.or(`academic_year.eq.${course.academic_year},id.in.(${course.makeup_students.join(",")})`);
-    } else {
-      query = query.eq("academic_year", course.academic_year);
+    // First, find the student globally by code
+    const { data: student } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
+    
+    if (!student) {
+      vibrateError();
+      alert("لم يتم العثور على طالب بهذا الكود في أي فرقة!");
+      return null;
     }
 
-    const { data: localStudent } = await query.maybeSingle();
-    if (localStudent) return localStudent;
+    const inMakeup = isMakeup && course.makeup_students.includes(student.id);
+    const inCourseSections = course.sections && course.sections.includes(student.section) && student.academic_year === course.academic_year;
 
+    if (inMakeup || inCourseSections) {
+      return student;
+    }
+
+    // If not in the course naturally or via makeup, trigger makeup prompt
     return await handleCrossCourseMakeup(code);
   };
 

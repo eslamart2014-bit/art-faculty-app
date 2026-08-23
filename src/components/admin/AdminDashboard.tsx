@@ -14,11 +14,16 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [sheetUrl, setSheetUrl] = useState("");
+  
+  const [parsedStudents, setParsedStudents] = useState<any[] | null>(null);
 
   useEffect(() => {
     if (activeModal === "users") {
       fetchUsers();
     }
+    // reset on open
+    setParsedStudents(null);
+    setMsg("");
   }, [activeModal]);
 
   const fetchUsers = async () => {
@@ -28,13 +33,12 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
     }
   };
 
-  const handleGoogleSheetSync = async () => {
+  const parseGoogleSheet = async () => {
     if (!sheetUrl.trim()) {
       setMsg("الرجاء إدخال رابط Google Sheet أولاً.");
       return;
     }
 
-    // Extract Sheet ID
     const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match || !match[1]) {
       setMsg("الرابط غير صحيح، يرجى التأكد من نسخ رابط Google Sheet الصحيح.");
@@ -45,17 +49,16 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
 
     setLoading(true);
-    setMsg("جاري الاتصال بسيرفرات جوجل وسحب البيانات...");
+    setMsg("جاري فحص الشيت واستخراج البيانات...");
 
     Papa.parse(csvUrl, {
       download: true,
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      complete: (results) => {
         try {
           const data = results.data as any[];
-          
-          const studentsToInsert = data.map((row) => {
+          const toInsert = data.map((row) => {
             const name = row["اسم الطالب"] || row["Name"] || row["الاسم"];
             const code = row["كود الطالب"] || row["Code"] || row["الكود"] || row["رقم الجلوس"];
             const level = row["الفرقة"] || row["Level"] || row["السنة"];
@@ -72,53 +75,108 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
             return null;
           }).filter(Boolean);
 
-          if (studentsToInsert.length === 0) {
-            setMsg("لم يتم العثور على بيانات صالحة. تأكد من تطابق أسماء الأعمدة (اسم الطالب، كود الطالب، الفرقة).");
+          if (toInsert.length === 0) {
+            setMsg("لم يتم العثور على بيانات صالحة. تأكد من تطابق أسماء الأعمدة.");
             setLoading(false);
             return;
           }
 
-          // Deduplicate by student_code to prevent "ON CONFLICT DO UPDATE command cannot affect row a second time"
           const uniqueStudentsMap = new Map();
-          studentsToInsert.forEach((student: any) => {
+          toInsert.forEach((student: any) => {
             uniqueStudentsMap.set(student.student_code, student);
           });
           const uniqueStudents = Array.from(uniqueStudentsMap.values());
 
-          setMsg(`تم سحب ${uniqueStudents.length} طالب، جاري الحفظ في النظام...`);
-
-          const { error } = await supabase.from("students").upsert(
-            uniqueStudents, 
-            { onConflict: "student_code" }
-          );
-
-          if (error) {
-            setMsg("حدث خطأ أثناء الحفظ: " + error.message);
-          } else {
-            setMsg(`✅ تم تحديث بيانات ${uniqueStudents.length} طالب بنجاح وتمت المزامنة!`);
-          }
+          setParsedStudents(uniqueStudents);
+          setMsg(`✅ تم العثور على ${uniqueStudents.length} طالب جاهز للتحديث.`);
         } catch (err: any) {
-          setMsg("حدث خطأ أثناء معالجة البيانات: " + err.message);
+          setMsg("حدث خطأ أثناء فحص البيانات: " + err.message);
         }
         setLoading(false);
       },
-      error: (error) => {
-        setMsg("حدث خطأ في الاتصال بجوجل: تأكد أن الشيت متاح للجميع (Anyone with the link can view).");
+      error: () => {
+        setMsg("تعذر الوصول للشيت. تأكد أن إعدادات المشاركة هي Anyone with the link can view.");
         setLoading(false);
       }
     });
   };
 
+  const handleUpdateOnly = async () => {
+    if (!parsedStudents) return;
+    setLoading(true);
+    setMsg("جاري تحديث بيانات الطلاب (تحديث القديم وإضافة الجديد)...");
+
+    const { error } = await supabase.from("students").upsert(
+      parsedStudents, 
+      { onConflict: "student_code" }
+    );
+
+    if (error) {
+      setMsg("حدث خطأ أثناء الحفظ: " + error.message);
+    } else {
+      setMsg(`✅ تم تحديث بيانات ${parsedStudents.length} طالب بنجاح!`);
+      setParsedStudents(null);
+    }
+    setLoading(false);
+  };
+
+  const handleRenewData = async () => {
+    if (!parsedStudents) return;
+    const confirmDelete = window.confirm("تحذير خطير: هذا الخيار سيقوم بحذف أي طالب موجود في النظام وغير موجود في هذا الشيت! سيؤدي هذا إلى حذف كل درجاتهم وغيابهم السابقة. هل أنت متأكد من رغبتك في إحلال وتجديد البيانات بالكامل؟");
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    setMsg("جاري إحلال وتجديد البيانات بالكامل...");
+
+    // 1. Get all existing student codes
+    const { data: existingStudents, error: fetchErr } = await supabase.from("students").select("student_code");
+    
+    if (fetchErr) {
+      setMsg("خطأ في جلب الطلاب الحاليين: " + fetchErr.message);
+      setLoading(false);
+      return;
+    }
+
+    const newCodesSet = new Set(parsedStudents.map(s => s.student_code));
+    const codesToDelete = existingStudents.filter(s => !newCodesSet.has(s.student_code)).map(s => s.student_code);
+
+    // 2. Delete students not in the sheet
+    if (codesToDelete.length > 0) {
+      setMsg(`جاري حذف ${codesToDelete.length} طالب قديم...`);
+      // Delete in batches of 1000 if necessary, but assuming small DB
+      const { error: delErr } = await supabase.from("students").delete().in("student_code", codesToDelete);
+      if (delErr) {
+        console.error(delErr);
+      }
+    }
+
+    // 3. Upsert the new data
+    setMsg(`جاري إضافة/تحديث ${parsedStudents.length} طالب...`);
+    const { error: upsertErr } = await supabase.from("students").upsert(
+      parsedStudents, 
+      { onConflict: "student_code" }
+    );
+
+    if (upsertErr) {
+      setMsg("حدث خطأ أثناء التحديث: " + upsertErr.message);
+    } else {
+      setMsg(`✅ تمت عملية الإحلال والتجديد بنجاح! (حُذف ${codesToDelete.length} وحُدّث ${parsedStudents.length})`);
+      setParsedStudents(null);
+    }
+    
+    setLoading(false);
+  };
+
+
   if (!activeModal) return null;
 
   return (
     <>
-
       {activeModal === "roster" && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
-          <div className="card" style={{ width: "90%", maxWidth: "420px", textAlign: "center", display: "flex", flexDirection: "column", maxHeight: "85vh" }}>
-            <h3 style={{ color: "var(--success)", marginTop: 0 }}>📋 إدارة كشوف الطلاب</h3>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "15px" }}>تحديث قاعدة بيانات الطلاب لحظياً عبر Google Sheets</p>
+          <div className="card" style={{ width: "90%", maxWidth: "420px", textAlign: "center", display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
+            <h3 style={{ color: "var(--success)", marginTop: 0 }}>📋 إدارة كشوف الطلاب المتقدمة</h3>
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "15px" }}>تحديث وإحلال قاعدة بيانات الطلاب عبر Google Sheets</p>
 
             <div style={{ overflowY: "auto", flexGrow: 1 }}>
               
@@ -135,14 +193,44 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                 />
               </div>
 
-              <button 
-                onClick={handleGoogleSheetSync} 
-                disabled={loading}
-                style={{ background: "var(--success)", fontSize: "14px", fontWeight: "bold", margin: 0, width: "100%", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", padding: "12px" }}
-              >
-                {loading ? <div className="loader-circle" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></div> : "🔄"} 
-                {loading ? "جاري المزامنة..." : "سحب وتحديث البيانات الآن"}
-              </button>
+              {!parsedStudents ? (
+                <button 
+                  onClick={parseGoogleSheet} 
+                  disabled={loading}
+                  style={{ background: "#2196F3", fontSize: "14px", fontWeight: "bold", margin: 0, width: "100%", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", padding: "12px" }}
+                >
+                  {loading ? <div className="loader-circle" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></div> : "🔍"} 
+                  {loading ? "جاري الفحص..." : "فحص البيانات أولاً"}
+                </button>
+              ) : (
+                <div style={{ background: "#111", padding: "15px", borderRadius: "10px", border: "1px solid #4CAF50", marginBottom: "10px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: "bold", color: "#4CAF50", marginBottom: "15px" }}>
+                    تم التعرف على {parsedStudents.length} طالب في الشيت
+                  </div>
+                  
+                  <button 
+                    onClick={handleUpdateOnly} 
+                    disabled={loading}
+                    style={{ background: "#4CAF50", fontSize: "14px", fontWeight: "bold", marginBottom: "10px", width: "100%", padding: "12px" }}
+                  >
+                    🔄 تحديث البيانات فقط (آمن)
+                  </button>
+                  <p style={{ fontSize: "10px", color: "#888", marginBottom: "15px", textAlign: "right" }}>* سيتم تحديث بيانات الطلاب الحاليين وإضافة الطلاب الجدد، ولن يتم حذف أي طالب قديم من النظام.</p>
+
+                  <button 
+                    onClick={handleRenewData} 
+                    disabled={loading}
+                    style={{ background: "#F44336", fontSize: "14px", fontWeight: "bold", margin: 0, width: "100%", padding: "12px" }}
+                  >
+                    ⚠️ إحلال وتجديد كلي (خطر)
+                  </button>
+                  <p style={{ fontSize: "10px", color: "#888", marginTop: "5px", textAlign: "right" }}>* سيتم مسح أي طالب موجود في النظام وغير موجود في الشيت تماماً (بكل درجاته وحضوره)، واعتماد الشيت الجديد كلياً.</p>
+
+                  <button onClick={() => setParsedStudents(null)} style={{ background: "transparent", color: "#888", border: "none", fontSize: "12px", marginTop: "15px", textDecoration: "underline" }}>
+                    إلغاء الفحص
+                  </button>
+                </div>
+              )}
 
               {msg && (
                 <div style={{ marginTop: "15px", fontSize: "13px", color: msg.includes("✅") ? "var(--success)" : "var(--warning)", textAlign: "center", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
