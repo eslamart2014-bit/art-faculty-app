@@ -96,7 +96,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
           textAlign: 'center', padding: '5px', fontSize: '12px',
           fontWeight: 'bold', zIndex: 10000, position: 'relative'
         }}>
-          ⚠️ التطبيق حالياً في وضع الصيانة للطلاب (أنت تتصفح كمسؤول)
+          ⚠️ التطبيق حالياً في وضع الصيانة للمستخدمين (أنت تتصفح كمسؤول)
         </div>
       )}
       {children}
