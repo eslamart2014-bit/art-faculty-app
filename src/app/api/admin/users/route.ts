@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       .eq('id', adminId)
       .single();
 
-    if (adminProfile?.role !== 'مدير') {
+    if (adminProfile?.role !== 'مدير' && adminProfile?.role !== 'admin' && adminProfile?.role !== 'أدمن') {
       return NextResponse.json({ error: 'Unauthorized: Admins only' }, { status: 403 });
     }
 

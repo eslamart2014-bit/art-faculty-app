@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import QRScanner from "@/components/QRScanner";
 
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { extractStudentCode } from "@/lib/scannerHelper";
@@ -455,8 +456,10 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                 </button>
               </div>
 
-              <div style={{ display: isScanning ? "block" : "none", background: "#000", padding: "10px", borderRadius: "8px", marginBottom: "20px", border: "1px solid #333" }}>
-                <div id="global-reader" style={{ width: "100%", maxWidth: "400px", margin: "0 auto" }}></div>
+              <div style={{ display: isScanning ? "block" : "none", marginBottom: "20px" }}>
+                <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <QRScanner onScan={(result) => { if(result) { performGlobalSearch(extractStudentCode(result)); setIsScanning(false); } }} />
+                </div>
               </div>
 
               {/* نتائج البحث */}

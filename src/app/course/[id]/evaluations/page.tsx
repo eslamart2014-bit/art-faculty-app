@@ -715,16 +715,16 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 {/* Grade buttons */}
                 <div style={{
                   display: "grid",
-                  gridTemplateColumns: selectedProject.max_score <= 30 ? "repeat(8, 1fr)" : "repeat(5, 1fr)",
-                  gap: "4px", maxHeight: "150px", overflowY: "auto"
+                  gridTemplateColumns: selectedProject.max_score <= 30 ? "repeat(6, 1fr)" : "repeat(5, 1fr)",
+                  gap: "6px", maxHeight: "350px", overflowY: "auto", padding: "5px 0"
                 }}>
                   {getQuickGrades(selectedProject.max_score).map(g => (
                     <button key={g} onClick={() => handleSelectGradeForActiveStudent(g)} style={{
                       background: g === 0 ? "#333" : g >= selectedProject.max_score * 0.8 ? "#4CAF50" : g >= selectedProject.max_score * 0.5 ? "#2196F3" : "#FF9800",
                       border: "none", color: "#fff",
-                      padding: selectedProject.max_score <= 30 ? "8px 0" : "10px 0",
-                      borderRadius: "6px",
-                      fontSize: selectedProject.max_score <= 30 ? "13px" : "15px",
+                      padding: selectedProject.max_score <= 30 ? "15px 0" : "15px 0",
+                      borderRadius: "8px",
+                      fontSize: selectedProject.max_score <= 30 ? "18px" : "18px",
                       fontWeight: "bold", cursor: "pointer", margin: 0, width: "auto"
                     }}>
                       {g}

@@ -226,12 +226,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     setShowWeekRenameModal(false);
   };
 
-  const toggleSelection = (studentId: string) => {
+  const toggleSelection = (id: string) => {
     const newSet = new Set(selectedStudentIds);
-    if (newSet.has(studentId)) {
-      newSet.delete(studentId);
+    if (newSet.has(id)) {
+      // Prevent un-toggling if already saved in DB for this week
+      const isSaved = attendance.some(a => a.student_id === id && a.status === "حاضر");
+      if (isSaved) {
+        alert("هذا الطالب مسجل كحاضر بالفعل. للإلغاء استخدم الضغط المطول على اسم الطالب.");
+        return;
+      }
+      newSet.delete(id);
     } else {
-      newSet.add(studentId);
+      newSet.add(id);
     }
     setSelectedStudentIds(newSet);
   };
@@ -925,7 +931,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             ) : (
               <>
                 <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "260px", marginBottom: "15px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div id="mkp-reader" style={{ width: "100%", height: "100%" }}></div>
+                  <QRScanner onScan={(result) => { if(result) { handleAddMakeupStudentSubmit(extractStudentCode(result)); setMakeupCameraActive(false); } }} />
                   
                   {/* Target Overlay UI */}
                   <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", border: "3px solid rgba(233, 30, 99, 0.7)", borderRadius: "20px", pointerEvents: "none", boxShadow: "0 0 0 4000px rgba(0,0,0,0.5)" }}></div>
