@@ -157,8 +157,12 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         // Find attendance in this week
         const att = attendance.find(a => a.student_id === s.id && new Date(a.date) >= w.start && new Date(a.date) <= w.end);
         if (att) {
-          const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
-          rowHtml += `<td style="background-color: #d4edda !important; color: #155724; font-weight: bold; font-size: 11px;">${dateStr}</td>`;
+          if (att.status === 'غياب بعذر') {
+            rowHtml += `<td style="background-color: #fff3cd !important; color: #856404; font-weight: bold; font-size: 11px;">غياب بعذر<br/><span style="font-size: 9px">${att.note || ''}</span></td>`;
+          } else {
+            const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
+            rowHtml += `<td style="background-color: #d4edda !important; color: #155724; font-weight: bold; font-size: 11px;">${dateStr}</td>`;
+          }
         } else {
           rowHtml += `<td></td>`;
         }

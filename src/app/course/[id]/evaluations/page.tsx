@@ -278,8 +278,12 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setView('CAMERA');
   };
 
+  const isProcessingRef = useRef(false);
+
   const handleScannerScan = async (decodedText: string) => {
-    if (!decodedText || activeScannedStudent) return;
+    if (!decodedText || activeScannedStudent || isProcessingRef.current) return;
+    
+    isProcessingRef.current = true; // Lock scanner
     
     // pulse effect
     setScannerPulse(true);
@@ -289,35 +293,44 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     if (cleanCode.match(/^#(.*?)#$/)) {
       vibrateSuccess();
       await triggerEasterEgg(cleanCode.match(/^#(.*?)#$/)![1]);
+      isProcessingRef.current = false;
       return;
     }
 
-          const student = await checkStudentLocalOrGlobal(cleanCode);
-          if (student) {
-            if (scannedStudents.some(s => s.student.id === student.id)) {
-              vibrateError();
-              alert("تم مسح هذا الطالب بالفعل!");
-            } else {
-              const { data: existingGrade } = await supabase
-                .from("evaluations")
-                .select("score, created_at")
-                .eq("course_id", course.id)
-                .eq("student_id", student.id)
-                .eq("project_name", selectedProject!.name)
-                .maybeSingle();
+    try {
+      const student = await checkStudentLocalOrGlobal(cleanCode);
+      if (student) {
+        if (scannedStudents.some(s => s.student.id === student.id)) {
+          vibrateError();
+          alert("تم مسح هذا الطالب بالفعل!");
+        } else {
+          const { data: existingGrade } = await supabase
+            .from("evaluations")
+            .select("score, created_at")
+            .eq("course_id", course.id)
+            .eq("student_id", student.id)
+            .eq("project_name", selectedProject!.name)
+            .maybeSingle();
 
-              if (existingGrade) {
-                vibrateError();
-                const dateStr = new Date(existingGrade.created_at).toLocaleString('ar-EG');
-                const confirmModify = window.confirm(`هذا الطالب تم تقييمه بالفعل!\nالدرجة السابقة: ${existingGrade.score} من ${selectedProject!.max_score}\nتاريخ التقييم: ${dateStr}\n\nهل تريد الاستمرار وتعديل درجته؟`);
-                if (!confirmModify) return;
-              }
-              vibrateSuccess();
-              const attCount = await getAttendanceCount(student.id);
-              setActiveScannedStudent({ ...student, attCount });
+          if (existingGrade) {
+            vibrateError();
+            const dateStr = new Date(existingGrade.created_at).toLocaleString('ar-EG');
+            const confirmModify = window.confirm(`هذا الطالب تم تقييمه بالفعل!\nالدرجة السابقة: ${existingGrade.score} من ${selectedProject!.max_score}\nتاريخ التقييم: ${dateStr}\n\nهل تريد الاستمرار وتعديل درجته؟`);
+            if (!confirmModify) {
+              isProcessingRef.current = false;
+              return;
             }
           }
+          vibrateSuccess();
+          const attCount = await getAttendanceCount(student.id);
+          setActiveScannedStudent({ ...student, attCount });
+        }
+      }
+    } finally {
+      isProcessingRef.current = false;
+    }
   };
+
 
   const cancelScanner = () => {
     setView('EVAL_MENU');
@@ -661,23 +674,23 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 <option value="ADD_NEW" style={{ color: "#4CAF50" }}>➕ إضافة مشروع جديد...</option>
             </select>
 
-            <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              {!activeScannedStudent && (
+            {/* CAMERA SECTION - ONLY SHOW WHEN NOT GRADING */}
+            {!activeScannedStudent && (
+              <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <QRScanner onScan={(result) => { if (result) handleScannerScan(result); }} />
-              )}
-              
-              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", border: "3px solid", borderColor: scannerPulse ? "#81C784" : "rgba(76, 175, 80, 0.7)", borderRadius: "20px", pointerEvents: "none", boxShadow: scannerPulse ? "0 0 15px #81C784, 0 0 0 4000px rgba(0,0,0,0.5)" : "0 0 0 4000px rgba(0,0,0,0.5)", transition: "all 0.2s" }}></div>
-              <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", pointerEvents: "none" }}>
-                 <div style={{ position: "absolute", top: "-3px", left: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderTopLeftRadius: "15px" }}></div>
-                 <div style={{ position: "absolute", top: "-3px", right: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderTopRightRadius: "15px" }}></div>
-                 <div style={{ position: "absolute", bottom: "-3px", left: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderBottomLeftRadius: "15px" }}></div>
-                 <div style={{ position: "absolute", bottom: "-3px", right: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderBottomRightRadius: "15px" }}></div>
-              </div>
+                
+                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", border: "3px solid", borderColor: scannerPulse ? "#81C784" : "rgba(76, 175, 80, 0.7)", borderRadius: "20px", pointerEvents: "none", boxShadow: scannerPulse ? "0 0 15px #81C784, 0 0 0 4000px rgba(0,0,0,0.5)" : "0 0 0 4000px rgba(0,0,0,0.5)", transition: "all 0.2s" }}></div>
+                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", pointerEvents: "none" }}>
+                   <div style={{ position: "absolute", top: "-3px", left: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderTopLeftRadius: "15px" }}></div>
+                   <div style={{ position: "absolute", top: "-3px", right: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderTopRightRadius: "15px" }}></div>
+                   <div style={{ position: "absolute", bottom: "-3px", left: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderBottomLeftRadius: "15px" }}></div>
+                   <div style={{ position: "absolute", bottom: "-3px", right: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderBottomRightRadius: "15px" }}></div>
+                </div>
 
-              {!activeScannedStudent && (
-                 <div style={{ position: "absolute", bottom: "10px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "5px 15px", borderRadius: "15px", fontSize: "12px", zIndex: 10 }}>وجه الكاميرا داخل الإطار الأخضر</div>
-              )}
-            </div>
+                <div style={{ position: "absolute", bottom: "10px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "5px 15px", borderRadius: "15px", fontSize: "12px", zIndex: 10 }}>وجه الكاميرا داخل الإطار الأخضر</div>
+              </div>
+            )}
+
 
             {/* QUICK GRADE PANEL */}
             {activeScannedStudent && selectedProject && (

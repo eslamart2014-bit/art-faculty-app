@@ -721,10 +721,28 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         ) : (
           displayStudents.map((student) => {
             const isSelected = selectedStudentIds.has(student.id);
+            const isExcused = attendance.some(a => a.student_id === student.id && a.status === 'غياب بعذر');
+            
+            let bg = "#1e1e1e";
+            let borderColor = "transparent";
+            if (isSelected) {
+              bg = "#1b5e20";
+              borderColor = "#4CAF50";
+            } else if (isExcused) {
+              bg = "#4a3600";
+              borderColor = "#FFC107";
+            }
+            
             return (
               <div 
                 key={student.id} 
-                onClick={() => toggleSelection(student.id)}
+                onClick={() => {
+                  if (isExcused) {
+                    alert("هذا الطالب مسجل غياب بعذر، للإلغاء استخدم الضغط المطول ثم (إلغاء الحضور).");
+                    return;
+                  }
+                  toggleSelection(student.id);
+                }}
                 onTouchStart={() => handleTouchStart(student)}
                 onTouchEnd={handleTouchEnd}
                 onMouseDown={() => handleTouchStart(student)}
@@ -735,9 +753,9 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "15px 20px",
-                  background: isSelected ? "#1b5e20" : "#1e1e1e",
+                  background: bg,
                   borderBottom: "1px solid #333",
-                  borderRight: isSelected ? "5px solid #4CAF50" : "5px solid transparent",
+                  borderRight: `5px solid ${borderColor}`,
                   cursor: "pointer",
                   transition: "background 0.2s"
                 }}
@@ -754,6 +772,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
                 {isSelected && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
+                {isExcused && <div style={{ color: "#FFC107", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span>📝</span>
+                  <span style={{ fontSize: "9px" }}>بعذر</span>
+                </div>}
               </div>
             );
           })
@@ -790,6 +812,26 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             
             <button onClick={handleCancelAttendancePast} style={{ background: "#FF9800", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
               ❌ إلغاء حضور هذا الأسبوع
+            </button>
+            <button onClick={() => {
+              const excuse = window.prompt("أدخل سبب الغياب (مثال: مرضي، رياضي...):");
+              if (excuse !== null) {
+                // Upsert as excused
+                const inserts = [{
+                  course_id: course.id,
+                  student_id: longPressStudent.id,
+                  date: selectedWeekKey,
+                  status: "غياب بعذر",
+                  note: excuse,
+                  teacher_id: course.teacher_id
+                }];
+                supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
+                  fetchData();
+                });
+                setLongPressStudent(null);
+              }
+            }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
+              📝 تسجيل غياب بعذر
             </button>
             <button onClick={handleMoveToSectionClick} style={{ background: "#2196F3", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
               🔄 نقل الطالب لسكشن آخر
