@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
+  const [appVersion, setAppVersion] = useState("");
+
+  useEffect(() => {
+    setAppVersion(localStorage.getItem('appVersion') || "1.7");
+  }, []);
   const [tab, setTab] = useState<"normal" | "first">("normal");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -174,7 +179,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
               backgroundColor: "#222" // Fallback color
             }}
           />
-          <div style={{ fontSize: "14px", color: "#4CAF50", fontWeight: "bold", marginTop: "10px" }}>تحديث 1.2</div>
+          <div style={{ fontSize: "14px", color: "#4CAF50", fontWeight: "bold", marginTop: "10px" }}>تحديث {appVersion}</div>
         </div>
         <h2 style={{ textAlign: "center", marginTop: "5px", marginBottom: "12px", color: "var(--primary)" }}>
           نظام التربية الفنية

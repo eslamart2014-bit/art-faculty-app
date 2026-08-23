@@ -1,5 +1,5 @@
 "use client";
-
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface SettingsMenuProps {
@@ -25,6 +25,14 @@ export default function SettingsMenu({
   onOpenArchive,
   onOpenSuggestions
 }: SettingsMenuProps) {
+  const [appVersion, setAppVersion] = useState("1.7");
+  
+  useEffect(() => {
+    if (isOpen) {
+      setAppVersion(localStorage.getItem('appVersion') || "1.7");
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleLogout = async () => {
@@ -128,7 +136,7 @@ export default function SettingsMenu({
           }}
         >
           <div style={{ fontSize: "12px", color: "#888", fontWeight: "bold" }}>
-            📌 الإصدار الحالي: <span style={{ color: "#2196F3" }}>v1.2</span>
+            📌 الإصدار الحالي: <span style={{ color: "#2196F3" }}>v{appVersion}</span>
           </div>
         </div>
       </div>
