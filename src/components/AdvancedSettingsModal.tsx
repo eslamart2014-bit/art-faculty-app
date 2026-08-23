@@ -248,16 +248,20 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
       <div style={{ display: "flex", background: "#222", borderBottom: "1px solid #333" }}>
         <button 
           onClick={() => setActiveTab("study")}
-          style={{ flex: 1, padding: "15px", background: activeTab === "study" ? "#333" : "transparent", color: activeTab === "study" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "study" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}
-        >إعدادات الدراسة</button>
+          style={{ flex: 1, padding: "10px", background: activeTab === "study" ? "#333" : "transparent", color: activeTab === "study" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "study" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+        >الدراسة</button>
         <button 
           onClick={() => setActiveTab("students")}
-          style={{ flex: 1, padding: "15px", background: activeTab === "students" ? "#333" : "transparent", color: activeTab === "students" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "students" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}
-        >بوابة الطلاب</button>
+          style={{ flex: 1, padding: "10px", background: activeTab === "students" ? "#333" : "transparent", color: activeTab === "students" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "students" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+        >البوابة</button>
         <button 
           onClick={() => setActiveTab("search")}
-          style={{ flex: 1, padding: "15px", background: activeTab === "search" ? "#333" : "transparent", color: activeTab === "search" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "search" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}
-        >البحث الشامل 🔍</button>
+          style={{ flex: 1, padding: "10px", background: activeTab === "search" ? "#333" : "transparent", color: activeTab === "search" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "search" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+        >البحث 🔍</button>
+        <button 
+          onClick={() => setActiveTab("maintenance")}
+          style={{ flex: 1, padding: "10px", background: activeTab === "maintenance" ? "#333" : "transparent", color: activeTab === "maintenance" ? "#f44336" : "#888", border: "none", borderBottom: activeTab === "maintenance" ? "2px solid #f44336" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+        >الصيانة 🚧</button>
       </div>
 
       <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto" }}>
@@ -265,39 +269,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
         {/* Study Settings Tab */}
         {activeTab === "study" && (
           <div>
-            <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #333", marginBottom: "20px" }}>
-              <h3 style={{ color: "#fff", marginTop: 0 }}>🚨 وضع الصيانة (Maintenance Mode)</h3>
-              <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "15px" }}>
-                تفعيل وضع الصيانة سيؤدي إلى إخراج جميع المستخدمين فوراً ولن يتمكنوا من الدخول حتى تقوم بتعطيله.
-              </p>
-              
-              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "15px" }}>
-                <input 
-                  type="text" 
-                  value={maintenanceMessage} 
-                  onChange={e => setMaintenanceMessage(e.target.value)}
-                  placeholder="الرسالة التي ستظهر للمستخدمين..."
-                  style={{ flex: 1, padding: "10px", background: "#333", border: "1px solid #555", color: "#fff", borderRadius: "5px" }}
-                />
-                <button 
-                  onClick={() => toggleMaintenance(!isMaintenance)}
-                  style={{ 
-                    padding: "10px 20px", 
-                    background: isMaintenance ? "#f44336" : "#4CAF50", 
-                    color: "#fff", 
-                    border: "none", 
-                    borderRadius: "5px", 
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap"
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? "جاري..." : isMaintenance ? "إلغاء وضع الصيانة" : "تفعيل وضع الصيانة"}
-                </button>
-              </div>
-            </div>
-
             <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #333", marginBottom: "20px" }}>
               <p style={{ color: "#aaa", fontSize: "14px", marginTop: 0, marginBottom: "20px" }}>
                 قم بتحديد تواريخ بداية كل ترم. سيقوم النظام بحساب رقم الأسبوع تلقائياً بناءً على هذه التواريخ ودمجها في التقارير (PDF).
@@ -577,6 +548,53 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Maintenance Settings Tab */}
+        {activeTab === "maintenance" && (
+          <div>
+            <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #f44336", marginBottom: "20px" }}>
+              <h3 style={{ color: "#f44336", marginTop: 0, display: "flex", alignItems: "center" }}>
+                <span style={{ fontSize: "24px", marginLeft: "10px" }}>🚧</span> وضع الصيانة الفوري
+              </h3>
+              <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "20px", lineHeight: "1.6" }}>
+                عند تفعيل هذا الوضع، سيتم <strong>طرد جميع المستخدمين العاديين فوراً</strong> من التطبيق وستظهر لهم الشاشة السوداء. لن يتمكن أحد غيرك (وغير المسؤولين) من تصفح التطبيق حتى تقوم بتعطيله.
+              </p>
+              
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>الرسالة التي ستظهر للمستخدمين:</label>
+                <textarea 
+                  value={maintenanceMessage} 
+                  onChange={e => setMaintenanceMessage(e.target.value)}
+                  placeholder="مثال: التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار..."
+                  rows={3}
+                  style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #555", color: "#fff", borderRadius: "5px", resize: "none" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button 
+                  onClick={() => toggleMaintenance(!isMaintenance)}
+                  style={{ 
+                    padding: "8px 16px", 
+                    background: isMaintenance ? "#f44336" : "#4CAF50", 
+                    color: "#fff", 
+                    border: "none", 
+                    borderRadius: "5px", 
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px"
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? "جاري التطبيق..." : isMaintenance ? "إيقاف وضع الصيانة ❌" : "تفعيل وضع الصيانة ✅"}
+                </button>
+              </div>
             </div>
           </div>
         )}
