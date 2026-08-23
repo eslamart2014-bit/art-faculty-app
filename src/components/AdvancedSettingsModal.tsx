@@ -11,7 +11,7 @@ interface AdvancedSettingsModalProps {
 }
 
 export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | null>("study");
+  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | null>("study");
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
