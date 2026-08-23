@@ -40,6 +40,26 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
     // Register service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(console.error);
+
+      // Listen for updates from the SW
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('SW requested reload due to update');
+          setShowUpdateBanner(true);
+          setUpdateProgress(100);
+          setTimeout(() => window.location.reload(), 1000);
+        }
+      });
+
+      // Reload when a new SW takes control
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          console.log('Controller changed, reloading...');
+          window.location.reload();
+        }
+      });
     }
 
     // Force update check
