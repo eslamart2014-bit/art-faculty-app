@@ -21,6 +21,8 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
   const [loadingSections, setLoadingSections] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+
   useEffect(() => {
     if (isOpen) {
       // Reset state when opening
@@ -29,8 +31,20 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
       setCourseType("sections");
       setAvailableSections([]);
       setSelectedSections([]);
+      fetchAvailableYears();
     }
   }, [isOpen]);
+
+  const fetchAvailableYears = async () => {
+    const { data } = await supabase.from("students").select("academic_year").eq("is_active", true);
+    if (data) {
+      const uniqueYears = Array.from(new Set(data.map((d: any) => d.academic_year))).filter(Boolean) as string[];
+      // Sort them roughly
+      const sortOrder: Record<string, number> = { "الأولى": 1, "الاولي": 1, "الثانية": 2, "الثالثة": 3, "الرابعة": 4 };
+      uniqueYears.sort((a, b) => (sortOrder[a] || 99) - (sortOrder[b] || 99));
+      setAvailableYears(uniqueYears);
+    }
+  };
 
   useEffect(() => {
     if (academicYear) {
@@ -128,10 +142,9 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
             style={{ marginBottom: "12px" }}
           >
             <option value="">-- اختر الفرقة --</option>
-            <option value="الأولى">الفرقة الأولى</option>
-            <option value="الثانية">الفرقة الثانية</option>
-            <option value="الثالثة">الفرقة الثالثة</option>
-            <option value="الرابعة">الفرقة الرابعة</option>
+            {availableYears.map(y => (
+              <option key={y} value={y}>الفرقة {y}</option>
+            ))}
           </select>
 
           <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--warning)", marginBottom: "4px", display: "block", textAlign: "right" }}>3. طبيعة المقرر:</label>
