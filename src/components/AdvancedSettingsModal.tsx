@@ -11,7 +11,7 @@ interface AdvancedSettingsModalProps {
 }
 
 export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | null>("study");
+  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | "shares" | null>("study");
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
@@ -30,6 +30,11 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   const [searchLoading, setSearchLoading] = useState(false);
   const [studentsList, setStudentsList] = useState<any[] | null>(null);
   const [selectedStudentResult, setSelectedStudentResult] = useState<any | null>(null);
+  
+  // Share Requests state
+  const [shareRequests, setShareRequests] = useState<any[]>([]);
+  const [profilesList, setProfilesList] = useState<any[]>([]);
+  const [selectedColleagues, setSelectedColleagues] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -41,7 +46,60 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
     if (!isOpen || activeTab !== "search") {
       setIsScanning(false);
     }
+    if (isOpen && activeTab === "shares") {
+      fetchShareRequests();
+      fetchProfiles();
+    }
   }, [isOpen, activeTab]);
+
+  const fetchShareRequests = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("course_share_requests")
+      .select("*, courses(name), profiles(full_name)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    if (data) setShareRequests(data);
+    setLoading(false);
+  };
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase.from("profiles").select("id, full_name, role").order("full_name");
+    if (data) setProfilesList(data);
+  };
+
+  const handleApproveShare = async (request: any) => {
+    const colleagues = selectedColleagues[request.id];
+    if (!colleagues || colleagues.length === 0) {
+      alert("يرجى اختيار زميل واحد على الأقل");
+      return;
+    }
+    
+    setLoading(true);
+    // Fetch current course
+    const { data: course } = await supabase.from("courses").select("shared_with").eq("id", request.course_id).single();
+    if (course) {
+      const currentShared = course.shared_with || [];
+      const newShared = Array.from(new Set([...currentShared, ...colleagues]));
+      
+      // Update course
+      await supabase.from("courses").update({ shared_with: newShared }).eq("id", request.course_id);
+      
+      // Update request status
+      await supabase.from("course_share_requests").update({ status: "approved" }).eq("id", request.id);
+      
+      alert("تمت إضافة الزملاء للمقرر بنجاح");
+      fetchShareRequests();
+    }
+    setLoading(false);
+  };
+
+  const handleRejectShare = async (id: string) => {
+    setLoading(true);
+    await supabase.from("course_share_requests").update({ status: "rejected" }).eq("id", id);
+    fetchShareRequests();
+    setLoading(false);
+  };
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -232,6 +290,10 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
           onClick={() => setActiveTab("maintenance")}
           style={{ flex: 1, padding: "10px", background: activeTab === "maintenance" ? "#333" : "transparent", color: activeTab === "maintenance" ? "#f44336" : "#888", border: "none", borderBottom: activeTab === "maintenance" ? "2px solid #f44336" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
         >الصيانة 🚧</button>
+        <button 
+          onClick={() => setActiveTab("shares")}
+          style={{ flex: 1, padding: "10px", background: activeTab === "shares" ? "#333" : "transparent", color: activeTab === "shares" ? "#4CAF50" : "#888", border: "none", borderBottom: activeTab === "shares" ? "2px solid #4CAF50" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+        >مشاركة 🤝</button>
       </div>
 
       <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto" }}>
@@ -605,6 +667,60 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Shares Settings Tab */}
+        {activeTab === "shares" && (
+          <div>
+            <h2 style={{ color: "#fff", marginBottom: "20px" }}>طلبات مشاركة المقررات</h2>
+            {shareRequests.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px", color: "#888", background: "#222", borderRadius: "10px" }}>
+                لا توجد طلبات مشاركة معلقة حالياً.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                {shareRequests.map(req => (
+                  <div key={req.id} style={{ background: "#222", padding: "15px", borderRadius: "10px", border: "1px solid #4CAF50" }}>
+                    <div style={{ marginBottom: "10px" }}>
+                      <strong style={{ color: "#2196F3" }}>{req.profiles.full_name}</strong> يطلب مشاركة المقرر: <strong style={{ color: "#fff" }}>{req.courses.name}</strong>
+                    </div>
+                    <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "15px" }}>
+                      طلب إضافة: <strong style={{ color: "#FF9800" }}>{req.target_name}</strong>
+                    </div>
+                    
+                    <div style={{ marginBottom: "15px" }}>
+                      <label style={{ display: "block", color: "#aaa", fontSize: "13px", marginBottom: "8px" }}>اختر الزميل (أو الزملاء) لربطهم بالمقرر:</label>
+                      <select 
+                        multiple
+                        value={selectedColleagues[req.id] || []}
+                        onChange={(e) => {
+                          const values = Array.from(e.target.selectedOptions, option => option.value);
+                          setSelectedColleagues(prev => ({ ...prev, [req.id]: values }));
+                        }}
+                        style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "5px", height: "100px" }}
+                      >
+                        {profilesList.map(p => (
+                          <option key={p.id} value={p.id}>{p.full_name}</option>
+                        ))}
+                      </select>
+                      <div style={{ fontSize: "11px", color: "#888", marginTop: "5px" }}>يمكنك اختيار أكثر من زميل باستخدام زر Ctrl (أو سحب بإصبعك على الهاتف).</div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "10px" }}>
+                      <button 
+                        onClick={() => handleApproveShare(req)}
+                        style={{ flex: 1, padding: "10px", background: "#4CAF50", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+                      >موافقة وإضافة</button>
+                      <button 
+                        onClick={() => handleRejectShare(req.id)}
+                        style={{ flex: 1, padding: "10px", background: "#f44336", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+                      >رفض</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

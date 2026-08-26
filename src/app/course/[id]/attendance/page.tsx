@@ -709,7 +709,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           {course?.course_type === "lectures" ? (
             <option value="محاضرات">محاضرات (الفرقة كاملة)</option>
           ) : (
-            course?.sections?.map((sec: string) => (
+            [...(course?.sections || [])].sort((a: string, b: string) => a.localeCompare(b, undefined, {numeric: true})).map((sec: string) => (
               <option key={sec} value={sec}>سكشن {sec}</option>
             ))
           )}

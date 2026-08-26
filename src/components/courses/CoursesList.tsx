@@ -19,6 +19,9 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [courseToRename, setCourseToRename] = useState<any>(null);
   const [newName, setNewName] = useState("");
   const [courseToDelete, setCourseToDelete] = useState<any>(null);
+  const [courseToShare, setCourseToShare] = useState<any>(null);
+  const [colleagueName, setColleagueName] = useState("");
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     fetchCourses();
@@ -29,7 +32,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const { data, error } = await supabase
       .from("courses")
       .select("*")
-      .eq("teacher_id", user.id)
+      .or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`)
       .order("created_at", { ascending: false });
 
     if (data && !error) {
@@ -110,6 +113,29 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     setCourseToDelete(null);
   };
 
+  const handleShareSubmit = async () => {
+    if (!colleagueName.trim()) {
+      alert("يرجى إدخال اسم الزميل");
+      return;
+    }
+    setIsSharing(true);
+    const { error } = await supabase.from("course_share_requests").insert({
+      course_id: courseToShare.id,
+      requester_id: user.id,
+      target_name: colleagueName.trim(),
+      status: "pending"
+    });
+    
+    if (error) {
+      alert("حدث خطأ أثناء إرسال الطلب. يرجى إعداد قاعدة البيانات أولاً.");
+    } else {
+      alert("تم إرسال الطلب، سوف يتم الإضافة من قبل المطور.");
+      setCourseToShare(null);
+      setColleagueName("");
+    }
+    setIsSharing(false);
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "20px", color: "var(--text-muted)" }}>
@@ -153,6 +179,11 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
               {course.created_at && (
                 <span style={{ fontSize: "10px", background: "#333", padding: "2px 6px", borderRadius: "10px", color: "#aaa", fontWeight: "normal" }}>
                   {new Date(course.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+              )}
+              {course.shared_with && course.shared_with.length > 0 && (
+                <span style={{ fontSize: "10px", background: "#4CAF50", padding: "2px 6px", borderRadius: "10px", color: "#fff", fontWeight: "normal" }}>
+                  🤝 مشترك
                 </span>
               )}
             </h3>
@@ -229,6 +260,18 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                   >
                     🗑️ حذف المقرر
                   </div>
+                  <div 
+                    onClick={(e) => {
+                       e.stopPropagation();
+                       setCourseToShare(course);
+                       setActiveMenuId(null);
+                    }}
+                    style={{ padding: "12px 15px", cursor: "pointer", borderTop: "1px solid #333", fontSize: "13px", color: "#4CAF50" }}
+                    onMouseOver={(e) => e.currentTarget.style.background = "#2a3b2c"}
+                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                  >
+                    🤝 طلب مشاركة المقرر مع زميل
+                  </div>
                   </div>
                 </>
               )}
@@ -292,6 +335,40 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                 onClick={() => setCourseToDelete(null)}
                 style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "none", cursor: "pointer", marginTop: "10px" }}
               >تراجع وإلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {courseToShare && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+        }} onClick={() => setCourseToShare(null)}>
+          <div style={{ background: "#222", padding: "20px", borderRadius: "15px", width: "90%", maxWidth: "350px", border: "1px solid #4CAF50" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 15px 0", color: "#4CAF50" }}>🤝 طلب مشاركة المقرر مع زميل</h3>
+            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "15px", lineHeight: "1.5" }}>
+              سيتم إرسال الطلب للمطور لإضافة الزميل للمقرر. بعد الإضافة، سيتمكن كلاكما من إدارة نفس المقرر بكل بياناته.
+            </p>
+            <input 
+              type="text" 
+              value={colleagueName}
+              onChange={(e) => setColleagueName(e.target.value)}
+              placeholder="اكتب اسم الزميل هنا..."
+              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #555", background: "#111", color: "#fff", marginBottom: "20px" }}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button 
+                onClick={handleShareSubmit}
+                disabled={isSharing}
+                style={{ flex: 1, padding: "10px", background: "#4CAF50", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", opacity: isSharing ? 0.7 : 1 }}
+              >{isSharing ? "جاري الإرسال..." : "إرسال الطلب"}</button>
+              <button 
+                onClick={() => setCourseToShare(null)}
+                style={{ flex: 1, padding: "10px", background: "#444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}
+              >إلغاء</button>
             </div>
           </div>
         </div>
