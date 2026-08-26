@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
+import { generatePrintableHtml } from "@/lib/pdfHelper";
 
 interface AdminDashboardProps {
   activeModal: "users" | "roster" | null;
@@ -10,163 +11,257 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ activeModal, onClose }: AdminDashboardProps) {
-  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [sheetUrl, setSheetUrl] = useState("");
+  const [activeTab, setActiveTab] = useState<"sync" | "export">("sync");
   
-  const [parsedStudents, setParsedStudents] = useState<any[] | null>(null);
+  // Sync state
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [previewData, setPreviewData] = useState<{
+    updateList: any[],
+    insertList: any[],
+    archiveList: any[]
+  } | null>(null);
 
-  useEffect(() => {
-    if (activeModal === "users") {
-      fetchUsers();
-    }
-    // reset on open
-    setParsedStudents(null);
-    setMsg("");
-  }, [activeModal]);
+  // Export state
+  const [exportYear, setExportYear] = useState("");
 
-  const fetchUsers = async () => {
-    const { data, error } = await supabase.from("profiles").select("*");
-    if (!error && data) {
-      setUsers(data);
-    }
+  const normalizeName = (name: string) => {
+    if (!name) return "";
+    return name
+      .replace(/أ|إ|آ/g, "ا")
+      .replace(/ة/g, "ه")
+      .replace(/ى/g, "ي")
+      .replace(/\s+/g, " ")
+      .trim();
   };
 
   const parseGoogleSheet = async () => {
-    if (!sheetUrl.trim()) {
-      setMsg("الرجاء إدخال رابط Google Sheet أولاً.");
+    if (!sheetUrl.includes("docs.google.com/spreadsheets")) {
+      setMsg("الرابط غير صحيح. تأكد أنه رابط Google Sheets.");
       return;
     }
-
-    const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (!match || !match[1]) {
-      setMsg("الرابط غير صحيح، يرجى التأكد من نسخ رابط Google Sheet الصحيح.");
-      return;
-    }
-
-    const sheetId = match[1];
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
 
     setLoading(true);
-    setMsg("جاري فحص الشيت واستخراج البيانات...");
+    setMsg("جاري تحميل الشيت ومعالجة البيانات...");
 
-    Papa.parse(csvUrl, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        try {
+    try {
+      const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) throw new Error("لا يمكن استخراج معرف الشيت.");
+      const sheetId = match[1];
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+
+      const response = await fetch(csvUrl);
+      if (!response.ok) throw new Error("فشل تحميل الشيت. تأكد أنه 'Anyone with link can view'.");
+      
+      const csvText = await response.text();
+
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
           const data = results.data as any[];
-          const toInsert = data.map((row) => {
-            const name = row["اسم الطالب"] || row["Name"] || row["الاسم"];
-            const code = row["كود الطالب"] || row["Code"] || row["الكود"] || row["رقم الجلوس"];
-            const level = row["الفرقة"] || row["Level"] || row["السنة"];
-            const section = row["السكشن"] || row["Section"] || row["المجموعة"] || "عام";
-
-            if (name && code && level) {
-              return {
-                student_code: String(code).trim(),
-                full_name: String(name).trim(),
-                academic_year: String(level).trim(),
-                section: String(section).trim(),
-              };
-            }
-            return null;
-          }).filter(Boolean);
-
-          if (toInsert.length === 0) {
-            setMsg("لم يتم العثور على بيانات صالحة. تأكد من تطابق أسماء الأعمدة.");
-            setLoading(false);
-            return;
-          }
-
-          const uniqueStudentsMap = new Map();
-          toInsert.forEach((student: any) => {
-            uniqueStudentsMap.set(student.student_code, student);
-          });
-          const uniqueStudents = Array.from(uniqueStudentsMap.values());
-
-          setParsedStudents(uniqueStudents);
-          setMsg(`✅ تم العثور على ${uniqueStudents.length} طالب جاهز للتحديث.`);
-        } catch (err: any) {
-          setMsg("حدث خطأ أثناء فحص البيانات: " + err.message);
+          await analyzeData(data);
+        },
+        error: (err: any) => {
+          setMsg("خطأ في قراءة الملف: " + err.message);
+          setLoading(false);
         }
-        setLoading(false);
-      },
-      error: () => {
-        setMsg("تعذر الوصول للشيت. تأكد أن إعدادات المشاركة هي Anyone with the link can view.");
-        setLoading(false);
-      }
-    });
+      });
+    } catch (err: any) {
+      setMsg("خطأ: " + err.message);
+      setLoading(false);
+    }
   };
 
-  const handleUpdateOnly = async () => {
-    if (!parsedStudents) return;
-    setLoading(true);
-    setMsg("جاري تحديث بيانات الطلاب (تحديث القديم وإضافة الجديد)...");
+  const analyzeData = async (sheetData: any[]) => {
+    try {
+      // 1. Fetch active students
+      const { data: activeStudents, error } = await supabase.from("students").select("*").eq("is_active", true);
+      if (error) throw error;
 
-    const { error } = await supabase.from("students").upsert(
-      parsedStudents, 
-      { onConflict: "student_code" }
-    );
+      // 2. Build DB Map for matching
+      const dbMap = new Map();
+      (activeStudents || []).forEach(s => dbMap.set(normalizeName(s.full_name), s));
 
-    if (error) {
-      setMsg("حدث خطأ أثناء الحفظ: " + error.message);
-    } else {
-      setMsg(`✅ تم تحديث بيانات ${parsedStudents.length} طالب بنجاح!`);
-      setParsedStudents(null);
+      // 3. Diffing logic
+      const updateList: any[] = [];
+      const insertList: any[] = [];
+      const sheetActiveKeys = new Set();
+
+      sheetData.forEach(row => {
+        const rawName = row["اسم الطالب"] || row["Name"] || row["الاسم"];
+        if (!rawName) return; // Skip empty names
+        
+        const normName = normalizeName(rawName);
+        const year = row["الفرقة"] || row["Level"] || row["السنة"] || "الأولى";
+        const section = row["السكشن"] || row["Section"] || row["المجموعة"] || "عام";
+
+        const existing = dbMap.get(normName);
+        if (existing) {
+          updateList.push({ ...existing, academic_year: year, section: section });
+          sheetActiveKeys.add(normName);
+        } else {
+          insertList.push({ full_name: rawName, academic_year: year, section: section, is_active: true });
+        }
+      });
+
+      const archiveList = (activeStudents || []).filter(s => !sheetActiveKeys.has(normalizeName(s.full_name)));
+
+      setPreviewData({ updateList, insertList, archiveList });
+      setMsg("");
+    } catch (err: any) {
+      setMsg("خطأ في تحليل البيانات: " + err.message);
     }
     setLoading(false);
   };
 
-  const handleRenewData = async () => {
-    if (!parsedStudents) return;
-    const confirmDelete = window.confirm("تحذير خطير: هذا الخيار سيقوم بحذف أي طالب موجود في النظام وغير موجود في هذا الشيت! سيؤدي هذا إلى حذف كل درجاتهم وغيابهم السابقة. هل أنت متأكد من رغبتك في إحلال وتجديد البيانات بالكامل؟");
-    if (!confirmDelete) return;
-
+  const executeSync = async () => {
+    if (!previewData) return;
     setLoading(true);
-    setMsg("جاري إحلال وتجديد البيانات بالكامل...");
+    setMsg("جاري تنفيذ العمليات، يرجى عدم إغلاق الشاشة...");
 
-    // 1. Get all existing student codes
-    const { data: existingStudents, error: fetchErr } = await supabase.from("students").select("student_code");
-    
-    if (fetchErr) {
-      setMsg("خطأ في جلب الطلاب الحاليين: " + fetchErr.message);
+    try {
+      // 1. Process Archive
+      if (previewData.archiveList.length > 0) {
+        const archiveIds = previewData.archiveList.map(s => s.id);
+        const { error: archiveErr } = await supabase.from("students").update({ is_active: false }).in("id", archiveIds);
+        if (archiveErr) throw new Error("خطأ أثناء الأرشفة: " + archiveErr.message);
+      }
+
+      // 2. Process Updates
+      if (previewData.updateList.length > 0) {
+        const { error: updateErr } = await supabase.from("students").upsert(
+          previewData.updateList.map(s => ({
+            id: s.id,
+            student_code: s.student_code,
+            full_name: s.full_name,
+            academic_year: s.academic_year,
+            section: s.section,
+            is_active: s.is_active,
+            created_at: s.created_at
+          })), 
+          { onConflict: "id" }
+        );
+        if (updateErr) throw new Error("خطأ أثناء التحديث: " + updateErr.message);
+      }
+
+      // 3. Process Inserts (Generate Codes)
+      if (previewData.insertList.length > 0) {
+        // Fetch all student codes to find max
+        const { data: allCodes } = await supabase.from("students").select("student_code");
+        let maxCode = 0;
+        (allCodes || []).forEach(s => {
+          if (s.student_code) {
+            const num = parseInt(s.student_code, 10);
+            if (!isNaN(num) && num > maxCode) maxCode = num;
+          }
+        });
+
+        const finalInsertData = previewData.insertList.map(s => {
+          maxCode++;
+          s.student_code = maxCode.toString().padStart(4, "0");
+          return s;
+        });
+
+        // Insert in batches of 1000 if necessary, but assume <1000 inserts per year
+        const { error: insertErr } = await supabase.from("students").insert(finalInsertData);
+        if (insertErr) throw new Error("خطأ أثناء الإضافة: " + insertErr.message);
+      }
+
+      setMsg(`تمت المزامنة بنجاح! تم إضافة ${previewData.insertList.length} وتحديث ${previewData.updateList.length} وأرشفة ${previewData.archiveList.length} طالب.`);
+      setPreviewData(null);
+      setSheetUrl("");
+    } catch (err: any) {
+      setMsg(err.message);
+    }
+    setLoading(false);
+  };
+
+  const handleExportPDF = async () => {
+    if (!exportYear) {
+      alert("الرجاء اختيار الفرقة أولاً");
+      return;
+    }
+    setLoading(true);
+    const { data: students } = await supabase.from("students").select("*").eq("is_active", true).eq("academic_year", exportYear);
+    if (!students || students.length === 0) {
+      alert("لا يوجد طلاب نشطين في هذه الفرقة.");
       setLoading(false);
       return;
     }
 
-    const newCodesSet = new Set(parsedStudents.map(s => s.student_code));
-    const codesToDelete = existingStudents.filter(s => !newCodesSet.has(s.student_code)).map(s => s.student_code);
+    // Group by section
+    const grouped: any = {};
+    students.forEach(s => {
+      if (!grouped[s.section]) grouped[s.section] = [];
+      grouped[s.section].push(s);
+    });
 
-    // 2. Delete students not in the sheet
-    if (codesToDelete.length > 0) {
-      setMsg(`جاري حذف ${codesToDelete.length} طالب قديم...`);
-      // Delete in batches of 1000 if necessary, but assuming small DB
-      const { error: delErr } = await supabase.from("students").delete().in("student_code", codesToDelete);
-      if (delErr) {
-        console.error(delErr);
-      }
+    // Sort sections numerically
+    const sortedSections = Object.keys(grouped).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+
+    let tableHtml = "";
+    sortedSections.forEach(section => {
+      const sectionStudents = grouped[section].sort((a: any, b: any) => a.full_name.localeCompare(b.full_name));
+      tableHtml += `
+        <h3 style="text-align: right; margin-top: 20px;">السكشن: ${section} (العدد: ${sectionStudents.length})</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>م</th>
+              <th>اسم الطالب</th>
+              <th>الكود</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sectionStudents.map((s: any, idx: number) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td>${s.full_name}</td>
+                <td style="font-weight: bold; letter-spacing: 2px;">${s.student_code}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    });
+
+    const finalHtml = generatePrintableHtml("الإدارة", "كشف أكواد الطلاب", `الفرقة: ${exportYear}`, tableHtml);
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(finalHtml);
+      printWindow.document.close();
     }
-
-    // 3. Upsert the new data
-    setMsg(`جاري إضافة/تحديث ${parsedStudents.length} طالب...`);
-    const { error: upsertErr } = await supabase.from("students").upsert(
-      parsedStudents, 
-      { onConflict: "student_code" }
-    );
-
-    if (upsertErr) {
-      setMsg("حدث خطأ أثناء التحديث: " + upsertErr.message);
-    } else {
-      setMsg(`✅ تمت عملية الإحلال والتجديد بنجاح! (حُذف ${codesToDelete.length} وحُدّث ${parsedStudents.length})`);
-      setParsedStudents(null);
-    }
-    
     setLoading(false);
   };
 
+  const handleExportExcel = async () => {
+    if (!exportYear) {
+      alert("الرجاء اختيار الفرقة أولاً");
+      return;
+    }
+    setLoading(true);
+    const { data: students } = await supabase.from("students").select("*").eq("is_active", true).eq("academic_year", exportYear);
+    if (!students || students.length === 0) {
+      alert("لا يوجد طلاب.");
+      setLoading(false);
+      return;
+    }
+
+    let csvContent = "\uFEFFالاسم,الكود,السكشن\n"; // \uFEFF for Arabic Excel support
+    students.forEach(s => {
+      csvContent += `${s.full_name},="${s.student_code}",${s.section}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `أكواد_الفرقة_${exportYear.replace(/\s+/g, '_')}.csv`;
+    link.click();
+    setLoading(false);
+  };
 
   if (!activeModal) return null;
 
@@ -174,72 +269,98 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
     <>
       {activeModal === "roster" && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
-          <div className="card" style={{ width: "90%", maxWidth: "420px", textAlign: "center", display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
-            <h3 style={{ color: "var(--success)", marginTop: 0 }}>📋 إدارة كشوف الطلاب المتقدمة</h3>
-            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "15px" }}>تحديث وإحلال قاعدة بيانات الطلاب عبر Google Sheets</p>
+          <div className="card" style={{ width: "90%", maxWidth: "500px", display: "flex", flexDirection: "column", maxHeight: "90vh", padding: 0, overflow: "hidden" }}>
+            
+            {/* Header Tabs */}
+            <div style={{ display: "flex", background: "#1e1e1e", borderBottom: "1px solid #333" }}>
+              <button onClick={() => setActiveTab("sync")} style={{ flex: 1, padding: "15px", background: activeTab === "sync" ? "#333" : "transparent", color: activeTab === "sync" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "sync" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}>مزامنة ذكية 🤖</button>
+              <button onClick={() => setActiveTab("export")} style={{ flex: 1, padding: "15px", background: activeTab === "export" ? "#333" : "transparent", color: activeTab === "export" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "export" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}>تصدير الكشوف 📥</button>
+            </div>
 
-            <div style={{ overflowY: "auto", flexGrow: 1 }}>
+            <div style={{ overflowY: "auto", padding: "20px", flexGrow: 1 }}>
               
-              <div style={{ background: "#1e1e1e", border: "1px solid var(--primary)", padding: "15px", borderRadius: "10px", marginBottom: "15px", textAlign: "right" }}>
-                <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--primary)", display: "block", marginBottom: "5px" }}>1. رابط شيت جوجل المفتوح:</label>
-                <p style={{ fontSize: "11px", color: "#bbb", margin: "0 0 10px 0" }}>قم بنسخ رابط الشيت وضعه هنا (تأكد أن إعدادات المشاركة Anyone with link can view).</p>
-                <input 
-                  type="text" 
-                  value={sheetUrl}
-                  onChange={(e) => setSheetUrl(e.target.value)}
-                  placeholder="https://docs.google.com/spreadsheets/d/..." 
-                  style={{ marginBottom: "10px", fontSize: "12px", width: "100%", direction: "ltr", textAlign: "left" }} 
-                  disabled={loading} 
-                />
-              </div>
+              {activeTab === "sync" && (
+                <>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "20px", textAlign: "center", lineHeight: "1.6" }}>
+                    قم برفع الشيت (الاسم، الفرقة، السكشن) <b>بدون أكواد</b>.<br/>سيقوم النظام آلياً بالاحتفاظ بأكواد الطلاب المستمرين وتوليد أكواد للمستجدين وأرشفة الخريجين.
+                  </p>
 
-              {!parsedStudents ? (
-                <button 
-                  onClick={parseGoogleSheet} 
-                  disabled={loading}
-                  style={{ background: "#2196F3", fontSize: "14px", fontWeight: "bold", margin: 0, width: "100%", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", padding: "12px" }}
-                >
-                  {loading ? <div className="loader-circle" style={{ width: "16px", height: "16px", borderWidth: "2px" }}></div> : "🔍"} 
-                  {loading ? "جاري الفحص..." : "فحص البيانات أولاً"}
-                </button>
-              ) : (
-                <div style={{ background: "#111", padding: "15px", borderRadius: "10px", border: "1px solid #4CAF50", marginBottom: "10px" }}>
-                  <div style={{ fontSize: "14px", fontWeight: "bold", color: "#4CAF50", marginBottom: "15px" }}>
-                    تم التعرف على {parsedStudents.length} طالب في الشيت
+                  <div style={{ background: "#1e1e1e", border: "1px solid var(--primary)", padding: "15px", borderRadius: "10px", marginBottom: "15px", textAlign: "right" }}>
+                    <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--primary)", display: "block", marginBottom: "5px" }}>رابط شيت جوجل (Anyone with link can view):</label>
+                    <input 
+                      type="text" 
+                      value={sheetUrl}
+                      onChange={(e) => setSheetUrl(e.target.value)}
+                      placeholder="https://docs.google.com/spreadsheets/d/..." 
+                      style={{ marginBottom: "10px", fontSize: "12px", width: "100%", direction: "ltr", textAlign: "left", padding: "10px", borderRadius: "5px", border: "1px solid #444", background: "#111", color: "#fff" }} 
+                      disabled={loading || !!previewData} 
+                    />
                   </div>
-                  
-                  <button 
-                    onClick={handleUpdateOnly} 
-                    disabled={loading}
-                    style={{ background: "#4CAF50", fontSize: "14px", fontWeight: "bold", marginBottom: "10px", width: "100%", padding: "12px" }}
-                  >
-                    🔄 تحديث البيانات فقط (آمن)
-                  </button>
-                  <p style={{ fontSize: "10px", color: "#888", marginBottom: "15px", textAlign: "right" }}>* سيتم تحديث بيانات الطلاب الحاليين وإضافة الطلاب الجدد، ولن يتم حذف أي طالب قديم من النظام.</p>
 
-                  <button 
-                    onClick={handleRenewData} 
-                    disabled={loading}
-                    style={{ background: "#F44336", fontSize: "14px", fontWeight: "bold", margin: 0, width: "100%", padding: "12px" }}
-                  >
-                    ⚠️ إحلال وتجديد كلي (خطر)
-                  </button>
-                  <p style={{ fontSize: "10px", color: "#888", marginTop: "5px", textAlign: "right" }}>* سيتم مسح أي طالب موجود في النظام وغير موجود في الشيت تماماً (بكل درجاته وحضوره)، واعتماد الشيت الجديد كلياً.</p>
+                  {!previewData ? (
+                    <button onClick={parseGoogleSheet} disabled={loading || !sheetUrl} style={{ background: "#2196F3", fontSize: "14px", fontWeight: "bold", width: "100%", padding: "12px", borderRadius: "5px", border: "none", color: "#fff", cursor: loading ? "not-allowed" : "pointer" }}>
+                      {loading ? "جاري المعالجة..." : "تحليل الشيت والمطابقة 🔍"}
+                    </button>
+                  ) : (
+                    <div style={{ background: "#111", padding: "15px", borderRadius: "10px", border: "1px solid #4CAF50", marginBottom: "10px" }}>
+                      <h4 style={{ color: "#4CAF50", margin: "0 0 15px 0", textAlign: "center" }}>نتيجة المطابقة الذكية</h4>
+                      <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px 0", fontSize: "14px", lineHeight: "2" }}>
+                        <li style={{ display: "flex", justifyContent: "space-between" }}><span>🟢 طلاب مستجدين (أكواد جديدة):</span> <b>{previewData.insertList.length}</b></li>
+                        <li style={{ display: "flex", justifyContent: "space-between" }}><span>🔵 طلاب مستمرين (تحديث فرقة):</span> <b>{previewData.updateList.length}</b></li>
+                        <li style={{ display: "flex", justifyContent: "space-between", color: "#f44336" }}><span>🔴 خريجين/منقولين (للأرشيف):</span> <b>{previewData.archiveList.length}</b></li>
+                      </ul>
+                      
+                      <button onClick={executeSync} disabled={loading} style={{ background: "#4CAF50", fontSize: "14px", fontWeight: "bold", width: "100%", padding: "12px", borderRadius: "5px", border: "none", color: "#fff", marginBottom: "10px", cursor: loading ? "not-allowed" : "pointer" }}>
+                        {loading ? "جاري الحفظ..." : "تأكيد وتنفيذ المزامنة ✅"}
+                      </button>
+                      <button onClick={() => setPreviewData(null)} disabled={loading} style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", width: "100%", padding: "10px", borderRadius: "5px", cursor: "pointer" }}>
+                        إلغاء
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
 
-                  <button onClick={() => setParsedStudents(null)} style={{ background: "transparent", color: "#888", border: "none", fontSize: "12px", marginTop: "15px", textDecoration: "underline" }}>
-                    إلغاء الفحص
-                  </button>
+              {activeTab === "export" && (
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "20px", lineHeight: "1.6" }}>
+                    بعد إتمام المزامنة، يمكنك تحميل كشوف الطلاب متضمنة الأكواد التي تم توليدها أو الاحتفاظ بها آلياً.
+                  </p>
+                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>اختر الفرقة المراد تصديرها:</label>
+                  <select 
+                    value={exportYear} 
+                    onChange={e => setExportYear(e.target.value)}
+                    style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #555", color: "#fff", borderRadius: "5px", marginBottom: "20px" }}
+                  >
+                    <option value="">-- اختر الفرقة --</option>
+                    <option value="الأولى">الفرقة الأولى</option>
+                    <option value="الثانية">الفرقة الثانية</option>
+                    <option value="الثالثة">الفرقة الثالثة</option>
+                    <option value="الرابعة">الفرقة الرابعة</option>
+                    <option value="تخلفات">تخلفات</option>
+                  </select>
+
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={handleExportPDF} disabled={loading} style={{ flex: 1, background: "#F44336", color: "#fff", border: "none", padding: "12px", borderRadius: "5px", fontWeight: "bold", cursor: "pointer" }}>
+                      تحميل PDF 📄
+                    </button>
+                    <button onClick={handleExportExcel} disabled={loading} style={{ flex: 1, background: "#4CAF50", color: "#fff", border: "none", padding: "12px", borderRadius: "5px", fontWeight: "bold", cursor: "pointer" }}>
+                      تحميل Excel 📊
+                    </button>
+                  </div>
                 </div>
               )}
 
               {msg && (
-                <div style={{ marginTop: "15px", fontSize: "13px", color: msg.includes("✅") ? "var(--success)" : "var(--warning)", textAlign: "center", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
+                <div style={{ marginTop: "15px", fontSize: "13px", color: msg.includes("بنجاح") ? "var(--success)" : "var(--warning)", textAlign: "center", background: "rgba(0,0,0,0.2)", padding: "10px", borderRadius: "8px" }}>
                   {msg}
                 </div>
               )}
             </div>
 
-            <button className="secondary" onClick={onClose} style={{ width: "100%", marginTop: "15px" }}>إغلاق</button>
+            <div style={{ padding: "15px", background: "#1e1e1e", borderTop: "1px solid #333" }}>
+              <button className="secondary" onClick={onClose} style={{ width: "100%", margin: 0 }}>إغلاق</button>
+            </div>
           </div>
         </div>
       )}
