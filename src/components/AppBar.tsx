@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import NotificationsModal from "./NotificationsModal";
 
 interface AppBarProps {
   user: any;
@@ -14,6 +16,8 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
 
   const [updateProgress, setUpdateProgress] = useState(0);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -98,8 +102,16 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
     };
     checkVersion();
 
-    return () => clearInterval(interval);
-  }, []);
+    const fetchUnread = async () => {
+      if (!user?.id) return;
+      const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_read', false);
+      if (count !== null) setUnreadCount(count);
+    };
+    fetchUnread();
+    const notifInterval = setInterval(fetchUnread, 30000); // Check every 30s
+
+    return () => { clearInterval(interval); clearInterval(notifInterval); };
+  }, [user]);
 
 
   return (
@@ -187,8 +199,29 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
         </div>
       </div>
 
-      {/* Left: Settings Button */}
-      <div style={{ flex: 1, display: "flex", justifyContent: "flex-end" }}>
+      {/* Left: Settings Button & Notifications */}
+      <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+        <button
+          onClick={() => { setIsNotificationsOpen(true); setUnreadCount(0); }}
+          style={{
+            background: "rgba(255, 255, 255, 0.05)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            color: "#e0e0e0",
+            padding: "8px",
+            borderRadius: "50%",
+            fontSize: "16px",
+            cursor: "pointer",
+            position: "relative"
+          }}
+        >
+          🔔
+          {unreadCount > 0 && (
+            <span style={{ position: "absolute", top: "-2px", right: "-2px", background: "#f44336", color: "#fff", fontSize: "10px", width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={onOpenSettings}
           style={{
@@ -208,10 +241,11 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
           }}
         >
           <span style={{ fontSize: "16px" }}>⚙️</span> 
-          <span>إعدادات</span>
+          <span className="hide-on-mobile">إعدادات</span>
         </button>
       </div>
     </div>
+    <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} user={user} />
     </>
   );
 }

@@ -88,7 +88,24 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
       // Update request status
       await supabase.from("course_share_requests").update({ status: "approved" }).eq("id", request.id);
       
-      alert("تمت إضافة الزملاء للمقرر بنجاح");
+      // Send notifications
+      const notifs = [];
+      const courseName = request.courses?.name || "المقرر";
+      notifs.push({
+        user_id: request.requester_id,
+        title: "قبول طلب المشاركة 🤝",
+        message: `تمت الموافقة على طلبك بنجاح. تمت إضافة الزملاء للمقرر: ${courseName}. جميع البيانات الآن أصبحت مشتركة.`
+      });
+      for(const col of colleagues) {
+        notifs.push({
+          user_id: col,
+          title: "إضافة لمقرر مشترك 🤝",
+          message: `تمت إضافتك للمقرر المشترك: ${courseName} بناءً على طلب الزميل. يرجى العلم أن أي تعديل في الغياب أو الدرجات سيطبق عند كلا الطرفين.`
+        });
+      }
+      await supabase.from("notifications").insert(notifs);
+
+      alert("تمت إضافة الزملاء وإرسال الإشعارات بنجاح");
       fetchShareRequests();
     }
     setLoading(false);
