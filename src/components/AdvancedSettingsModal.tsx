@@ -28,8 +28,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   const [searchQuery, setSearchQuery] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchResult, setSearchResult] = useState<any>(null);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -39,10 +38,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
 
   useEffect(() => {
     if (!isOpen || activeTab !== "search") {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
-      }
       setIsScanning(false);
     }
   }, [isOpen, activeTab]);
@@ -124,109 +119,88 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   };
 
   const toggleScanner = () => {
-    if (isScanning) {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
-      }
-      setIsScanning(false);
-    } else {
-      setIsScanning(true);
-      setTimeout(() => {
-        const scanner = new Html5QrcodeScanner(
-          "global-reader",
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          false
-        );
-        scannerRef.current = scanner;
-        scanner.render(
-          (text) => {
-            scanner.clear();
-            scannerRef.current = null;
-            setIsScanning(false);
-            const studentCode = extractStudentCode(text);
-            setSearchQuery(studentCode);
-            performGlobalSearch(studentCode);
-          },
-          (err) => {
-            // ignore
-          }
-        );
-      }, 100);
-    }
+    setIsScanning(!isScanning);
   };
 
   const performGlobalSearch = async (query: string) => {
     if (!query.trim()) return;
     setSearchLoading(true);
-    setSearchResult(null);
+    setSearchResults(null);
 
-    // 1. Find Student (First by code, then by name)
+    let q = query.trim();
+    if (/^\d+$/.test(q) && q.length < 4) {
+      q = q.padStart(4, '0');
+    }
+
+    // 1. Find Student(s) (First by code, then by name)
     let { data: students } = await supabase
       .from('students')
       .select('*')
-      .eq('student_code', query)
-      .limit(1);
+      .eq('student_code', q)
+      .eq('is_active', true);
 
     if (!students || students.length === 0) {
       const { data: studentsByName } = await supabase
         .from('students')
         .select('*')
-        .ilike('full_name', `%${query}%`)
-        .limit(1);
+        .ilike('full_name', `%${q}%`)
+        .eq('is_active', true);
       students = studentsByName;
     }
 
     if (!students || students.length === 0) {
-      alert("لم يتم العثور على طالب بهذا الكود أو الاسم.");
+      alert("لم يتم العثور على طالب نشط بهذا الكود أو الاسم.");
       setSearchLoading(false);
       return;
     }
 
-    const student = students[0];
+    const results = [];
 
-    // 2. Fetch all courses
+    // 2. Fetch all courses once
     const { data: courses } = await supabase.from('courses').select('id, name');
     const coursesMap = new Map((courses || []).map(c => [c.id, c.name]));
 
-    // 3. Fetch attendance
-    const { data: attendance } = await supabase
-      .from('attendance')
-      .select('course_id, status')
-      .eq('student_id', student.id);
+    for (const student of students) {
+      // 3. Fetch attendance
+      const { data: attendance } = await supabase
+        .from('attendance')
+        .select('course_id, status')
+        .eq('student_id', student.id);
 
-    // 4. Fetch evaluations
-    const { data: evaluations } = await supabase
-      .from('evaluations')
-      .select('course_id, project_name, score')
-      .eq('student_id', student.id);
+      // 4. Fetch evaluations
+      const { data: evaluations } = await supabase
+        .from('evaluations')
+        .select('course_id, project_name, score')
+        .eq('student_id', student.id);
 
-    // Aggregate data by course
-    const courseStats = new Map<string, any>();
+      // Aggregate data by course
+      const courseStats = new Map<string, any>();
 
-    (attendance || []).forEach(att => {
-      const courseId = att.course_id;
-      if (!courseStats.has(courseId)) {
-        courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
-      }
-      if (att.status === 'غائب') {
-        courseStats.get(courseId).totalAbsences += 1;
-      }
-    });
+      (attendance || []).forEach(att => {
+        const courseId = att.course_id;
+        if (!courseStats.has(courseId)) {
+          courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
+        }
+        if (att.status === 'غائب') {
+          courseStats.get(courseId).totalAbsences += 1;
+        }
+      });
 
-    (evaluations || []).forEach(ev => {
-      const courseId = ev.course_id;
-      if (!courseStats.has(courseId)) {
-        courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
-      }
-      courseStats.get(courseId).evaluations.push({ project_name: ev.project_name, score: ev.score });
-    });
+      (evaluations || []).forEach(ev => {
+        const courseId = ev.course_id;
+        if (!courseStats.has(courseId)) {
+          courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
+        }
+        courseStats.get(courseId).evaluations.push({ project_name: ev.project_name, score: ev.score });
+      });
 
-    setSearchResult({
-      student,
-      courses: Array.from(courseStats.values())
-    });
+      results.push({
+        student,
+        courses: Array.from(courseStats.values())
+      });
+    }
 
+    setSearchResults(results);
     setSearchLoading(false);
   };
 
@@ -487,21 +461,24 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                 </button>
               </div>
 
-              <div style={{ display: isScanning ? "block" : "none", marginBottom: "20px" }}>
-                <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <QRScanner onScan={(result) => { if(result) { performGlobalSearch(extractStudentCode(result)); setIsScanning(false); } }} />
+              {isScanning && (
+                <div style={{ marginBottom: "20px" }}>
+                  <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <QRScanner onScan={(result) => { if(result) { performGlobalSearch(extractStudentCode(result)); setIsScanning(false); } }} />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* نتائج البحث */}
-              {searchResult && (
-                <div style={{ textAlign: "right", marginTop: "20px" }}>
+              {searchResults && searchResults.map((searchResult, sIdx) => (
+                <div key={sIdx} style={{ textAlign: "right", marginTop: "20px", paddingBottom: "20px", borderBottom: sIdx !== searchResults.length - 1 ? "2px dashed #444" : "none" }}>
                   <div style={{ background: "#333", padding: "20px", borderRadius: "8px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <h2 style={{ margin: "0 0 5px 0", color: "#fff" }}>{searchResult.student.full_name}</h2>
                       <div style={{ color: "#aaa" }}>
                         الكود: <strong style={{ color: "#fff" }}>{searchResult.student.student_code}</strong> | 
-                        الفرقة: <strong style={{ color: "#fff" }}>{searchResult.student.academic_year}</strong>
+                        الفرقة: <strong style={{ color: "#fff" }}>{searchResult.student.academic_year}</strong> |
+                        السكشن: <strong style={{ color: "#fff" }}>{searchResult.student.section}</strong>
                       </div>
                     </div>
                   </div>
@@ -547,7 +524,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                     </div>
                   )}
                 </div>
-              )}
+              ))}
             </div>
           </div>
         )}

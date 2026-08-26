@@ -1,11 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [message, setMessage] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const isAdminRef = useRef(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
         if (profile && (profile.role === 'مدير' || profile.role === 'admin' || profile.role === 'أدمن')) {
           setIsAdmin(true);
+          isAdminRef.current = true;
         }
       }
 
@@ -28,7 +30,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
       if (settings) {
         currentIsMaintenance = settings.is_maintenance_mode || false;
         setIsMaintenance(currentIsMaintenance);
-        setMessage(settings.maintenance_message || "التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار...");
+        setMessage(settings.maintenance_message || "تطبيقنا يخضع لعملية صيانة حالياً. نرجو المحاولة لاحقاً...");
       }
       setLoading(false);
     };
@@ -44,10 +46,10 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         (payload) => {
           const newData = payload.new;
           setIsMaintenance(newData.is_maintenance_mode || false);
-          setMessage(newData.maintenance_message || "التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار...");
+          setMessage(newData.maintenance_message || "تطبيقنا يخضع لعملية صيانة حالياً. نرجو المحاولة لاحقاً...");
           
           // Force reload for normal users when maintenance ends to get new app version
-          if (currentIsMaintenance && !newData.is_maintenance_mode && !isAdmin) {
+          if (currentIsMaintenance && !newData.is_maintenance_mode && !isAdminRef.current) {
              window.location.reload();
           }
           currentIsMaintenance = newData.is_maintenance_mode;
@@ -58,7 +60,7 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
+  }, []);
 
   if (loading) return null; 
 
