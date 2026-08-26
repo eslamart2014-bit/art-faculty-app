@@ -148,7 +148,14 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
           }}
         >
           <div>
-            <h3 style={{ margin: "0 0 5px 0", color: "#fff", fontSize: "16px" }}>{course.name}</h3>
+            <h3 style={{ margin: "0 0 5px 0", color: "#fff", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              {course.name}
+              {course.created_at && (
+                <span style={{ fontSize: "10px", background: "#333", padding: "2px 6px", borderRadius: "10px", color: "#aaa", fontWeight: "normal" }}>
+                  {new Date(course.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </h3>
             <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
               الفرقة {course.academic_year} • {course.course_type === "lectures" ? "محاضرات" : `سكاشن: ${course.sections.join(", ")}`}
             </div>
