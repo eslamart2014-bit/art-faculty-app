@@ -25,6 +25,21 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
 
   // Export state
   const [exportYear, setExportYear] = useState("");
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (activeTab === "export") {
+      fetchUniqueYears();
+    }
+  }, [activeTab]);
+
+  const fetchUniqueYears = async () => {
+    const { data } = await supabase.from("students").select("academic_year").eq("is_active", true);
+    if (data) {
+      const years = Array.from(new Set(data.map(d => d.academic_year)));
+      setAvailableYears(years.filter(Boolean));
+    }
+  };
 
   const normalizeName = (name: string) => {
     if (!name) return "";
@@ -202,32 +217,34 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
     const sortedSections = Object.keys(grouped).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
 
     let tableHtml = "";
-    sortedSections.forEach(section => {
+    sortedSections.forEach((section, index) => {
       const sectionStudents = grouped[section].sort((a: any, b: any) => a.full_name.localeCompare(b.full_name));
       tableHtml += `
-        <h3 style="text-align: right; margin-top: 20px;">السكشن: ${section} (العدد: ${sectionStudents.length})</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>م</th>
-              <th>اسم الطالب</th>
-              <th>الكود</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${sectionStudents.map((s: any, idx: number) => `
+        <div style="${index > 0 ? 'page-break-before: always;' : ''}">
+          <h3 style="text-align: right; margin-top: 20px;">السكشن: ${section} (العدد: ${sectionStudents.length})</h3>
+          <table>
+            <thead>
               <tr>
-                <td>${idx + 1}</td>
-                <td>${s.full_name}</td>
-                <td style="font-weight: bold; letter-spacing: 2px;">${s.student_code}</td>
+                <th>م</th>
+                <th>اسم الطالب</th>
+                <th>الكود</th>
               </tr>
-            `).join("")}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${sectionStudents.map((s: any, idx: number) => `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td>${s.full_name}</td>
+                  <td style="font-weight: bold; letter-spacing: 2px;">${s.student_code}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
       `;
     });
 
-    const finalHtml = generatePrintableHtml("الإدارة", "كشف أكواد الطلاب", `الفرقة: ${exportYear}`, tableHtml);
+    const finalHtml = generatePrintableHtml("", "كشف أكواد الطلاب", `الفرقة: ${exportYear}`, tableHtml, "الإدارة");
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(finalHtml);
@@ -333,11 +350,9 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                     style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #555", color: "#fff", borderRadius: "5px", marginBottom: "20px" }}
                   >
                     <option value="">-- اختر الفرقة --</option>
-                    <option value="الأولى">الفرقة الأولى</option>
-                    <option value="الثانية">الفرقة الثانية</option>
-                    <option value="الثالثة">الفرقة الثالثة</option>
-                    <option value="الرابعة">الفرقة الرابعة</option>
-                    <option value="تخلفات">تخلفات</option>
+                    {availableYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
                   </select>
 
                   <div style={{ display: "flex", gap: "10px" }}>

@@ -52,7 +52,7 @@ export const generatePrintableHtml = (
                   </div>
                   <div style="text-align: left;">
                     ${instructorName}<br/>
-                    مقرر: ${courseName}
+                    ${courseName ? `مقرر: ${courseName}` : ''}
                   </div>
                 </div>
                 <div class="title-container">
