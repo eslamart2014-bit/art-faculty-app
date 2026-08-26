@@ -48,8 +48,11 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
       .order("created_at", { ascending: false });
 
     if (data && !error) {
-      // Filter out archived courses
-      const activeCourses = data.filter(c => !c.custom_week_names?.__archived);
+      // Filter out archived courses and courses hidden for this user
+      const activeCourses = data.filter(c => 
+        !c.custom_week_names?.__archived && 
+        !(c.custom_week_names?.__hidden_for || []).includes(user.id)
+      );
       setCourses(activeCourses);
     }
     setLoading(false);
@@ -101,27 +104,42 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     setCourseToDelete(course);
   };
 
-  const handleArchive = async () => {
+  const handleArchiveGlobal = async () => {
     if (!courseToDelete) return;
     const currentCustom = courseToDelete.custom_week_names || {};
-    const updatedCustom = {
-      ...currentCustom,
-      __archived: true
-    };
+    const updatedCustom = { ...currentCustom, __archived: true };
 
-    // Optimistic UI update (removes it from view)
     setCourses(courses.filter(c => c.id !== courseToDelete.id));
     
-    // Create archive record
     await supabase.from("archives").insert({
       user_id: user?.id,
       item_type: "course",
-      description: `حذف مقرر: ${courseToDelete.name}`,
+      description: `حذف مقرر للجميع: ${courseToDelete.name}`,
       original_data: { course_id: courseToDelete.id }
     });
 
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
-    
+    setCourseToDelete(null);
+  };
+
+  const handleDeleteForMeOnly = async () => {
+    if (!courseToDelete) return;
+    const currentCustom = courseToDelete.custom_week_names || {};
+    const hiddenFor = currentCustom.__hidden_for || [];
+    const updatedCustom = { ...currentCustom, __hidden_for: [...hiddenFor, user.id] };
+
+    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
+    setCourseToDelete(null);
+  };
+
+  const handleLeaveCourse = async () => {
+    if (!courseToDelete) return;
+    const sharedWith = courseToDelete.shared_with || [];
+    const newShared = sharedWith.filter((id: string) => id !== user.id);
+
+    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    await supabase.from("courses").update({ shared_with: newShared }).eq("id", courseToDelete.id);
     setCourseToDelete(null);
   };
 
@@ -343,10 +361,33 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
             </p>
             
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button 
-                onClick={handleArchive}
-                style={{ width: "100%", padding: "12px", background: "#f44336", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
-              >حذف المقرر (نقل للأرشيف)</button>
+              {courseToDelete.teacher_id === user.id ? (
+                // Owner
+                courseToDelete.shared_with && courseToDelete.shared_with.length > 0 ? (
+                  <>
+                    <button 
+                      onClick={handleDeleteForMeOnly}
+                      style={{ width: "100%", padding: "12px", background: "#FF9800", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                    >حذف لدي فقط (يبقى للزملاء)</button>
+                    <button 
+                      onClick={handleArchiveGlobal}
+                      style={{ width: "100%", padding: "12px", background: "#f44336", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                    >حذف عند الجميع (نقل للأرشيف)</button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={handleArchiveGlobal}
+                    style={{ width: "100%", padding: "12px", background: "#f44336", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                  >حذف المقرر (نقل للأرشيف)</button>
+                )
+              ) : (
+                // Colleague
+                <button 
+                  onClick={handleLeaveCourse}
+                  style={{ width: "100%", padding: "12px", background: "#FF9800", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                >حذف من قائمتي (انسحاب من المقرر)</button>
+              )}
+
               <button 
                 onClick={() => setCourseToDelete(null)}
                 style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "none", cursor: "pointer", marginTop: "10px" }}
