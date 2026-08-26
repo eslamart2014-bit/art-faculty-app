@@ -23,9 +23,21 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [colleagueName, setColleagueName] = useState("");
   const [isSharing, setIsSharing] = useState(false);
 
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+
   useEffect(() => {
     fetchCourses();
+    fetchProfiles();
   }, [user.id, refreshTrigger]);
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase.from("profiles").select("id, full_name");
+    if (data) {
+      const map: Record<string, string> = {};
+      data.forEach(p => map[p.id] = p.full_name);
+      setProfilesMap(map);
+    }
+  };
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -183,7 +195,11 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
               )}
               {course.shared_with && course.shared_with.length > 0 && (
                 <span style={{ fontSize: "10px", background: "#4CAF50", padding: "2px 6px", borderRadius: "10px", color: "#fff", fontWeight: "normal" }}>
-                  🤝 مشترك
+                  🤝 مشترك مع {
+                    course.teacher_id === user.id 
+                    ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join(" و ")
+                    : profilesMap[course.teacher_id] || "الزميل"
+                  }
                 </span>
               )}
             </h3>
