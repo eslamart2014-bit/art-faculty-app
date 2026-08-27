@@ -23,8 +23,16 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userE
     setLoading(true);
     setError("");
 
-    // We verify the password by attempting to sign in with it
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+    // We verify the password by attempting to sign in with a temporary client
+    // that does NOT persist the session, so it doesn't log out the admin/current user.
+    const { createClient } = await import("@supabase/supabase-js");
+    const tempClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { data, error: signInError } = await tempClient.auth.signInWithPassword({
       email: userEmail,
       password: password,
     });
