@@ -78,9 +78,15 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     if (!confirm(`هل أنت متأكد من حذف الحساب نهائياً؟\nالاسم: ${user.full_name}`)) return;
     
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ action: 'delete_user', userId: user.id, adminId: adminUser.id })
       });
       const data = await res.json();
@@ -106,9 +112,15 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     for (let i = 0; i < 10; i++) newPass += chars.charAt(Math.floor(Math.random() * chars.length));
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
       const res = await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ action: 'change_password', userId: user.id, newPassword: newPass, adminId: adminUser.id })
       });
       const data = await res.json();

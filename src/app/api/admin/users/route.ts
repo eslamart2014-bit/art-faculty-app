@@ -17,8 +17,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing adminId' }, { status: 401 });
     }
 
-    // Bypass ALL role/profile checks temporarily to guarantee password reset works.
-    // The frontend already hides this feature from non-admins.
+    // Verify Authorization Header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    // Validate the token and get the user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
+    // Check if the user is an admin in the database
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile || profile.role !== 'مدير') {
+      return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    // Pass security checks, proceed with action
 
     if (action === 'change_password') {
       if (!userId || !newPassword) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
