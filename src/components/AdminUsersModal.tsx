@@ -17,6 +17,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   const [inviting, setInviting] = useState(false);
   
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [generatedPasswordData, setGeneratedPasswordData] = useState<{pass: string, email: string} | null>(null);
 
   useEffect(() => {
     if (isOpen && adminUser) {
@@ -97,12 +98,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   };
 
   const handleChangePassword = async (user: any) => {
-    const newPass = prompt(`أدخل كلمة المرور الجديدة للحساب:\n${user.email}`);
-    if (!newPass) return;
-    if (newPass.length < 6) {
-      alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
-      return;
-    }
+    if (!confirm(`هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم:\n${user.full_name || user.email}؟`)) return;
+
+    // Auto-generate a secure 10-char password
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
+    let newPass = "";
+    for (let i = 0; i < 10; i++) newPass += chars.charAt(Math.floor(Math.random() * chars.length));
 
     try {
       const res = await fetch('/api/admin/users', {
@@ -112,8 +113,8 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
       });
       const data = await res.json();
       if (data.success) {
-        alert(`تم تغيير كلمة المرور بنجاح إلى:\n${newPass}\n\nيرجى إعطاؤها للمستخدم.`);
-        fetchData(); // to clear locks if any
+        setGeneratedPasswordData({ pass: newPass, email: user.email });
+        fetchData();
       } else {
         alert("خطأ: " + data.error);
       }
@@ -278,6 +279,35 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
           )}
         </div>
       </div>
+
+      {generatedPasswordData && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.8)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+        }} onClick={() => setGeneratedPasswordData(null)}>
+          <div style={{ background: "#222", padding: "20px", borderRadius: "10px", width: "90%", maxWidth: "350px", textAlign: "center", border: "1px solid #4CAF50" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: "#4CAF50", marginTop: 0 }}>تم إنشاء كلمة مرور جديدة</h3>
+            <p style={{ color: "#aaa", fontSize: "13px" }}>للحساب: <br/><strong>{generatedPasswordData.email}</strong></p>
+            
+            <div style={{ background: "#111", padding: "15px", borderRadius: "8px", border: "1px dashed #555", margin: "20px 0", fontSize: "24px", letterSpacing: "2px", fontWeight: "bold", userSelect: "all" }}>
+              {generatedPasswordData.pass}
+            </div>
+
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(`البريد: ${generatedPasswordData.email}\nكلمة المرور: ${generatedPasswordData.pass}`);
+                alert("تم النسخ بنجاح!");
+              }}
+              style={{ width: "100%", padding: "12px", background: "#2196F3", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginBottom: "10px" }}
+            >📋 نسخ بيانات الدخول</button>
+
+            <button 
+              onClick={() => setGeneratedPasswordData(null)}
+              style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "1px solid #555", borderRadius: "8px", cursor: "pointer" }}
+            >إغلاق</button>
+          </div>
+        </div>
+      )}
       
       <style>{`
         @keyframes slideDown {
