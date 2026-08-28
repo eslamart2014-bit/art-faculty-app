@@ -1322,14 +1322,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                   
                   {editProjectIsActive && (
                     <>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: "block", color: "#aaa", fontSize: "10px", marginBottom: "2px" }}>من يوم:</label>
-                          <input type="datetime-local" value={editProjectStartDate} onChange={e => setEditProjectStartDate(e.target.value)} style={{ width: "100%", padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "11px" }} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div>
+                          <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>من تاريخ:</label>
+                          <input type="datetime-local" value={editProjectStartDate} onChange={e => setEditProjectStartDate(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} />
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: "block", color: "#aaa", fontSize: "10px", marginBottom: "2px" }}>إلى يوم:</label>
-                          <input type="datetime-local" value={editProjectEndDate} onChange={e => setEditProjectEndDate(e.target.value)} style={{ width: "100%", padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "11px" }} />
+                        <div>
+                          <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>إلى تاريخ:</label>
+                          <input type="datetime-local" value={editProjectEndDate} onChange={e => setEditProjectEndDate(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} />
                         </div>
                       </div>
 
