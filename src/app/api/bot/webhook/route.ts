@@ -41,17 +41,17 @@ export async function POST(request: Request) {
       const firstName = update.message.from.first_name || 'طالبنا العزيز';
 
       // --- Admin "Login as Student" Reply Handler ---
-      if (update.message.reply_to_message && update.message.reply_to_message.text.includes('يرجى كتابة (كود الطالب) أو (رقم الجلوس)')) {
+      if (update.message.reply_to_message && update.message.reply_to_message.text.includes('يرجى كتابة (كود الطالب)')) {
         const studentCode = text;
         
         // Fetch student from DB
-        const { data: student } = await supabase.from('students').select('*').eq('code', studentCode).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
         
         if (!student) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `عفواً أيها المدير، لم أتمكن من العثور على طالب بالكود: ${studentCode}` });
         }
 
-        const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.code}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (بدون أي تعارض مع حسابه الحقيقي). ماذا تريد أن تفعل؟`;
+        const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.student_code}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (بدون أي تعارض مع حسابه الحقيقي). ماذا تريد أن تفعل؟`;
         return NextResponse.json({
           method: 'sendMessage',
           chat_id: chatId,
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           method: 'sendMessage',
           chat_id: chatId,
-          text: 'يرجى كتابة (كود الطالب) أو (رقم الجلوس) الذي تود محاكاة حسابه:',
+          text: 'يرجى كتابة (كود الطالب) الذي تود محاكاة حسابه:',
           reply_markup: { force_reply: true, selective: true }
         });
       }
