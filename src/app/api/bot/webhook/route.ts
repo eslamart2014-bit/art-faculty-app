@@ -24,29 +24,45 @@ export async function POST(request: Request) {
         let replyText = '';
         let replyMarkup = null;
 
-        if (payload === 'student') {
-          replyText = `مرحباً بك يا ${firstName} في بوابة كلية التربية الفنية 🎨\n\nأنت الآن في (بوابة الطلاب).\nلربط حسابك الأكاديمي، يرجى الضغط على الزر بالأسفل للبحث عن اسمك.`;
-          replyMarkup = {
-            inline_keyboard: [
-              [{ text: '🔍 البحث عن اسمي وربط الحساب', callback_data: 'student_link_account' }]
-            ]
-          };
-        } else if (payload === 'staff') {
-          replyText = `مرحباً بك د. ${firstName} 🎓\n\nأنت الآن في (بوابة المعلمين والإدارة).\nلربط حسابك الأكاديمي، يرجى إدخال (البريد الإلكتروني) الخاص بك على النظام:`;
-          replyMarkup = {
-            inline_keyboard: [
-              [{ text: '🔐 تسجيل الدخول بالبريد الإلكتروني', callback_data: 'staff_login' }]
-            ]
-          };
+        if (payload) {
+          // Check if payload is a teacher token
+          const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_link_token', payload).maybeSingle();
+          
+          if (profile) {
+            // Link successful!
+            await supabase.from('profiles').update({ 
+              telegram_id: update.message.from.id,
+              telegram_link_token: null // invalidate token
+            }).eq('id', profile.id);
+            
+            const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
+            replyText = `مرحباً بك د. ${profile.full_name} 🎓\n\nلقد تم ربط حسابك الأكاديمي بنجاح بصلاحية (${roleName}).\n\nيمكنك الآن استلام إشعارات النظام، وتصفح أعمال الطلاب مباشرة من هنا!`;
+            replyMarkup = {
+              inline_keyboard: [
+                [{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }],
+                [{ text: '⚙️ إعدادات الإشعارات', callback_data: 'staff_settings' }]
+              ]
+            };
+          } else {
+            // Check if it's a student token (we will build this later)
+            replyText = `عفواً، رابط التفعيل منتهي الصلاحية أو غير صحيح. يرجى توليد رابط جديد من لوحة التحكم.`;
+          }
         } else {
-          // Generic start (without deep link)
-          replyText = `مرحباً بك في البوابة الذكية لكلية التربية الفنية 🎨🎓\n\nيرجى تحديد هويتك للبدء:`;
-          replyMarkup = {
-            inline_keyboard: [
-              [{ text: '👨‍🎓 الدخول كـ (طالب)', callback_data: 'select_role_student' }],
-              [{ text: '👨‍🏫 الدخول كـ (معلم / إدارة)', callback_data: 'select_role_staff' }]
-            ]
-          };
+          // No payload? Check if they are ALREADY linked!
+          const { data: existingProfile } = await supabase.from('profiles').select('*').eq('telegram_id', update.message.from.id).maybeSingle();
+          
+          if (existingProfile) {
+            const roleName = existingProfile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
+            replyText = `أهلاً بعودتك د. ${existingProfile.full_name} 🎓 (${roleName})\n\nكيف يمكنني مساعدتك اليوم؟`;
+            replyMarkup = {
+              inline_keyboard: [
+                [{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]
+              ]
+            };
+          } else {
+            // Generic start
+            replyText = `مرحباً بك في البوابة الذكية لكلية التربية الفنية 🎨🎓\n\nيبدو أن حسابك غير مربوط بالنظام.\nإذا كنت معلماً، يرجى الدخول لموقع الكلية والضغط على زر (ربط تليجرام) من إعدادات حسابك.`;
+          }
         }
 
         // Return direct JSON to Telegram to send the message instantly!
