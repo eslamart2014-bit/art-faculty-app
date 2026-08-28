@@ -160,154 +160,90 @@ export async function POST(request: Request) {
       const data = callbackQuery.data;
       const tgUserId = callbackQuery.from.id;
 
-      // First, get the profile of the user clicking
-      const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_id', tgUserId).maybeSingle();
-      if (!profile) {
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل.' });
-      }
+      // =====================================================
+      // STUDENT ACTIONS — no profile needed (students not in profiles table)
+      // =====================================================
 
-      // --- ADMIN LOGIN AS STUDENT ---
-      if (data === 'admin_login_student' && profile.role === 'مدير') {
-        return NextResponse.json({
-          method: 'sendMessage',
-          chat_id: chatId,
-          text: 'يرجى كتابة (كود الطالب) الذي تود محاكاة حسابه:',
-          reply_markup: { force_reply: true, selective: true }
-        });
-      }
-
-      // --- STUDENT CONFIRMATION BUTTONS ---
       if (data === 'cancel_link') {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إلغاء عملية الربط.' });
       }
 
       if (data.startsWith('confirm_link_')) {
-        // format: confirm_link_{studentUUID}_{browserId}
         const withoutPrefix = data.slice('confirm_link_'.length);
-        const studentId = withoutPrefix.slice(0, 36); // UUID = 36 chars
-        const browserId = withoutPrefix.length > 37 ? withoutPrefix.slice(37) : ''; // optional browser fingerprint
-
-        // 1. Verify student exists and is still not linked
+        const studentId = withoutPrefix.slice(0, 36);
+        const browserId = withoutPrefix.length > 37 ? withoutPrefix.slice(37) : '';
         const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
-        if (!student) {
-          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: لم يتم العثور على الطالب.' });
-        }
-        if (student.telegram_id && student.telegram_id !== chatId) {
-          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: هذا الطالب مربوط بحساب آخر.' });
-        }
-
-        // 2. Link account
-        await supabase.from('students').update({
-          telegram_id: chatId,
-          telegram_username: callbackQuery.from.username || null,
-          telegram_first_name: callbackQuery.from.first_name || null,
-          telegram_browser_id: browserId || null
-        }).eq('id', student.id);
-
-        return NextResponse.json({
-          method: 'sendMessage',
-          chat_id: chatId,
-          text: `تم التأكيد! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم قفل هذا الحساب على اسمك بنجاح ✅\nيمكنك الآن استخدامه لرفع أعمالك.`,
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '📸 رفع عمل جديد', callback_data: `student_upload` }],
-              [{ text: '📁 معرض أعمالي', callback_data: `student_gallery` }]
-            ]
-          }
-        });
+        if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: لم يتم العثور على الطالب.' });
+        if (student.telegram_id && student.telegram_id !== chatId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: هذا الطالب مربوط بحساب آخر.' });
+        await supabase.from('students').update({ telegram_id: chatId, telegram_username: callbackQuery.from.username || null, telegram_first_name: callbackQuery.from.first_name || null, telegram_browser_id: browserId || null }).eq('id', student.id);
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `تم التأكيد! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم قفل هذا الحساب على اسمك بنجاح ✅\nيمكنك الآن استخدامه لرفع أعمالك.`, reply_markup: { inline_keyboard: [[{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],[{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }]] } });
       }
 
-      // --- STUDENT & SIMULATION UPLOAD FLOW ---
-      let studentIdForAction = null;
-      if (data === 'student_upload') {
-        const { data: s } = await supabase.from('students').select('id').eq('telegram_id', chatId).maybeSingle();
-        if (s) studentIdForAction = s.id;
-      } else if (data.startsWith('sim_upload_')) {
-        studentIdForAction = data.replace('sim_upload_', '');
+      if (data === 'student_gallery') {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'معرض أعمالك (قيد التطوير) 🚧' });
       }
 
-      if (studentIdForAction) {
-        // Fetch Student
+      // student_upload OR sim_upload_ → show courses
+      if (data === 'student_upload' || data.startsWith('sim_upload_')) {
+        const studentIdForAction = data === 'student_upload'
+          ? (await supabase.from('students').select('id').eq('telegram_id', chatId).maybeSingle()).data?.id
+          : data.replace('sim_upload_', '');
+        if (!studentIdForAction) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على حسابك. يرجى التسجيل أولاً.' });
         const { data: student } = await supabase.from('students').select('*').eq('id', studentIdForAction).maybeSingle();
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على الطالب.' });
-
-        // Fetch Courses matching academic_year
         const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
-                                          
-        if (!courses || courses.length === 0) {
-           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لفرقتك حالياً.' });
-        }
-        
-        // Filter by section if course is section-specific
+        if (!courses || courses.length === 0) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لفرقتك حالياً.' });
         const availableCourses = courses.filter(c => {
-           if (c.course_type === 'sections' && c.sections && Array.isArray(c.sections)) {
-               return c.sections.includes(student.section);
-           }
-           return true; // course_type === 'all'
+          if (c.course_type === 'sections' && c.sections && Array.isArray(c.sections)) return c.sections.includes(student.section);
+          return true;
         });
-
-        if (availableCourses.length === 0) {
-           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لشعبتك حالياً.' });
-        }
-
-        const keyboard = availableCourses.map(c => {
-           // format: stu_crs_{stuId}_{crsId}  — stuId is UUID (36 chars)
-           return [{ text: `📚 ${c.name} - ${c.academic_year}`, callback_data: `stu_crs_${studentIdForAction}_${c.id}` }];
-        });
+        if (availableCourses.length === 0) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لشعبتك حالياً.' });
+        const keyboard = availableCourses.map(c => [{ text: `📚 ${c.name} - ${c.academic_year}`, callback_data: `stu_crs_${studentIdForAction}_${c.id}` }]);
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `📚 مقررات فرقتك (${student.academic_year}):\n\nاختر المقرر لرفع تقييم جديد:`, reply_markup: { inline_keyboard: keyboard } });
       }
 
-      // Course Selected -> Show Projects
       if (data.startsWith('stu_crs_')) {
-        // format: stu_crs_{stuId(36)}_{crsId(36)}
         const withoutPrefix = data.slice('stu_crs_'.length);
         const stuId = withoutPrefix.slice(0, 36);
-        const crsId = withoutPrefix.slice(37); // skip underscore separator
-
-        // Fetch course to get custom_week_names.__projects__
+        const crsId = withoutPrefix.slice(37);
         const { data: course } = await supabase.from('courses').select('custom_week_names, name').eq('id', crsId).maybeSingle();
-        const projects = (course?.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived);
-
-        if (projects.length === 0) {
-           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `لا يوجد مشاريع مطلوبة في مقرر (${course?.name || ''}) حالياً.` });
-        }
-        const keyboard = projects.map((p: any) => {
-           return [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `stu_proj_${stuId}_${crsId}_${p.id}` }];
-        });
+        const projects = ((course?.custom_week_names as any)?.__projects__ || []).filter((p: any) => !p.is_archived);
+        if (projects.length === 0) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `لا يوجد مشاريع مطلوبة في مقرر (${(course as any)?.name || ''}) حالياً.` });
+        const keyboard = projects.map((p: any) => [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `stu_proj_${stuId}_${crsId}_${p.id}` }]);
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المشروع أو التقييم المطلوب:', reply_markup: { inline_keyboard: keyboard } });
       }
 
-      // Project Selected -> Show Camera Button
       if (data.startsWith('stu_proj_')) {
-        // format: stu_proj_{stuId}_{crsId}_{projId}  (all UUIDs with hyphens, separated by _)
-        // stuId is a UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
         const withoutPrefix = data.slice('stu_proj_'.length);
-        const stuId = withoutPrefix.slice(0, 36);       // UUID = 36 chars
-        const rest = withoutPrefix.slice(37);           // skip the _ separator
+        const stuId = withoutPrefix.slice(0, 36);
+        const rest = withoutPrefix.slice(37);
         const crsId = rest.slice(0, 36);
         const projId = rest.slice(37);
-
-        const host = request.headers.get('host') || 'localhost:3000';
+        const host = request.headers.get('host') || 'art-faculty-app.vercel.app';
         const protocol = host.includes('localhost') ? 'http' : 'https';
         const cameraUrl = `${protocol}://${host}/camera?stu=${stuId}&crs=${crsId}&proj=${projId}`;
-
-        return NextResponse.json({ 
-           method: 'sendMessage', 
-           chat_id: chatId, 
-           text: 'ممتاز! ✅\nالآن، اضغط على زر (فتح الكاميرا 📸) بالأسفل للبدء في تصوير لوحتك.\n\n⚠️ يرجى التأكد من الإضاءة الجيدة وعدم اهتزاز الهاتف.', 
-           reply_markup: { 
-               inline_keyboard: [
-                  [{ text: '📸 فتح الكاميرا وتصوير اللوحة', web_app: { url: cameraUrl } }]
-               ] 
-           } 
-        });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'ممتاز! ✅\nاضغط على الزر بالأسفل لفتح الكاميرا وتصوير لوحتك.\n\n⚠️ تأكد من الإضاءة الجيدة وعدم اهتزاز الهاتف.', reply_markup: { inline_keyboard: [[{ text: '📸 فتح الكاميرا وتصوير اللوحة', web_app: { url: cameraUrl } }]] } });
       }
 
-      // --- SIMULATION EXIT & GALLERY ---
+      // =====================================================
+      // STAFF & ADMIN ACTIONS — profile required
+      // =====================================================
+      const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_id', tgUserId).maybeSingle();
+      if (!profile) {
+        // Check if they're a known student clicking something unexpected
+        const { data: knownStudent } = await supabase.from('students').select('full_name').eq('telegram_id', tgUserId).maybeSingle();
+        if (knownStudent) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `مرحباً ${(knownStudent as any).full_name}!\n\nاختر ما تريد:`, reply_markup: { inline_keyboard: [[{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],[{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }]] } });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل في النظام.' });
+      }
+
+      if (data === 'admin_login_student' && profile.role === 'مدير') {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'يرجى كتابة (كود الطالب) الذي تود محاكاة حسابه:', reply_markup: { force_reply: true, selective: true } });
+      }
+
       if (data === 'sim_exit') {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إنهاء وضع المحاكاة. عودة لصلاحيات الإدارة 👑' });
       }
-      if (data.startsWith('sim_gallery_') || data === 'student_gallery') {
+      if (data.startsWith('sim_gallery_')) {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'جاري برمجة معرض أعمال الطالب (قيد التطوير) 🚧' });
       }
 
