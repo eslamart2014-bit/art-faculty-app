@@ -80,12 +80,14 @@ function CameraApp() {
   // 2. Attach stream to video element whenever stream and videoRef are available
   useEffect(() => {
     if (isCameraStarted && stream && videoRef.current) {
-      videoRef.current.srcObject = stream;
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
       videoRef.current.play().catch((err) => {
         console.warn("Auto-play error:", err);
       });
     }
-  }, [isCameraStarted, stream]);
+  }, [isCameraStarted, stream, photo]);
 
   // 3. Cleanup on unmount
   useEffect(() => {
@@ -220,6 +222,12 @@ function CameraApp() {
   const retakePhoto = () => {
     setPhoto(null);
     setFilterWarnings([]);
+    if (videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+      videoRef.current.play().catch((err) => console.warn("Retake play error:", err));
+    }
   };
 
   const uploadPhoto = async () => {
@@ -340,15 +348,19 @@ function CameraApp() {
           /* Live Camera / Captured Photo View */
           <>
             <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {!photo ? (
-                <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                />
-              ) : (
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  display: photo ? 'none' : 'block' 
+                }} 
+              />
+              {photo && (
                 <img 
                   src={photo} 
                   alt="Captured" 
