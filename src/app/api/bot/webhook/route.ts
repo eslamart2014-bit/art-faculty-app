@@ -61,17 +61,52 @@ async function sendTelegramPhoto(botToken: string, chatId: number | string, phot
   }
 }
 
+async function getAdminSettingsView() {
+  const { count: totalStudents } = await supabase.from('students').select('id', { count: 'exact', head: true });
+  const { count: linkedStudents } = await supabase.from('students').select('id', { count: 'exact', head: true }).not('telegram_id', 'is', null);
+  const { count: totalStaff } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
+  const { count: linkedStaff } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).not('telegram_id', 'is', null);
+
+  const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+  const showScores = sysData?.telegram_config?.show_project_scores_to_students !== false;
+  const showAttendance = sysData?.telegram_config?.show_attendance_to_students !== false;
+
+  const stuRate = (totalStudents || 0) > 0 ? Math.round(((linkedStudents || 0) / totalStudents!) * 100) : 0;
+
+  const text = `⚙️ <b>لوحة تحكم المدير والإعدادات المتقدمة:</b>\n\n` +
+    `📊 <b>إحصائيات المشتركين والمنضمين للبوت:</b>\n` +
+    `👥 <b>الطلاب المرتبطين:</b> <b>${linkedStudents || 0}</b> من إجمالي ${totalStudents || 0} طالب (${stuRate}%)\n` +
+    `👨‍🏫 <b>المعلمين المرتبطين:</b> <b>${linkedStaff || 0}</b> من إجمالي ${totalStaff || 0} معلم\n\n` +
+    `🔒 <b>صلاحيات ورؤية الطلاب الحالية:</b>\n` +
+    `• إظهار درجات المشاريع للطلاب: ${showScores ? 'مفعل ✅' : 'معطل ❌'}\n` +
+    `• إتاحة استعلام الحضور للطلاب: ${showAttendance ? 'مفعل ✅' : 'معطل ❌'}\n\n` +
+    `<i>اختر أحد الأوامر بالأسفل للإدارة أو فرمتة الحسابات:</i>`;
+
+  const replyMarkup = {
+    inline_keyboard: [
+      [{ text: '👥 قائمة المعلمين المرتبطين', callback_data: 'admin_view_staff' }],
+      [{ text: '🎓 آخر الطلاب المنضمين للبوت', callback_data: 'admin_recent_students' }],
+      [{ text: '🔍 بحث عن طالب وفرمتة حسابه', callback_data: 'admin_search_student_reset' }],
+      [{ text: `⭐️ درجات المشاريع: [ ${showScores ? 'مفعل ✅' : 'معطل ❌'} ]`, callback_data: 'admin_toggle_scores' }],
+      [{ text: `📅 استعلام الحضور: [ ${showAttendance ? 'مفعل ✅' : 'معطل ❌'} ]`, callback_data: 'admin_toggle_attendance' }],
+      [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'admin_main_menu' }]
+    ]
+  };
+
+  return { text, replyMarkup };
+}
+
 export async function POST(request: Request) {
   try {
     const update = await request.json();
 
-    // Fetch token & permissions to use API directly for background tasks
+    // Fetch token & permissions
     const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
     const botToken = sysData?.telegram_config?.token;
     const showScoresToStudents = sysData?.telegram_config?.show_project_scores_to_students !== false;
     const showAttendanceToStudents = sysData?.telegram_config?.show_attendance_to_students !== false;
 
-    // Student default inline keyboard
+    // Default Menus
     const studentMainMenuMarkup = {
       inline_keyboard: [
         [{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],
@@ -80,13 +115,75 @@ export async function POST(request: Request) {
       ]
     };
 
+    const getAdminMainMenuMarkup = () => ({
+      inline_keyboard: [
+        [{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }],
+        [{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }],
+        [{ text: '⚙️ الإعدادات المتقدمة وإدارة المشتركين', callback_data: 'admin_advanced_settings' }]
+      ]
+    });
+
     // ==========================================
     // 1. Handle Text Messages (/start & Replies)
     // ==========================================
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
       const text = update.message.text.trim();
-      const firstName = update.message.from.first_name || 'طالبنا العزيز';
+
+      // --- Admin "Search Student for Reset / Format" Reply Handler ---
+      if (update.message.reply_to_message && update.message.reply_to_message.text.includes('للبحث عنه وفرمتة حسابه')) {
+        const query = text;
+        let { data: students } = await supabase
+          .from('students')
+          .select('id, full_name, student_code, section, academic_year, telegram_id, telegram_username, telegram_first_name, updated_at')
+          .eq('student_code', query);
+
+        if (!students || students.length === 0) {
+          const { data: byName } = await supabase
+            .from('students')
+            .select('id, full_name, student_code, section, academic_year, telegram_id, telegram_username, telegram_first_name, updated_at')
+            .ilike('full_name', `%${query}%`)
+            .limit(5);
+          students = byName;
+        }
+
+        if (!students || students.length === 0) {
+          return NextResponse.json({
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: `عفواً أيها المدير، لم يتم العثور على طالب بهذا الكود أو الاسم (${query}).`,
+            reply_markup: { inline_keyboard: [[{ text: '🔍 بحث مجدداً', callback_data: 'admin_search_student_reset' }], [{ text: '🔙 عودة للإعدادات', callback_data: 'admin_advanced_settings' }]] }
+          });
+        }
+
+        if (botToken) {
+          for (const s of students) {
+            const isLinked = !!s.telegram_id;
+            const linkStatusText = isLinked
+              ? `✅ <b>مرتبط بتليجرام:</b>\n🆔 آيدي: <code>${s.telegram_id}</code>\n👤 اسم الحساب: ${s.telegram_first_name || 'غير محدد'}\n🔗 المعرف: @${s.telegram_username || 'لا يوجد'}`
+              : `❌ <b>غير مرتبط بتليجرام حالياً</b>`;
+
+            const cardText = `👨‍🎓 <b>بيانات الطالب:</b>\n\n` +
+              `👤 <b>الاسم:</b> <b>${s.full_name}</b>\n` +
+              `📌 <b>الكود:</b> <code>${s.student_code}</code>\n` +
+              `🏫 <b>الفرقة:</b> ${s.academic_year} - سكشن ${s.section}\n\n` +
+              `📱 <b>حالة الارتباط:</b>\n${linkStatusText}`;
+
+            const buttons: any[] = [];
+            if (isLinked) {
+              buttons.push([{ text: `🔄 فرمتة وفك ربط الحساب فوراً`, callback_data: `admin_do_reset_${s.id}` }]);
+            }
+            buttons.push([{ text: `🕵️‍♂️ محاكاة حسابه`, callback_data: `sim_upload_${s.student_code}` }]);
+
+            await sendTelegramMessage(botToken, chatId, cardText, { inline_keyboard: buttons });
+          }
+
+          await sendTelegramMessage(botToken, chatId, `يمكنك الضغط على زر (فرمتة وفك ربط الحساب) لأي طالب لإلغاء ارتباطه القديم فوراً.`, {
+            inline_keyboard: [[{ text: '🔍 بحث عن طالب آخر', callback_data: 'admin_search_student_reset' }], [{ text: '🔙 عودة للإعدادات', callback_data: 'admin_advanced_settings' }]]
+          });
+        }
+        return NextResponse.json({ ok: true });
+      }
 
       // --- Admin "Login as Student" Reply Handler ---
       if (update.message.reply_to_message && update.message.reply_to_message.text.includes('يرجى كتابة (كود الطالب)')) {
@@ -104,18 +201,22 @@ export async function POST(request: Request) {
 
         const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.student_code}\n\n📱 حالة ارتباط تليجرام:\n${telegramInfo}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (كما سيراه هو تماماً). ماذا تريد أن تفعل؟`;
         
+        const simButtons = [
+          [{ text: '📸 رفع عمل جديد', callback_data: `sim_upload_${student.student_code}` }],
+          [{ text: '📁 استعراض أعمال الطالب', callback_data: `sim_gallery_${student.id}` }],
+          [{ text: '📅 سجل حضور الطالب', callback_data: `sim_att_${student.id}` }]
+        ];
+
+        if (student.telegram_id) {
+          simButtons.push([{ text: `🔄 فرمتة وفك ربط هذا الطالب`, callback_data: `admin_do_reset_${student.id}` }]);
+        }
+        simButtons.push([{ text: '❌ إنهاء وضع المحاكاة', callback_data: `sim_exit` }]);
+
         return NextResponse.json({
           method: 'sendMessage',
           chat_id: chatId,
           text: caption,
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: '📸 رفع عمل جديد', callback_data: `sim_upload_${student.student_code}` }],
-              [{ text: '📁 استعراض أعمال الطالب', callback_data: `sim_gallery_${student.id}` }],
-              [{ text: '📅 سجل حضور الطالب', callback_data: `sim_att_${student.id}` }],
-              [{ text: '❌ إنهاء وضع المحاكاة', callback_data: `sim_exit` }]
-            ]
-          }
+          reply_markup: { inline_keyboard: simButtons }
         });
       }
 
@@ -162,7 +263,7 @@ export async function POST(request: Request) {
         const parts = text.split(' ');
         const payload = parts.length > 1 ? parts[1] : '';
         let replyText = '';
-        let replyMarkup = null;
+        let replyMarkup: any = null;
 
         if (payload) {
           if (payload.startsWith('stu_')) {
@@ -203,11 +304,11 @@ export async function POST(request: Request) {
               const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
               replyText = `مرحباً بك د. ${profile.full_name} 🎓\n\nلقد تم ربط حسابك بنجاح بصلاحية (${roleName}).`;
               
-              const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
               if (profile.role === 'مدير') {
-                buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+                replyMarkup = getAdminMainMenuMarkup();
+              } else {
+                replyMarkup = { inline_keyboard: [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]] };
               }
-              replyMarkup = { inline_keyboard: buttons };
 
             } else {
               replyText = `عفواً، رابط التفعيل غير صحيح أو منتهي الصلاحية.`;
@@ -218,11 +319,11 @@ export async function POST(request: Request) {
           if (existingProfile) {
             replyText = `أهلاً بعودتك د. ${existingProfile.full_name} 🎓\nكيف يمكنني مساعدتك؟`;
             
-            const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
             if (existingProfile.role === 'مدير') {
-              buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+              replyMarkup = getAdminMainMenuMarkup();
+            } else {
+              replyMarkup = { inline_keyboard: [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]] };
             }
-            replyMarkup = { inline_keyboard: buttons };
 
           } else {
             const { data: knownStudent } = await supabase.from('students').select('*').eq('telegram_id', chatId.toString()).maybeSingle();
@@ -334,7 +435,6 @@ export async function POST(request: Request) {
         const { data: student } = await supabase.from('students').select('*').eq('id', stuId).maybeSingle();
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على بيانات الطالب.' });
 
-        // Fetch student courses
         const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
         if (!courses || courses.length === 0) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا توجد مقررات متاحة لفرقتك حالياً.' });
@@ -510,12 +610,204 @@ export async function POST(request: Request) {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل في النظام.' });
       }
 
+      // --- ADMIN MAIN MENU ---
+      if (data === 'admin_main_menu') {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `👑 <b>القائمة الرئيسية للإدارة:</b>\nمرحباً بك د. ${profile.full_name}`,
+          reply_markup: getAdminMainMenuMarkup()
+        });
+      }
+
+      // --- ADMIN ADVANCED SETTINGS ---
+      if (data === 'admin_advanced_settings' && profile.role === 'مدير') {
+        const viewData = await getAdminSettingsView();
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: viewData.text,
+          reply_markup: viewData.replyMarkup
+        });
+      }
+
+      // --- ADMIN TOGGLE PROJECT SCORES ---
+      if (data === 'admin_toggle_scores' && profile.role === 'مدير') {
+        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+        const cur = sData?.telegram_config || {};
+        const newScoresFlag = cur.show_project_scores_to_students === false ? true : false;
+        
+        await supabase.from('system_settings').update({
+          telegram_config: { ...cur, show_project_scores_to_students: newScoresFlag },
+          updated_at: new Date().toISOString()
+        }).eq('id', 1);
+
+        const viewData = await getAdminSettingsView();
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `✅ تم تغيير إعداد إظهار درجات المشاريع إلى: (<b>${newScoresFlag ? 'مفعل ✅' : 'معطل ❌'}</b>)\n\n` + viewData.text,
+          reply_markup: viewData.replyMarkup
+        });
+      }
+
+      // --- ADMIN TOGGLE ATTENDANCE INQUIRY ---
+      if (data === 'admin_toggle_attendance' && profile.role === 'مدير') {
+        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+        const cur = sData?.telegram_config || {};
+        const newAttFlag = cur.show_attendance_to_students === false ? true : false;
+        
+        await supabase.from('system_settings').update({
+          telegram_config: { ...cur, show_attendance_to_students: newAttFlag },
+          updated_at: new Date().toISOString()
+        }).eq('id', 1);
+
+        const viewData = await getAdminSettingsView();
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `✅ تم تغيير إعداد استعلام الحضور إلى: (<b>${newAttFlag ? 'مفعل ✅' : 'معطل ❌'}</b>)\n\n` + viewData.text,
+          reply_markup: viewData.replyMarkup
+        });
+      }
+
+      // --- ADMIN VIEW LINKED STAFF ---
+      if (data === 'admin_view_staff' && profile.role === 'مدير') {
+        const { data: allStaff } = await supabase.from('profiles').select('id, full_name, role, telegram_id').order('role');
+        
+        let staffMsg = `👥 <b>قائمة أعضاء هيئة التدريس بالنظام (${allStaff?.length || 0} عضو):</b>\n\n`;
+        (allStaff || []).forEach((st, idx) => {
+          const roleBadge = st.role === 'مدير' ? '👑 مدير' : '👨‍🏫 عضو تدريس';
+          const linkBadge = st.telegram_id ? `✅ (مرتبط: <code>${st.telegram_id}</code>)` : `❌ (غير مرتبط)`;
+          staffMsg += `${idx + 1}. <b>${st.full_name}</b> [${roleBadge}]\n   ${linkBadge}\n\n`;
+        });
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: staffMsg,
+          reply_markup: { inline_keyboard: [[{ text: '🔙 عودة للإعدادات المتقدمة', callback_data: 'admin_advanced_settings' }]] }
+        });
+      }
+
+      // --- ADMIN VIEW RECENT LINKED STUDENTS ---
+      if (data === 'admin_recent_students' && profile.role === 'مدير') {
+        const { data: recentStudents } = await supabase
+          .from('students')
+          .select('id, full_name, student_code, section, academic_year, telegram_id, telegram_username, telegram_first_name, updated_at')
+          .not('telegram_id', 'is', null)
+          .order('updated_at', { ascending: false })
+          .limit(15);
+
+        if (!recentStudents || recentStudents.length === 0) {
+          return NextResponse.json({
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: 'لا يوجد أي طلاب منضمين للبوت حتى الآن.',
+            reply_markup: { inline_keyboard: [[{ text: '🔙 عودة للإعدادات', callback_data: 'admin_advanced_settings' }]] }
+          });
+        }
+
+        if (botToken) {
+          await sendTelegramMessage(botToken, chatId, `🎓 <b>آخر الطلاب المنضمين للبوت (${recentStudents.length} طالب):</b>\nيمكنك فرمتة وفك ربط أي طالب بالضغط على الزر المخصص له 👇`);
+          
+          for (const s of recentStudents) {
+            const timeAgo = s.updated_at ? formatRelativeTimeArabic(s.updated_at) : 'مؤخراً';
+            const sMsg = `👨‍🎓 <b>${s.full_name}</b>\n` +
+              `📌 <b>الكود:</b> <code>${s.student_code}</code> | <b>الفرقة:</b> ${s.academic_year} (ش:${s.section})\n` +
+              `📱 <b>الحساب:</b> @${s.telegram_username || 'لا يوجد'} (ID: <code>${s.telegram_id}</code>)\n` +
+              `⏱️ <b>آخر نشاط:</b> ${timeAgo}`;
+
+            const buttons = [
+              [
+                { text: `🔄 فرمتة وفك ربط: ${s.full_name.split(' ')[0]}`, callback_data: `admin_do_reset_${s.id}` },
+                { text: `🕵️‍♂️ محاكاة`, callback_data: `sim_upload_${s.student_code}` }
+              ]
+            ];
+
+            await sendTelegramMessage(botToken, chatId, sMsg, { inline_keyboard: buttons });
+          }
+
+          await sendTelegramMessage(botToken, chatId, `انتهت القائمة.`, {
+            inline_keyboard: [
+              [{ text: '🔍 بحث عن طالب بالاسم/الكود', callback_data: 'admin_search_student_reset' }],
+              [{ text: '🔙 عودة للإعدادات المتقدمة', callback_data: 'admin_advanced_settings' }]
+            ]
+          });
+        }
+        return NextResponse.json({ ok: true });
+      }
+
+      // --- ADMIN SEARCH STUDENT FOR RESET PROMPT ---
+      if (data === 'admin_search_student_reset' && profile.role === 'مدير') {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `🔍 <b>البحث عن طالب وفرمتة حسابه:</b>\n\nيرجى الرد على هذه الرسالة بكتابة (كود الطالب) أو جزء من اسمه للبحث عنه وفرمتة حسابه:`,
+          reply_markup: { force_reply: true, selective: true }
+        });
+      }
+
+      // --- ADMIN DO RESET / FORMAT STUDENT ---
+      if (data.startsWith('admin_do_reset_') && profile.role === 'مدير') {
+        const studentId = data.replace('admin_do_reset_', '');
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+        
+        if (!student) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، لم يتم العثور على هذا الطالب.' });
+        }
+
+        const prevTelegramId = student.telegram_id;
+
+        // Clear Telegram linkage from student record
+        await supabase.from('students').update({
+          telegram_id: null,
+          telegram_username: null,
+          telegram_first_name: null,
+          telegram_browser_id: null,
+          updated_at: new Date().toISOString()
+        }).eq('id', studentId);
+
+        // Send alert to the unlinked telegram account if available
+        if (prevTelegramId && botToken) {
+          sendTelegramMessage(botToken, prevTelegramId, `⚠️ <b>تنبيه من إدارة الكلية:</b>\n\nتم فك ارتباط حسابك بالطالب (${student.full_name}).\nإذا كنت صاحب الكود، يمكنك إعادة مسح بطاقتك أو الدخول من بوابة الطالب وربط حسابك مجدداً.`);
+        }
+
+        const successMsg = `✅ <b>تم فرمتة وفك ربط حساب الطالب بنجاح!</b>\n\n` +
+          `👨‍🎓 <b>الطالب:</b> <b>${student.full_name}</b>\n` +
+          `📌 <b>الكود:</b> <code>${student.student_code}</code>\n\n` +
+          `🔓 <i>تم مسح الارتباط السابق بالكامل. أصبح بإمكان الطالب الآن فتح البوابة من هاتفه أو مسح بطاقته وربط حسابه الشرعي مجدداً بكل حرية وسهولة.</i>`;
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: successMsg,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔍 بحث عن طالب آخر', callback_data: 'admin_search_student_reset' }],
+              [{ text: '🔙 عودة للإعدادات المتقدمة', callback_data: 'admin_advanced_settings' }]
+            ]
+          }
+        });
+      }
+
+      // --- ADMIN LOGIN STUDENT (SIMULATION) ---
       if (data === 'admin_login_student' && profile.role === 'مدير') {
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'يرجى كتابة (كود الطالب) الذي تود محاكاة حسابه:', reply_markup: { force_reply: true, selective: true } });
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: 'يرجى كتابة (كود الطالب) الذي تود محاكاة حسابه:',
+          reply_markup: { force_reply: true, selective: true }
+        });
       }
 
       if (data === 'sim_exit') {
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إنهاء وضع المحاكاة. عودة لصلاحيات الإدارة 👑' });
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: 'تم إنهاء وضع المحاكاة. عودة لصلاحيات الإدارة 👑',
+          reply_markup: getAdminMainMenuMarkup()
+        });
       }
 
       // --- Grade / Rate Evaluation Action ---
