@@ -53,7 +53,7 @@ function CameraApp() {
       if (isFlat) {
         setTiltStatus("الوضع ممتاز! يمكنك التصوير الآن ✅");
       } else {
-        setTiltStatus("يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق اللوحة 📱");
+        setTiltStatus("يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق المشروع 📱");
       }
     };
 
@@ -158,7 +158,7 @@ function CameraApp() {
     const warnings = [];
     if (avgBrightness < 40) warnings.push("⚠️ الإضاءة ضعيفة جداً.");
     if (avgBrightness > 240) warnings.push("⚠️ الإضاءة ساطعة جداً (تجنب تصوير ورقة بيضاء فقط).");
-    if (variance < 100) warnings.push("⚠️ يبدو أن اللوحة فارغة أو ذات لون مسطح.");
+    if (variance < 100) warnings.push("⚠️ يبدو أن المشروع فارغ أو ذو لون مسطح.");
     
     setFilterWarnings(warnings);
     
@@ -225,7 +225,7 @@ function CameraApp() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#121212', color: 'white', fontFamily: 'system-ui' }}>
         <h1 style={{ color: '#4caf50', fontSize: '3rem', marginBottom: '10px' }}>✅</h1>
-        <h2>تم رفع اللوحة بنجاح!</h2>
+        <h2>تم رفع المشروع بنجاح!</h2>
         <p style={{ color: '#aaa', marginTop: '10px' }}>يمكنك الآن إغلاق هذه النافذة والعودة للتليجرام.</p>
         <button 
           onClick={() => {
@@ -255,8 +255,13 @@ function CameraApp() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#121212', color: 'white', padding: '20px', textAlign: 'center' }}>
         <h1 style={{ fontSize: '3rem', margin: 0 }}>📷</h1>
-        <h2 style={{ marginTop: '20px' }}>مستعد لتصوير اللوحة؟</h2>
-        <p style={{ color: '#aaa', marginBottom: '30px' }}>ضع اللوحة على سطح مستوٍ (طاولة أو أرضية)، وسنساعدك في التقاطها بشكل موزون لتجنب تشوه المنظور.</p>
+        <h2 style={{ marginTop: '20px' }}>مستعد لتصوير المشروع؟</h2>
+        <p style={{ color: '#aaa', marginBottom: '15px' }}>ضع المشروع على سطح مستوٍ (طاولة أو أرضية)، وسنساعدك في التقاطه بشكل موزون لتجنب تشوه المنظور.</p>
+        
+        <div style={{ backgroundColor: 'rgba(255, 152, 0, 0.1)', border: '1px solid #ff9800', borderRadius: '8px', padding: '12px', marginBottom: '30px', textAlign: 'right', direction: 'rtl', fontSize: '0.9rem', color: '#ffcc80' }}>
+          <strong>ملاحظة أمنية:</strong> سيطلب منك تليجرام الآن السماح للبوابة بالوصول للكاميرا (سيعرض رسالة تنبيه قياسية من النظام). هذه الصلاحية تستخدم حصراً في هذه اللحظة لالتقاط صورتك ولا يتم مشاركتها.
+        </div>
+
         <button 
           onClick={startCamera}
           style={{ padding: '15px 40px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
