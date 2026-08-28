@@ -153,6 +153,9 @@ function CameraApp() {
     }
   };
 
+  // Store perceptual hash
+  const [imageHash, setImageHash] = useState<string>("");
+
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
     
@@ -169,7 +172,32 @@ function CameraApp() {
     
     ctx.drawImage(video, 0, 0, width, height);
     
-    // Quick heuristic image analysis
+    // 1. Calculate 64-bit Difference Hash (dHash) for fast similarity detection
+    try {
+      const hashCanvas = document.createElement("canvas");
+      hashCanvas.width = 9;
+      hashCanvas.height = 8;
+      const hCtx = hashCanvas.getContext("2d");
+      if (hCtx) {
+        hCtx.drawImage(canvas, 0, 0, 9, 8);
+        const hData = hCtx.getImageData(0, 0, 9, 8).data;
+        let hashStr = "";
+        for (let y = 0; y < 8; y++) {
+          for (let x = 0; x < 8; x++) {
+            const i1 = (y * 9 + x) * 4;
+            const i2 = (y * 9 + (x + 1)) * 4;
+            const g1 = hData[i1] * 0.299 + hData[i1 + 1] * 0.587 + hData[i1 + 2] * 0.114;
+            const g2 = hData[i2] * 0.299 + hData[i2 + 1] * 0.587 + hData[i2 + 2] * 0.114;
+            hashStr += g1 < g2 ? "1" : "0";
+          }
+        }
+        setImageHash(hashStr);
+      }
+    } catch (e) {
+      console.warn("dHash error:", e);
+    }
+
+    // 2. Quick heuristic image analysis
     try {
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
@@ -221,6 +249,7 @@ function CameraApp() {
 
   const retakePhoto = () => {
     setPhoto(null);
+    setImageHash("");
     setFilterWarnings([]);
     if (videoRef.current && stream) {
       if (videoRef.current.srcObject !== stream) {
@@ -239,7 +268,7 @@ function CameraApp() {
       const response = await fetch("/api/student/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo, stuId, crsId, projId }),
+        body: JSON.stringify({ photo, stuId, crsId, projId, imageHash }),
       });
 
       const result = await response.json();
