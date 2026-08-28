@@ -39,6 +39,10 @@ type Project = {
   name: string;
   max_score: number;
   is_archived?: boolean;
+  is_active?: boolean;
+  start_date?: string;
+  end_date?: string;
+  show_score?: boolean;
 };
 
 export default function EvaluationsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -91,9 +95,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [newProjectMaxScore, setNewProjectMaxScore] = useState("50");
 
   const [showManageProjectModal, setShowManageProjectModal] = useState(false);
-  const [longPressProject, setLongPressProject] = useState<Project | null>(null);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectMaxScore, setEditProjectMaxScore] = useState("");
+  
+  // NEW TELEGRAM SETTINGS STATE
+  const [editProjectIsActive, setEditProjectIsActive] = useState(true);
+  const [editProjectStartDate, setEditProjectStartDate] = useState("");
+  const [editProjectEndDate, setEditProjectEndDate] = useState("");
+  const [editProjectShowScore, setEditProjectShowScore] = useState(true);
+  const [showTelegramSettings, setShowTelegramSettings] = useState(false);
+  const [sendBroadcastOnSave, setSendBroadcastOnSave] = useState(false);
+
+  const [longPressProject, setLongPressProject] = useState<Project | null>(null);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggered = useRef(false);
   const [scannerPulse, setScannerPulse] = useState(false);
@@ -232,6 +245,12 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       setLongPressProject(proj);
       setEditProjectName(proj.name);
       setEditProjectMaxScore(proj.max_score.toString());
+      setEditProjectIsActive(proj.is_active ?? true);
+      setEditProjectStartDate(proj.start_date ?? "");
+      setEditProjectEndDate(proj.end_date ?? "");
+      setEditProjectShowScore(proj.show_score ?? true);
+      setShowTelegramSettings(false);
+      setSendBroadcastOnSave(false);
       setShowManageProjectModal(true);
       vibrateSuccess();
     }, 600);
@@ -246,12 +265,42 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const maxScoreNum = Number(editProjectMaxScore);
     if (isNaN(maxScoreNum) || maxScoreNum <= 0) return;
     const updatedProjects = projects.map(p => 
-      p.id === longPressProject.id ? { ...p, name: editProjectName, max_score: maxScoreNum } : p
+      p.id === longPressProject.id ? { 
+        ...p, 
+        name: editProjectName, 
+        max_score: maxScoreNum,
+        is_active: editProjectIsActive,
+        start_date: editProjectStartDate,
+        end_date: editProjectEndDate,
+        show_score: editProjectShowScore
+      } : p
     );
-    const updatedCustomWeekNames = { ...(course.custom_week_names || {}), __projects__: updatedProjects };
-    await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course.id);
+
+    const updatedCustomWeekNames = {
+      ...(course?.custom_week_names || {}),
+      __projects__: updatedProjects
+    };
+
+    await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course!.id);
+    
     setProjects(updatedProjects);
-    setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
+    if (course) setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
+    
+    // Broadcast to students if requested
+    if (sendBroadcastOnSave) {
+      await fetch('/api/bot/notify_course', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: course?.id,
+          projectName: editProjectName,
+          startDate: editProjectStartDate,
+          endDate: editProjectEndDate
+        })
+      });
+      alert("تم إرسال إشعار للطلاب بنجاح!");
+    }
+
     setShowManageProjectModal(false);
   };
 
@@ -582,6 +631,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       score: scoreNum,
       teacher_id: course.teacher_id
     }, { onConflict: 'course_id,student_id,project_name' });
+
+    // Send Telegram Notification
+    fetch('/api/bot/notify_eval', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentId: targetStudent.id,
+        projectName: selectedProject.name,
+        score: scoreNum,
+        projectShowScore: selectedProject.show_score
+      })
+    });
 
     vibrateSuccess();
     setSearchInput("");
@@ -1242,6 +1303,50 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
               onChange={e => setEditProjectMaxScore(e.target.value)}
               style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "16px", textAlign: "center", fontSize: "16px" }}
             />
+
+            <div style={{ background: "#2a2a2a", borderRadius: "8px", padding: "10px", marginBottom: "16px", textAlign: "right" }}>
+              <button 
+                onClick={() => setShowTelegramSettings(!showTelegramSettings)}
+                style={{ width: "100%", background: "none", border: "none", color: "#2196F3", fontWeight: "bold", fontSize: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: 0 }}
+              >
+                <span>✈️ إعدادات التليجرام للطالب</span>
+                <span>{showTelegramSettings ? "▲" : "▼"}</span>
+              </button>
+              
+              {showTelegramSettings && (
+                <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={editProjectIsActive} onChange={e => setEditProjectIsActive(e.target.checked)} />
+                    تفعيل استقبال المشروع عبر البوت
+                  </label>
+                  
+                  {editProjectIsActive && (
+                    <>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: "block", color: "#aaa", fontSize: "10px", marginBottom: "2px" }}>من يوم:</label>
+                          <input type="datetime-local" value={editProjectStartDate} onChange={e => setEditProjectStartDate(e.target.value)} style={{ width: "100%", padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "11px" }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: "block", color: "#aaa", fontSize: "10px", marginBottom: "2px" }}>إلى يوم:</label>
+                          <input type="datetime-local" value={editProjectEndDate} onChange={e => setEditProjectEndDate(e.target.value)} style={{ width: "100%", padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "11px" }} />
+                        </div>
+                      </div>
+
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}>
+                        <input type="checkbox" checked={editProjectShowScore} onChange={e => setEditProjectShowScore(e.target.checked)} />
+                        عرض وإرسال الدرجة للطالب فور تقييمه
+                      </label>
+
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ffeb3b", fontSize: "13px", cursor: "pointer", marginTop: "4px", borderTop: "1px solid #444", paddingTop: "8px" }}>
+                        <input type="checkbox" checked={sendBroadcastOnSave} onChange={e => setSendBroadcastOnSave(e.target.checked)} />
+                        إرسال إشعار فوري للطلاب بفتح المشروع
+                      </label>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
