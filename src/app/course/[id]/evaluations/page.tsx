@@ -646,7 +646,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
           else if (view === 'MANUAL') { setView('EVAL_MENU'); setTargetStudent(null); setSearchInput(""); }
           else if (view === 'EVAL_MENU') setView('PROJECTS');
           else router.push(`/course/${course?.id}`);
-        }} style={{ background: "none", border: "none", color: "#fff", fontSize: "22px", cursor: "pointer" }}>🡲</button>
+        }} style={{ width: "auto", padding: "4px 10px", margin: 0, background: "none", border: "none", color: "#fff", fontSize: "22px", cursor: "pointer" }}>🡲</button>
         <h2 style={{ margin: 0, color: "#FF9800", fontSize: "17px", fontWeight: "bold" }}>بوابة التقييم</h2>
         <div style={{ width: "24px" }}></div>
       </div>
@@ -658,7 +658,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ color: "#FF9800", margin: 0, fontSize: "16px" }}>المشاريع المتاحة للتقييم</h3>
-              <button onClick={() => setShowAddProjectModal(true)} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px" }}>➕ إضافة مشروع</button>
+              <button onClick={() => setShowAddProjectModal(true)} style={{ width: "auto", margin: 0, background: "#4CAF50", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px" }}>➕ إضافة مشروع</button>
             </div>
 
             {projects.filter(p => !p.is_archived).length === 0 ? (
@@ -692,7 +692,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         <button 
                           onClick={(e) => openProjectStats(proj, e)}
                           title="إحصائية المشروع وتصدير كشف المتأخرين PDF"
-                          style={{ background: "rgba(33, 150, 243, 0.15)", color: "#2196F3", border: "1px solid #2196F3", borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                          style={{ width: "auto", margin: 0, background: "rgba(33, 150, 243, 0.15)", color: "#2196F3", border: "1px solid #2196F3", borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
                         >
                           📊 إحصائية
                         </button>
@@ -723,10 +723,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             </div>
 
             <h3 style={{ color: "#FF9800", marginBottom: "20px", fontSize: "16px" }}>⭐ اختر طريقة التقييم</h3>
-            <button onClick={startScanner} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", marginBottom: "12px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+            <button onClick={startScanner} style={{ width: "100%", margin: "0 0 12px 0", background: "#4CAF50", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
               <span style={{ fontSize: "22px" }}>📱</span> التقييم الذكي (بالكاميرا والمطابقة)
             </button>
-            <button onClick={() => setView('MANUAL')} style={{ width: "100%", background: "#2196F3", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", marginBottom: "12px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+            <button onClick={() => setView('MANUAL')} style={{ width: "100%", margin: "0 0 12px 0", background: "#2196F3", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
               <span style={{ fontSize: "22px" }}>📝</span> التقييم اليدوي ومراجعة اللوحات
             </button>
           </div>
@@ -761,7 +761,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 onKeyDown={e => { if (e.key === 'Enter') handleManualSearch(); }}
                 style={{ flex: 1, padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", fontSize: "16px", textAlign: "center", outline: "none" }} 
               />
-              <button onClick={handleManualSearch} disabled={searchingManual} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 20px", borderRadius: "8px", fontWeight: "bold", fontSize: "14px", cursor: "pointer" }}>
+              <button onClick={handleManualSearch} disabled={searchingManual} style={{ width: "auto", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "0 20px", borderRadius: "8px", fontWeight: "bold", fontSize: "14px", cursor: "pointer" }}>
                 {searchingManual ? "..." : "بحث"}
               </button>
             </div>
@@ -769,11 +769,36 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             {targetStudent && selectedProject && (
               <div style={{ background: "#151e15", padding: "14px", borderRadius: "12px", border: "2px solid #4CAF50", animation: "slideUp 0.25s" }}>
                 
-                {/* Student Full Info Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px", marginBottom: "4px" }}>{targetStudent.full_name}</div>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {/* Student Full Info Header with Absolute Close Button */}
+                <div style={{ position: "relative", marginBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px" }}>
+                  <button 
+                    onClick={() => { setTargetStudent(null); setSearchInput(""); }} 
+                    title="إغلاق بطاقة الطالب"
+                    style={{ 
+                      position: "absolute", 
+                      top: "0", 
+                      left: "0", 
+                      width: "28px", 
+                      height: "28px", 
+                      padding: "0", 
+                      margin: "0", 
+                      background: "rgba(244,67,54,0.2)", 
+                      color: "#f44336", 
+                      border: "1px solid #f44336", 
+                      borderRadius: "50%", 
+                      fontSize: "13px", 
+                      fontWeight: "bold", 
+                      cursor: "pointer", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      zIndex: 5
+                    }}
+                  >✕</button>
+
+                  <div style={{ paddingLeft: "35px" }}>
+                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px", marginBottom: "4px", lineHeight: "1.3" }}>{targetStudent.full_name}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                       <span style={{ background: "#2196F3", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>كود: {targetStudent.student_code}</span>
                       <span style={{ background: "#333", color: "#ddd", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>س: {targetStudent.section}</span>
                       <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>حضور: {targetStudent.attCount}</span>
@@ -782,12 +807,6 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       )}
                     </div>
                   </div>
-
-                  <button onClick={() => { setTargetStudent(null); setSearchInput(""); }} style={{
-                    background: "rgba(244,67,54,0.15)", color: "#f44336", border: "1px solid #f44336",
-                    borderRadius: "6px", padding: "4px 8px", fontSize: "11px", fontWeight: "bold",
-                    cursor: "pointer", flexShrink: 0
-                  }}>✕ إغلاق</button>
                 </div>
 
                 {/* BOT UPLOAD STATUS & ARTWORK PREVIEW */}
@@ -816,7 +835,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", gap: "8px" }}>
                         <button 
                           onClick={() => cancelArtwork(targetStudent.evalRecord.id)}
-                          style={{ background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flex: 1 }}
+                          style={{ width: "auto", margin: 0, background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flex: 1 }}
                         >
                           🗑️ إلغاء واعتماد إعادة الرفع
                         </button>
@@ -824,7 +843,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         {targetStudent.telegram_id && (
                           <button 
                             onClick={() => resetTelegramLink(targetStudent.id, targetStudent.full_name)}
-                            style={{ background: "rgba(255, 152, 0, 0.15)", color: "#ff9800", border: "1px solid #ff9800", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                            style={{ width: "auto", margin: 0, background: "rgba(255, 152, 0, 0.15)", color: "#ff9800", border: "1px solid #ff9800", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
                           >
                             🔓 فك تليجرام
                           </button>
@@ -854,6 +873,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         key={score}
                         onClick={() => setManualScore(score.toString())}
                         style={{
+                          width: "100%",
+                          margin: 0,
+                          padding: 0,
                           height: "38px",
                           background: manualScore === score.toString() ? "#4CAF50" : "#222",
                           color: manualScore === score.toString() ? "#000" : "#fff",
@@ -890,7 +912,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                   <span style={{ fontSize: "16px", color: "#aaa", fontWeight: "bold" }}>من {selectedProject.max_score}</span>
                 </div>
 
-                <button onClick={saveManualEvaluation} disabled={savingManual} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "14px", borderRadius: "10px", border: "none", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>
+                <button onClick={saveManualEvaluation} disabled={savingManual} style={{ width: "100%", margin: 0, background: "#4CAF50", color: "#fff", padding: "14px", borderRadius: "10px", border: "none", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>
                   {savingManual ? "جاري الحفظ..." : "💾 حفظ التقييم والانتقال للبحث ↵"}
                 </button>
               </div>
@@ -937,24 +959,42 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             {activeScannedStudent && selectedProject && (
               <div style={{ background: "#151e15", border: "2px solid #4CAF50", padding: "14px", borderRadius: "12px", marginTop: "6px", animation: "slideUp 0.2s" }}>
                 
-                {/* Student Info Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "6px" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px", marginBottom: "2px" }}>{activeScannedStudent.student.full_name}</div>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {/* Student Info Header with Absolute Close Button */}
+                <div style={{ position: "relative", marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "6px" }}>
+                  <button 
+                    onClick={handleCancelActiveStudent} 
+                    title="إلغاء الطالب الحالي"
+                    style={{ 
+                      position: "absolute", 
+                      top: "0", 
+                      left: "0", 
+                      width: "28px", 
+                      height: "28px", 
+                      padding: "0", 
+                      margin: "0", 
+                      background: "rgba(244,67,54,0.2)", 
+                      color: "#f44336", 
+                      border: "1px solid #f44336", 
+                      borderRadius: "50%", 
+                      fontSize: "13px", 
+                      fontWeight: "bold", 
+                      cursor: "pointer", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      zIndex: 5
+                    }}
+                  >✕</button>
+
+                  <div style={{ paddingLeft: "35px" }}>
+                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px", marginBottom: "2px", lineHeight: "1.3" }}>{activeScannedStudent.student.full_name}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                       <span style={{ background: "#2196F3", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>كود: {activeScannedStudent.student.student_code}</span>
                       <span style={{ background: "#333", color: "#ddd", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>س: {activeScannedStudent.student.section}</span>
                       <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>حضور: {activeScannedStudent.attCount}</span>
                       <span style={{ background: "#555", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>Max: {selectedProject.max_score}</span>
                     </div>
                   </div>
-                  
-                  {/* COMPACT CANCEL BUTTON */}
-                  <button onClick={handleCancelActiveStudent} style={{
-                    background: "rgba(244,67,54,0.15)", color: "#f44336", border: "1px solid #f44336",
-                    borderRadius: "6px", padding: "4px 8px", fontSize: "11px", fontWeight: "bold",
-                    cursor: "pointer", flexShrink: 0
-                  }}>✕ إلغاء</button>
                 </div>
 
                 {/* BOT UPLOAD STATUS & ARTWORK PREVIEW */}
@@ -971,7 +1011,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       </div>
                       <button 
                         onClick={() => openZoomImage(activeScannedStudent.evalRecord.photo_url)}
-                        style={{ background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                        style={{ width: "auto", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
                       >
                         🖼️ معاينة وتكبير
                       </button>
@@ -999,6 +1039,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         key={score}
                         onClick={() => handleQuickGradeSelect(score)}
                         style={{
+                          width: "100%",
+                          margin: 0,
+                          padding: 0,
                           height: "38px",
                           background: activeScannedStudent.score === score ? "#4CAF50" : "#222",
                           color: activeScannedStudent.score === score ? "#000" : "#fff",
@@ -1025,7 +1068,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
               <div style={{ marginTop: "12px", flexGrow: 1, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                   <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "13px" }}>📋 المسجلين بالجلسة ({scannedStudents.length})</span>
-                  <button onClick={handleBatchSaveEvaluations} disabled={savingBatch} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>
+                  <button onClick={handleBatchSaveEvaluations} disabled={savingBatch} style={{ width: "auto", margin: 0, background: "#4CAF50", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>
                     {savingBatch ? "جاري الحفظ..." : `💾 حفظ الكل (${scannedStudents.length})`}
                   </button>
                 </div>
@@ -1039,7 +1082,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ background: "#4CAF50", color: "#000", fontWeight: "bold", padding: "3px 6px", borderRadius: "5px", fontSize: "12px" }}>{s.score ?? 0}</span>
-                        <button onClick={() => handleRemoveScannedStudent(idx)} style={{ background: "none", border: "none", color: "#f44336", fontSize: "14px", cursor: "pointer", padding: "0 4px" }}>✕</button>
+                        <button onClick={() => handleRemoveScannedStudent(idx)} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#f44336", fontSize: "14px", cursor: "pointer", padding: "0 4px" }}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -1057,7 +1100,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "12px" }}>
               <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📊 إحصائيات مشروع: {statsProject.name}</h3>
-              <button onClick={() => { setStatsProject(null); setStatsData(null); }} style={{ background: "none", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}>✕</button>
+              <button onClick={() => { setStatsProject(null); setStatsData(null); }} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
 
             {loadingStatsModal ? (
@@ -1082,7 +1125,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 {statsData.missing.length > 0 && (
                   <button 
                     onClick={() => exportMissingStudentsPdf(statsProject, statsData.missing)}
-                    style={{ width: "100%", background: "#e53935", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    style={{ width: "100%", margin: "0 0 12px 0", background: "#e53935", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                   >
                     🖨️ طباعة / تصدير كشف المتأخرين (PDF)
                   </button>
@@ -1109,7 +1152,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       {/* IMAGE ZOOM MODAL (WITH SAFE POPSTATE / BACK BUTTON) */}
       {zoomImage && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.95)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px" }}>
-          <button onClick={closeZoomImage} style={{ position: "absolute", top: "16px", right: "16px", background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: "20px", width: "40px", height: "40px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          <button onClick={closeZoomImage} style={{ position: "absolute", top: "16px", right: "16px", background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: "20px", width: "40px", height: "40px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: 0, padding: 0 }}>✕</button>
           <img src={zoomImage} alt="Zoomed Artwork" style={{ maxWidth: "95%", maxHeight: "85%", objectFit: "contain", borderRadius: "8px" }} />
           <div style={{ color: "#aaa", fontSize: "12px", marginTop: "10px" }}>اضغط (✕) أو زر الرجوع بالهاتف للعودة للتقييم</div>
         </div>
@@ -1141,8 +1184,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             />
 
             <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={saveNewProject} style={{ flex: 1, background: "#4CAF50", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ المشروع</button>
-              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
+              <button onClick={saveNewProject} style={{ flex: 1, margin: 0, background: "#4CAF50", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ المشروع</button>
+              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
             </div>
           </div>
         </div>
@@ -1153,7 +1196,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "#000", zIndex: 999, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px", borderBottom: "2px solid #0f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0a0a" }}>
             <h1 style={{ color: "#0f0", margin: 0, fontFamily: "monospace", fontSize: "18px" }}>// CLASSIFIED_REPORT</h1>
-            <button onClick={() => setShowEasterEgg(false)} style={{ background: "none", border: "none", color: "#0f0", fontSize: "22px", cursor: "pointer" }}>✖</button>
+            <button onClick={() => setShowEasterEgg(false)} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#0f0", fontSize: "22px", cursor: "pointer" }}>✖</button>
           </div>
           <div style={{ position: "relative", flexGrow: 1, overflowY: "auto", padding: "16px", direction: "rtl", color: "#0f0", fontFamily: "monospace" }}>
             <div style={{ border: "1px dashed #0f0", padding: "12px", marginBottom: "16px" }}>
@@ -1201,9 +1244,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             />
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button onClick={updateProject} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
-              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ background: "#F44336", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>أرشفة المشروع</button>
-              <button onClick={() => setShowManageProjectModal(false)} style={{ background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
+              <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
+              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "#F44336", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>أرشفة المشروع</button>
+              <button onClick={() => setShowManageProjectModal(false)} style={{ width: "100%", margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
             </div>
           </div>
         </div>
