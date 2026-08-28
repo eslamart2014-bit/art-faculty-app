@@ -32,11 +32,20 @@ export default function StudentPortal() {
       browserIdRef.current = bId;
     }
     
-    // Fetch bot username
+    // Fetch bot username from public API
     const fetchBot = async () => {
-      const { data } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
-      if (data?.telegram_config?.botInfo?.username) {
-        setBotUsername(data.telegram_config.botInfo.username);
+      try {
+        const SUPABASE_URL = 'https://zyjwxzkxkwkkpfdipmoc.supabase.co';
+        const ANON_KEY = 'sb_publishable_icyal0PmeqMePWyzT9QJuA_mqezDg3f';
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/system_settings?select=telegram_config&id=eq.1`, {
+          headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
+        });
+        const data = await res.json();
+        if (data?.[0]?.telegram_config?.botInfo?.username) {
+          setBotUsername(data[0].telegram_config.botInfo.username);
+        }
+      } catch (e) {
+        console.error('Could not fetch bot username', e);
       }
     };
     fetchBot();
