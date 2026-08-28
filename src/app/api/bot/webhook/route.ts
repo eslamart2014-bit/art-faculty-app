@@ -234,12 +234,21 @@ export async function POST(request: Request) {
         if (evalId) {
           const { data: evalRecord } = await supabase
             .from('evaluations')
-            .select('id, project_name, student_id, students ( full_name, telegram_id )')
+            .select('id, project_name, course_id, student_id, students ( full_name, telegram_id )')
             .eq('id', evalId)
             .limit(1).maybeSingle();
 
           if (evalRecord) {
             await supabase.from('evaluations').update({ score: scoreNum }).eq('id', evalId);
+
+            let projectShowScore = true;
+            if (evalRecord.course_id) {
+              const { data: c } = await supabase.from('courses').select('custom_week_names').eq('id', evalRecord.course_id).limit(1).maybeSingle();
+              const proj = ((c?.custom_week_names as any)?.__projects__ || []).find((p: any) => p.name === evalRecord.project_name);
+              if (proj && proj.show_score === false) {
+                projectShowScore = false;
+              }
+            }
 
             // Notify Teacher
             await sendTelegramMessage(botToken, chatId, `✅ <b>تم رصد الدرجة بنجاح!</b>\n\n👨‍🎓 الطالب: ${(evalRecord.students as any)?.full_name}\n📝 المشروع: ${evalRecord.project_name}\n⭐️ الدرجة: <b>${scoreNum}</b>`);
@@ -247,7 +256,7 @@ export async function POST(request: Request) {
             // Notify Student if connected
             const studentTgId = (evalRecord.students as any)?.telegram_id;
             if (studentTgId && botToken) {
-              const studentScoreMsg = showScoresToStudents
+              const studentScoreMsg = (showScoresToStudents && projectShowScore)
                 ? `🎉 <b>تم رصد وتقييم عملك!</b>\n\n📝 <b>المشروع:</b> ${evalRecord.project_name}\n⭐️ <b>الدرجة المرصودة:</b> <b>${scoreNum}</b>\n\n<i>يمكنك الاطلاع على أعمالك عبر زر (معرض أعمالي).</i>`
                 : `🎉 <b>تم اعتماد وتقييم عملك بنجاح!</b>\n\n📝 <b>المشروع:</b> ${evalRecord.project_name}\n✅ <b>الحالة:</b> معتمد ومقيّم.\n\n<i>يمكنك متابعة أعمالك عبر زر (معرض أعمالي).</i>`;
 
@@ -572,8 +581,42 @@ export async function POST(request: Request) {
         if (projects.length === 0) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `لا يوجد مشاريع مطلوبة في مقرر (${(course as any)?.name || ''}) حالياً.` });
         
         const prefix = isSimulation ? 'sim_proj_' : 'stu_proj_';
-        const keyboard = projects.map((p: any) => [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `${prefix}${crsId}_${p.id}` }]);
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المشروع أو التقييم المطلوب:', reply_markup: { inline_keyboard: keyboard } });
+        const now = new Date();
+        const keyboard: any[] = [];
+        
+        let textMsg = 'اختر المشروع أو التقييم المطلوب:\n\n';
+
+        projects.forEach((p: any) => {
+          let isOpen = p.is_active !== false;
+          let dateStr = '';
+          
+          if (isOpen && p.start_date) {
+            if (now < new Date(p.start_date)) {
+              isOpen = false;
+              dateStr = ` (يفتح في ${new Date(p.start_date).toLocaleDateString('ar-EG')})`;
+            }
+          }
+          if (isOpen && p.end_date) {
+            if (now > new Date(p.end_date)) {
+              isOpen = false;
+              dateStr = ` (مغلق لانتهاء الموعد)`;
+            } else {
+              dateStr = ` (حتى ${new Date(p.end_date).toLocaleDateString('ar-EG')})`;
+            }
+          }
+
+          if (isOpen) {
+             keyboard.push([{ text: `📝 ${p.name} (الدرجة: ${p.max_score})${dateStr}`, callback_data: `${prefix}${crsId}_${p.id}` }]);
+          } else {
+             keyboard.push([{ text: `🔒 ${p.name} (مغلق)${dateStr}`, callback_data: `closed_project` }]);
+          }
+        });
+
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: textMsg, reply_markup: { inline_keyboard: keyboard } });
+      }
+
+      if (data === 'closed_project') {
+        return NextResponse.json({ method: 'answerCallbackQuery', callback_query_id: callbackQuery.id, text: 'عفواً، هذا المشروع مغلق حالياً.', show_alert: true });
       }
 
       if (data.startsWith('stu_proj_') || data.startsWith('sim_proj_')) {
