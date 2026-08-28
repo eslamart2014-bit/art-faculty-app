@@ -622,6 +622,14 @@ export async function POST(request: Request) {
 
       // --- ADMIN ADVANCED SETTINGS ---
       if (data === 'admin_advanced_settings' && profile.role === 'مدير') {
+        // Auto-unlink admin from any student records they might have used for testing to prevent weird conflicts
+        await supabase.from('students').update({ 
+          telegram_id: null, 
+          telegram_username: null, 
+          telegram_first_name: null,
+          telegram_browser_id: null
+        }).eq('telegram_id', tgUserId.toString());
+
         const viewData = await getAdminSettingsView();
         return NextResponse.json({
           method: 'sendMessage',
