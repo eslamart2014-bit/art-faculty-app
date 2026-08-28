@@ -265,7 +265,7 @@ export async function POST(request: Request) {
         const host = request.headers.get('host') || 'art-faculty-app.vercel.app';
         const protocol = host.includes('localhost') ? 'http' : 'https';
         const cameraUrl = `${protocol}://${host}/camera?stu=${stuId}&crs=${crsId}&proj=${projId}`;
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'ممتاز! ✅\nاضغط على الزر بالأسفل لفتح الكاميرا وتصوير لوحتك.\n\n⚠️ تأكد من الإضاءة الجيدة وعدم اهتزاز الهاتف.', reply_markup: { inline_keyboard: [[{ text: '📸 فتح الكاميرا وتصوير اللوحة', web_app: { url: cameraUrl } }]] } });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'ممتاز! ✅\nاضغط على الزر بالأسفل لفتح الكاميرا.\n\n⚠️ تأكد من الإضاءة الجيدة وعدم اهتزاز الهاتف.', reply_markup: { inline_keyboard: [[{ text: '📸 تصوير المشروع', web_app: { url: cameraUrl } }]] } });
       }
 
       // =====================================================
