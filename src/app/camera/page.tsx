@@ -319,7 +319,7 @@ function CameraApp() {
             </p>
             
             <div style={{ backgroundColor: 'rgba(33, 150, 243, 0.1)', border: '1px solid #2196F3', borderRadius: '10px', padding: '14px', marginBottom: '28px', textAlign: 'right', direction: 'rtl', fontSize: '0.85rem', color: '#90caf9', maxWidth: '360px', lineHeight: '1.5' }}>
-              ℹ️ <strong>ملاحظة:</strong> عند الضغط بالأسفل، سيطلب منك النظام السماح باستخدام الكاميرا لالتقاط صورة المشروع فقط.
+              ℹ️ <strong>ملاحظة أمنية:</strong> عند الضغط بالأسفل، سيطلب منك تليجرام السماح بالوصول للكاميرا. هذه الصلاحية تستخدم حصراً في هذه اللحظة لالتقاط صورة مشروعك فقط ولا يتم مشاركتها.
             </div>
 
             {hasError && (
