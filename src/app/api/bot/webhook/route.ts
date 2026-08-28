@@ -80,22 +80,49 @@ export async function POST(request: Request) {
         let replyMarkup = null;
 
         if (payload) {
-          const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_link_token', payload).maybeSingle();
-          if (profile) {
-            await supabase.from('profiles').update({ telegram_id: chatId, telegram_link_token: null }).eq('id', profile.id);
-            const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
-            replyText = `مرحباً بك د. ${profile.full_name} 🎓\n\nلقد تم ربط حسابك بنجاح بصلاحية (${roleName}).`;
+          if (payload.startsWith('stu_')) {
+            const studentCode = payload.replace('stu_', '');
+            const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
             
-            const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
-            if (profile.role === 'مدير') {
-              buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+            if (!student) {
+              replyText = `عفواً، لم يتم العثور على طالب بهذا الكود. يرجى مراجعة الإدارة.`;
+            } else if (student.telegram_id && student.telegram_id !== chatId) {
+              replyText = `⚠️ هذا الكود مربوط مسبقاً بحساب تليجرام آخر! إذا كنت تعتقد أن هناك خطأ، يرجى التوجه للإدارة.`;
+            } else {
+              // Link Student
+              await supabase.from('students').update({
+                telegram_id: chatId,
+                telegram_username: update.message.from.username || null,
+                telegram_first_name: update.message.from.first_name || null
+              }).eq('id', student.id);
+              
+              replyText = `تم التحقق! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم ربط حسابك بنجاح ✅\nيمكنك الآن رفع تقييماتك واستعراض غيابك مباشرة من هذا البوت!`;
+              replyMarkup = {
+                inline_keyboard: [
+                  [{ text: '📸 رفع عمل جديد', callback_data: `student_upload` }],
+                  [{ text: '📁 معرض أعمالي', callback_data: `student_gallery` }]
+                ]
+              };
             }
-            replyMarkup = { inline_keyboard: buttons };
-
           } else {
-            replyText = `عفواً، رابط التفعيل غير صحيح أو منتهي الصلاحية.`;
+            const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_link_token', payload).maybeSingle();
+            if (profile) {
+              await supabase.from('profiles').update({ telegram_id: chatId, telegram_link_token: null }).eq('id', profile.id);
+              const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
+              replyText = `مرحباً بك د. ${profile.full_name} 🎓\n\nلقد تم ربط حسابك بنجاح بصلاحية (${roleName}).`;
+              
+              const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
+              if (profile.role === 'مدير') {
+                buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+              }
+              replyMarkup = { inline_keyboard: buttons };
+
+            } else {
+              replyText = `عفواً، رابط التفعيل غير صحيح أو منتهي الصلاحية.`;
+            }
           }
         } else {
+          // No payload logic...
           const { data: existingProfile } = await supabase.from('profiles').select('*').eq('telegram_id', chatId).maybeSingle();
           if (existingProfile) {
             replyText = `أهلاً بعودتك د. ${existingProfile.full_name} 🎓\nكيف يمكنني مساعدتك؟`;

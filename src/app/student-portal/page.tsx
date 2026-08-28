@@ -13,6 +13,8 @@ export default function StudentPortal() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const browserIdRef = useRef<string>("");
 
+  const [botUsername, setBotUsername] = useState<string>("");
+
   useEffect(() => {
     // Generate or get browser_id
     if (typeof window !== 'undefined') {
@@ -23,6 +25,15 @@ export default function StudentPortal() {
       }
       browserIdRef.current = bId;
     }
+    
+    // Fetch bot username
+    const fetchBot = async () => {
+      const { data } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+      if (data?.telegram_config?.botInfo?.username) {
+        setBotUsername(data.telegram_config.botInfo.username);
+      }
+    };
+    fetchBot();
   }, []);
 
   useEffect(() => {
@@ -126,11 +137,30 @@ export default function StudentPortal() {
 
           <div style={{ background: "rgba(255, 152, 0, 0.1)", border: "1px dashed #FF9800", padding: "15px", borderRadius: "10px", marginBottom: "20px" }}>
             <p style={{ margin: 0, color: "#FF9800", fontSize: "13px", lineHeight: "1.6" }}>
-              📸 <b>يرجى التقاط لقطة شاشة (Screenshot)</b> لهذه البطاقة والاحتفاظ بها. ستحتاجها يومياً لتسجيل حضورك وتقييماتك في المحاضرات.
+              يرجى <b>أخذ لقطة شاشة لهذه الشاشة (Screenshot)</b> والاحتفاظ بها للضرورة.
             </p>
           </div>
 
-          <div style={{ borderTop: "1px solid #333", paddingTop: "15px", marginTop: "20px" }}>
+          {botUsername && (
+            <div style={{ marginBottom: "20px" }}>
+              <a 
+                href={`https://t.me/${botUsername}?start=stu_${selectedStudent.student_code}`}
+                target="_blank"
+                style={{
+                  display: "block", background: "#2196F3", color: "#fff", textDecoration: "none", 
+                  padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "15px", 
+                  boxShadow: "0 4px 15px rgba(33, 150, 243, 0.4)"
+                }}
+              >
+                ✈️ الدخول لبوت تليجرام الخاص بي
+              </a>
+              <div style={{ color: "#888", fontSize: "11px", marginTop: "8px", lineHeight: "1.5" }}>
+                هذا الرابط خاص بك أنت فقط، استخدمه لرفع أعمالك والاستعلام عن الحضور.
+              </div>
+            </div>
+          )}
+
+          <div style={{ borderTop: "1px solid #333", paddingTop: "15px", marginTop: "10px" }}>
             <div style={{ color: "#666", fontSize: "11px" }}>نظام التربية الفنية الجديد</div>
             <div style={{ color: "#555", fontSize: "10px", marginTop: "3px" }}>مطور النظام: د/ إسلام عبد اللطيف حسن</div>
           </div>
