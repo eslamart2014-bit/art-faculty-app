@@ -51,7 +51,13 @@ export async function POST(request: Request) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `عفواً أيها المدير، لم أتمكن من العثور على طالب بالكود: ${studentCode}` });
         }
 
-        const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.student_code}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (بدون أي تعارض مع حسابه الحقيقي). ماذا تريد أن تفعل؟`;
+        let telegramInfo = '❌ (غير مربوط بأي حساب تليجرام حتى الآن)';
+        if (student.telegram_id) {
+          telegramInfo = `✅ (مربوط)\n🆔 آيدي الحساب: ${student.telegram_id}\n👤 اسم الحساب: ${student.telegram_first_name || 'غير معروف'}\n🔗 المعرف: @${student.telegram_username || 'لا يوجد'}`;
+        }
+
+        const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.student_code}\n\n📱 حالة ارتباط تليجرام:\n${telegramInfo}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (كما سيراه هو تماماً). ماذا تريد أن تفعل؟`;
+        
         return NextResponse.json({
           method: 'sendMessage',
           chat_id: chatId,
