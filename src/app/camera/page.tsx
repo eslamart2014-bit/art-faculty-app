@@ -236,45 +236,22 @@ function CameraApp() {
     setIsUploading(true);
     
     try {
-      const { data: course } = await supabase.from("courses").select("custom_week_names").eq("id", crsId).single();
-      const projects = (course?.custom_week_names as any)?.__projects__ || [];
-      const project = projects.find((p: any) => p.id === projId);
-      const projectName = project ? project.name : "غير معروف";
+      const response = await fetch("/api/student/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo, stuId, crsId, projId }),
+      });
 
-      const res = await fetch(photo);
-      const blob = await res.blob();
-      
-      const fileName = `${stuId}/${crsId}/${projId}_${Date.now()}.jpg`;
-      
-      const { error: uploadError } = await supabase
-        .storage
-        .from("artworks")
-        .upload(fileName, blob, {
-          contentType: "image/jpeg",
-          upsert: true
-        });
-        
-      if (uploadError) throw uploadError;
-      
-      const { data: publicUrlData } = supabase.storage.from("artworks").getPublicUrl(fileName);
-      const photoUrl = publicUrlData.publicUrl;
-      
-      const { error: dbError } = await supabase.from("evaluations").upsert({
-        course_id: crsId,
-        student_id: stuId,
-        project_id: projId,
-        project_name: projectName,
-        photo_url: photoUrl,
-        score: null, 
-        ai_status: "pending"
-      }, { onConflict: "course_id,student_id,project_name" });
-      
-      if (dbError) throw dbError;
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "فشل الرفع");
+      }
       
       setUploadSuccess(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload failed", err);
-      alert("حدث خطأ أثناء الرفع. يرجى المحاولة مرة أخرى.");
+      alert(err.message || "حدث خطأ أثناء الرفع. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsUploading(false);
     }
