@@ -70,7 +70,8 @@ export async function POST(request: Request) {
 
       const { error: dbError } = await supabaseAdmin
         .from('system_settings')
-        .upsert({ key: 'telegram_bot', value: settingsValue, updated_at: new Date().toISOString() });
+        .update({ telegram_config: settingsValue, updated_at: new Date().toISOString() })
+        .eq('id', 1);
 
       if (dbError) throw dbError;
 
@@ -80,14 +81,14 @@ export async function POST(request: Request) {
     if (action === 'get_token') {
       const { data, error } = await supabaseAdmin
         .from('system_settings')
-        .select('value')
-        .eq('key', 'telegram_bot')
+        .select('telegram_config')
+        .eq('id', 1)
         .maybeSingle();
       
       if (error) throw error;
       
-      if (data && data.value) {
-        return NextResponse.json({ success: true, data: data.value });
+      if (data && data.telegram_config) {
+        return NextResponse.json({ success: true, data: data.telegram_config });
       }
       return NextResponse.json({ success: true, data: null });
     }
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("TELEGRAM API ERROR:", error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
