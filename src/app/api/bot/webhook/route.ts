@@ -182,9 +182,10 @@ export async function POST(request: Request) {
       }
 
       if (data.startsWith('confirm_link_')) {
-        const parts = data.split('_');
-        const studentId = parts[2];
-        const browserId = parts.slice(3).join('_'); // might be empty
+        // format: confirm_link_{studentUUID}_{browserId}
+        const withoutPrefix = data.slice('confirm_link_'.length);
+        const studentId = withoutPrefix.slice(0, 36); // UUID = 36 chars
+        const browserId = withoutPrefix.length > 37 ? withoutPrefix.slice(37) : ''; // optional browser fingerprint
 
         // 1. Verify student exists and is still not linked
         const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
@@ -226,44 +227,69 @@ export async function POST(request: Request) {
       }
 
       if (studentIdForAction) {
-        // Fetch Enrolled Courses
-        const { data: enrollments } = await supabase.from('course_enrollments').select('courses(id, name, academic_years(name))').eq('student_id', studentIdForAction);
-        if (!enrollments || enrollments.length === 0) {
-           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'أنت غير مسجل في أي مقررات حالياً.' });
+        // Fetch Student
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentIdForAction).maybeSingle();
+        if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على الطالب.' });
+
+        // Fetch Courses matching academic_year
+        const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
+                                          
+        if (!courses || courses.length === 0) {
+           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لفرقتك حالياً.' });
         }
-        const keyboard = enrollments.map(e => {
-           const c = e.courses as any;
-           const year = c.academic_years?.name || 'عام';
-           return [{ text: `📚 ${c.name} - ${year}`, callback_data: `stu_crs_${studentIdForAction}_${c.id}` }];
+        
+        // Filter by section if course is section-specific
+        const availableCourses = courses.filter(c => {
+           if (c.course_type === 'sections' && c.sections && Array.isArray(c.sections)) {
+               return c.sections.includes(student.section);
+           }
+           return true; // course_type === 'all'
         });
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المقرر لرفع تقييم جديد:', reply_markup: { inline_keyboard: keyboard } });
+
+        if (availableCourses.length === 0) {
+           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مقررات متاحة لشعبتك حالياً.' });
+        }
+
+        const keyboard = availableCourses.map(c => {
+           // format: stu_crs_{stuId}_{crsId}  — stuId is UUID (36 chars)
+           return [{ text: `📚 ${c.name} - ${c.academic_year}`, callback_data: `stu_crs_${studentIdForAction}_${c.id}` }];
+        });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `📚 مقررات فرقتك (${student.academic_year}):\n\nاختر المقرر لرفع تقييم جديد:`, reply_markup: { inline_keyboard: keyboard } });
       }
 
       // Course Selected -> Show Projects
       if (data.startsWith('stu_crs_')) {
-        const parts = data.split('_');
-        const stuId = parts[2];
-        const crsId = parts[3];
+        // format: stu_crs_{stuId(36)}_{crsId(36)}
+        const withoutPrefix = data.slice('stu_crs_'.length);
+        const stuId = withoutPrefix.slice(0, 36);
+        const crsId = withoutPrefix.slice(37); // skip underscore separator
 
-        const { data: projects } = await supabase.from('projects').select('*').eq('course_id', crsId).order('created_at', { ascending: true });
-        if (!projects || projects.length === 0) {
-           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مشاريع مطلوبة في هذا المقرر حالياً.' });
+        // Fetch course to get custom_week_names.__projects__
+        const { data: course } = await supabase.from('courses').select('custom_week_names, name').eq('id', crsId).maybeSingle();
+        const projects = (course?.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived);
+
+        if (projects.length === 0) {
+           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `لا يوجد مشاريع مطلوبة في مقرر (${course?.name || ''}) حالياً.` });
         }
-        const keyboard = projects.map(p => {
-           return [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `stu_proj_${stuId}_${p.id}` }];
+        const keyboard = projects.map((p: any) => {
+           return [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `stu_proj_${stuId}_${crsId}_${p.id}` }];
         });
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المشروع أو التقييم المطلوب:', reply_markup: { inline_keyboard: keyboard } });
       }
 
       // Project Selected -> Show Camera Button
       if (data.startsWith('stu_proj_')) {
-        const parts = data.split('_');
-        const stuId = parts[2];
-        const projId = parts[3];
-        
+        // format: stu_proj_{stuId}_{crsId}_{projId}  (all UUIDs with hyphens, separated by _)
+        // stuId is a UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
+        const withoutPrefix = data.slice('stu_proj_'.length);
+        const stuId = withoutPrefix.slice(0, 36);       // UUID = 36 chars
+        const rest = withoutPrefix.slice(37);           // skip the _ separator
+        const crsId = rest.slice(0, 36);
+        const projId = rest.slice(37);
+
         const host = request.headers.get('host') || 'localhost:3000';
         const protocol = host.includes('localhost') ? 'http' : 'https';
-        const cameraUrl = `${protocol}://${host}/camera?stu=${stuId}&proj=${projId}`;
+        const cameraUrl = `${protocol}://${host}/camera?stu=${stuId}&crs=${crsId}&proj=${projId}`;
 
         return NextResponse.json({ 
            method: 'sendMessage', 
@@ -288,7 +314,7 @@ export async function POST(request: Request) {
       // --- BROWSE COURSES ---
       if (data === 'staff_browse_courses') {
         // Fetch courses WITH academic_years
-        const { data: allCourses } = await supabase.from('courses').select('*, academic_years(name)').order('created_at', { ascending: false });
+        const { data: allCourses } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
         let userCourses = allCourses || [];
         
         // If not admin, filter by owner or shared
@@ -302,7 +328,7 @@ export async function POST(request: Request) {
 
         // Add Academic Year to button text!
         const keyboard = userCourses.map(c => {
-          const yearName = (c.academic_years as any)?.name || 'عام';
+          const yearName = c.academic_year || 'عام';
           return [{ text: `📚 ${c.name} - ${yearName}`, callback_data: `view_course_${c.id}` }];
         });
         

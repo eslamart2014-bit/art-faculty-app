@@ -480,8 +480,9 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                   })()}
 
                   {/* سجل العمليات */}
-                  <h4 style={{ color: "#fff", marginBottom: "15px" }}>سجل أحدث العمليات</h4>
-                  <div style={{ overflowX: "auto", maxHeight: "400px" }}>
+                  <details style={{ background: "#111", padding: "10px", borderRadius: "8px", border: "1px solid #333", cursor: "pointer", marginTop: "20px" }}>
+                    <summary style={{ color: "#aaa", fontSize: "14px", fontWeight: "bold" }}>🔽 عرض السجل العادي (بحث وفتح بطاقة)</summary>
+                    <div style={{ overflowX: "auto", maxHeight: "400px", marginTop: "15px" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", color: "#fff", fontSize: "14px" }}>
                       <thead>
                         <tr style={{ background: "#111", position: "sticky", top: 0 }}>
@@ -507,6 +508,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                       </tbody>
                     </table>
                   </div>
+                </details>
                 </>
               )}
             </div>
