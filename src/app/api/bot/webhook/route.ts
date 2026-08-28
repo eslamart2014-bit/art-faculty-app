@@ -81,7 +81,12 @@ export async function POST(request: Request) {
 
         if (payload) {
           if (payload.startsWith('stu_')) {
-            const studentCode = payload.replace('stu_', '');
+            const rawPayload = payload.replace('stu_', '');
+            // rawPayload might be: 0001 or 0001_br_XYZ123
+            const codeParts = rawPayload.split('_');
+            const studentCode = codeParts[0];
+            const browserId = codeParts.slice(1).join('_'); // Get the rest as browser ID
+
             const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
             
             if (!student) {
@@ -89,18 +94,22 @@ export async function POST(request: Request) {
             } else if (student.telegram_id && student.telegram_id !== chatId) {
               replyText = `⚠️ هذا الكود مربوط مسبقاً بحساب تليجرام آخر! إذا كنت تعتقد أن هناك خطأ، يرجى التوجه للإدارة.`;
             } else {
-              // Link Student
-              await supabase.from('students').update({
-                telegram_id: chatId,
-                telegram_username: update.message.from.username || null,
-                telegram_first_name: update.message.from.first_name || null
-              }).eq('id', student.id);
-              
-              replyText = `تم التحقق! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم ربط حسابك بنجاح ✅\nيمكنك الآن رفع تقييماتك واستعراض غيابك مباشرة من هذا البوت!`;
+              // Check if THIS telegram account is already linked to ANOTHER student!
+              const { data: otherStudent } = await supabase.from('students').select('full_name').eq('telegram_id', chatId).maybeSingle();
+              if (otherStudent && otherStudent.id !== student.id) {
+                return NextResponse.json({
+                  method: 'sendMessage',
+                  chat_id: chatId,
+                  text: `🚨 **تنبيه أمني:** حساب التليجرام الخاص بك مربوط بالفعل مسبقاً بالطالب (${otherStudent.full_name})! لا يُسمح بربط أكثر من طالب بنفس الحساب.`
+                });
+              }
+
+              // Show Confirmation Warning
+              replyText = `⚠️ **تنبيه هام ومصيري!**\n\nأنت على وشك ربط هاتفك وحسابك بالطالب:\n👨‍🎓 **${student.full_name}**\n\nبمجرد الضغط على (تأكيد)، **لن تتمكن أبداً من تغيير هذا الاسم**، وسيتم تسجيل جميع أعمالك وحضورك تحت هذا الاسم حتى تخرجك!\n\nهل أنت متأكد أن هذا هو اسمك؟`;
               replyMarkup = {
                 inline_keyboard: [
-                  [{ text: '📸 رفع عمل جديد', callback_data: `student_upload` }],
-                  [{ text: '📁 معرض أعمالي', callback_data: `student_gallery` }]
+                  [{ text: '✅ نعم، أنا هذا الطالب (تأكيد)', callback_data: `confirm_link_${student.id}_${browserId}` }],
+                  [{ text: '❌ لا، إلغاء', callback_data: `cancel_link` }]
                 ]
               };
             }
@@ -167,12 +176,113 @@ export async function POST(request: Request) {
         });
       }
 
-      // --- SIMULATION BUTTONS ---
+      // --- STUDENT CONFIRMATION BUTTONS ---
+      if (data === 'cancel_link') {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إلغاء عملية الربط.' });
+      }
+
+      if (data.startsWith('confirm_link_')) {
+        const parts = data.split('_');
+        const studentId = parts[2];
+        const browserId = parts.slice(3).join('_'); // might be empty
+
+        // 1. Verify student exists and is still not linked
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+        if (!student) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: لم يتم العثور على الطالب.' });
+        }
+        if (student.telegram_id && student.telegram_id !== chatId) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: هذا الطالب مربوط بحساب آخر.' });
+        }
+
+        // 2. Link account
+        await supabase.from('students').update({
+          telegram_id: chatId,
+          telegram_username: callbackQuery.from.username || null,
+          telegram_first_name: callbackQuery.from.first_name || null,
+          telegram_browser_id: browserId || null
+        }).eq('id', student.id);
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `تم التأكيد! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم قفل هذا الحساب على اسمك بنجاح ✅\nيمكنك الآن استخدامه لرفع أعمالك.`,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📸 رفع عمل جديد', callback_data: `student_upload` }],
+              [{ text: '📁 معرض أعمالي', callback_data: `student_gallery` }]
+            ]
+          }
+        });
+      }
+
+      // --- STUDENT & SIMULATION UPLOAD FLOW ---
+      let studentIdForAction = null;
+      if (data === 'student_upload') {
+        const { data: s } = await supabase.from('students').select('id').eq('telegram_id', chatId).maybeSingle();
+        if (s) studentIdForAction = s.id;
+      } else if (data.startsWith('sim_upload_')) {
+        studentIdForAction = data.replace('sim_upload_', '');
+      }
+
+      if (studentIdForAction) {
+        // Fetch Enrolled Courses
+        const { data: enrollments } = await supabase.from('course_enrollments').select('courses(id, name, academic_years(name))').eq('student_id', studentIdForAction);
+        if (!enrollments || enrollments.length === 0) {
+           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'أنت غير مسجل في أي مقررات حالياً.' });
+        }
+        const keyboard = enrollments.map(e => {
+           const c = e.courses as any;
+           const year = c.academic_years?.name || 'عام';
+           return [{ text: `📚 ${c.name} - ${year}`, callback_data: `stu_crs_${studentIdForAction}_${c.id}` }];
+        });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المقرر لرفع تقييم جديد:', reply_markup: { inline_keyboard: keyboard } });
+      }
+
+      // Course Selected -> Show Projects
+      if (data.startsWith('stu_crs_')) {
+        const parts = data.split('_');
+        const stuId = parts[2];
+        const crsId = parts[3];
+
+        const { data: projects } = await supabase.from('projects').select('*').eq('course_id', crsId).order('created_at', { ascending: true });
+        if (!projects || projects.length === 0) {
+           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد مشاريع مطلوبة في هذا المقرر حالياً.' });
+        }
+        const keyboard = projects.map(p => {
+           return [{ text: `📝 ${p.name} (الدرجة: ${p.max_score})`, callback_data: `stu_proj_${stuId}_${p.id}` }];
+        });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'اختر المشروع أو التقييم المطلوب:', reply_markup: { inline_keyboard: keyboard } });
+      }
+
+      // Project Selected -> Show Camera Button
+      if (data.startsWith('stu_proj_')) {
+        const parts = data.split('_');
+        const stuId = parts[2];
+        const projId = parts[3];
+        
+        const host = request.headers.get('host') || 'localhost:3000';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        const cameraUrl = `${protocol}://${host}/camera?stu=${stuId}&proj=${projId}`;
+
+        return NextResponse.json({ 
+           method: 'sendMessage', 
+           chat_id: chatId, 
+           text: 'ممتاز! ✅\nالآن، اضغط على زر (فتح الكاميرا 📸) بالأسفل للبدء في تصوير لوحتك.\n\n⚠️ يرجى التأكد من الإضاءة الجيدة وعدم اهتزاز الهاتف.', 
+           reply_markup: { 
+               inline_keyboard: [
+                  [{ text: '📸 فتح الكاميرا وتصوير اللوحة', web_app: { url: cameraUrl } }]
+               ] 
+           } 
+        });
+      }
+
+      // --- SIMULATION EXIT & GALLERY ---
       if (data === 'sim_exit') {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إنهاء وضع المحاكاة. عودة لصلاحيات الإدارة 👑' });
       }
-      if (data.startsWith('sim_upload_') || data.startsWith('sim_gallery_')) {
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'جاري برمجة نظام الطلاب (قيد التطوير) 🚧' });
+      if (data.startsWith('sim_gallery_') || data === 'student_gallery') {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'جاري برمجة معرض أعمال الطالب (قيد التطوير) 🚧' });
       }
 
       // --- BROWSE COURSES ---
