@@ -95,12 +95,12 @@ export async function POST(request: Request) {
               replyText = `⚠️ هذا الكود مربوط مسبقاً بحساب تليجرام آخر! إذا كنت تعتقد أن هناك خطأ، يرجى التوجه للإدارة.`;
             } else {
               // Check if THIS telegram account is already linked to ANOTHER student!
-              const { data: otherStudent } = await supabase.from('students').select('full_name').eq('telegram_id', chatId).maybeSingle();
-              if (otherStudent && otherStudent.id !== student.id) {
+              const { data: otherStudent } = await supabase.from('students').select('id, full_name').eq('telegram_id', chatId).maybeSingle();
+              if (otherStudent && (otherStudent as any).id !== student.id) {
                 return NextResponse.json({
                   method: 'sendMessage',
                   chat_id: chatId,
-                  text: `🚨 **تنبيه أمني:** حساب التليجرام الخاص بك مربوط بالفعل مسبقاً بالطالب (${otherStudent.full_name})! لا يُسمح بربط أكثر من طالب بنفس الحساب.`
+                  text: `🚨 تنبيه أمني: حساب التليجرام الخاص بك مربوط بالفعل بالطالب (${(otherStudent as any).full_name})! لا يُسمح بربط أكثر من طالب بنفس الحساب.`
                 });
               }
 
