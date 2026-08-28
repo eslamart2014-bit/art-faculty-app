@@ -65,9 +65,20 @@ export async function POST(request: Request) {
   try {
     const update = await request.json();
 
-    // Fetch token to use API directly for background tasks
+    // Fetch token & permissions to use API directly for background tasks
     const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
     const botToken = sysData?.telegram_config?.token;
+    const showScoresToStudents = sysData?.telegram_config?.show_project_scores_to_students !== false;
+    const showAttendanceToStudents = sysData?.telegram_config?.show_attendance_to_students !== false;
+
+    // Student default inline keyboard
+    const studentMainMenuMarkup = {
+      inline_keyboard: [
+        [{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],
+        [{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }],
+        [{ text: '📅 سجل حضوري بالمقررات', callback_data: 'student_attendance' }]
+      ]
+    };
 
     // ==========================================
     // 1. Handle Text Messages (/start & Replies)
@@ -101,6 +112,7 @@ export async function POST(request: Request) {
             inline_keyboard: [
               [{ text: '📸 رفع عمل جديد', callback_data: `sim_upload_${student.student_code}` }],
               [{ text: '📁 استعراض أعمال الطالب', callback_data: `sim_gallery_${student.id}` }],
+              [{ text: '📅 سجل حضور الطالب', callback_data: `sim_att_${student.id}` }],
               [{ text: '❌ إنهاء وضع المحاكاة', callback_data: `sim_exit` }]
             ]
           }
@@ -110,7 +122,6 @@ export async function POST(request: Request) {
       // --- Teacher "Grade Student Evaluation" Reply Handler ---
       if (update.message.reply_to_message && update.message.reply_to_message.text.includes('رصد درجة التقييم')) {
         const replyPrompt = update.message.reply_to_message.text;
-        // Prompt format: `... [EVAL:uuid] ...`
         const evalMatch = replyPrompt.match(/\[EVAL:([a-f0-9\-]+)\]/);
         const evalId = evalMatch ? evalMatch[1] : null;
 
@@ -135,7 +146,11 @@ export async function POST(request: Request) {
             // Notify Student if connected
             const studentTgId = (evalRecord.students as any)?.telegram_id;
             if (studentTgId && botToken) {
-              sendTelegramMessage(botToken, studentTgId, `🎉 <b>تم رصد وتقييم عملك!</b>\n\n📝 <b>المشروع:</b> ${evalRecord.project_name}\n⭐️ <b>الدرجة المرصودة:</b> <b>${scoreNum}</b>\n\n<i>يمكنك الاطلاع على درجاتك الكاملة من المنظومة أو معرض أعمالك.</i>`);
+              const studentScoreMsg = showScoresToStudents
+                ? `🎉 <b>تم رصد وتقييم عملك!</b>\n\n📝 <b>المشروع:</b> ${evalRecord.project_name}\n⭐️ <b>الدرجة المرصودة:</b> <b>${scoreNum}</b>\n\n<i>يمكنك الاطلاع على أعمالك عبر زر (معرض أعمالي).</i>`
+                : `🎉 <b>تم اعتماد وتقييم عملك بنجاح!</b>\n\n📝 <b>المشروع:</b> ${evalRecord.project_name}\n✅ <b>الحالة:</b> معتمد ومقيّم.\n\n<i>يمكنك متابعة أعمالك عبر زر (معرض أعمالي).</i>`;
+
+              sendTelegramMessage(botToken, studentTgId, studentScoreMsg);
             }
             return NextResponse.json({ ok: true });
           }
@@ -213,12 +228,7 @@ export async function POST(request: Request) {
             const { data: knownStudent } = await supabase.from('students').select('*').eq('telegram_id', chatId.toString()).maybeSingle();
             if (knownStudent) {
               replyText = `مرحباً بك يا <b>${knownStudent.full_name}</b> 👨‍🎓\n\nماذا تريد أن تفعل اليوم؟`;
-              replyMarkup = {
-                inline_keyboard: [
-                  [{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],
-                  [{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }]
-                ]
-              };
+              replyMarkup = studentMainMenuMarkup;
             } else {
               replyText = `مرحباً بك في المنظومة الأكاديمية! للحصول على رابط ربط حسابك، يرجى مسح بطاقتك أو الدخول من بوابة الطالب.`;
             }
@@ -253,7 +263,7 @@ export async function POST(request: Request) {
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: لم يتم العثور على الطالب.' });
         if (student.telegram_id && student.telegram_id !== chatId.toString()) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: هذا الطالب مربوط بحساب آخر.' });
         await supabase.from('students').update({ telegram_id: chatId.toString(), telegram_username: callbackQuery.from.username || null, telegram_first_name: callbackQuery.from.first_name || null, telegram_browser_id: browserId || null }).eq('id', student.id);
-        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `تم التأكيد! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم قفل هذا الحساب على اسمك بنجاح ✅\nيمكنك الآن استخدامه لرفع أعمالك.`, reply_markup: { inline_keyboard: [[{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],[{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }]] } });
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `تم التأكيد! أهلاً بك يا ${student.full_name} 👨‍🎓\n\nتم قفل هذا الحساب على اسمك بنجاح ✅\nيمكنك الآن استخدامه لرفع أعمالك ومتابعة حضورك.`, reply_markup: studentMainMenuMarkup });
       }
 
       // --- Student Gallery Handler ---
@@ -283,12 +293,129 @@ export async function POST(request: Request) {
           for (const ev of evals) {
             const courseName = (ev.courses as any)?.name || 'مقرر';
             const uploadTimeStr = formatRelativeTimeArabic(ev.created_at);
-            const scoreText = ev.score !== null && ev.score !== undefined && ev.score > 0 ? `⭐️ <b>الدرجة:</b> ${ev.score}` : '⏳ <b>الحالة:</b> بانتظار التقييم';
+            
+            let scoreText = '⏳ <b>الحالة:</b> بانتظار التقييم';
+            if (ev.score !== null && ev.score !== undefined && ev.score > 0) {
+              scoreText = showScoresToStudents
+                ? `⭐️ <b>الدرجة:</b> ${ev.score}`
+                : `⭐️ <b>الحالة:</b> تم التقييم بنجاح ✅`;
+            }
+
             const caption = `🎨 <b>المشروع:</b> ${ev.project_name}\n📚 <b>المقرر:</b> ${courseName}\n⏱️ <b>وقت الرفع:</b> ${uploadTimeStr}\n${scoreText}`;
             await sendTelegramPhoto(botToken, chatId, ev.photo_url, caption);
           }
         }
         return NextResponse.json({ ok: true });
+      }
+
+      // --- Student Attendance Inquiry Handler ---
+      if (data === 'student_attendance' || data.startsWith('sim_att_')) {
+        let stuId = null;
+        let isSimulation = false;
+
+        if (data.startsWith('sim_att_')) {
+          isSimulation = true;
+          stuId = data.replace('sim_att_', '');
+        } else {
+          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+        }
+
+        if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على حسابك. يرجى التسجيل أولاً.' });
+
+        // Check Admin Permission
+        if (!showAttendanceToStudents && !isSimulation) {
+          return NextResponse.json({
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: '⚠️ <b>عفواً، خاصية الاستعلام عن الحضور معطلة حالياً من قبل إدارة الكلية.</b>'
+          });
+        }
+
+        const { data: student } = await supabase.from('students').select('*').eq('id', stuId).maybeSingle();
+        if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على بيانات الطالب.' });
+
+        // Fetch student courses
+        const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
+        if (!courses || courses.length === 0) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا توجد مقررات متاحة لفرقتك حالياً.' });
+        }
+
+        const availableCourses = courses.filter(c => {
+          if (c.course_type === 'sections' && c.sections && Array.isArray(c.sections)) return c.sections.includes(student.section);
+          return true;
+        });
+
+        if (availableCourses.length === 0) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا توجد مقررات مسجلة لشعبتك حالياً.' });
+        }
+
+        const prefix = isSimulation ? 'sim_att_crs_' : 'stu_att_crs_';
+        const keyboard = availableCourses.map(c => [{ text: `📚 ${c.name}`, callback_data: `${prefix}${c.id}` }]);
+        
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: `📅 <b>سجل الحضور والغياب:</b>\n\nاختر المقرر لمعرفة عدد مرات حضورك وغيابك:`,
+          reply_markup: { inline_keyboard: keyboard }
+        });
+      }
+
+      // --- Student Course Attendance Detail Handler ---
+      if (data.startsWith('stu_att_crs_') || data.startsWith('sim_att_crs_')) {
+        const isSimulation = data.startsWith('sim_att_crs_');
+        const crsId = data.replace(isSimulation ? 'sim_att_crs_' : 'stu_att_crs_', '');
+
+        let stuId = null;
+        if (isSimulation) {
+          const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).maybeSingle();
+          if (profile?.telegram_link_token?.startsWith('SIM_')) {
+            stuId = profile.telegram_link_token.replace('SIM_', '');
+          }
+        } else {
+          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+        }
+
+        if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، انتهت الجلسة أو الحساب غير مسجل.' });
+
+        const { data: course } = await supabase.from('courses').select('*, profiles ( full_name )').eq('id', crsId).maybeSingle();
+        const teacherName = (course?.profiles as any)?.full_name || 'أستاذ المقرر';
+
+        const { data: attRecords } = await supabase
+          .from('attendance')
+          .select('date, status')
+          .eq('course_id', crsId)
+          .eq('student_id', stuId)
+          .order('date', { ascending: true });
+
+        const presentCount = (attRecords || []).filter(a => a.status === 'حاضر').length;
+        const absentCount = (attRecords || []).filter(a => a.status === 'غائب').length;
+        const permissionCount = (attRecords || []).filter(a => a.status === 'إذن').length;
+        const totalWeeks = (attRecords || []).length;
+        const attendanceRate = totalWeeks > 0 ? Math.round((presentCount / totalWeeks) * 100) : 100;
+
+        let reportMsg = `📊 <b>تقرير الحضور لمقرر (${course?.name || 'المقرر'}):</b>\n\n` +
+          `👨‍🏫 <b>أستاذ المقرر:</b> د. ${teacherName}\n\n` +
+          `✅ <b>مرات الحضور:</b> ${presentCount} أسابيع\n` +
+          `❌ <b>مرات الغياب:</b> ${absentCount} أسابيع\n` +
+          `📝 <b>مرات الإذن:</b> ${permissionCount}\n` +
+          `📈 <b>نسبة الحضور:</b> <b>${attendanceRate}%</b>\n\n`;
+
+        if (attRecords && attRecords.length > 0) {
+          reportMsg += `🗓️ <b>تفاصيل التواريخ المسجلة:</b>\n`;
+          attRecords.forEach((a, idx) => {
+            const icon = a.status === 'حاضر' ? '✅' : a.status === 'غائب' ? '❌' : '📝';
+            reportMsg += `${idx + 1}. ${a.date} : ${icon} (${a.status})\n`;
+          });
+        } else {
+          reportMsg += `ℹ️ <i>لم يتم رصد أي جلسات حضور أو غياب لك في هذا المقرر حتى الآن.</i>`;
+        }
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: reportMsg,
+          reply_markup: studentMainMenuMarkup
+        });
       }
 
       // --- Student Upload OR Sim Upload ---
@@ -379,7 +506,7 @@ export async function POST(request: Request) {
       const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_id', tgUserId.toString()).maybeSingle();
       if (!profile) {
         const { data: knownStudent } = await supabase.from('students').select('full_name').eq('telegram_id', tgUserId.toString()).maybeSingle();
-        if (knownStudent) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `مرحباً ${(knownStudent as any).full_name}!\n\nاختر ما تريد:`, reply_markup: { inline_keyboard: [[{ text: '📸 رفع عمل جديد', callback_data: 'student_upload' }],[{ text: '📁 معرض أعمالي', callback_data: 'student_gallery' }]] } });
+        if (knownStudent) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `مرحباً ${(knownStudent as any).full_name}!\n\nاختر ما تريد:`, reply_markup: studentMainMenuMarkup });
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل في النظام.' });
       }
 
@@ -420,10 +547,8 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (ev) {
-          // Clear photo_url and reset evaluation
           await supabase.from('evaluations').update({ photo_url: null, ai_status: null, score: 0 }).eq('id', evalId);
 
-          // Notify student that they can re-upload
           const studentTg = (ev.students as any)?.telegram_id;
           if (studentTg && botToken) {
             sendTelegramMessage(botToken, studentTg, `⚠️ <b>تنبيه بخصوص مشروع (${ev.project_name}):</b>\n\nتم إلغاء اعتماد العمل المرفوع بواسطة أستاذ المقرر.\nيمكنك الآن فتح الكاميرا وإعادة تصوير مشروعك ورفعه مجدداً.`);
@@ -436,7 +561,6 @@ export async function POST(request: Request) {
 
       // --- Course Single Project Statistics Action ---
       if (data.startsWith('pstats_')) {
-        // format: pstats_crsId_projId
         const withoutPrefix = data.replace('pstats_', '');
         const underscoreIdx = withoutPrefix.indexOf('_');
         const crsId = withoutPrefix.slice(0, underscoreIdx);
@@ -447,14 +571,12 @@ export async function POST(request: Request) {
         const project = projects.find((p: any) => p.id === projId);
         const projName = project ? project.name : 'المشروع';
 
-        // Fetch all students for this course
         const { data: allStudents } = await supabase.from('students').select('id, full_name, student_code, section').eq('academic_year', course?.academic_year);
         let eligibleStudents = allStudents || [];
         if (course?.course_type === 'sections' && course.sections && Array.isArray(course.sections)) {
           eligibleStudents = eligibleStudents.filter(s => course.sections.includes(s.section));
         }
 
-        // Fetch submitted evaluations for this project
         const { data: evals } = await supabase
           .from('evaluations')
           .select('student_id, score, created_at')
@@ -522,7 +644,6 @@ export async function POST(request: Request) {
 
         const projects = ((course?.custom_week_names as any)?.__projects__ || []).filter((p: any) => !p.is_archived);
 
-        // Send project stats buttons
         if (projects.length > 0) {
           const statsButtons = projects.map((p: any) => [
             { text: `📊 إحصائية وتأخيرات: ${p.name}`, callback_data: `pstats_${courseId}_${p.id}` }
@@ -532,7 +653,6 @@ export async function POST(request: Request) {
           }
         }
 
-        // Fetch all student submissions with photos for this course
         const { data: evals } = await supabase
           .from('evaluations')
           .select('id, project_name, score, photo_url, created_at, students ( id, full_name, student_code, section )')
