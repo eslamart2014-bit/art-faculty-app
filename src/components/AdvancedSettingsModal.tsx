@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import QRScanner from "@/components/QRScanner";
+import TelegramSettingsTab from "@/components/TelegramSettingsTab";
 
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { extractStudentCode } from "@/lib/scannerHelper";
@@ -11,7 +12,7 @@ interface AdvancedSettingsModalProps {
 }
 
 export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | "shares" | null>("study");
+  const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | "shares" | "telegram" | null>("study");
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
@@ -317,6 +318,10 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
           onClick={() => setActiveTab("shares")}
           style={{ flex: 1, padding: "10px", background: activeTab === "shares" ? "#333" : "transparent", color: activeTab === "shares" ? "#4CAF50" : "#888", border: "none", borderBottom: activeTab === "shares" ? "2px solid #4CAF50" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
         >مشاركة 🤝</button>
+        <button 
+          onClick={() => setActiveTab("telegram")}
+          style={{ flex: 1, padding: "10px", background: activeTab === "telegram" ? "#333" : "transparent", color: activeTab === "telegram" ? "#2196F3" : "#888", border: "none", borderBottom: activeTab === "telegram" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px", minWidth: "90px" }}
+        >تليجرام ✈️</button>
       </div>
 
       <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto" }}>
@@ -745,6 +750,11 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
               </div>
             )}
           </div>
+        )}
+
+        {/* Telegram Settings Tab */}
+        {activeTab === "telegram" && (
+          <TelegramSettingsTab />
         )}
       </div>
     </div>
