@@ -103,8 +103,34 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [statsData, setStatsData] = useState<{ submitted: any[]; missing: any[] } | null>(null);
   const [loadingStatsModal, setLoadingStatsModal] = useState(false);
 
-  // Image Zoom Modal
+  // Image Zoom Modal & Mobile Back Handling
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+
+  const openZoomImage = (url: string) => {
+    setZoomImage(url);
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "zoomImage" }, "");
+    }
+  };
+
+  const closeZoomImage = () => {
+    if (zoomImage) {
+      setZoomImage(null);
+      if (typeof window !== "undefined" && window.history.state && window.history.state.modal === "zoomImage") {
+        window.history.back();
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (zoomImage) {
+        setZoomImage(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [zoomImage]);
 
   // Form states
   const [searchInput, setSearchInput] = useState("");
@@ -345,22 +371,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // Harmonious Quick Grades Generator
+  // Full 0 to max_score with +1 increment
   const getQuickGrades = (maxScore: number) => {
-    if (maxScore <= 20) return Array.from({ length: maxScore + 1 }, (_, i) => i);
-    if (maxScore === 25) return [0, 5, 10, 15, 18, 20, 22, 23, 24, 25];
-    if (maxScore === 30) return [0, 5, 10, 15, 20, 22, 24, 26, 28, 30];
-    if (maxScore === 50) return [0, 10, 20, 25, 30, 35, 40, 42, 45, 48, 50];
-    if (maxScore === 100) return [0, 20, 40, 50, 60, 70, 75, 80, 85, 90, 95, 100];
-    
-    // Default smart steps
-    const steps = 10;
-    const result = new Set<number>([0]);
-    for (let i = 1; i <= steps; i++) {
-      result.add(Math.round((maxScore / steps) * i));
-    }
-    result.add(maxScore);
-    return Array.from(result).sort((a, b) => a - b);
+    const safeMax = Math.min(Math.max(Math.floor(maxScore || 10), 1), 100);
+    return Array.from({ length: safeMax + 1 }, (_, i) => i);
   };
 
   const vibrateSuccess = () => { if (navigator.vibrate) navigator.vibrate(100); };
@@ -539,7 +553,6 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       const attCount = await getAttendanceCount(student.id);
       setTargetStudent({ ...student, attCount, evalRecord: ex });
       
-      // Prefill score only if actively graded (>0)
       setManualScore(ex && ex.score && ex.score > 0 ? ex.score.toString() : "");
       
       setTimeout(() => document.getElementById("manualGradeInput")?.focus(), 100);
@@ -624,36 +637,36 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   if (loading || !course) return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div className="loader-circle"></div></div>;
 
   return (
-    <div style={{ padding: "0", maxWidth: "900px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "#121212" }}>
+    <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column", background: "#121212" }}>
       
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", background: "#1e1e1e", borderBottom: "1px solid #333", direction: "rtl" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "#1e1e1e", borderBottom: "1px solid #333", direction: "rtl" }}>
         <button className="hide-on-mobile" onClick={() => {
           if (view === 'CAMERA') cancelScanner();
           else if (view === 'MANUAL') { setView('EVAL_MENU'); setTargetStudent(null); setSearchInput(""); }
           else if (view === 'EVAL_MENU') setView('PROJECTS');
           else router.push(`/course/${course?.id}`);
-        }} style={{ background: "none", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}>🡲</button>
-        <h2 style={{ margin: 0, color: "#FF9800", fontSize: "18px" }}>بوابة التقييم</h2>
+        }} style={{ background: "none", border: "none", color: "#fff", fontSize: "22px", cursor: "pointer" }}>🡲</button>
+        <h2 style={{ margin: 0, color: "#FF9800", fontSize: "17px", fontWeight: "bold" }}>بوابة التقييم</h2>
         <div style={{ width: "24px" }}></div>
       </div>
 
-      <div style={{ padding: "20px", direction: "rtl", flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "14px", direction: "rtl", flexGrow: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
         
         {/* PROJECTS LIST VIEW */}
         {view === 'PROJECTS' && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ color: "#FF9800", margin: 0 }}>المشاريع المتاحة للتقييم</h3>
-              <button onClick={() => setShowAddProjectModal(true)} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "8px 15px", borderRadius: "8px", fontWeight: "bold" }}>➕ إضافة مشروع</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ color: "#FF9800", margin: 0, fontSize: "16px" }}>المشاريع المتاحة للتقييم</h3>
+              <button onClick={() => setShowAddProjectModal(true)} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px" }}>➕ إضافة مشروع</button>
             </div>
 
             {projects.filter(p => !p.is_archived).length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#666", background: "#1e1e1e", borderRadius: "15px", border: "1px dashed #444" }}>
+              <div style={{ textAlign: "center", padding: "35px", color: "#666", background: "#1e1e1e", borderRadius: "14px", border: "1px dashed #444", fontSize: "14px" }}>
                 لا توجد مشاريع مضافة حتى الآن.<br/>اضغط على "إضافة مشروع" للبدء.
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px" }}>
                 {projects.filter(p => !p.is_archived).map(proj => {
                   const graded = projectStats[proj.name] || 0;
                   const ungraded = totalCourseStudents - graded;
@@ -665,25 +678,25 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       onMouseDown={() => handleProjectTouchStart(proj)}
                       onMouseUp={handleProjectTouchEnd}
                       onMouseLeave={handleProjectTouchEnd}
-                      style={{ background: "#1e1e1e", padding: "18px 20px", borderRadius: "15px", border: "1px solid #333", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      style={{ background: "#1e1e1e", padding: "14px 16px", borderRadius: "12px", border: "1px solid #333", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ flex: 1, pointerEvents: "none" }}>
-                        <div style={{ color: "#90CAF9", fontWeight: "bold", fontSize: "19px", marginBottom: "8px" }}>{proj.name} <span style={{ color: "#888", fontSize: "14px", fontWeight: "normal" }}>({proj.max_score} درجة)</span></div>
-                        <div style={{ display: "flex", gap: "15px", fontSize: "12px", opacity: 0.9 }}>
+                        <div style={{ color: "#90CAF9", fontWeight: "bold", fontSize: "16px", marginBottom: "6px" }}>{proj.name} <span style={{ color: "#888", fontSize: "13px", fontWeight: "normal" }}>({proj.max_score} درجة)</span></div>
+                        <div style={{ display: "flex", gap: "10px", fontSize: "11px", opacity: 0.9, flexWrap: "wrap" }}>
                           <span style={{ color: "#81C784" }}>✅ مقيّم: {graded}</span>
                           <span style={{ color: "#E57373" }}>⏳ متبقي: {ungraded}</span>
                           <span style={{ color: "#B0BEC5" }}>👥 الإجمالي: {totalCourseStudents}</span>
                         </div>
                       </div>
                       
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <button 
                           onClick={(e) => openProjectStats(proj, e)}
                           title="إحصائية المشروع وتصدير كشف المتأخرين PDF"
-                          style={{ background: "rgba(33, 150, 243, 0.15)", color: "#2196F3", border: "1px solid #2196F3", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                          style={{ background: "rgba(33, 150, 243, 0.15)", color: "#2196F3", border: "1px solid #2196F3", borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
                         >
-                          📊 إحصائية وتأخيرات
+                          📊 إحصائية
                         </button>
-                        <div style={{ color: "#fff", fontSize: "20px" }}>🡰</div>
+                        <div style={{ color: "#fff", fontSize: "18px" }}>🡰</div>
                       </div>
                     </div>
                   );
@@ -696,110 +709,114 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         {/* EVALUATION MENU */}
         {view === 'EVAL_MENU' && selectedProject && (
           <div style={{ textAlign: "center", marginTop: "10px" }}>
-            <div style={{ background: "#2d2d2d", padding: "15px", borderRadius: "10px", marginBottom: "30px", border: "1px solid #4CAF50" }}>
-              <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "5px" }}>المشروع المحدد:</div>
-              <div style={{ color: "#81C784", fontWeight: "bold", fontSize: "24px", marginBottom: "20px", textAlign: "center" }}>{selectedProject.name} <span style={{ color: "#888", fontSize: "16px", fontWeight: "normal" }}>({selectedProject.max_score} درجة)</span></div>
+            <div style={{ background: "#222", padding: "16px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #4CAF50" }}>
+              <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "4px" }}>المشروع المحدد:</div>
+              <div style={{ color: "#81C784", fontWeight: "bold", fontSize: "20px", marginBottom: "14px", textAlign: "center" }}>{selectedProject.name} <span style={{ color: "#888", fontSize: "14px", fontWeight: "normal" }}>({selectedProject.max_score} درجة)</span></div>
               
-              <div style={{ display: "flex", justifyContent: "space-around", background: "#1e1e1e", padding: "15px", borderRadius: "10px", fontSize: "11px", opacity: 0.9 }}>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#81C784", fontSize: "20px", fontWeight: "bold" }}>{projectStats[selectedProject.name] || 0}</div><div style={{ color: "#888", marginTop: "6px" }}>مقيّم ✅</div></div>
+              <div style={{ display: "flex", justifyContent: "space-around", background: "#161616", padding: "12px", borderRadius: "8px", fontSize: "11px" }}>
+                 <div style={{ textAlign: "center" }}><div style={{ color: "#81C784", fontSize: "18px", fontWeight: "bold" }}>{projectStats[selectedProject.name] || 0}</div><div style={{ color: "#888", marginTop: "4px" }}>مقيّم ✅</div></div>
                  <div style={{ width: "1px", background: "#333" }}></div>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#E57373", fontSize: "20px", fontWeight: "bold" }}>{totalCourseStudents - (projectStats[selectedProject.name] || 0)}</div><div style={{ color: "#888", marginTop: "6px" }}>متبقي ⏳</div></div>
+                 <div style={{ textAlign: "center" }}><div style={{ color: "#E57373", fontSize: "18px", fontWeight: "bold" }}>{totalCourseStudents - (projectStats[selectedProject.name] || 0)}</div><div style={{ color: "#888", marginTop: "4px" }}>متبقي ⏳</div></div>
                  <div style={{ width: "1px", background: "#333" }}></div>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#90CAF9", fontSize: "20px", fontWeight: "bold" }}>{totalCourseStudents}</div><div style={{ color: "#888", marginTop: "6px" }}>الإجمالي 👥</div></div>
+                 <div style={{ textAlign: "center" }}><div style={{ color: "#90CAF9", fontSize: "18px", fontWeight: "bold" }}>{totalCourseStudents}</div><div style={{ color: "#888", marginTop: "4px" }}>الإجمالي 👥</div></div>
               </div>
             </div>
 
-            <h3 style={{ color: "#FF9800", marginBottom: "30px" }}>⭐ اختر طريقة التقييم</h3>
-            <button onClick={startScanner} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "20px", borderRadius: "15px", fontSize: "18px", fontWeight: "bold", marginBottom: "15px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-              <span style={{ fontSize: "24px" }}>📱</span> التقييم الذكي (بالكاميرا والمطابقة)
+            <h3 style={{ color: "#FF9800", marginBottom: "20px", fontSize: "16px" }}>⭐ اختر طريقة التقييم</h3>
+            <button onClick={startScanner} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", marginBottom: "12px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+              <span style={{ fontSize: "22px" }}>📱</span> التقييم الذكي (بالكاميرا والمطابقة)
             </button>
-            <button onClick={() => setView('MANUAL')} style={{ width: "100%", background: "#2196F3", color: "#fff", padding: "20px", borderRadius: "15px", fontSize: "18px", fontWeight: "bold", marginBottom: "15px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-              <span style={{ fontSize: "24px" }}>📝</span> التقييم اليدوي ومراجعة اللوحات
+            <button onClick={() => setView('MANUAL')} style={{ width: "100%", background: "#2196F3", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", marginBottom: "12px", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+              <span style={{ fontSize: "22px" }}>📝</span> التقييم اليدوي ومراجعة اللوحات
             </button>
           </div>
         )}
 
         {/* MANUAL EVALUATION VIEW */}
         {view === 'MANUAL' && (
-          <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", flexGrow: 1, display: "flex", flexDirection: "column" }}>
+          <div style={{ background: "#1e1e1e", padding: "14px", borderRadius: "12px", border: "1px solid #333", flexGrow: 1, display: "flex", flexDirection: "column" }}>
             
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ color: "#aaa", fontSize: "12px", display: "block", marginBottom: "5px" }}>المشروع الحالي:</label>
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ color: "#aaa", fontSize: "11px", display: "block", marginBottom: "4px" }}>المشروع الحالي:</label>
               <select value={selectedProject?.id || ""} onChange={e => {
                 if (e.target.value === "ADD_NEW") setShowAddProjectModal(true);
                 else {
                   const p = projects.find(x => x.id === e.target.value);
                   if (p) setSelectedProject(p);
                 }
-              }} style={{ width: "100%", padding: "12px", background: "#222", border: "1px solid #444", borderRadius: "10px", color: "#fff", fontSize: "16px", outline: "none" }}>
+              }} style={{ width: "100%", padding: "10px", background: "#222", border: "1px solid #444", borderRadius: "8px", color: "#fff", fontSize: "14px", outline: "none" }}>
                 {projects.filter(p => !p.is_archived).map(p => <option key={p.id} value={p.id}>{p.name} (Max {p.max_score})</option>)}
                 <option value="ADD_NEW" style={{ color: "#4CAF50" }}>➕ إضافة مشروع جديد...</option>
               </select>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
               <input 
                 id="manualSearchInput"
                 type="text" 
                 inputMode="numeric"
-                placeholder="أدخل كود الطالب للبحث..." 
+                placeholder="أدخل كود الطالب..." 
                 value={searchInput} 
                 onChange={e => setSearchInput(e.target.value)} 
                 onKeyDown={e => { if (e.key === 'Enter') handleManualSearch(); }}
-                style={{ flex: 1, padding: "15px", background: "#121212", border: "1px solid #444", borderRadius: "10px", color: "#fff", fontSize: "18px", textAlign: "center", outline: "none" }} 
+                style={{ flex: 1, padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", fontSize: "16px", textAlign: "center", outline: "none" }} 
               />
-              <button onClick={handleManualSearch} disabled={searchingManual} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 25px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", cursor: "pointer" }}>
+              <button onClick={handleManualSearch} disabled={searchingManual} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 20px", borderRadius: "8px", fontWeight: "bold", fontSize: "14px", cursor: "pointer" }}>
                 {searchingManual ? "..." : "بحث"}
               </button>
             </div>
 
             {targetStudent && selectedProject && (
-              <div style={{ background: "#151e15", padding: "20px", borderRadius: "15px", border: "2px solid #4CAF50", animation: "slideUp 0.3s" }}>
+              <div style={{ background: "#151e15", padding: "14px", borderRadius: "12px", border: "2px solid #4CAF50", animation: "slideUp 0.25s" }}>
                 
                 {/* Student Full Info Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "12px" }}>
-                  <div>
-                    <h3 style={{ margin: "0 0 6px 0", color: "#fff", fontSize: "20px", fontWeight: "bold" }}>{targetStudent.full_name}</h3>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ background: "#2196F3", color: "#fff", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: "bold" }}>كود: {targetStudent.student_code}</span>
-                      <span style={{ background: "#333", color: "#ddd", borderRadius: "6px", padding: "3px 10px", fontSize: "12px" }}>سكشن: {targetStudent.section}</span>
-                      <span style={{ background: "#FF9800", color: "#fff", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: "bold" }}>حضور: {targetStudent.attCount} مرة</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px", marginBottom: "4px" }}>{targetStudent.full_name}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <span style={{ background: "#2196F3", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>كود: {targetStudent.student_code}</span>
+                      <span style={{ background: "#333", color: "#ddd", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>س: {targetStudent.section}</span>
+                      <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>حضور: {targetStudent.attCount}</span>
                       {targetStudent.evalRecord?.score > 0 && (
-                        <span style={{ background: "#4CAF50", color: "#000", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: "bold" }}>درجة سابقة: {targetStudent.evalRecord.score}</span>
+                        <span style={{ background: "#4CAF50", color: "#000", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>رُصد: {targetStudent.evalRecord.score}</span>
                       )}
                     </div>
                   </div>
+
+                  <button onClick={() => { setTargetStudent(null); setSearchInput(""); }} style={{
+                    background: "rgba(244,67,54,0.15)", color: "#f44336", border: "1px solid #f44336",
+                    borderRadius: "6px", padding: "4px 8px", fontSize: "11px", fontWeight: "bold",
+                    cursor: "pointer", flexShrink: 0
+                  }}>✕ إغلاق</button>
                 </div>
 
                 {/* BOT UPLOAD STATUS & ARTWORK PREVIEW */}
-                <div style={{ background: "#111", border: "1px solid #333", borderRadius: "12px", padding: "14px", marginBottom: "18px" }}>
+                <div style={{ background: "#111", border: "1px solid #333", borderRadius: "8px", padding: "10px", marginBottom: "12px" }}>
                   {targetStudent.evalRecord?.photo_url ? (
                     <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "6px" }}>
-                        <span style={{ color: "#4CAF50", fontSize: "14px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span>✅</span> تم رفع العمل عبر البوت
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "4px" }}>
+                        <span style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
+                          ✅ تم رفع العمل عبر البوت
                         </span>
-                        <span style={{ color: "#aaa", fontSize: "12px" }}>
+                        <span style={{ color: "#888", fontSize: "11px" }}>
                           ⏱️ {formatRelativeTimeArabic(targetStudent.evalRecord.created_at)}
                         </span>
                       </div>
 
-                      {/* Photo Thumbnail with Zoom */}
                       <div 
-                        onClick={() => setZoomImage(targetStudent.evalRecord.photo_url)}
-                        style={{ position: "relative", width: "100%", height: "220px", background: "#000", borderRadius: "10px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #444" }}
+                        onClick={() => openZoomImage(targetStudent.evalRecord.photo_url)}
+                        style={{ position: "relative", width: "100%", height: "160px", background: "#000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #333" }}
                       >
                         <img src={targetStudent.evalRecord.photo_url} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                        <div style={{ position: "absolute", bottom: "10px", right: "10px", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", color: "#fff", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}>
-                          <span>🔍</span> اضغط لتكبير ومعاينة اللوحة
+                        <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(0,0,0,0.8)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                          🔍 تكبير ومعاينة
                         </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", gap: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", gap: "8px" }}>
                         <button 
                           onClick={() => cancelArtwork(targetStudent.evalRecord.id)}
-                          style={{ background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", cursor: "pointer", flex: 1 }}
+                          style={{ background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flex: 1 }}
                         >
                           🗑️ إلغاء واعتماد إعادة الرفع
                         </button>
@@ -807,45 +824,47 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         {targetStudent.telegram_id && (
                           <button 
                             onClick={() => resetTelegramLink(targetStudent.id, targetStudent.full_name)}
-                            style={{ background: "rgba(255, 152, 0, 0.15)", color: "#ff9800", border: "1px solid #ff9800", padding: "10px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
+                            style={{ background: "rgba(255, 152, 0, 0.15)", color: "#ff9800", border: "1px solid #ff9800", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
                           >
-                            🔓 فك ربط تليجرام
+                            🔓 فك تليجرام
                           </button>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ textAlign: "center", padding: "12px 0", color: "#aaa", fontSize: "13px" }}>
+                    <div style={{ textAlign: "center", padding: "8px 0", color: "#aaa", fontSize: "12px" }}>
                       ⏳ لم يقم الطالب برفع صورة لهذا المشروع عبر البوت بعد.
                     </div>
                   )}
                 </div>
                 
-                {/* EQUAL SIZED QUICK GRADE BUTTONS */}
-                <div style={{ marginBottom: "15px" }}>
-                  <label style={{ display: "block", color: "#aaa", fontSize: "12px", marginBottom: "8px" }}>اختر الدرجة السريعة:</label>
+                {/* 0 TO MAX_SCORE QUICK GRADE GRID */}
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "6px" }}>اضغط لتحديد الدرجة (0 إلى {selectedProject.max_score}):</label>
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(58px, 1fr))",
-                    gap: "8px"
+                    gridTemplateColumns: "repeat(auto-fill, minmax(42px, 1fr))",
+                    gap: "6px",
+                    maxHeight: "150px",
+                    overflowY: "auto",
+                    padding: "2px"
                   }}>
                     {getQuickGrades(selectedProject.max_score).map(score => (
                       <button
                         key={score}
                         onClick={() => setManualScore(score.toString())}
                         style={{
-                          height: "46px",
+                          height: "38px",
                           background: manualScore === score.toString() ? "#4CAF50" : "#222",
                           color: manualScore === score.toString() ? "#000" : "#fff",
                           border: manualScore === score.toString() ? "2px solid #fff" : "1px solid #444",
-                          borderRadius: "10px",
-                          fontSize: "16px",
+                          borderRadius: "8px",
+                          fontSize: "14px",
                           fontWeight: "bold",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          transition: "all 0.2s"
+                          justifyContent: "center"
                         }}
                       >
                         {score}
@@ -855,7 +874,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 {/* Grade Input & Save */}
-                <div style={{ display: "flex", gap: "10px", alignItems: "center", background: "#111", padding: "12px", borderRadius: "10px", marginBottom: "15px" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", background: "#111", padding: "8px 12px", borderRadius: "8px", marginBottom: "12px" }}>
                   <input 
                     id="manualGradeInput"
                     type="number" 
@@ -864,15 +883,15 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                     value={manualScore} 
                     onChange={e => setManualScore(e.target.value)} 
                     onKeyDown={handleManualScoreKeyPress}
-                    placeholder="اكتب الدرجة هنا..." 
+                    placeholder="الدرجة" 
                     autoFocus
-                    style={{ flex: 1, padding: "12px", background: "#1e1e1e", border: "2px solid #4CAF50", borderRadius: "8px", color: "#fff", fontSize: "22px", textAlign: "center", outline: "none", fontWeight: "bold" }} 
+                    style={{ flex: 1, padding: "8px", background: "#1e1e1e", border: "2px solid #4CAF50", borderRadius: "6px", color: "#fff", fontSize: "18px", textAlign: "center", outline: "none", fontWeight: "bold" }} 
                   />
-                  <span style={{ fontSize: "20px", color: "#aaa", fontWeight: "bold" }}>من {selectedProject.max_score}</span>
+                  <span style={{ fontSize: "16px", color: "#aaa", fontWeight: "bold" }}>من {selectedProject.max_score}</span>
                 </div>
 
-                <button onClick={saveManualEvaluation} disabled={savingManual} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "16px", borderRadius: "12px", border: "none", fontSize: "18px", fontWeight: "bold", cursor: "pointer", boxShadow: "0 4px 12px rgba(76, 175, 80, 0.4)" }}>
-                  {savingManual ? "جاري الحفظ..." : "💾 حفظ التقييم والانتقال للبحث التالي ↵"}
+                <button onClick={saveManualEvaluation} disabled={savingManual} style={{ width: "100%", background: "#4CAF50", color: "#fff", padding: "14px", borderRadius: "10px", border: "none", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>
+                  {savingManual ? "جاري الحفظ..." : "💾 حفظ التقييم والانتقال للبحث ↵"}
                 </button>
               </div>
             )}
@@ -883,12 +902,12 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         {view === 'CAMERA' && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
             
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1e1e1e", padding: "10px", borderRadius: "10px", marginBottom: "10px" }}>
-              <span style={{ fontSize: "14px", fontWeight: "bold" }}>📝 إضافة حضور مع التقييم</span>
-              <label style={{ position: "relative", display: "inline-block", width: "46px", height: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1e1e1e", padding: "8px 12px", borderRadius: "8px", marginBottom: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "bold" }}>📝 إضافة حضور مع التقييم</span>
+              <label style={{ position: "relative", display: "inline-block", width: "42px", height: "22px" }}>
                 <input type="checkbox" checked={markAttendanceWithEval} onChange={e => setMarkAttendanceWithEval(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
-                <span style={{ position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: markAttendanceWithEval ? "#4CAF50" : "#555", borderRadius: "24px", transition: "0.3s" }}>
-                  <span style={{ position: "absolute", content: '""', height: "18px", width: "18px", left: "3px", bottom: "3px", backgroundColor: "white", borderRadius: "50%", transition: "0.3s", transform: markAttendanceWithEval ? "translateX(22px)" : "none" }}></span>
+                <span style={{ position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: markAttendanceWithEval ? "#4CAF50" : "#555", borderRadius: "22px", transition: "0.3s" }}>
+                  <span style={{ position: "absolute", content: '""', height: "16px", width: "16px", left: "3px", bottom: "3px", backgroundColor: "white", borderRadius: "50%", transition: "0.3s", transform: markAttendanceWithEval ? "translateX(20px)" : "none" }}></span>
                 </span>
               </label>
             </div>
@@ -899,104 +918,98 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                   const p = projects.find(x => x.id === e.target.value);
                   if (p) setSelectedProject(p);
                 }
-              }} style={{ width: "100%", padding: "12px", background: "#1e1e1e", border: "1px solid #444", borderRadius: "10px", color: "#fff", marginBottom: "10px", fontSize: "16px", outline: "none" }}>
+              }} style={{ width: "100%", padding: "10px", background: "#1e1e1e", border: "1px solid #444", borderRadius: "8px", color: "#fff", marginBottom: "8px", fontSize: "14px", outline: "none" }}>
                 {projects.filter(p => !p.is_archived).map(p => <option key={p.id} value={p.id}>{p.name} (Max {p.max_score})</option>)}
                 <option value="ADD_NEW" style={{ color: "#4CAF50" }}>➕ إضافة مشروع جديد...</option>
             </select>
 
             {/* CAMERA SECTION - ONLY SHOW WHEN NOT GRADING */}
             {!activeScannedStudent && (
-              <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "260px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <QRScanner onScan={(result) => { if (result) handleScannerScan(result); }} />
                 
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", border: "3px solid", borderColor: scannerPulse ? "#81C784" : "rgba(76, 175, 80, 0.7)", borderRadius: "20px", pointerEvents: "none", boxShadow: scannerPulse ? "0 0 15px #81C784, 0 0 0 4000px rgba(0,0,0,0.5)" : "0 0 0 4000px rgba(0,0,0,0.5)", transition: "all 0.2s" }}></div>
-                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", pointerEvents: "none" }}>
-                   <div style={{ position: "absolute", top: "-3px", left: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderTopLeftRadius: "15px" }}></div>
-                   <div style={{ position: "absolute", top: "-3px", right: "-3px", width: "30px", height: "30px", borderTop: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderTopRightRadius: "15px" }}></div>
-                   <div style={{ position: "absolute", bottom: "-3px", left: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderLeft: "4px solid #4CAF50", borderBottomLeftRadius: "15px" }}></div>
-                   <div style={{ position: "absolute", bottom: "-3px", right: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #4CAF50", borderRight: "4px solid #4CAF50", borderBottomRightRadius: "15px" }}></div>
-                </div>
-
-                <div style={{ position: "absolute", bottom: "10px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "5px 15px", borderRadius: "15px", fontSize: "12px", zIndex: 10 }}>وجه الكاميرا داخل الإطار الأخضر</div>
+                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "200px", height: "200px", border: "3px solid", borderColor: scannerPulse ? "#81C784" : "rgba(76, 175, 80, 0.7)", borderRadius: "16px", pointerEvents: "none", boxShadow: scannerPulse ? "0 0 15px #81C784, 0 0 0 4000px rgba(0,0,0,0.5)" : "0 0 0 4000px rgba(0,0,0,0.5)", transition: "all 0.2s" }}></div>
+                <div style={{ position: "absolute", bottom: "8px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "4px 12px", borderRadius: "12px", fontSize: "11px", zIndex: 10 }}>وجه الكاميرا داخل الإطار الأخضر</div>
               </div>
             )}
 
-            {/* FULL SCREEN EXPANDED GRADE PANEL FOR SCANNED STUDENT */}
+            {/* EXPANDED GRADE PANEL FOR SCANNED STUDENT */}
             {activeScannedStudent && selectedProject && (
-              <div style={{ background: "#151e15", border: "2px solid #4CAF50", padding: "18px", borderRadius: "15px", marginTop: "10px", animation: "slideUp 0.25s" }}>
+              <div style={{ background: "#151e15", border: "2px solid #4CAF50", padding: "14px", borderRadius: "12px", marginTop: "6px", animation: "slideUp 0.2s" }}>
                 
                 {/* Student Info Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "6px" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "18px", marginBottom: "4px" }}>{activeScannedStudent.student.full_name}</div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ background: "#2196F3", color: "#fff", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", fontWeight: "bold" }}>كود: {activeScannedStudent.student.student_code}</span>
-                      <span style={{ background: "#333", color: "#ddd", borderRadius: "6px", padding: "3px 8px", fontSize: "12px" }}>س: {activeScannedStudent.student.section}</span>
-                      <span style={{ background: "#FF9800", color: "#fff", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", fontWeight: "bold" }}>حضور: {activeScannedStudent.attCount} مرة</span>
-                      <span style={{ background: "#555", color: "#fff", borderRadius: "6px", padding: "3px 8px", fontSize: "12px" }}>Max: {selectedProject.max_score}</span>
+                    <div style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "16px", marginBottom: "2px" }}>{activeScannedStudent.student.full_name}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <span style={{ background: "#2196F3", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>كود: {activeScannedStudent.student.student_code}</span>
+                      <span style={{ background: "#333", color: "#ddd", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>س: {activeScannedStudent.student.section}</span>
+                      <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>حضور: {activeScannedStudent.attCount}</span>
+                      <span style={{ background: "#555", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>Max: {selectedProject.max_score}</span>
                     </div>
                   </div>
+                  
+                  {/* COMPACT CANCEL BUTTON */}
                   <button onClick={handleCancelActiveStudent} style={{
-                    background: "rgba(244,67,54,0.2)", color: "#f44336", border: "1px solid #f44336",
-                    borderRadius: "8px", padding: "6px 12px", fontSize: "13px", fontWeight: "bold",
+                    background: "rgba(244,67,54,0.15)", color: "#f44336", border: "1px solid #f44336",
+                    borderRadius: "6px", padding: "4px 8px", fontSize: "11px", fontWeight: "bold",
                     cursor: "pointer", flexShrink: 0
                   }}>✕ إلغاء</button>
                 </div>
 
                 {/* BOT UPLOAD STATUS & ARTWORK PREVIEW */}
-                <div style={{ background: "#111", border: "1px solid #333", borderRadius: "10px", padding: "10px 14px", marginBottom: "14px" }}>
+                <div style={{ background: "#111", border: "1px solid #333", borderRadius: "8px", padding: "8px 12px", marginBottom: "10px" }}>
                   {activeScannedStudent.evalRecord?.photo_url ? (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <div style={{ color: "#4CAF50", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}>
-                          <span>✅</span> تم رفع العمل عبر البوت
+                        <div style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
+                          ✅ تم رفع العمل عبر البوت
                         </div>
-                        <div style={{ color: "#888", fontSize: "11px", marginTop: "2px" }}>
+                        <div style={{ color: "#888", fontSize: "10px", marginTop: "2px" }}>
                           ⏱️ {formatRelativeTimeArabic(activeScannedStudent.evalRecord.created_at)}
                         </div>
                       </div>
                       <button 
-                        onClick={() => setZoomImage(activeScannedStudent.evalRecord.photo_url)}
-                        style={{ background: "#2196F3", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px" }}
+                        onClick={() => openZoomImage(activeScannedStudent.evalRecord.photo_url)}
+                        style={{ background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
                       >
-                        🖼️ معاينة اللوحة
+                        🖼️ معاينة وتكبير
                       </button>
                     </div>
                   ) : (
-                    <div style={{ color: "#aaa", fontSize: "12px", textAlign: "center" }}>
+                    <div style={{ color: "#aaa", fontSize: "11px", textAlign: "center" }}>
                       ⏳ لم يقم الطالب برفع صورة لهذا المشروع بعد.
                     </div>
                   )}
                 </div>
 
-                {/* HARMONIOUS EQUAL SIZED GRADE BUTTONS GRID */}
-                <div style={{ marginBottom: "6px" }}>
-                  <label style={{ display: "block", color: "#aaa", fontSize: "12px", marginBottom: "6px" }}>اضغط لتحديد الدرجة فوراً:</label>
+                {/* 0 TO MAX_SCORE QUICK GRADE GRID */}
+                <div style={{ marginBottom: "4px" }}>
+                  <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>اضغط لتحديد الدرجة (0 إلى {selectedProject.max_score}):</label>
                   <div style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(56px, 1fr))",
-                    gap: "8px",
-                    maxHeight: "180px",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(42px, 1fr))",
+                    gap: "6px",
+                    maxHeight: "150px",
                     overflowY: "auto",
-                    padding: "4px"
+                    padding: "2px"
                   }}>
                     {getQuickGrades(selectedProject.max_score).map(score => (
                       <button
                         key={score}
                         onClick={() => handleQuickGradeSelect(score)}
                         style={{
-                          height: "46px",
+                          height: "38px",
                           background: activeScannedStudent.score === score ? "#4CAF50" : "#222",
                           color: activeScannedStudent.score === score ? "#000" : "#fff",
                           border: activeScannedStudent.score === score ? "2px solid #fff" : "1px solid #4CAF50",
-                          borderRadius: "10px",
-                          fontSize: "16px",
+                          borderRadius: "8px",
+                          fontSize: "14px",
                           fontWeight: "bold",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          transition: "all 0.2s"
+                          justifyContent: "center"
                         }}
                       >
                         {score}
@@ -1009,24 +1022,24 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
             {/* SCANNED BATCH LIST */}
             {scannedStudents.length > 0 && !activeScannedStudent && (
-              <div style={{ marginTop: "15px", flexGrow: 1, display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "14px" }}>📋 المسجلين في هذه الجلسة ({scannedStudents.length})</span>
-                  <button onClick={handleBatchSaveEvaluations} disabled={savingBatch} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 10px rgba(76, 175, 80, 0.3)" }}>
+              <div style={{ marginTop: "12px", flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ color: "#FF9800", fontWeight: "bold", fontSize: "13px" }}>📋 المسجلين بالجلسة ({scannedStudents.length})</span>
+                  <button onClick={handleBatchSaveEvaluations} disabled={savingBatch} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>
                     {savingBatch ? "جاري الحفظ..." : `💾 حفظ الكل (${scannedStudents.length})`}
                   </button>
                 </div>
 
-                <div style={{ flexGrow: 1, overflowY: "auto", maxHeight: "220px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ flexGrow: 1, overflowY: "auto", maxHeight: "200px", display: "flex", flexDirection: "column", gap: "5px" }}>
                   {scannedStudents.map((s, idx) => (
-                    <div key={idx} style={{ background: "#1e1e1e", border: "1px solid #333", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div key={idx} style={{ background: "#1e1e1e", border: "1px solid #333", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>{s.student.full_name}</div>
-                        <div style={{ color: "#888", fontSize: "11px" }}>كود: {s.student.student_code} • س: {s.student.section}</div>
+                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "12px" }}>{s.student.full_name}</div>
+                        <div style={{ color: "#888", fontSize: "10px" }}>كود: {s.student.student_code} • س: {s.student.section}</div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ background: "#4CAF50", color: "#000", fontWeight: "bold", padding: "4px 8px", borderRadius: "6px", fontSize: "13px" }}>{s.score ?? 0}</span>
-                        <button onClick={() => handleRemoveScannedStudent(idx)} style={{ background: "none", border: "none", color: "#f44336", fontSize: "16px", cursor: "pointer", padding: "0 4px" }}>✕</button>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ background: "#4CAF50", color: "#000", fontWeight: "bold", padding: "3px 6px", borderRadius: "5px", fontSize: "12px" }}>{s.score ?? 0}</span>
+                        <button onClick={() => handleRemoveScannedStudent(idx)} style={{ background: "none", border: "none", color: "#f44336", fontSize: "14px", cursor: "pointer", padding: "0 4px" }}>✕</button>
                       </div>
                     </div>
                   ))}
@@ -1040,53 +1053,50 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       {/* PROJECT STATS MODAL */}
       {statsProject && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "95%", maxWidth: "550px", maxHeight: "90vh", display: "flex", flexDirection: "column", borderRadius: "15px", border: "1px solid #2196F3", direction: "rtl", padding: "20px" }}>
+          <div style={{ background: "#1e1e1e", width: "95%", maxWidth: "550px", maxHeight: "90vh", display: "flex", flexDirection: "column", borderRadius: "15px", border: "1px solid #2196F3", direction: "rtl", padding: "16px" }}>
             
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "12px", marginBottom: "15px" }}>
-              <h3 style={{ margin: 0, color: "#2196F3", fontSize: "18px" }}>📊 إحصائيات مشروع: {statsProject.name}</h3>
-              <button onClick={() => { setStatsProject(null); setStatsData(null); }} style={{ background: "none", border: "none", color: "#fff", fontSize: "22px", cursor: "pointer" }}>✕</button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "12px" }}>
+              <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📊 إحصائيات مشروع: {statsProject.name}</h3>
+              <button onClick={() => { setStatsProject(null); setStatsData(null); }} style={{ background: "none", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
 
             {loadingStatsModal ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#aaa" }}>جاري تحميل الإحصائيات...</div>
+              <div style={{ textAlign: "center", padding: "30px", color: "#aaa" }}>جاري تحميل الإحصائيات...</div>
             ) : statsData ? (
               <div style={{ overflowY: "auto", flexGrow: 1 }}>
-                {/* Summary Cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "15px", textAlign: "center" }}>
-                  <div style={{ background: "#121212", border: "1px solid #333", borderRadius: "10px", padding: "10px" }}>
-                    <div style={{ color: "#888", fontSize: "11px" }}>المطلوب منهم</div>
-                    <div style={{ color: "#90caf9", fontSize: "20px", fontWeight: "bold" }}>{statsData.submitted.length + statsData.missing.length}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px", textAlign: "center" }}>
+                  <div style={{ background: "#121212", border: "1px solid #333", borderRadius: "8px", padding: "8px" }}>
+                    <div style={{ color: "#888", fontSize: "10px" }}>المطلوب منهم</div>
+                    <div style={{ color: "#90caf9", fontSize: "18px", fontWeight: "bold" }}>{statsData.submitted.length + statsData.missing.length}</div>
                   </div>
-                  <div style={{ background: "#121212", border: "1px solid #4CAF50", borderRadius: "10px", padding: "10px" }}>
-                    <div style={{ color: "#888", fontSize: "11px" }}>قاموا بالرفع ✅</div>
-                    <div style={{ color: "#4CAF50", fontSize: "20px", fontWeight: "bold" }}>{statsData.submitted.length}</div>
+                  <div style={{ background: "#121212", border: "1px solid #4CAF50", borderRadius: "8px", padding: "8px" }}>
+                    <div style={{ color: "#888", fontSize: "10px" }}>قاموا بالرفع ✅</div>
+                    <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>{statsData.submitted.length}</div>
                   </div>
-                  <div style={{ background: "#121212", border: "1px solid #f44336", borderRadius: "10px", padding: "10px" }}>
-                    <div style={{ color: "#888", fontSize: "11px" }}>متأخرين ❌</div>
-                    <div style={{ color: "#f44336", fontSize: "20px", fontWeight: "bold" }}>{statsData.missing.length}</div>
+                  <div style={{ background: "#121212", border: "1px solid #f44336", borderRadius: "8px", padding: "8px" }}>
+                    <div style={{ color: "#888", fontSize: "10px" }}>متأخرين ❌</div>
+                    <div style={{ color: "#f44336", fontSize: "18px", fontWeight: "bold" }}>{statsData.missing.length}</div>
                   </div>
                 </div>
 
-                {/* PDF Export Button */}
                 {statsData.missing.length > 0 && (
                   <button 
                     onClick={() => exportMissingStudentsPdf(statsProject, statsData.missing)}
-                    style={{ width: "100%", background: "#e53935", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold", fontSize: "14px", cursor: "pointer", marginBottom: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+                    style={{ width: "100%", background: "#e53935", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                   >
                     🖨️ طباعة / تصدير كشف المتأخرين (PDF)
                   </button>
                 )}
 
-                {/* Missing Students List */}
-                <h4 style={{ color: "#f44336", margin: "10px 0 8px 0", fontSize: "14px" }}>قائمة الطلاب المتأخرين عن الرفع ({statsData.missing.length}):</h4>
-                <div style={{ maxHeight: "250px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px" }}>
+                <h4 style={{ color: "#f44336", margin: "8px 0 6px 0", fontSize: "13px" }}>قائمة الطلاب المتأخرين ({statsData.missing.length}):</h4>
+                <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
                   {statsData.missing.map((s, idx) => (
-                    <div key={idx} style={{ background: "#121212", border: "1px solid #333", borderRadius: "8px", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                    <div key={idx} style={{ background: "#121212", border: "1px solid #333", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
                       <div>
                         <span style={{ color: "#fff", fontWeight: "bold" }}>{idx + 1}. {s.full_name}</span>
-                        <span style={{ color: "#888", fontSize: "11px", marginRight: "8px" }}>كود: {s.student_code} • س: {s.section}</span>
+                        <span style={{ color: "#888", fontSize: "10px", marginRight: "6px" }}>كود: {s.student_code} • س: {s.section}</span>
                       </div>
-                      <span style={{ color: "#f44336", fontSize: "11px", fontWeight: "bold" }}>لم يرفع</span>
+                      <span style={{ color: "#f44336", fontSize: "10px", fontWeight: "bold" }}>لم يرفع</span>
                     </div>
                   ))}
                 </div>
@@ -1096,42 +1106,43 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* IMAGE ZOOM MODAL */}
+      {/* IMAGE ZOOM MODAL (WITH SAFE POPSTATE / BACK BUTTON) */}
       {zoomImage && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.95)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <button onClick={() => setZoomImage(null)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#fff", fontSize: "30px", cursor: "pointer" }}>✖</button>
-          <img src={zoomImage} alt="Zoomed Artwork" style={{ maxWidth: "95%", maxHeight: "85%", objectFit: "contain", borderRadius: "8px", boxShadow: "0 0 30px rgba(0,0,0,0.8)" }} />
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.95)", zIndex: 2000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px" }}>
+          <button onClick={closeZoomImage} style={{ position: "absolute", top: "16px", right: "16px", background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: "20px", width: "40px", height: "40px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          <img src={zoomImage} alt="Zoomed Artwork" style={{ maxWidth: "95%", maxHeight: "85%", objectFit: "contain", borderRadius: "8px" }} />
+          <div style={{ color: "#aaa", fontSize: "12px", marginTop: "10px" }}>اضغط (✕) أو زر الرجوع بالهاتف للعودة للتقييم</div>
         </div>
       )}
 
       {/* ADD PROJECT MODAL */}
       {showAddProjectModal && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "20px", borderRadius: "15px", border: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ color: "#FF9800", marginTop: 0 }}>➕ إضافة مشروع جديد</h3>
+          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "16px", borderRadius: "12px", border: "1px solid #333", direction: "rtl" }}>
+            <h3 style={{ color: "#FF9800", marginTop: 0, fontSize: "16px" }}>➕ إضافة مشروع جديد</h3>
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "12px", marginBottom: "5px", textAlign: "right" }}>اسم المشروع:</label>
+            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>اسم المشروع:</label>
             <input 
               type="text" 
               placeholder="مثال: لوحة الطبيعة الصامتة" 
               value={newProjectName} 
               onChange={e => setNewProjectName(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", marginBottom: "15px", textAlign: "right" }}
+              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "12px", textAlign: "right" }}
             />
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "12px", marginBottom: "5px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
+            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
             <input 
               type="number" 
               inputMode="decimal"
               placeholder="50" 
               value={newProjectMaxScore} 
               onChange={e => setNewProjectMaxScore(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", marginBottom: "20px", textAlign: "center", fontSize: "18px" }}
+              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "16px", textAlign: "center", fontSize: "16px" }}
             />
 
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={saveNewProject} style={{ flex: 1, background: "#4CAF50", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold" }}>حفظ المشروع</button>
-              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, background: "transparent", color: "#fff", border: "1px solid #555", padding: "12px", borderRadius: "8px" }}>إلغاء</button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button onClick={saveNewProject} style={{ flex: 1, background: "#4CAF50", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ المشروع</button>
+              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
             </div>
           </div>
         </div>
@@ -1140,25 +1151,25 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       {/* EASTER EGG MODAL */}
       {showEasterEgg && easterEggData && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "#000", zIndex: 999, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "20px", borderBottom: "2px solid #0f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0a0a" }}>
-            <h1 style={{ color: "#0f0", margin: 0, fontFamily: "monospace", fontSize: "20px", textShadow: "0 0 10px #0f0" }}>// CLASSIFIED_REPORT</h1>
-            <button onClick={() => setShowEasterEgg(false)} style={{ background: "none", border: "none", color: "#0f0", fontSize: "24px", cursor: "pointer" }}>✖</button>
+          <div style={{ padding: "16px", borderBottom: "2px solid #0f0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#0a0a0a" }}>
+            <h1 style={{ color: "#0f0", margin: 0, fontFamily: "monospace", fontSize: "18px" }}>// CLASSIFIED_REPORT</h1>
+            <button onClick={() => setShowEasterEgg(false)} style={{ background: "none", border: "none", color: "#0f0", fontSize: "22px", cursor: "pointer" }}>✖</button>
           </div>
-          <div style={{ position: "relative", flexGrow: 1, overflowY: "auto", padding: "20px", direction: "rtl", color: "#0f0", fontFamily: "monospace" }}>
-            <div style={{ border: "1px dashed #0f0", padding: "15px", marginBottom: "20px" }}>
+          <div style={{ position: "relative", flexGrow: 1, overflowY: "auto", padding: "16px", direction: "rtl", color: "#0f0", fontFamily: "monospace" }}>
+            <div style={{ border: "1px dashed #0f0", padding: "12px", marginBottom: "16px" }}>
               <div style={{ opacity: 0.7 }}>[TARGET_IDENTIFIED]</div>
-              <div style={{ fontSize: "22px", fontWeight: "bold", marginTop: "10px" }}>{easterEggData.student.full_name}</div>
+              <div style={{ fontSize: "18px", fontWeight: "bold", marginTop: "8px" }}>{easterEggData.student.full_name}</div>
               <div>ID_CODE: {easterEggData.student.student_code}</div>
               <div>SECTION: {easterEggData.student.section}</div>
             </div>
-            <div style={{ border: "1px dashed #0f0", padding: "15px", marginBottom: "20px" }}>
+            <div style={{ border: "1px dashed #0f0", padding: "12px", marginBottom: "16px" }}>
               <div style={{ opacity: 0.7 }}>[ATTENDANCE_METRICS]</div>
-              <div style={{ fontSize: "30px", margin: "10px 0" }}>{easterEggData.attendanceCount} <span style={{ fontSize: "16px" }}>Weeks Present</span></div>
+              <div style={{ fontSize: "24px", margin: "8px 0" }}>{easterEggData.attendanceCount} Weeks Present</div>
             </div>
-            <div style={{ border: "1px dashed #0f0", padding: "15px" }}>
-              <div style={{ opacity: 0.7, marginBottom: "15px" }}>[EVALUATION_RECORDS]</div>
+            <div style={{ border: "1px dashed #0f0", padding: "12px" }}>
+              <div style={{ opacity: 0.7, marginBottom: "12px" }}>[EVALUATION_RECORDS]</div>
               {easterEggData.evaluations.map((ev: any) => (
-                <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(0,255,0,0.2)", padding: "10px 0" }}>
+                <div key={ev.id} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(0,255,0,0.2)", padding: "8px 0" }}>
                   <span>{ev.project_name}</span><span style={{ fontWeight: "bold" }}>{ev.score}</span>
                 </div>
               ))}
@@ -1170,29 +1181,29 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       {/* MANAGE PROJECT MODAL */}
       {showManageProjectModal && longPressProject && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "20px", borderRadius: "15px", border: "1px solid #2196F3", direction: "rtl", textAlign: "center" }}>
-            <h3 style={{ color: "#2196F3", marginTop: 0 }}>⚙️ إدارة المشروع</h3>
+          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "16px", borderRadius: "12px", border: "1px solid #2196F3", direction: "rtl", textAlign: "center" }}>
+            <h3 style={{ color: "#2196F3", marginTop: 0, fontSize: "16px" }}>⚙️ إدارة المشروع</h3>
             
             <input 
               type="text" 
               value={editProjectName} 
               onChange={e => setEditProjectName(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", marginBottom: "15px", textAlign: "right" }}
+              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "12px", textAlign: "right" }}
             />
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "12px", marginBottom: "5px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
+            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
             <input 
               type="number" 
               inputMode="decimal"
               value={editProjectMaxScore} 
               onChange={e => setEditProjectMaxScore(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", marginBottom: "20px", textAlign: "center", fontSize: "18px" }}
+              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "16px", textAlign: "center", fontSize: "16px" }}
             />
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button onClick={updateProject} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold" }}>حفظ التعديلات</button>
-              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ background: "#F44336", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold" }}>أرشفة المشروع</button>
-              <button onClick={() => setShowManageProjectModal(false)} style={{ background: "transparent", color: "#fff", border: "1px solid #555", padding: "12px", borderRadius: "8px" }}>إلغاء</button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <button onClick={updateProject} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
+              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ background: "#F44336", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>أرشفة المشروع</button>
+              <button onClick={() => setShowManageProjectModal(false)} style={{ background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
             </div>
           </div>
         </div>

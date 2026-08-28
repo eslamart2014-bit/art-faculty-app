@@ -28,8 +28,8 @@ function formatRelativeTimeArabic(dateInput: string | Date): string {
     relative = `منذ ${weeks} ${weeks === 1 ? 'أسبوع' : weeks === 2 ? 'أسبوعين' : weeks <= 10 ? 'أسابيع' : 'أسبوع'}`;
   }
 
-  const exactDate = past.toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
-  const exactTime = past.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  const exactDate = past.toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'numeric', day: 'numeric' });
+  const exactTime = past.toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
   return `${relative} (${exactDate} - ${exactTime})`;
 }
 

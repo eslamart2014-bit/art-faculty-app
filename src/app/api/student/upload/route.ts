@@ -154,10 +154,12 @@ export async function POST(request: Request) {
 
     // 7. Instant Student Confirmation via Telegram
     if (botToken && currentStudent?.telegram_id) {
+      const cairoDate = new Date().toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo", year: "numeric", month: "numeric", day: "numeric" });
+      const cairoTime = new Date().toLocaleTimeString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" });
       const studentMsg = `✅ <b>تم استلام وتوثيق عملك بنجاح!</b>\n\n` +
         `📚 <b>المقرر:</b> ${course?.name || "المقرر"}\n` +
         `📝 <b>المشروع:</b> ${projectName}\n` +
-        `⏱️ <b>وقت الرفع:</b> ${new Date().toLocaleTimeString("ar-EG")} (${new Date().toLocaleDateString("ar-EG")})\n\n` +
+        `⏱️ <b>وقت الرفع:</b> ${cairoTime} (${cairoDate})\n\n` +
         `⏳ <i>حالة العمل: بانتظار مراجعة وتقييم أستاذ المقرر. يمكنك متابعة أعمالك عبر زر (معرض أعمالي).</i>`;
 
       sendTelegramMessage(botToken, currentStudent.telegram_id, studentMsg);
