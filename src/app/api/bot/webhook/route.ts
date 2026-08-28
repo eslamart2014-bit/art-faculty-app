@@ -33,13 +33,40 @@ export async function POST(request: Request) {
     const botToken = sysData?.telegram_config?.token;
 
     // ==========================================
-    // 1. Handle Text Messages (/start)
+    // 1. Handle Text Messages (/start & Replies)
     // ==========================================
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
       const text = update.message.text.trim();
       const firstName = update.message.from.first_name || 'طالبنا العزيز';
 
+      // --- Admin "Login as Student" Reply Handler ---
+      if (update.message.reply_to_message && update.message.reply_to_message.text.includes('يرجى كتابة (كود الطالب) أو (رقم الجلوس)')) {
+        const studentCode = text;
+        
+        // Fetch student from DB
+        const { data: student } = await supabase.from('students').select('*').eq('code', studentCode).maybeSingle();
+        
+        if (!student) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `عفواً أيها المدير، لم أتمكن من العثور على طالب بالكود: ${studentCode}` });
+        }
+
+        const caption = `🕵️‍♂️ (وضع المحاكاة نشط)\n👨‍🎓 الطالب: ${student.full_name}\n📌 الكود: ${student.code}\n\nأنت الآن تتصفح البوت بصفتك هذا الطالب (بدون أي تعارض مع حسابه الحقيقي). ماذا تريد أن تفعل؟`;
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: caption,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📸 رفع عمل جديد', callback_data: `sim_upload_${student.id}` }],
+              [{ text: '📁 استعراض أعمال الطالب', callback_data: `sim_gallery_${student.id}` }],
+              [{ text: '❌ إنهاء وضع المحاكاة', callback_data: `sim_exit` }]
+            ]
+          }
+        });
+      }
+
+      // --- /start Handler ---
       if (text.startsWith('/start')) {
         const parts = text.split(' ');
         const payload = parts.length > 1 ? parts[1] : '';
@@ -52,7 +79,13 @@ export async function POST(request: Request) {
             await supabase.from('profiles').update({ telegram_id: chatId, telegram_link_token: null }).eq('id', profile.id);
             const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
             replyText = `مرحباً بك د. ${profile.full_name} 🎓\n\nلقد تم ربط حسابك بنجاح بصلاحية (${roleName}).`;
-            replyMarkup = { inline_keyboard: [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]] };
+            
+            const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
+            if (profile.role === 'مدير') {
+              buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+            }
+            replyMarkup = { inline_keyboard: buttons };
+
           } else {
             replyText = `عفواً، رابط التفعيل غير صحيح أو منتهي الصلاحية.`;
           }
@@ -60,7 +93,13 @@ export async function POST(request: Request) {
           const { data: existingProfile } = await supabase.from('profiles').select('*').eq('telegram_id', chatId).maybeSingle();
           if (existingProfile) {
             replyText = `أهلاً بعودتك د. ${existingProfile.full_name} 🎓\nكيف يمكنني مساعدتك؟`;
-            replyMarkup = { inline_keyboard: [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]] };
+            
+            const buttons = [[{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }]];
+            if (existingProfile.role === 'مدير') {
+              buttons.push([{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }]);
+            }
+            replyMarkup = { inline_keyboard: buttons };
+
           } else {
             replyText = `مرحباً بك! حسابك غير مربوط. يرجى التفعيل من موقع الكلية.`;
           }
@@ -85,9 +124,28 @@ export async function POST(request: Request) {
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل.' });
       }
 
+      // --- ADMIN LOGIN AS STUDENT ---
+      if (data === 'admin_login_student' && profile.role === 'مدير') {
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: 'يرجى كتابة (كود الطالب) أو (رقم الجلوس) الذي تود محاكاة حسابه:',
+          reply_markup: { force_reply: true, selective: true }
+        });
+      }
+
+      // --- SIMULATION BUTTONS ---
+      if (data === 'sim_exit') {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'تم إنهاء وضع المحاكاة. عودة لصلاحيات الإدارة 👑' });
+      }
+      if (data.startsWith('sim_upload_') || data.startsWith('sim_gallery_')) {
+        return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'جاري برمجة نظام الطلاب (قيد التطوير) 🚧' });
+      }
+
       // --- BROWSE COURSES ---
       if (data === 'staff_browse_courses') {
-        const { data: allCourses } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+        // Fetch courses WITH academic_years
+        const { data: allCourses } = await supabase.from('courses').select('*, academic_years(name)').order('created_at', { ascending: false });
         let userCourses = allCourses || [];
         
         // If not admin, filter by owner or shared
@@ -99,7 +157,11 @@ export async function POST(request: Request) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لا يوجد لديك مقررات حالياً.' });
         }
 
-        const keyboard = userCourses.map(c => [{ text: `📚 ${c.name}`, callback_data: `view_course_${c.id}` }]);
+        // Add Academic Year to button text!
+        const keyboard = userCourses.map(c => {
+          const yearName = (c.academic_years as any)?.name || 'عام';
+          return [{ text: `📚 ${c.name} - ${yearName}`, callback_data: `view_course_${c.id}` }];
+        });
         
         return NextResponse.json({
           method: 'sendMessage',
