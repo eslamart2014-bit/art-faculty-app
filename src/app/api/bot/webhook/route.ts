@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         // Sort students alphabetically
         const sortedStudents = enrollments
           .filter(e => e.students)
-          .sort((a, b) => a.students.full_name.localeCompare(b.students.full_name, 'ar'));
+          .sort((a, b) => ((a.students as any).full_name).localeCompare(((b.students as any).full_name), 'ar'));
 
         for (const enrollment of sortedStudents) {
           if (!enrollment.evaluations || enrollment.evaluations.length === 0) continue;
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
 
             const dateStr = new Date(ev.created_at).toLocaleDateString('ar-EG');
             const timeStr = new Date(ev.created_at).toLocaleTimeString('ar-EG');
-            const caption = `👨‍🎓 الطالب: ${enrollment.students.full_name}\n📅 التاريخ: ${dateStr} - ${timeStr}`;
+            const caption = `👨‍🎓 الطالب: ${(enrollment.students as any).full_name}\n📅 التاريخ: ${dateStr} - ${timeStr}`;
 
             if (botToken) {
               await sendTelegramPhoto(botToken, chatId, finalUrl, caption);
