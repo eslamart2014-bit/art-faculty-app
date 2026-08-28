@@ -67,7 +67,7 @@ async function getAdminSettingsView() {
   const { count: totalStaff } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
   const { count: linkedStaff } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).not('telegram_id', 'is', null);
 
-  const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+  const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
   const showScores = sysData?.telegram_config?.show_project_scores_to_students !== false;
   const showAttendance = sysData?.telegram_config?.show_attendance_to_students !== false;
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const update = await request.json();
 
     // Fetch token & permissions
-    const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+    const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
     const botToken = sysData?.telegram_config?.token;
     const showScoresToStudents = sysData?.telegram_config?.show_project_scores_to_students !== false;
     const showAttendanceToStudents = sysData?.telegram_config?.show_attendance_to_students !== false;
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
       // --- Admin "Login as Student" Reply Handler ---
       if (update.message.reply_to_message && update.message.reply_to_message.text.includes('يرجى كتابة (كود الطالب)')) {
         const studentCode = text;
-        const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).limit(1).maybeSingle();
         
         if (!student) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `عفواً أيها المدير، لم أتمكن من العثور على طالب بالكود: ${studentCode}` });
@@ -236,7 +236,7 @@ export async function POST(request: Request) {
             .from('evaluations')
             .select('id, project_name, student_id, students ( full_name, telegram_id )')
             .eq('id', evalId)
-            .maybeSingle();
+            .limit(1).maybeSingle();
 
           if (evalRecord) {
             await supabase.from('evaluations').update({ score: scoreNum }).eq('id', evalId);
@@ -272,7 +272,7 @@ export async function POST(request: Request) {
             const studentCode = codeParts[0];
             const browserId = codeParts.slice(1).join('_');
 
-            const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
+            const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).limit(1).maybeSingle();
             
             if (!student) {
               replyText = `عفواً، لم يتم العثور على طالب بهذا الكود. يرجى مراجعة الإدارة.`;
@@ -280,7 +280,7 @@ export async function POST(request: Request) {
               replyText = `⚠️ هذا الكود مربوط مسبقاً بحساب تليجرام آخر! إذا كنت تعتقد أن هناك خطأ، يرجى التوجه للإدارة.`;
             } else {
               // Check if THIS telegram account is already linked to ANOTHER student
-              const { data: otherStudent } = await supabase.from('students').select('id, full_name').eq('telegram_id', chatId.toString()).maybeSingle();
+              const { data: otherStudent } = await supabase.from('students').select('id, full_name').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
               if (otherStudent && (otherStudent as any).id !== student.id) {
                 return NextResponse.json({
                   method: 'sendMessage',
@@ -298,7 +298,7 @@ export async function POST(request: Request) {
               };
             }
           } else {
-            const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_link_token', payload).maybeSingle();
+            const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_link_token', payload).limit(1).maybeSingle();
             if (profile) {
               await supabase.from('profiles').update({ telegram_id: chatId.toString(), telegram_link_token: null }).eq('id', profile.id);
               const roleName = profile.role === 'مدير' ? 'المدير 👑' : 'عضو هيئة التدريس 👨‍🏫';
@@ -315,7 +315,7 @@ export async function POST(request: Request) {
             }
           }
         } else {
-          const { data: existingProfile } = await supabase.from('profiles').select('*').eq('telegram_id', chatId.toString()).maybeSingle();
+          const { data: existingProfile } = await supabase.from('profiles').select('*').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
           if (existingProfile) {
             replyText = `أهلاً بعودتك د. ${existingProfile.full_name} 🎓\nكيف يمكنني مساعدتك؟`;
             
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
             }
 
           } else {
-            const { data: knownStudent } = await supabase.from('students').select('*').eq('telegram_id', chatId.toString()).maybeSingle();
+            const { data: knownStudent } = await supabase.from('students').select('*').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
             if (knownStudent) {
               replyText = `مرحباً بك يا <b>${knownStudent.full_name}</b> 👨‍🎓\n\nماذا تريد أن تفعل اليوم؟`;
               replyMarkup = studentMainMenuMarkup;
@@ -360,7 +360,7 @@ export async function POST(request: Request) {
         const withoutPrefix = data.slice('confirm_link_'.length);
         const studentId = withoutPrefix.slice(0, 36);
         const browserId = withoutPrefix.length > 37 ? withoutPrefix.slice(37) : '';
-        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).limit(1).maybeSingle();
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: لم يتم العثور على الطالب.' });
         if (student.telegram_id && student.telegram_id !== chatId.toString()) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'خطأ: هذا الطالب مربوط بحساب آخر.' });
         await supabase.from('students').update({ telegram_id: chatId.toString(), telegram_username: callbackQuery.from.username || null, telegram_first_name: callbackQuery.from.first_name || null, telegram_browser_id: browserId || null }).eq('id', student.id);
@@ -373,7 +373,7 @@ export async function POST(request: Request) {
         if (data.startsWith('sim_gallery_')) {
           stuId = data.replace('sim_gallery_', '');
         } else {
-          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
         }
 
         if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على حسابك. يرجى التسجيل أولاً.' });
@@ -418,7 +418,7 @@ export async function POST(request: Request) {
           isSimulation = true;
           stuId = data.replace('sim_att_', '');
         } else {
-          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
         }
 
         if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على حسابك. يرجى التسجيل أولاً.' });
@@ -432,7 +432,7 @@ export async function POST(request: Request) {
           });
         }
 
-        const { data: student } = await supabase.from('students').select('*').eq('id', stuId).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('id', stuId).limit(1).maybeSingle();
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على بيانات الطالب.' });
 
         const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
@@ -467,17 +467,17 @@ export async function POST(request: Request) {
 
         let stuId = null;
         if (isSimulation) {
-          const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).maybeSingle();
+          const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
           if (profile?.telegram_link_token?.startsWith('SIM_')) {
             stuId = profile.telegram_link_token.replace('SIM_', '');
           }
         } else {
-          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+          stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
         }
 
         if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، انتهت الجلسة أو الحساب غير مسجل.' });
 
-        const { data: course } = await supabase.from('courses').select('*, profiles ( full_name )').eq('id', crsId).maybeSingle();
+        const { data: course } = await supabase.from('courses').select('*, profiles ( full_name )').eq('id', crsId).limit(1).maybeSingle();
         const teacherName = (course?.profiles as any)?.full_name || 'أستاذ المقرر';
 
         const { data: attRecords } = await supabase
@@ -524,18 +524,18 @@ export async function POST(request: Request) {
         let isSimulation = false;
         
         if (data === 'student_upload') {
-          studentIdForAction = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+          studentIdForAction = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
           if (!studentIdForAction) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على حسابك. يرجى التسجيل أولاً.' });
         } else {
           isSimulation = true;
           const simStudentCode = data.replace('sim_upload_', '');
-          studentIdForAction = (await supabase.from('students').select('id').eq('student_code', simStudentCode).maybeSingle()).data?.id;
+          studentIdForAction = (await supabase.from('students').select('id').eq('student_code', simStudentCode).limit(1).maybeSingle()).data?.id;
           if (!studentIdForAction) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على الطالب.' });
           
           await supabase.from('profiles').update({ telegram_link_token: `SIM_${studentIdForAction}` }).eq('telegram_id', chatId.toString());
         }
 
-        const { data: student } = await supabase.from('students').select('*').eq('id', studentIdForAction).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentIdForAction).limit(1).maybeSingle();
         if (!student) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على الطالب.' });
         
         const { data: courses } = await supabase.from('courses').select('*').eq('academic_year', student.academic_year);
@@ -558,16 +558,16 @@ export async function POST(request: Request) {
         
         let stuId = null;
         if (isSimulation) {
-           const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).maybeSingle();
+           const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
            if (profile?.telegram_link_token?.startsWith('SIM_')) {
                stuId = profile.telegram_link_token.replace('SIM_', '');
            }
         } else {
-           stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+           stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
         }
         if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، انتهت الجلسة أو الحساب غير مسجل.' });
 
-        const { data: course } = await supabase.from('courses').select('custom_week_names, name').eq('id', crsId).maybeSingle();
+        const { data: course } = await supabase.from('courses').select('custom_week_names, name').eq('id', crsId).limit(1).maybeSingle();
         const projects = ((course?.custom_week_names as any)?.__projects__ || []).filter((p: any) => !p.is_archived);
         if (projects.length === 0) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `لا يوجد مشاريع مطلوبة في مقرر (${(course as any)?.name || ''}) حالياً.` });
         
@@ -585,12 +585,12 @@ export async function POST(request: Request) {
         
         let stuId = null;
         if (isSimulation) {
-           const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).maybeSingle();
+           const { data: profile } = await supabase.from('profiles').select('telegram_link_token').eq('telegram_id', chatId.toString()).limit(1).maybeSingle();
            if (profile?.telegram_link_token?.startsWith('SIM_')) {
                stuId = profile.telegram_link_token.replace('SIM_', '');
            }
         } else {
-           stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).maybeSingle()).data?.id;
+           stuId = (await supabase.from('students').select('id').eq('telegram_id', chatId.toString()).limit(1).maybeSingle()).data?.id;
         }
         if (!stuId) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، انتهت الجلسة أو الحساب غير مسجل.' });
 
@@ -603,9 +603,9 @@ export async function POST(request: Request) {
       // =====================================================
       // STAFF & ADMIN ACTIONS
       // =====================================================
-      const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_id', tgUserId.toString()).maybeSingle();
+      const { data: profile } = await supabase.from('profiles').select('*').eq('telegram_id', tgUserId.toString()).limit(1).maybeSingle();
       if (!profile) {
-        const { data: knownStudent } = await supabase.from('students').select('full_name').eq('telegram_id', tgUserId.toString()).maybeSingle();
+        const { data: knownStudent } = await supabase.from('students').select('full_name').eq('telegram_id', tgUserId.toString()).limit(1).maybeSingle();
         if (knownStudent) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: `مرحباً ${(knownStudent as any).full_name}!\n\nاختر ما تريد:`, reply_markup: studentMainMenuMarkup });
         return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، حسابك غير مسجل في النظام.' });
       }
@@ -641,7 +641,7 @@ export async function POST(request: Request) {
 
       // --- ADMIN TOGGLE PROJECT SCORES ---
       if (data === 'admin_toggle_scores' && profile.role === 'مدير') {
-        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
         const cur = sData?.telegram_config || {};
         const newScoresFlag = cur.show_project_scores_to_students === false ? true : false;
         
@@ -661,7 +661,7 @@ export async function POST(request: Request) {
 
       // --- ADMIN TOGGLE ATTENDANCE INQUIRY ---
       if (data === 'admin_toggle_attendance' && profile.role === 'مدير') {
-        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+        const { data: sData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
         const cur = sData?.telegram_config || {};
         const newAttFlag = cur.show_attendance_to_students === false ? true : false;
         
@@ -759,7 +759,7 @@ export async function POST(request: Request) {
       // --- ADMIN DO RESET / FORMAT STUDENT ---
       if (data.startsWith('admin_do_reset_') && profile.role === 'مدير') {
         const studentId = data.replace('admin_do_reset_', '');
-        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+        const { data: student } = await supabase.from('students').select('*').eq('id', studentId).limit(1).maybeSingle();
         
         if (!student) {
           return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عفواً، لم يتم العثور على هذا الطالب.' });
@@ -825,7 +825,7 @@ export async function POST(request: Request) {
           .from('evaluations')
           .select('id, project_name, student_id, students ( full_name )')
           .eq('id', evalId)
-          .maybeSingle();
+          .limit(1).maybeSingle();
 
         if (!ev) return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'لم يتم العثور على هذا التقييم.' });
 
@@ -844,7 +844,7 @@ export async function POST(request: Request) {
           .from('evaluations')
           .select('id, project_name, student_id, students ( full_name, telegram_id )')
           .eq('id', evalId)
-          .maybeSingle();
+          .limit(1).maybeSingle();
 
         if (ev) {
           await supabase.from('evaluations').update({ photo_url: null, ai_status: null, score: 0 }).eq('id', evalId);
@@ -866,7 +866,7 @@ export async function POST(request: Request) {
         const crsId = withoutPrefix.slice(0, underscoreIdx);
         const projId = withoutPrefix.slice(underscoreIdx + 1);
 
-        const { data: course } = await supabase.from('courses').select('*').eq('id', crsId).maybeSingle();
+        const { data: course } = await supabase.from('courses').select('*').eq('id', crsId).limit(1).maybeSingle();
         const projects = ((course?.custom_week_names as any)?.__projects__ || []);
         const project = projects.find((p: any) => p.id === projId);
         const projName = project ? project.name : 'المشروع';
@@ -936,7 +936,7 @@ export async function POST(request: Request) {
       // --- VIEW COURSE ARTWORKS & STATS ---
       if (data.startsWith('view_course_')) {
         const courseId = data.replace('view_course_', '');
-        const { data: course } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle();
+        const { data: course } = await supabase.from('courses').select('*').eq('id', courseId).limit(1).maybeSingle();
         
         if (botToken) {
           await sendTelegramMessage(botToken, chatId, `جاري تجميع أعمال مقرر (${course?.name || ''})... يرجى الانتظار ⏳`);
