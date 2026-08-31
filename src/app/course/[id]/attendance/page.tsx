@@ -840,12 +840,23 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       note: excuse,
                       teacher_id: course.teacher_id
                     }];
-                    supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
-                      const newSet = new Set(selectedStudentIds);
-                      newSet.delete(longPressStudent.id);
-                      setSelectedStudentIds(newSet);
-                      fetchData();
-                    });
+                    const recordToDelete = attendance.find(a => a.student_id === longPressStudent.id);
+                    
+                    const saveExcuse = async () => {
+                      if (recordToDelete) {
+                        await supabase.from("attendance").delete().eq("id", recordToDelete.id);
+                      }
+                      const { error } = await supabase.from("attendance").insert(inserts);
+                      if (error) {
+                        alert("خطأ في قاعدة البيانات: " + error.message);
+                      } else {
+                        const newSet = new Set(selectedStudentIds);
+                        newSet.delete(longPressStudent.id);
+                        setSelectedStudentIds(newSet);
+                        fetchData();
+                      }
+                    };
+                    saveExcuse();
                     setLongPressStudent(null);
                   }
                 }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
