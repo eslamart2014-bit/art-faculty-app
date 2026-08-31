@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   try {
-    const { action, userId, newPassword, adminId } = await request.json();
+    const { action, userId, newPassword, newRole, adminId } = await request.json();
 
     if (!adminId) {
       return NextResponse.json({ error: 'Missing adminId' }, { status: 401 });
@@ -78,6 +78,23 @@ export async function POST(request: Request) {
         if (error) throw error;
       }
       
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'grant_role') {
+      // Only full admin can grant/revoke roles
+      if (profile.role !== 'مدير') {
+        return NextResponse.json({ error: 'Forbidden: Only admin can change roles' }, { status: 403 });
+      }
+      const roleToSet = newRole || 'teacher';
+      if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+
+      const { error: roleError } = await supabaseAdmin
+        .from('profiles')
+        .update({ role: roleToSet })
+        .eq('id', userId);
+
+      if (roleError) throw roleError;
       return NextResponse.json({ success: true });
     }
 
