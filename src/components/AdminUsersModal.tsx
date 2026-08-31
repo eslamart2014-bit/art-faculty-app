@@ -29,7 +29,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     setLoading(true);
     const { data: profilesData } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
     if (profilesData) {
-      const isAssistant = adminUser?.role === 'مساعد مطور';
+      const isAssistant = adminUser?.role === 'مدير مساعد';
       setUsers(profilesData.filter(u => !(isAssistant && u.full_name?.startsWith('[محذوف]'))));
     }
 
@@ -106,18 +106,18 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   };
 
   const isAdmin = adminUser?.role === 'مدير';
-  const isAssistant = adminUser?.role === 'مساعد مطور';
+  const isAssistant = adminUser?.role === 'مدير مساعد';
 
   const handleGrantAssistantRole = async (user: any) => {
     if (!isAdmin) return;
-    const newRole = user.role === 'مساعد مطور' ? 'عضو هيئة تدريس' : 'مساعد مطور';
-    const actionText = newRole === 'مساعد مطور' ? 'منح' : 'إلغاء';
-    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (مساعد مطور) لهذا الحساب؟\nالاسم: ${user.full_name}`)) return;
+    const newRole = user.role === 'مدير مساعد' ? 'عضو هيئة تدريس' : 'مدير مساعد';
+    const actionText = newRole === 'مدير مساعد' ? 'منح' : 'إلغاء';
+    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (مدير مساعد) لهذا الحساب؟\nالاسم: ${user.full_name}`)) return;
 
     await supabase.from("profiles").update({ role: newRole }).eq("id", user.id);
     
     // Optional: Notify the user if they have Telegram connected
-    if (newRole === 'مساعد مطور' && user.telegram_id) {
+    if (newRole === 'مدير مساعد' && user.telegram_id) {
       const botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || ''; 
       try {
         await fetch("/api/bot/notify_warning", { 
@@ -279,7 +279,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                           {u.degree && <span style={{ color: "#4CAF50" }}>{u.degree}</span>}
                           {u.full_name || "بدون اسم"}
                           {u.role === 'مدير' && <span style={{ background: "#2196F3", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير</span>}
-                          {u.role === 'مساعد مطور' && <span style={{ background: "#9C27B0", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مساعد مطور</span>}
+                          {u.role === 'مدير مساعد' && <span style={{ background: "#9C27B0", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير مساعد</span>}
                           {isLocked && <span style={{ background: "#f44336", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🔒 مقفول</span>}
                         </div>
                         <div style={{ color: "#888", fontSize: "12px", display: "flex", gap: "10px", alignItems: "center" }}>
@@ -331,7 +331,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                             
                             {u.role !== 'مدير' && (
                               <button onClick={() => handleGrantAssistantRole(u)} style={{ background: "#9C27B0", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
-                                {u.role === 'مساعد مطور' ? "❌ إلغاء صلاحية مساعد مطور" : "⭐ منح صلاحية مساعد مطور"}
+                                {u.role === 'مدير مساعد' ? "❌ إلغاء صلاحية مدير مساعد" : "⭐ منح صلاحية مدير مساعد"}
                               </button>
                             )}
                           </>

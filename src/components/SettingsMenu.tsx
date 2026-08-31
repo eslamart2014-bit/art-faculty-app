@@ -91,7 +91,7 @@ export default function SettingsMenu({
           }
         `}</style>
 
-        {["مدير", "مساعد مطور"].includes(user?.role) && (
+        {["مدير", "مدير مساعد"].includes(user?.role) && (
           <div className="settings-item" onClick={() => { onClose(); onOpenAdminPanel(); }}>
             <span style={{ marginLeft: "10px" }}>🛡️</span> إدارة المستخدمين والتراخيص
           </div>

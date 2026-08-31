@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single();
 
-    if (!profile || !['مدير', 'مساعد مطور'].includes(profile.role)) {
+    if (!profile || !['مدير', 'مدير مساعد'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     // Fetch target user to prevent Assistant from modifying Manager
     const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
-    if (profile.role === 'مساعد مطور' && targetProfile?.role === 'مدير') {
+    if (profile.role === 'مدير مساعد' && targetProfile?.role === 'مدير') {
       return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
     }
 
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     if (action === 'delete_user') {
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
       
-      if (profile.role === 'مساعد مطور') {
+      if (profile.role === 'مدير مساعد') {
         // Soft delete: freeze the account and hide from assistant by prefixing the name
         const { data: userToDelete } = await supabaseAdmin.from('profiles').select('full_name').eq('id', userId).single();
         const currentName = userToDelete?.full_name || 'بدون اسم';

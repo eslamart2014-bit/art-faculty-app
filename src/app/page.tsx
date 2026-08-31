@@ -35,7 +35,7 @@ export default function Home() {
       if (session?.user) {
         fetchProfile(session.user).then(profile => {
           setUser(profile);
-          setOriginalAdminUser(['مدير', 'مساعد مطور'].includes(profile.role) ? profile : null);
+          setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile.role) ? profile : null);
           setLoading(false);
         });
       } else {
@@ -55,7 +55,7 @@ export default function Home() {
               return;
             }
             setUser(profile);
-            setOriginalAdminUser(['مدير', 'مساعد مطور'].includes(profile.role) ? profile : null);
+            setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile.role) ? profile : null);
           }
         } else {
           setUser(null);
