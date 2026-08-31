@@ -729,7 +729,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         ) : (
           displayStudents.map((student) => {
             const isSelected = selectedStudentIds.has(student.id);
-            const isExcused = attendance.some(a => a.student_id === student.id && a.status === 'غياب بعذر');
+            const excuseRecord = attendance.find(a => a.student_id === student.id && a.status === 'غياب بعذر');
+            const isExcused = !!excuseRecord;
             
             let bg = "#1e1e1e";
             let borderColor = "transparent";
@@ -775,12 +776,17 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       <span style={{ background: "#E91E63", color: "white", fontSize: "10px", padding: "2px 6px", borderRadius: "8px" }}>تخلفات</span>
                     )}
                   </div>
-                  <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : "#888", marginTop: "4px", fontFamily: "monospace" }}>
+                  <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : (isExcused ? "#ffbaba" : "#888"), marginTop: "4px", fontFamily: "monospace" }}>
                     كود: {student.student_code}
+                    {isExcused && excuseRecord?.note && (
+                      <span style={{ marginLeft: "10px", background: "rgba(255,255,255,0.2)", padding: "2px 6px", borderRadius: "4px", color: "#fff" }}>
+                        {excuseRecord.note}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isSelected && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
-                {isExcused && <div style={{ color: "#f44336", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                {isExcused && <div style={{ color: "#fff", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span>📝</span>
                   <span style={{ fontSize: "9px" }}>بعذر</span>
                 </div>}
