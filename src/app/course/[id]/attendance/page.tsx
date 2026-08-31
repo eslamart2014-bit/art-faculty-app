@@ -733,12 +733,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             
             let bg = "#1e1e1e";
             let borderColor = "transparent";
-            if (isSelected) {
-              bg = "#1b5e20";
-              borderColor = "#4CAF50";
-            } else if (isExcused) {
+            if (isExcused) {
               bg = "#d32f2f";
               borderColor = "#ff5252";
+            } else if (isSelected) {
+              bg = "#1b5e20";
+              borderColor = "#4CAF50";
             }
             
             return (
@@ -841,6 +841,9 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       teacher_id: course.teacher_id
                     }];
                     supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
+                      const newSet = new Set(selectedStudentIds);
+                      newSet.delete(longPressStudent.id);
+                      setSelectedStudentIds(newSet);
                       fetchData();
                     });
                     setLongPressStudent(null);
