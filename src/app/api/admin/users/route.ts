@@ -42,7 +42,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
+
     // Pass security checks, proceed with action
+
+    // Fetch target user to prevent Assistant from modifying Manager
+    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
+    if (profile.role === 'مساعد مطور' && targetProfile?.role === 'مدير') {
+      return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
+    }
+
 
     if (action === 'change_password') {
       if (!userId || !newPassword) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
