@@ -91,11 +91,14 @@ export default function SettingsMenu({
           }
         `}</style>
 
+        {["مدير", "مساعد مطور"].includes(user?.role) && (
+          <div className="settings-item" onClick={() => { onClose(); onOpenAdminPanel(); }}>
+            <span style={{ marginLeft: "10px" }}>🛡️</span> إدارة المستخدمين والتراخيص
+          </div>
+        )}
+
         {user?.role === "مدير" && (
           <>
-            <div className="settings-item" onClick={() => { onClose(); onOpenAdminPanel(); }}>
-              <span style={{ marginLeft: "10px" }}>🛡️</span> إدارة المستخدمين والتراخيص
-            </div>
             <div className="settings-item" onClick={() => { onClose(); onOpenRoster(); }}>
               <span style={{ marginLeft: "10px" }}>📋</span> إدارة كشوف الطلاب
             </div>

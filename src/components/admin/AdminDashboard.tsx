@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
+import { downloadPdf } from "@/lib/downloadPdf";
 
 interface AdminDashboardProps {
   activeModal: "users" | "roster" | null;
@@ -244,12 +245,8 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
       `;
     });
 
-    const finalHtml = generatePrintableHtml("", "كشف أكواد الطلاب", `الفرقة: ${exportYear}`, tableHtml, "الإدارة");
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(finalHtml);
-      printWindow.document.close();
-    }
+    await downloadPdf(`student_codes_${exportYear}.pdf`, "", "كشف أكواد الطلاب", `الفرقة: ${exportYear}`, tableHtml, "الإدارة");
+
     setLoading(false);
   };
 

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
+import { downloadPdf } from "@/lib/downloadPdf";
 
 function formatRelativeTimeArabic(dateInput: string | Date): string {
   const now = new Date();
@@ -43,6 +44,8 @@ type Project = {
   start_date?: string;
   end_date?: string;
   show_score?: boolean;
+  camera_mode?: '2d' | '3d';
+  required_photos?: number;
 };
 
 export default function EvaluationsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -103,6 +106,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [editProjectStartDate, setEditProjectStartDate] = useState("");
   const [editProjectEndDate, setEditProjectEndDate] = useState("");
   const [editProjectShowScore, setEditProjectShowScore] = useState(true);
+  const [editProjectCameraMode, setEditProjectCameraMode] = useState<'2d'|'3d'>('2d');
+  const [editProjectRequiredPhotos, setEditProjectRequiredPhotos] = useState<number>(1);
   const [showTelegramSettings, setShowTelegramSettings] = useState(false);
   const [sendBroadcastOnSave, setSendBroadcastOnSave] = useState(false);
 
@@ -249,6 +254,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       setEditProjectStartDate(proj.start_date ?? "");
       setEditProjectEndDate(proj.end_date ?? "");
       setEditProjectShowScore(proj.show_score ?? true);
+      setEditProjectCameraMode(proj.camera_mode ?? '2d');
+      setEditProjectRequiredPhotos(proj.required_photos ?? 1);
       setShowTelegramSettings(false);
       setSendBroadcastOnSave(false);
       setShowManageProjectModal(true);
@@ -272,7 +279,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         is_active: editProjectIsActive,
         start_date: editProjectStartDate,
         end_date: editProjectEndDate,
-        show_score: editProjectShowScore
+        show_score: editProjectShowScore,
+        camera_mode: editProjectCameraMode,
+        required_photos: editProjectRequiredPhotos
       } : p
     );
 
@@ -403,21 +412,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       </table>
     `;
 
-    const html = generatePrintableHtml(
+    downloadPdf(
+      "missing_students.pdf",
       course.name,
       `تقرير الطلاب المتأخرين عن رفع مشروع (${proj.name})`,
       `إجمالي المتأخرين: ${missingList.length} طالب - تاريخ التقرير: ${new Date().toLocaleDateString('ar-EG')}`,
       tableHtml,
       "أستاذ المقرر: ...................."
     );
-
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.focus();
-      setTimeout(() => win.print(), 500);
-    }
   };
 
   // Full 0 to max_score with +1 increment
@@ -1337,6 +1339,31 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         <input type="checkbox" checked={editProjectShowScore} onChange={e => setEditProjectShowScore(e.target.checked)} />
                         عرض وإرسال الدرجة للطالب فور تقييمه
                       </label>
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>
+                        <label style={{ color: "#aaa", fontSize: "12px" }}>وضع الكاميرا:</label>
+                        <select 
+                          value={editProjectCameraMode} 
+                          onChange={(e: any) => setEditProjectCameraMode(e.target.value)}
+                          style={{ padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px" }}
+                        >
+                          <option value="2d">مسطح (2D)</option>
+                          <option value="3d">مجسم (3D)</option>
+                        </select>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>
+                        <label style={{ color: "#aaa", fontSize: "12px" }}>عدد الصور المطلوبة:</label>
+                        <select 
+                          value={editProjectRequiredPhotos} 
+                          onChange={(e: any) => setEditProjectRequiredPhotos(Number(e.target.value))}
+                          style={{ padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px" }}
+                        >
+                          <option value={1}>صورة واحدة</option>
+                          <option value={2}>صورتان</option>
+                          <option value={3}>3 صور</option>
+                        </select>
+                      </div>
 
                       <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ffeb3b", fontSize: "13px", cursor: "pointer", marginTop: "4px", borderTop: "1px solid #444", paddingTop: "8px" }}>
                         <input type="checkbox" checked={sendBroadcastOnSave} onChange={e => setSendBroadcastOnSave(e.target.checked)} />

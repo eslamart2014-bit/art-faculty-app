@@ -3,7 +3,8 @@ export const generatePrintableHtml = (
   title: string, 
   subtitle: string, 
   tableHtml: string,
-  instructorName: string = "........................"
+  instructorName: string = "........................",
+  isDownload: boolean = false
 ) => {
   return `
     <html dir="rtl" lang="ar">
@@ -82,9 +83,11 @@ export const generatePrintableHtml = (
           </tfoot>
         </table>
         
+        ${!isDownload ? `
         <script>
           window.onload = function() { window.print(); window.close(); }
         </script>
+        ` : ''}
       </body>
     </html>
   `;

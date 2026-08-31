@@ -27,9 +27,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
   const fetchData = async () => {
     setLoading(true);
-    // Fetch registered profiles
     const { data: profilesData } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
-    if (profilesData) setUsers(profilesData);
+    if (profilesData) {
+      const isAssistant = adminUser?.role === 'مساعد مطور';
+      setUsers(profilesData.filter(u => !(isAssistant && u.full_name?.startsWith('[محذوف]'))));
+    }
 
     // Fetch pending invitations
     const { data: invData } = await supabase.from("invitations").select("*").eq("status", "pending").order("created_at", { ascending: false });
@@ -100,6 +102,39 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
       console.error(err);
       alert("حدث خطأ في الاتصال");
     }
+    setActiveMenuId(null);
+  };
+
+  const isAdmin = adminUser?.role === 'مدير';
+  const isAssistant = adminUser?.role === 'مساعد مطور';
+
+  const handleGrantAssistantRole = async (user: any) => {
+    if (!isAdmin) return;
+    const newRole = user.role === 'مساعد مطور' ? 'teacher' : 'مساعد مطور';
+    const actionText = newRole === 'مساعد مطور' ? 'منح' : 'إلغاء';
+    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (مساعد مطور) لهذا الحساب؟\nالاسم: ${user.full_name}`)) return;
+
+    await supabase.from("profiles").update({ role: newRole }).eq("id", user.id);
+    
+    // Optional: Notify the user if they have Telegram connected
+    if (newRole === 'مساعد مطور' && user.telegram_id) {
+      const botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || ''; 
+      try {
+        await fetch("/api/bot/notify_warning", { 
+        });
+      } catch(e) {}
+    }
+
+    try {
+      await fetch('/api/admin/notify_role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, newRole })
+      });
+    } catch (e) {}
+
+    alert(`تم ${actionText} الصلاحية بنجاح.`);
+    fetchData();
     setActiveMenuId(null);
   };
 
@@ -218,7 +253,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                 const isLocked = u.locked_until && new Date(u.locked_until) > new Date();
                 
                 const getLastSeen = (dateStr: string | null) => {
-                  if (!dateStr) return null;
+                  if (!isAdmin || !dateStr) return null;
                   const diffMins = (new Date().getTime() - new Date(dateStr).getTime()) / 1000 / 60;
                   if (diffMins < 5) return <span style={{ fontSize: "11px", color: "#4CAF50" }}>🟢 نشط الآن</span>;
                   if (diffMins < 60) return <span style={{ fontSize: "11px", color: "#FF9800" }}>🟠 نشط منذ {Math.floor(diffMins)} دقيقة</span>;
@@ -244,6 +279,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                           {u.degree && <span style={{ color: "#4CAF50" }}>{u.degree}</span>}
                           {u.full_name || "بدون اسم"}
                           {u.role === 'مدير' && <span style={{ background: "#2196F3", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير</span>}
+                          {u.role === 'مساعد مطور' && <span style={{ background: "#9C27B0", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مساعد مطور</span>}
                           {isLocked && <span style={{ background: "#f44336", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🔒 مقفول</span>}
                         </div>
                         <div style={{ color: "#888", fontSize: "12px", display: "flex", gap: "10px", alignItems: "center" }}>
@@ -265,23 +301,33 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                           🔑 تغيير كلمة المرور
                         </button>
                         
-                        <button onClick={() => handleToggleSuspend(u)} style={{ background: "#333", color: u.is_suspended ? "#4CAF50" : "#FF9800", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                          {u.is_suspended ? "▶️ تفعيل الحساب" : "⏸️ إيقاف مؤقت"}
-                        </button>
-
-                        {isLocked && (
-                          <button onClick={() => handleUnlock(u)} style={{ background: "#333", color: "#4CAF50", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1" }}>
-                            🔓 فك قفل الحساب وإعطاء محاولات جديدة
-                          </button>
-                        )}
-
-                        <button onClick={() => handleImpersonate(u)} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
-                          🎭 الدخول كـ {u.full_name}
-                        </button>
-                        
                         <button onClick={() => handleDeleteUser(u)} style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
                           🗑️ حذف نهائي
                         </button>
+
+                        {isAdmin && (
+                          <>
+                            <button onClick={() => handleToggleSuspend(u)} style={{ background: "#333", color: u.is_suspended ? "#4CAF50" : "#FF9800", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
+                              {u.is_suspended ? "▶️ تفعيل الحساب" : "⏸️ إيقاف مؤقت"}
+                            </button>
+
+                            {isLocked && (
+                              <button onClick={() => handleUnlock(u)} style={{ background: "#333", color: "#4CAF50", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1" }}>
+                                🔓 فك قفل الحساب وإعطاء محاولات جديدة
+                              </button>
+                            )}
+
+                            <button onClick={() => handleImpersonate(u)} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
+                              🎭 الدخول كـ {u.full_name}
+                            </button>
+                            
+                            {u.role !== 'مدير' && (
+                              <button onClick={() => handleGrantAssistantRole(u)} style={{ background: "#9C27B0", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
+                                {u.role === 'مساعد مطور' ? "❌ إلغاء صلاحية مساعد مطور" : "⭐ منح صلاحية مساعد مطور"}
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

@@ -4,7 +4,6 @@ import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
-import { downloadPdf } from "@/lib/downloadPdf";
 import { getTermAndWeekInfo } from "@/lib/termHelper";
 
 export default function ReportsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -155,11 +154,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     students.forEach((s, i) => {
       let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right; white-space: nowrap;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td>`;
       weeks.forEach(w => {
-        // Find attendance in this week by exact week key
-        const att = attendance.find(a => a.student_id === s.id && a.date === w.key);
+        // Find attendance in this week
+        const att = attendance.find(a => a.student_id === s.id && new Date(a.date) >= w.start && new Date(a.date) <= w.end);
         if (att) {
           if (att.status === 'غياب بعذر') {
-            rowHtml += `<td style="background-color: #f8d7da !important; color: #721c24; font-weight: bold; font-size: 11px;">غياب بعذر<br/><span style="font-size: 9px">${att.note || ''}</span></td>`;
+            rowHtml += `<td style="background-color: #fff3cd !important; color: #856404; font-weight: bold; font-size: 11px;">غياب بعذر<br/><span style="font-size: 9px">${att.note || ''}</span></td>`;
           } else {
             const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
             rowHtml += `<td style="background-color: #d4edda !important; color: #155724; font-weight: bold; font-size: 11px;">${dateStr}</td>`;
@@ -203,7 +202,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       </table>
     `;
 
-    await downloadPdf("report.pdf", course?.name || "", "كشف الغياب والحضور التفصيلي بالتاريخ", `يعرض تواريخ حضور كل طالب بدقة. ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف الغياب والحضور التفصيلي بالتاريخ", `يعرض تواريخ حضور كل طالب بدقة. ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   // --- Report 2: Single Project ---
@@ -231,7 +232,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         <tbody>${tableRows}</tbody>
       </table>
     `;
-    await downloadPdf("report.pdf", course?.name || "", "كشف الطلاب غير المقيمين", `المشروع: ${proj?.name || ''} | ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف الطلاب غير المقيمين", `المشروع: ${proj?.name || ''} | ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   const printSingleProjectEvaluated = async () => {
@@ -251,7 +254,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         <tbody>${tableRows}</tbody>
       </table>
     `;
-    await downloadPdf("report.pdf", course?.name || "", "كشف رصد درجات مشروع", `المشروع: ${proj?.name || ''} | ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف رصد درجات مشروع", `المشروع: ${proj?.name || ''} | ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   // --- Report 3: All Projects Summary ---
@@ -266,14 +271,16 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     return { completelyUnevaluated, evaluatedSomehow };
   };
 
-  const printAllProjectsUnevaluated = async () => {
+  const printAllProjectsUnevaluated = () => {
     const { completelyUnevaluated } = getAllProjectsStats();
     let tableRows = '';
     completelyUnevaluated.forEach((s, i) => {
       tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td><td>لم يقدم أي مشروع</td></tr>`;
     });
     const tableHtml = `<table><thead><tr><th style="width: 50px;">م</th><th>اسم الطالب</th><th style="width: 100px;">السكشن</th><th style="width: 150px;">الحالة</th></tr></thead><tbody>${tableRows}</tbody></table>`;
-    await downloadPdf("report.pdf", course?.name || "", "كشف الطلاب المحرومين", "الطلاب الذين لم يقدموا أو يُقيّموا في أي مشروع نهائياً.", tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف الطلاب المحرومين", "الطلاب الذين لم يقدموا أو يُقيّموا في أي مشروع نهائياً.", tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   const printAllProjectsEvaluated = async () => {
@@ -285,7 +292,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     });
     const tableHtml = `<table><thead><tr><th style="width: 50px;">م</th><th>اسم الطالب</th><th style="width: 100px;">السكشن</th><th style="width: 150px;">المشاريع المقيمة</th></tr></thead><tbody>${tableRows}</tbody>      </table>
     `;
-    await downloadPdf("report.pdf", course?.name || "", "كشف إجمالي درجات التقييمات", `إجمالي الدرجات التي حصل عليها الطالب في جميع المشاريع المقيمة. | ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف إجمالي درجات التقييمات", `إجمالي الدرجات التي حصل عليها الطالب في جميع المشاريع المقيمة. | ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   // --- Report 4: Comprehensive Raw Report ---
@@ -331,7 +340,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       </table>
     `;
 
-    await downloadPdf("report.pdf", course?.name || "", "كشف درجات أعمال السنة (تجميعي)", `يعرض درجات الغياب، المشاريع، والميدتيرم مجمعة. | ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف درجات أعمال السنة (تجميعي)", `يعرض درجات الغياب، المشاريع، والميدتيرم مجمعة. | ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
 
@@ -418,7 +429,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       </table>
     `;
 
-    await downloadPdf("report.pdf", course?.name || "", "كشف النتيجة النهائية المجمع (الكنترول)", `تمت معالجة وتحجيم الدرجات وتقريبها حسب إعدادات الكنترول المطلوبة. | ${termInfo}`, tableHtml, instructorName);
+    const html = generatePrintableHtml(course?.name || "", "كشف النتيجة النهائية المجمع (الكنترول)", `تمت معالجة وتحجيم الدرجات وتقريبها حسب إعدادات الكنترول المطلوبة. | ${termInfo}`, tableHtml, instructorName);
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   // UI Tabs Definition

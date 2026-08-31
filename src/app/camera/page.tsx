@@ -21,10 +21,22 @@ function CameraApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const [hasError, setHasError] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   
+  // Project settings
+  const [projectData, setProjectData] = useState<any>(null);
+
+  useEffect(() => {
+    if (crsId && projId) {
+      supabase.from('courses').select('custom_week_names').eq('id', crsId).single().then(({data}) => {
+        const proj = data?.custom_week_names?.__projects__?.find((p:any) => p.id === projId);
+        if (proj) setProjectData(proj);
+      });
+    }
+  }, [crsId, projId]);
+
   // Camera start state & stream
   const [isCameraStarted, setIsCameraStarted] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -56,17 +68,23 @@ function CameraApp() {
       setHasGyro(true);
       clearTimeout(gyroTimeout);
 
-      // When the phone is flat above a table, beta and gamma are both near 0.
-      // Margin of error: 9 degrees for smooth user experience
-      const threshold = 9;
-      const isFlat = Math.abs(beta) < threshold && Math.abs(gamma) < threshold;
+      const threshold = 15; // increased tolerance for easier use
+      let isCorrect = false;
+
+      if (projectData?.camera_mode === '3d') {
+        // 3D mode (مجسم): phone should be held vertically (beta near 90 or -90)
+        isCorrect = Math.abs(Math.abs(beta) - 90) < threshold && Math.abs(gamma) < threshold;
+      } else {
+        // 2D mode (مسطح): phone should be flat (beta and gamma near 0)
+        isCorrect = Math.abs(beta) < threshold && Math.abs(gamma) < threshold;
+      }
       
-      setIsLeveled(isFlat);
+      setIsLeveled(isCorrect);
       
-      if (isFlat) {
+      if (isCorrect) {
         setTiltStatus("الوضع ممتاز! يمكنك التصوير الآن ✅");
       } else {
-        setTiltStatus("يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق المشروع 📱");
+        setTiltStatus(projectData?.camera_mode === '3d' ? "يرجى مسك الهاتف بشكل عمودي ثابت أمام المجسم 📱" : "يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق المشروع 📱");
       }
     };
 
@@ -75,7 +93,7 @@ function CameraApp() {
       window.removeEventListener("deviceorientation", handleOrientation);
       clearTimeout(gyroTimeout);
     };
-  }, [hasGyro]);
+  }, [hasGyro, projectData]);
 
   // 2. Attach stream to video element whenever stream and videoRef are available
   useEffect(() => {
@@ -87,7 +105,7 @@ function CameraApp() {
         console.warn("Auto-play error:", err);
       });
     }
-  }, [isCameraStarted, stream, photo]);
+  }, [isCameraStarted, stream, photos]);
 
   // 3. Cleanup on unmount
   useEffect(() => {
@@ -244,11 +262,11 @@ function CameraApp() {
     }
     
     const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    setPhoto(dataUrl);
+    setPhotos(prev => [...prev, dataUrl]);
   };
 
   const retakePhoto = () => {
-    setPhoto(null);
+    setPhotos([]);
     setImageHash("");
     setFilterWarnings([]);
     if (videoRef.current && stream) {
@@ -260,15 +278,43 @@ function CameraApp() {
   };
 
   const uploadPhoto = async () => {
-    if (!photo || !stuId || !crsId || !projId) return;
+    if (photos.length === 0 || !stuId || !crsId || !projId) return;
     
     setIsUploading(true);
     
     try {
+      let finalPhoto = photos[0];
+      
+      if (photos.length > 1) {
+        // Create collage
+        const imgElements = await Promise.all(photos.map(p => {
+          return new Promise<HTMLImageElement>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.src = p;
+          });
+        }));
+        
+        const canvas = document.createElement('canvas');
+        const width = imgElements[0].width;
+        const height = imgElements[0].height;
+        
+        canvas.width = width;
+        canvas.height = height * photos.length;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          imgElements.forEach((img, i) => {
+            ctx.drawImage(img, 0, i * height, width, height);
+          });
+          finalPhoto = canvas.toDataURL('image/jpeg', 0.8);
+        }
+      }
+
       const response = await fetch("/api/student/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo, stuId, crsId, projId, imageHash }),
+        body: JSON.stringify({ photo: finalPhoto, stuId, crsId, projId, imageHash }),
       });
 
       const result = await response.json();
@@ -363,19 +409,19 @@ function CameraApp() {
                   width: '100%', 
                   height: '100%', 
                   objectFit: 'cover',
-                  display: photo ? 'none' : 'block' 
+                  display: photos.length >= (projectData?.required_photos || 1) ? 'none' : 'block' 
                 }} 
               />
-              {photo && (
+              {photos.length >= (projectData?.required_photos || 1) && (
                 <img 
-                  src={photo} 
+                  src={photos[photos.length - 1]} 
                   alt="Captured" 
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                 />
               )}
               
               {/* Leveling Indicator Overlay (only in live mode) */}
-              {!photo && (
+              {photos.length < (projectData?.required_photos || 1) && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ 
                     width: '90px', 
@@ -402,7 +448,7 @@ function CameraApp() {
               )}
               
               {/* AI Warnings Overlay */}
-              {filterWarnings.length > 0 && photo && (
+              {filterWarnings.length > 0 && photos.length > 0 && (
                 <div style={{ position: 'absolute', top: '12px', left: '12px', right: '12px', backgroundColor: 'rgba(255, 82, 82, 0.92)', color: 'white', padding: '12px', borderRadius: '10px', zIndex: 10, textAlign: 'right', direction: 'rtl', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
                   {filterWarnings.map((w, i) => <div key={i} style={{ fontWeight: 'bold' }}>{w}</div>)}
                   <div style={{ fontSize: '0.8rem', marginTop: '4px', opacity: 0.9 }}>يمكنك إعادة الالتقاط للحصول على صورة أفضل وأوضح.</div>
@@ -414,8 +460,21 @@ function CameraApp() {
             </div>
 
             {/* Bottom Controls */}
+            <div style={{ padding: "10px", background: "#222", display: "flex", gap: "10px", overflowX: "auto" }}>
+              {photos.map((p, i) => (
+                <div key={i} style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0, border: "2px solid #4CAF50", borderRadius: "8px", overflow: "hidden" }}>
+                  <img src={p} alt={`Photo ${i+1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+              ))}
+              {projectData?.required_photos > 1 && photos.length < projectData.required_photos && (
+                <div style={{ width: "60px", height: "60px", flexShrink: 0, border: "2px dashed #666", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>
+                  {photos.length} / {projectData.required_photos}
+                </div>
+              )}
+            </div>
+
             <div style={{ height: '110px', backgroundColor: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 20px' }}>
-              {!photo ? (
+              {photos.length < (projectData?.required_photos || 1) ? (
                 <button 
                   onClick={capturePhoto}
                   disabled={!isLeveled}

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single();
 
-    if (!profile || profile.role !== 'مدير') {
+    if (!profile || !['مدير', 'مساعد مطور'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
@@ -62,8 +62,21 @@ export async function POST(request: Request) {
     if (action === 'delete_user') {
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
       
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (error) throw error;
+      if (profile.role === 'مساعد مطور') {
+        // Soft delete: freeze the account and hide from assistant by prefixing the name
+        const { data: userToDelete } = await supabaseAdmin.from('profiles').select('full_name').eq('id', userId).single();
+        const currentName = userToDelete?.full_name || 'بدون اسم';
+        const newName = currentName.startsWith('[محذوف]') ? currentName : `[محذوف] ${currentName}`;
+        
+        await supabaseAdmin.from('profiles').update({
+          is_suspended: true,
+          full_name: newName
+        }).eq('id', userId);
+      } else {
+        // Hard delete for Manager
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (error) throw error;
+      }
       
       return NextResponse.json({ success: true });
     }

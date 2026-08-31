@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 import QRScanner from "@/components/QRScanner";
+import { downloadPdf } from "@/lib/downloadPdf";
 import { extractStudentCode } from "@/lib/scannerHelper";
 
 const getWeekRangeFromKey = (key: string) => {
@@ -473,6 +474,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       return;
     }
 
+    const confirmed = window.confirm(`بيانات الطالب:\nالاسم: ${student.full_name}\nالفرقة: ${student.academic_year}\nالسكشن: ${student.section || 'عام'}\n\nهل أنت متأكد من إضافة هذا الطالب كـ (تخلفات) لهذا المقرر؟`);
+    if (!confirmed) {
+      setSaving(false);
+      return;
+    }
+
     const updatedMakeup = [...(course.makeup_students || []), student.id];
     await supabase.from("courses").update({ makeup_students: updatedMakeup }).eq("id", course.id);
     setCourse({ ...course, makeup_students: updatedMakeup });
@@ -526,12 +533,9 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     return list.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'));
   };
 
-  const handlePrintWarnings = () => {
+  const getWarningsList = () => {
     const limit = Number(absenceLimit);
-    if (isNaN(limit)) {
-      alert("يرجى إدخال رقم صحيح لحد الغياب.");
-      return;
-    }
+    if (isNaN(limit)) return [];
     
     const excluded = course?.excluded_students || [];
     const activeStudents = students.filter(s => !excluded.includes(s.id));
@@ -539,7 +543,6 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const allStds = [...activeStudents, ...activeMakeup.map(s => ({ ...s, isMakeup: true }))];
 
     const warnings: any[] = [];
-    
     allStds.forEach(s => {
       const presences = allAttendances.filter(a => a.student_id === s.id).length;
       const absences = totalWeeksCount - presences;
@@ -547,91 +550,80 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         warnings.push({ ...s, absences, presences });
       }
     });
+    return warnings.sort((a, b) => b.absences - a.absences || a.full_name.localeCompare(b.full_name, 'ar'));
+  };
 
+  const handlePrintWarnings = async () => {
+    const warnings = getWarningsList();
+    const limit = Number(absenceLimit);
     if (warnings.length === 0) {
       alert("ممتاز! لا يوجد أي طلاب تجاوزوا حد الغياب المحدد حتى الآن.");
       return;
     }
 
-    warnings.sort((a, b) => b.absences - a.absences || a.full_name.localeCompare(b.full_name, 'ar'));
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const html = `
-      <html dir="rtl" lang="ar">
-        <head>
-          <title>قائمة الإنذارات - ${course?.name || ''}</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #fff; color: #000; }
-            .print-container { border: 4px double #000; padding: 30px; min-height: 90vh; }
-            .header { text-align: center; margin-bottom: 30px; font-weight: bold; font-size: 18px; line-height: 1.6; }
-            .title { text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px; }
-            .info { margin-bottom: 20px; font-size: 16px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #000; padding: 10px; text-align: center; font-size: 14px; }
-            th { background-color: #f0f0f0; font-weight: bold; }
-            .footer { margin-top: 50px; text-align: left; padding-left: 50px; font-weight: bold; }
-            @media print {
-              body { padding: 0; }
-              .print-container { border: 4px double #000; padding: 20px; margin: 20px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-container">
-            <div class="header">
-              جامعة قنا<br/>
-              كلية التربية النوعية<br/>
-              قسم التربية الفنية<br/>
-              مقرر: ${course?.name || '________________'}
-            </div>
-            
-            <div style="text-align: center;">
-              <div class="title">إنذار تجاوز نسبة الغياب</div>
-            </div>
-
-            <div class="info">
-              إنذار أولي للطلاب الآتي أسماؤهم لتجاوزهم نسبة الغياب المقررة (${limit} مرات غياب فأكثر) من إجمالي ${totalWeeksCount} أسابيع فعلية تم رصدها حتى الآن في المقرر:
-            </div>
-
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 50px;">م</th>
-                  <th>اسم الطالب</th>
-                  <th style="width: 100px;">القسم/الفرقة</th>
-                  <th style="width: 100px;">السكشن</th>
-                  <th style="width: 100px;">مرات الغياب</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${warnings.map((w, index) => `
-                  <tr>
-                    <td>${index + 1}</td>
-                    <td style="text-align: right; padding-right: 15px;">${w.full_name} ${w.isMakeup ? '(تخلفات)' : ''}</td>
-                    <td>${w.department || '-'}</td>
-                    <td>${w.isMakeup ? 'تخلفات' : w.section || '-'}</td>
-                    <td><strong>${w.absences}</strong></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-
-            <div class="footer">
-              التوقيع:<br/><br/>
-              ${instructorName}
-            </div>
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
-        </body>
-      </html>
+    const tableHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 50px;">م</th>
+            <th>اسم الطالب</th>
+            <th style="width: 100px;">القسم/الفرقة</th>
+            <th style="width: 100px;">السكشن</th>
+            <th style="width: 100px;">مرات الغياب</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${warnings.map((w, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td style="text-align: right; padding-right: 15px;">${w.full_name} ${w.isMakeup ? '(تخلفات)' : ''}</td>
+              <td>${w.department || '-'}</td>
+              <td>${w.isMakeup ? 'تخلفات' : w.section || '-'}</td>
+              <td><strong>${w.absences}</strong></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     `;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    await downloadPdf(
+      "warnings.pdf",
+      course?.name || "",
+      "إنذار تجاوز نسبة الغياب",
+      `إنذار أولي لتجاوز نسبة الغياب (${limit} مرات فأكثر) من إجمالي ${totalWeeksCount} أسابيع فعلية.`,
+      tableHtml,
+      instructorName
+    );
+  };
+
+  const handleSendTelegramWarnings = async () => {
+    const warnings = getWarningsList();
+    if (warnings.length === 0) {
+      alert("لا يوجد متجاوزين لإرسال إنذارات لهم.");
+      return;
+    }
+    const limit = Number(absenceLimit);
+    
+    if (!window.confirm(`سيتم إرسال إنذار فوري عبر التليجرام لعدد (${warnings.length}) طلاب متجاوزين.\nمتابعة؟`)) return;
+    
+    setSaving(true);
+    try {
+      const res = await fetch("/api/bot/notify_warning", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ warnings, courseName: course.name, limit })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`تم إرسال الإنذار بنجاح إلى ${data.count} طلاب لديهم حسابات تليجرام مربوطة.`);
+      } else {
+        alert("خطأ: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("فشل الإرسال.");
+    }
+    setSaving(false);
   };
 
   if (loading) {
@@ -742,8 +734,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
               bg = "#1b5e20";
               borderColor = "#4CAF50";
             } else if (isExcused) {
-              bg = "#4a3600";
-              borderColor = "#FFC107";
+              bg = "#4a0b0b";
+              borderColor = "#f44336";
             }
             
             return (
@@ -785,7 +777,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
                 {isSelected && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
-                {isExcused && <div style={{ color: "#FFC107", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                {isExcused && <div style={{ color: "#f44336", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span>📝</span>
                   <span style={{ fontSize: "9px" }}>بعذر</span>
                 </div>}
@@ -817,35 +809,45 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Long Press Modal */}
-      {longPressStudent && (
+      {longPressStudent && (() => {
+        const isExcused = attendance.some(a => a.student_id === longPressStudent.id && a.status === 'غياب بعذر');
+        return (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(3px)" }}>
           <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #333", direction: "rtl" }}>
             <h3 style={{ color: "var(--primary)", marginTop: 0 }}>{longPressStudent.full_name}</h3>
             <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "20px", fontFamily: "monospace" }}>كود: {longPressStudent.student_code}</p>
             
-            <button onClick={handleCancelAttendancePast} style={{ background: "#FF9800", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-              ❌ إلغاء حضور هذا الأسبوع
-            </button>
-            <button onClick={() => {
-              const excuse = window.prompt("أدخل سبب الغياب (مثال: مرضي، رياضي...):");
-              if (excuse !== null) {
-                // Upsert as excused
-                const inserts = [{
-                  course_id: course.id,
-                  student_id: longPressStudent.id,
-                  date: selectedWeekKey,
-                  status: "غياب بعذر",
-                  note: excuse,
-                  teacher_id: course.teacher_id
-                }];
-                supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
-                  fetchData();
-                });
-                setLongPressStudent(null);
-              }
-            }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-              📝 تسجيل غياب بعذر
-            </button>
+            {isExcused ? (
+              <button onClick={handleCancelAttendancePast} style={{ background: "#f44336", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
+                ❌ إلغاء العذر
+              </button>
+            ) : (
+              <>
+                <button onClick={handleCancelAttendancePast} style={{ background: "#FF9800", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
+                  ❌ إلغاء حضور هذا الأسبوع
+                </button>
+                <button onClick={() => {
+                  const excuse = window.prompt("أدخل سبب الغياب (مثال: مرضي، رياضي...):");
+                  if (excuse !== null) {
+                    const inserts = [{
+                      course_id: course.id,
+                      student_id: longPressStudent.id,
+                      date: selectedWeekKey,
+                      status: "غياب بعذر",
+                      note: excuse,
+                      teacher_id: course.teacher_id
+                    }];
+                    supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
+                      fetchData();
+                    });
+                    setLongPressStudent(null);
+                  }
+                }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
+                  📝 تسجيل غياب بعذر
+                </button>
+              </>
+            )}
+            
             <button onClick={handleMoveToSectionClick} style={{ background: "#2196F3", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
               🔄 نقل الطالب لسكشن آخر
             </button>
@@ -857,7 +859,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Move Section Modal */}
       {showMoveModal && (
@@ -1096,6 +1099,9 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
             <button onClick={handlePrintWarnings} style={{ width: "100%", background: "#F44336", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px" }}>
               <span>📄</span> استخراج قائمة المنذرين بصيغة PDF
+            </button>
+            <button onClick={handleSendTelegramWarnings} disabled={saving} style={{ width: "100%", background: "#2196F3", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px", opacity: saving ? 0.7 : 1 }}>
+              <span>✈️</span> إرسال إنذار عبر التليجرام للمتجاوزين
             </button>
           </div>
         </div>
