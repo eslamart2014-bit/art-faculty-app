@@ -297,13 +297,21 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                         background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "10px",
                         marginTop: "5px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", animation: "slideDown 0.2s"
                       }}>
-                        <button onClick={() => handleChangePassword(u)} style={{ background: "#333", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                          🔑 تغيير كلمة المرور
-                        </button>
-                        
-                        <button onClick={() => handleDeleteUser(u)} style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                          🗑️ حذف نهائي
-                        </button>
+                        {isAssistant && u.role === 'مدير' ? (
+                          <div style={{ gridColumn: "1 / -1", color: "#888", textAlign: "center", fontSize: "12px", padding: "10px", background: "#222", borderRadius: "6px", border: "1px dashed #444" }}>
+                            🔒 حساب المدير محمي ولا يمكن التعديل عليه
+                          </div>
+                        ) : (
+                          <>
+                            <button onClick={() => handleChangePassword(u)} style={{ background: "#333", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
+                              🔑 تغيير كلمة المرور
+                            </button>
+                            
+                            <button onClick={() => handleDeleteUser(u)} style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
+                              {isAssistant ? '🗑️ حذف المستخدم' : '🗑️ حذف نهائي'}
+                            </button>
+                          </>
+                        )}
 
                         {isAdmin && (
                           <>
