@@ -248,10 +248,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const saveDate = selectedWeekKey;
 
     const displayIds = getDisplayStudents().map(s => s.id);
-    const toDeleteIds = displayIds.filter(id => !selectedStudentIds.has(id));
+    const toDeleteIds = displayIds.filter(id => 
+      !selectedStudentIds.has(id) && 
+      !attendance.some(a => a.student_id === id && a.status === 'غياب بعذر')
+    );
     const toInsertIds = displayIds.filter(id => 
       selectedStudentIds.has(id) && 
-      !attendance.some(a => a.student_id === id && a.status === "حاضر")
+      !attendance.some(a => a.student_id === id && (a.status === "حاضر" || a.status === "غياب بعذر"))
     );
 
     if (toDeleteIds.length > 0) {
@@ -734,8 +737,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
               bg = "#1b5e20";
               borderColor = "#4CAF50";
             } else if (isExcused) {
-              bg = "#4a0b0b";
-              borderColor = "#f44336";
+              bg = "#d32f2f";
+              borderColor = "#ff5252";
             }
             
             return (

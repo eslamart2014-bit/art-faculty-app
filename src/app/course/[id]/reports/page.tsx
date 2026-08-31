@@ -159,7 +159,8 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         const att = attendance.find(a => a.student_id === s.id && a.date === w.key);
         if (att) {
           if (att.status === 'غياب بعذر') {
-            rowHtml += `<td style="background-color: #f8d7da !important; color: #721c24; font-weight: bold; font-size: 11px;">غياب بعذر<br/><span style="font-size: 9px">${att.note || ''}</span></td>`;
+            const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
+            rowHtml += `<td style="background-color: #f8d7da !important; color: #721c24; font-weight: bold; font-size: 11px;">${dateStr}<br/>غياب بعذر<br/><span style="font-size: 9px">${att.note || ''}</span></td>`;
           } else {
             const dateStr = new Date(att.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });
             rowHtml += `<td style="background-color: #d4edda !important; color: #155724; font-weight: bold; font-size: 11px;">${dateStr}</td>`;
