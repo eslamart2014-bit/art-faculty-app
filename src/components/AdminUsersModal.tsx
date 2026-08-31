@@ -110,37 +110,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
   const handleGrantAssistantRole = async (user: any) => {
     if (!isAdmin) return;
-    const newRole = user.role === 'مساعد مطور' ? 'teacher' : 'مساعد مطور';
+    const newRole = user.role === 'مساعد مطور' ? 'عضو هيئة تدريس' : 'مساعد مطور';
     const actionText = newRole === 'مساعد مطور' ? 'منح' : 'إلغاء';
     if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (مساعد مطور) لهذا الحساب؟\nالاسم: ${user.full_name}`)) return;
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ action: 'grant_role', userId: user.id, newRole, adminId: adminUser.id })
-      });
-      const roleData = await res.json();
-      if (roleData.success) {
-        alert(`تم ${actionText} الصلاحية بنجاح.`);
-        fetchData();
-        setActiveMenuId(null);
-        return;
-      } else {
-        alert('خطأ: ' + (roleData.error || 'فشل تغيير الصلاحية'));
-        setActiveMenuId(null);
-        return;
-      }
-    } catch (err) {
-      console.error(err);
-      alert('حدث خطأ في الاتصال');
-      setActiveMenuId(null);
-      return;
-    }
-    // This line is unreachable but kept for safety
-    void 0;
+    await supabase.from("profiles").update({ role: newRole }).eq("id", user.id);
     
     // Optional: Notify the user if they have Telegram connected
     if (newRole === 'مساعد مطور' && user.telegram_id) {
