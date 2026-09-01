@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { addToQueue } from "@/lib/syncEngine";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 import QRScanner from "@/components/QRScanner";
 import { downloadPdf } from "@/lib/downloadPdf";
@@ -120,6 +121,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     fetchData();
   }, [resolvedParams.id, selectedWeekKey]);
 
+  
+  useEffect(() => {
+    const handleRefresh = () => fetchData();
+    window.addEventListener('refreshData', handleRefresh);
+    return () => window.removeEventListener('refreshData', handleRefresh);
+  }, [course]);
   const fetchData = async () => {
     setLoading(true);
     

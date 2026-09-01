@@ -3,6 +3,7 @@
 import { useEffect, useState, use, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { addToQueue } from "@/lib/syncEngine";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
