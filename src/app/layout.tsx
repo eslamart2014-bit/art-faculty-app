@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
+import BackButtonHandler from "@/components/BackButtonHandler";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className={cairo.className}>
         <div className="app-container">
           <MaintenanceGuard>
+            <BackButtonHandler />
             {children}
           </MaintenanceGuard>
         </div>

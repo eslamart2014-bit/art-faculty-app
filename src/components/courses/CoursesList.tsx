@@ -24,6 +24,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [isSharing, setIsSharing] = useState(false);
 
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchCourses();
@@ -36,6 +37,25 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
       const map: Record<string, string> = {};
       data.forEach(p => map[p.id] = p.full_name);
       setProfilesMap(map);
+    }
+  };
+
+  const handlePointerDown = (e: any, course: any) => {
+    const timer = setTimeout(() => {
+      setActiveMenuId(course.id);
+      setLongPressTimer(null);
+      if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
+    }, 500);
+    setLongPressTimer(timer);
+  };
+
+  const handlePointerUp = (e: any, courseId: string) => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+      if (!activeMenuId || activeMenuId !== courseId) {
+        router.push(`/course/${courseId}`);
+      }
     }
   };
 
@@ -189,6 +209,11 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         <div 
           key={course.id} 
           onClick={() => router.push(`/course/${course.id}`)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setActiveMenuId(course.id);
+            if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
+          }}
           style={{ 
             background: "var(--surface)", 
             padding: "15px", 
@@ -242,13 +267,6 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
             )}
             
             <div style={{ position: "relative" }}>
-              <span 
-                onClick={(e) => handleMenuClick(e, course.id)}
-                style={{ fontSize: "24px", color: "var(--text-muted)", cursor: "pointer", padding: "0 10px", position: "relative", zIndex: activeMenuId === course.id ? 101 : 1 }}
-              >
-                ⋮
-              </span>
-              
               {activeMenuId === course.id && (
                 <>
                   <div 
@@ -258,7 +276,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                   <div 
                     style={{
                       position: "absolute",
-                      top: "35px",
+                      top: "10px",
                       left: "0",
                       background: "#2a2a2a",
                       border: "1px solid #444",
@@ -271,7 +289,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     onClick={(e) => e.stopPropagation()}
                   >
                   <div 
-                    onClick={(e) => openRenameModal(e, course)}
+                    onClick={(e) => { e.stopPropagation(); openRenameModal(e, course); }}
                     style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#333"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -279,7 +297,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     ✏️ تعديل اسم المقرر
                   </div>
                   <div 
-                    onClick={(e) => togglePinAttendance(e, course)}
+                    onClick={(e) => { e.stopPropagation(); togglePinAttendance(e, course); }}
                     style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#333"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -287,7 +305,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     {course.custom_week_names?.__pinned_attendance ? "📌 إلغاء الكاميرا" : "📷 تثبيت زر الحضور"}
                   </div>
                   <div 
-                    onClick={(e) => openDeleteModal(e, course)}
+                    onClick={(e) => { e.stopPropagation(); openDeleteModal(e, course); }}
                     style={{ padding: "12px 15px", cursor: "pointer", fontSize: "13px", color: "#f44336" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#3a2020"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -300,20 +318,17 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                        setCourseToShare(course);
                        setActiveMenuId(null);
                     }}
-                    style={{ padding: "12px 15px", cursor: "pointer", borderTop: "1px solid #333", fontSize: "13px", color: "#4CAF50" }}
+                    style={{ padding: "12px 15px", cursor: "pointer", fontSize: "13px", color: "#4CAF50", borderTop: "1px solid #333" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#2a3b2c"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
                   >
-                    🤝 طلب مشاركة المقرر مع زميل
+                    🤝 مشاركة المقرر
                   </div>
                   </div>
                 </>
               )}
             </div>
             
-            <div style={{ fontSize: "20px", color: "var(--primary)" }}>
-              🡰
-            </div>
           </div>
         </div>
       ))}

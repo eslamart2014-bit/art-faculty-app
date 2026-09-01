@@ -372,7 +372,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     for (const s of scannedStudents) {
       const existing = attendance.find(a => a.student_id === s.id && a.date === saveDate);
       if (existing) {
-        await supabase.from("attendance").update({ status: "حاضر" }).eq("id", existing.id);
+        if (existing.status !== "حاضر") { await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existing.id); }
       } else {
         await supabase.from("attendance").insert({
           course_id: course.id,
