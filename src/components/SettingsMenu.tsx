@@ -25,6 +25,10 @@ export default function SettingsMenu({
   onOpenArchive,
   onOpenSuggestions
 }: SettingsMenuProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [appVersion, setAppVersion] = useState("1.7");
   
   useEffect(() => {

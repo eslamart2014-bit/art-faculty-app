@@ -9,6 +9,10 @@ interface AdminUsersModalProps {
 }
 
 export default function AdminUsersModal({ isOpen, onClose, adminUser, onImpersonate }: AdminUsersModalProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [users, setUsers] = useState<any[]>([]);
   const [invitations, setInvitations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

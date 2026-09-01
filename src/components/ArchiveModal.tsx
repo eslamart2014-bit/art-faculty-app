@@ -10,6 +10,10 @@ interface ArchiveModalProps {
 }
 
 export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: ArchiveModalProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [activeTab, setActiveTab] = useState<"general" | "graduates">("general");
   const [archives, setArchives] = useState<any[]>([]);
   const [graduates, setGraduates] = useState<any[]>([]);

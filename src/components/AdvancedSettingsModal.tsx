@@ -12,6 +12,10 @@ interface AdvancedSettingsModalProps {
 }
 
 export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSettingsModalProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [activeTab, setActiveTab] = useState<"study" | "students" | "search" | "maintenance" | "shares" | "telegram" | null>("study");
   
   // Study Settings state
@@ -202,6 +206,10 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   };
 
   const toggleScanner = () => {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
     setIsScanning(!isScanning);
   };
 

@@ -11,6 +11,10 @@ interface ProfileModalProps {
 const DEGREES = ["م", "م.د", "د", "أ.م.د", "أ.د"];
 
 export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }: ProfileModalProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [fullName, setFullName] = useState("");
   const [degree, setDegree] = useState("");
   const [saving, setSaving] = useState(false);

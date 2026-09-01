@@ -8,6 +8,10 @@ interface SuggestionsChatModalProps {
 }
 
 export default function SuggestionsChatModal({ isOpen, onClose, user }: SuggestionsChatModalProps) {
+  useEffect(() => {
+    window.history.pushState({ modal: true }, "");
+  }, []);
+
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);

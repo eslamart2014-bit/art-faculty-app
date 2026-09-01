@@ -257,7 +257,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (toDeleteIds.length > 0) {
       const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
       for (const rec of recordsToDelete) {
-        await supabase.from("attendance").delete().eq("id", rec.id);
+        const { error: delErr } = await supabase.from("attendance").delete().eq("id", rec.id);
+        if (delErr) { alert("حدث خطأ أثناء إلغاء الحضور، تأكد من الإنترنت."); setSaving(false); return; }
       }
     }
 
@@ -269,7 +270,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         status: "حاضر",
         teacher_id: course.teacher_id
       }));
-      await supabase.from("attendance").insert(inserts);
+      const { error: insErr } = await supabase.from("attendance").insert(inserts);
+      if (insErr) { alert("حدث خطأ في الحفظ، تأكد من اتصالك بالإنترنت."); setSaving(false); return; }
     }
 
     alert("تم حفظ الحضور بنجاح!");
@@ -372,7 +374,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     for (const s of scannedStudents) {
       const existing = attendance.find(a => a.student_id === s.id && a.date === saveDate);
       if (existing) {
-        if (existing.status !== "حاضر") { await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existing.id); }
+        if (existing.status !== "حاضر") { 
+          const { error: updErr } = await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existing.id); 
+          if (updErr) { alert("حدث خطأ في تحديث البيانات. تأكد من الإنترنت."); setSavingBatch(false); return; }
+        }
       } else {
         await supabase.from("attendance").insert({
           course_id: course.id,
