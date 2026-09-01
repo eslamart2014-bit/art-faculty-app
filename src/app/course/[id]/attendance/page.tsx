@@ -253,7 +253,6 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const handleSaveAttendance = async () => {
     setSaving(true);
     const saveDate = selectedWeekKey;
-
     const displayIds = getDisplayStudents().map(s => s.id);
     const toDeleteIds = displayIds.filter(id => !selectedStudentIds.has(id));
     const toInsertIds = displayIds.filter(id => 
@@ -261,11 +260,20 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       !attendance.some(a => a.student_id === id && a.status === "حاضر")
     );
 
+    // Queue function
+    const doQueue = () => {
+      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+      alert("ضعف في الاتصال. تم حفظ البيانات مؤقتاً وسيتم الرفع تلقائياً.");
+      setSaving(false);
+    };
+
+    if (!navigator.onLine) return doQueue();
+
     if (toDeleteIds.length > 0) {
       const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
       for (const rec of recordsToDelete) {
         const { error: delErr } = await supabase.from("attendance").delete().eq("id", rec.id);
-        if (delErr) { alert("حدث خطأ أثناء إلغاء الحضور، تأكد من الإنترنت."); setSaving(false); return; }
+        if (delErr) return doQueue();
       }
     }
 
@@ -278,11 +286,11 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         teacher_id: course.teacher_id
       }));
       const { error: insErr } = await supabase.from("attendance").insert(inserts);
-      if (insErr) { alert("حدث خطأ في الحفظ، تأكد من اتصالك بالإنترنت."); setSaving(false); return; }
+      if (insErr) return doQueue();
     }
 
     alert("تم حفظ الحضور بنجاح!");
-    await fetchData(); // Refresh data
+    await fetchData(); 
     setSaving(false);
   };
 
