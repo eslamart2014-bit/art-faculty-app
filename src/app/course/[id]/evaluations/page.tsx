@@ -558,7 +558,21 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       teacher_id: course.teacher_id
     }));
 
-    await supabase.from("evaluations").upsert(evalInserts, { onConflict: 'course_id,student_id,project_name' });
+    for (const s of scannedStudents) {
+      const { data: existing } = await supabase.from("evaluations").select("id").eq("course_id", course.id).eq("student_id", s.student.id).eq("project_name", selectedProject.name).maybeSingle();
+      if (existing) {
+        await supabase.from("evaluations").update({ score: s.score !== null ? s.score : 0 }).eq("id", existing.id);
+      } else {
+        await supabase.from("evaluations").insert({
+          course_id: course.id,
+          student_id: s.student.id,
+          project_name: selectedProject.name,
+          score: s.score !== null ? s.score : 0,
+          max_score: selectedProject.max_score,
+          teacher_id: course.teacher_id
+        });
+      }
+    }
 
     if (markAttendanceWithEval) {
       const today = new Date().toISOString().split('T')[0];
@@ -569,7 +583,20 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         status: "حاضر",
         teacher_id: course.teacher_id
       }));
-      await supabase.from("attendance").upsert(attInserts, { onConflict: 'course_id,student_id,date' });
+      for (const s of scannedStudents) {
+        const { data: existingAtt } = await supabase.from("attendance").select("id").eq("course_id", course.id).eq("student_id", s.student.id).eq("date", today).maybeSingle();
+        if (existingAtt) {
+          await supabase.from("attendance").update({ status: "حاضر" }).eq("id", existingAtt.id);
+        } else {
+          await supabase.from("attendance").insert({
+            course_id: course.id,
+            student_id: s.student.id,
+            date: today,
+            status: "حاضر",
+            teacher_id: course.teacher_id
+          });
+        }
+      }
     }
 
     vibrateSuccess();

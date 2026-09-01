@@ -52,6 +52,12 @@ export async function POST(request: Request) {
     }
 
 
+    if (action === 'unlock') {
+      if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+      await supabaseAdmin.from('profiles').update({ failed_attempts: 0, locked_until: null }).eq('id', userId);
+      return NextResponse.json({ success: true });
+    }
+
     if (action === 'change_password') {
       if (!userId || !newPassword) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
       

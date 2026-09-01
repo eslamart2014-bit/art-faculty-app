@@ -172,9 +172,22 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   };
 
   const handleUnlock = async (user: any) => {
-    await supabase.from("profiles").update({ failed_attempts: 0, locked_until: null }).eq("id", user.id);
-    alert("تم فك القفل عن الحساب!");
-    fetchData();
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unlock', userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("تم فك القفل عن الحساب بنجاح!");
+        fetchData();
+      } else {
+        alert("خطأ: " + data.error);
+      }
+    } catch (err) {
+      alert("حدث خطأ في الاتصال");
+    }
     setActiveMenuId(null);
   };
 
@@ -313,17 +326,17 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                           </>
                         )}
 
+                        {isLocked && (
+                          <button onClick={() => handleUnlock(u)} style={{ background: "#333", color: "#4CAF50", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1" }}>
+                            🔓 فك قفل الحساب وإعطاء محاولات جديدة
+                          </button>
+                        )}
+
                         {isAdmin && (
                           <>
                             <button onClick={() => handleToggleSuspend(u)} style={{ background: "#333", color: u.is_suspended ? "#4CAF50" : "#FF9800", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
                               {u.is_suspended ? "▶️ تفعيل الحساب" : "⏸️ إيقاف مؤقت"}
                             </button>
-
-                            {isLocked && (
-                              <button onClick={() => handleUnlock(u)} style={{ background: "#333", color: "#4CAF50", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1" }}>
-                                🔓 فك قفل الحساب وإعطاء محاولات جديدة
-                              </button>
-                            )}
 
                             <button onClick={() => handleImpersonate(u)} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
                               🎭 الدخول كـ {u.full_name}

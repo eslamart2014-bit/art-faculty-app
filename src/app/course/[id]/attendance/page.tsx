@@ -248,13 +248,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const saveDate = selectedWeekKey;
 
     const displayIds = getDisplayStudents().map(s => s.id);
-    const toDeleteIds = displayIds.filter(id => 
-      !selectedStudentIds.has(id) && 
-      !attendance.some(a => a.student_id === id && a.status === 'غياب بعذر')
-    );
+    const toDeleteIds = displayIds.filter(id => !selectedStudentIds.has(id));
     const toInsertIds = displayIds.filter(id => 
       selectedStudentIds.has(id) && 
-      !attendance.some(a => a.student_id === id && (a.status === "حاضر" || a.status === "غياب بعذر"))
+      !attendance.some(a => a.student_id === id && a.status === "حاضر")
     );
 
     if (toDeleteIds.length > 0) {
@@ -371,14 +368,21 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (scannedStudents.length === 0) return;
     setSavingBatch(true);
     const saveDate = selectedWeekKey;
-    const inserts = scannedStudents.map(s => ({
-      course_id: course.id,
-      student_id: s.id,
-      date: saveDate,
-      status: "حاضر",
-      teacher_id: course.teacher_id
-    }));
-    await supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' });
+    
+    for (const s of scannedStudents) {
+      const existing = attendance.find(a => a.student_id === s.id && a.date === saveDate);
+      if (existing) {
+        await supabase.from("attendance").update({ status: "حاضر" }).eq("id", existing.id);
+      } else {
+        await supabase.from("attendance").insert({
+          course_id: course.id,
+          student_id: s.id,
+          date: saveDate,
+          status: "حاضر",
+          teacher_id: course.teacher_id
+        });
+      }
+    }
     
     vibrateSuccess();
     alert("تم حفظ حضور هذه المجموعة بنجاح!");
@@ -729,17 +733,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         ) : (
           displayStudents.map((student) => {
             const isSelected = selectedStudentIds.has(student.id);
-            const excuseRecord = attendance.find(a => a.student_id === student.id && a.status === 'غياب بعذر');
-            const isExcused = !!excuseRecord;
+            const isExcused = attendance.some(a => a.student_id === student.id && a.status === 'غياب بعذر');
             
             let bg = "#1e1e1e";
             let borderColor = "transparent";
-            if (isExcused) {
-              bg = "#d32f2f";
-              borderColor = "#ff5252";
-            } else if (isSelected) {
+            if (isSelected) {
               bg = "#1b5e20";
               borderColor = "#4CAF50";
+            } else if (isExcused) {
+              bg = "#4a0b0b";
+              borderColor = "#f44336";
             }
             
             return (
@@ -776,17 +779,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       <span style={{ background: "#E91E63", color: "white", fontSize: "10px", padding: "2px 6px", borderRadius: "8px" }}>تخلفات</span>
                     )}
                   </div>
-                  <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : (isExcused ? "#ffbaba" : "#888"), marginTop: "4px", fontFamily: "monospace" }}>
+                  <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : "#888", marginTop: "4px", fontFamily: "monospace" }}>
                     كود: {student.student_code}
-                    {isExcused && excuseRecord?.note && (
-                      <span style={{ marginLeft: "10px", background: "rgba(255,255,255,0.2)", padding: "2px 6px", borderRadius: "4px", color: "#fff" }}>
-                        {excuseRecord.note}
-                      </span>
-                    )}
                   </div>
                 </div>
                 {isSelected && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
-                {isExcused && <div style={{ color: "#fff", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                {isExcused && <div style={{ color: "#f44336", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span>📝</span>
                   <span style={{ fontSize: "9px" }}>بعذر</span>
                 </div>}
@@ -846,23 +844,9 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       note: excuse,
                       teacher_id: course.teacher_id
                     }];
-                    const recordToDelete = attendance.find(a => a.student_id === longPressStudent.id);
-                    
-                    const saveExcuse = async () => {
-                      if (recordToDelete) {
-                        await supabase.from("attendance").delete().eq("id", recordToDelete.id);
-                      }
-                      const { error } = await supabase.from("attendance").insert(inserts);
-                      if (error) {
-                        alert("خطأ في قاعدة البيانات: " + error.message);
-                      } else {
-                        const newSet = new Set(selectedStudentIds);
-                        newSet.delete(longPressStudent.id);
-                        setSelectedStudentIds(newSet);
-                        fetchData();
-                      }
-                    };
-                    saveExcuse();
+                    supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
+                      fetchData();
+                    });
                     setLongPressStudent(null);
                   }
                 }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
