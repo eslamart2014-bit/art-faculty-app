@@ -117,9 +117,10 @@ export async function POST(request: Request) {
 
     const getAdminMainMenuMarkup = () => ({
       inline_keyboard: [
-        [{ text: '📂 تصفح المقررات والأعمال', callback_data: 'staff_browse_courses' }],
-        [{ text: '🕵️‍♂️ الدخول بحساب طالب (محاكاة)', callback_data: 'admin_login_student' }],
-        [{ text: '⚙️ الإعدادات المتقدمة وإدارة المشتركين', callback_data: 'admin_advanced_settings' }]
+        [{ text: '📂 تصفح المشاريع والأعمال', callback_data: 'staff_browse_courses' }],
+        [{ text: '🔍 البحث وقارئ الباركود (ذكي)', callback_data: 't_search' }],
+        [{ text: '📸 إضافة طالب متعثر (أوفلاين)', callback_data: 't_addoff' }],
+        [{ text: '⚙️ الإعدادات المتقدمة القديمة', callback_data: 'admin_advanced_settings' }]
       ]
     });
 
