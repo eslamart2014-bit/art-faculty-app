@@ -126,9 +126,51 @@ export async function POST(request: Request) {
     // ==========================================
     // 1. Handle Text Messages (/start & Replies)
     // ==========================================
+    
+    // 0. Handle WebApp Data (QR Scanner / Manual Search)
+    if (update.message?.web_app_data) {
+      const chatId = update.message.chat.id;
+      const messageId = update.message.message_id;
+      await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, message_id: messageId }) });
+      try {
+        const payload = JSON.parse(update.message.web_app_data.data);
+        if (payload.type === 'SCAN_RESULT') {
+          const { code: studentCode, crs, proj } = payload;
+          const { data: student } = await supabase.from('students').select('*').eq('student_code', studentCode).maybeSingle();
+          if (!student) {
+            return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: '❌ لم يتم العثور على الطالب.', reply_markup: { inline_keyboard: [[{ text: '🔙 العودة', callback_data: 'main_menu' }]] } });
+          }
+          if (crs && proj) {
+            // Teacher offline mode
+            const host = request.headers.get('host') || 'art-faculty-app.vercel.app';
+            const protocol = host.includes('localhost') ? 'http' : 'https';
+            const cameraUrl = `${protocol}://${host}/camera?stu=${student.id}&crs=${crs}&proj=${proj}`;
+            return NextResponse.json({
+               method: 'sendMessage', chat_id: chatId, 
+               text: `✅ الطالب: ${student.full_name}\n\nاضغط على الزر لفتح الكاميرا فوراً ورفع عمله:`, 
+               reply_markup: { inline_keyboard: [[{ text: '📸 افتح الكاميرا الآن', web_app: { url: cameraUrl } }]] }
+            });
+          } else {
+            // Normal Search
+            const text = `🎓 <b>الطالب:</b> ${student.full_name}\n🔢 <b>الكود:</b> ${student.student_code}\n\nاختر إجراء:`;
+            const replyMarkup = {
+               inline_keyboard: [
+                 [{ text: '❌ فك ارتباط التليجرام', callback_data: 't_unlink_' + student.id }],
+                 [{ text: '🔙 العودة للبحث', callback_data: 'admin_advanced_settings' }]
+               ]
+            };
+            return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text, parse_mode: 'HTML', reply_markup: replyMarkup });
+          }
+        }
+      } catch(e) {}
+      return NextResponse.json({ ok: true });
+    }
+
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
       const text = update.message.text.trim();
+      const msgId = update.message.message_id;
+      await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, message_id: msgId }) });
 
       // --- Admin "Search Student for Reset / Format" Reply Handler ---
       if (update.message.reply_to_message && update.message.reply_to_message.text.includes('للبحث عنه وفرمتة حسابه')) {
