@@ -770,7 +770,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       onMouseDown={() => handleProjectTouchStart(proj)}
                       onMouseUp={handleProjectTouchEnd}
                       onMouseLeave={handleProjectTouchEnd}
-                      style={{ background: "#1e1e1e", padding: "14px 16px", borderRadius: "12px", border: "1px solid #333", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      style={{ WebkitUserSelect: "none", WebkitTouchCallout: "none", userSelect: "none", background: "#1e1e1e", padding: "14px 16px", borderRadius: "12px", border: "1px solid #333", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ flex: 1, pointerEvents: "none" }}>
                         <div style={{ color: "#90CAF9", fontWeight: "bold", fontSize: "16px", marginBottom: "6px" }}>{proj.name} <span style={{ color: "#888", fontSize: "13px", fontWeight: "normal" }}>({proj.max_score} درجة)</span></div>
                         <div style={{ display: "flex", gap: "10px", fontSize: "11px", opacity: 0.9, flexWrap: "wrap" }}>
