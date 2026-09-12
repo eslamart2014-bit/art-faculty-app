@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -11,8 +12,7 @@ interface CoursesListProps {
 
 export default function CoursesList({ user, refreshTrigger }: CoursesListProps) {
   const router = useRouter();
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
   
   // Menu and Modals state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -23,60 +23,42 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [colleagueName, setColleagueName] = useState("");
   const [isSharing, setIsSharing] = useState(false);
 
-  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+  
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
 
+  
+  // --- SWR Caching ---
+  const fetcher = async () => {
+    const [coursesRes, profilesRes] = await Promise.all([
+      supabase.from("courses").select("*").or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name")
+    ]);
+    
+    let activeCourses = [];
+    if (coursesRes.data) {
+      activeCourses = coursesRes.data.filter(c => !c.custom_week_names?.__archived && !(c.custom_week_names?.__hidden_for || []).includes(user.id));
+    }
+    
+    const pMap: Record<string, string> = {};
+    if (profilesRes.data) {
+      profilesRes.data.forEach(p => pMap[p.id] = p.full_name);
+    }
+    
+    return { courses: activeCourses, profilesMap: pMap };
+  };
+
+  const { data: cachedData, mutate } = useSWR(user ? `courses_list_${user.id}` : null, fetcher, {
+    fallbackData: { courses: [], profilesMap: {} }
+  });
+
+  const courses = cachedData?.courses || [];
+  const profilesMap = cachedData?.profilesMap || {};
+  const loading = !cachedData;
+
   useEffect(() => {
-    fetchCourses();
-    fetchProfiles();
-  }, [user.id, refreshTrigger]);
-
-  const fetchProfiles = async () => {
-    const { data } = await supabase.from("profiles").select("id, full_name");
-    if (data) {
-      const map: Record<string, string> = {};
-      data.forEach(p => map[p.id] = p.full_name);
-      setProfilesMap(map);
-    }
-  };
-
-  const handlePointerDown = (e: any, course: any) => {
-    const timer = setTimeout(() => {
-      setActiveMenuId(course.id);
-      setLongPressTimer(null);
-      if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
-    }, 500);
-    setLongPressTimer(timer);
-  };
-
-  const handlePointerUp = (e: any, courseId: string) => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-      if (!activeMenuId || activeMenuId !== courseId) {
-        router.push(`/course/${courseId}`);
-      }
-    }
-  };
-
-  const fetchCourses = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("courses")
-      .select("*")
-      .or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`)
-      .order("created_at", { ascending: false });
-
-    if (data && !error) {
-      // Filter out archived courses and courses hidden for this user
-      const activeCourses = data.filter(c => 
-        !c.custom_week_names?.__archived && 
-        !(c.custom_week_names?.__hidden_for || []).includes(user.id)
-      );
-      setCourses(activeCourses);
-    }
-    setLoading(false);
-  };
+    mutate();
+  }, [refreshTrigger, mutate]);
+;
 
   const handleMenuClick = (e: React.MouseEvent, courseId: string) => {
     e.stopPropagation();
@@ -96,7 +78,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     };
 
     // Optimistic UI update
-    setCourses(courses.map(c => c.id === course.id ? { ...c, custom_week_names: updatedCustom } : c));
+    mutate();
     
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", course.id);
   };
@@ -112,7 +94,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     if (!newName.trim() || !courseToRename) return;
     
     // Optimistic UI update
-    setCourses(courses.map(c => c.id === courseToRename.id ? { ...c, name: newName } : c));
+    mutate();
     setCourseToRename(null);
 
     await supabase.from("courses").update({ name: newName }).eq("id", courseToRename.id);
@@ -129,7 +111,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const currentCustom = courseToDelete.custom_week_names || {};
     const updatedCustom = { ...currentCustom, __archived: true };
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    mutate();
     
     await supabase.from("archives").insert({
       user_id: user?.id,
@@ -148,7 +130,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const hiddenFor = currentCustom.__hidden_for || [];
     const updatedCustom = { ...currentCustom, __hidden_for: [...hiddenFor, user.id] };
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    mutate();
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
     setCourseToDelete(null);
   };
@@ -158,7 +140,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const sharedWith = courseToDelete.shared_with || [];
     const newShared = sharedWith.filter((id: string) => id !== user.id);
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    mutate();
     await supabase.from("courses").update({ shared_with: newShared }).eq("id", courseToDelete.id);
     setCourseToDelete(null);
   };

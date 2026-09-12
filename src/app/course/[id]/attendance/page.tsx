@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, use, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { addToQueue } from "@/lib/syncEngine";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
-import QRScanner from "@/components/QRScanner";
-import { downloadPdf } from "@/lib/downloadPdf";
+const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
+
 import { extractStudentCode } from "@/lib/scannerHelper";
 
 const getWeekRangeFromKey = (key: string) => {
@@ -613,7 +614,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       </table>
     `;
 
-    await downloadPdf(
+    await (await import("@/lib/downloadPdf")).downloadPdf(
       "warnings.pdf",
       course?.name || "",
       "إنذار تجاوز نسبة الغياب",

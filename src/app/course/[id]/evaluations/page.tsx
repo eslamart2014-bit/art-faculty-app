@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, use, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { addToQueue } from "@/lib/syncEngine";
-import QRScanner from "@/components/QRScanner";
+const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 import { extractStudentCode } from "@/lib/scannerHelper";
-import { generatePrintableHtml } from "@/lib/pdfHelper";
-import { downloadPdf } from "@/lib/downloadPdf";
+
+
 
 function formatRelativeTimeArabic(dateInput: string | Date): string {
   const now = new Date();
@@ -383,7 +384,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  const exportMissingStudentsPdf = (proj: Project, missingList: any[]) => {
+  const exportMissingStudentsPdf = async (proj: Project, missingList: any[]) => {
     const tableRows = missingList.map((s, idx) => `
       <tr>
         <td>${idx + 1}</td>
@@ -413,7 +414,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       </table>
     `;
 
-    downloadPdf(
+    (await import("@/lib/downloadPdf")).downloadPdf(
       "missing_students.pdf",
       course.name,
       `تقرير الطلاب المتأخرين عن رفع مشروع (${proj.name})`,

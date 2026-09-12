@@ -4,6 +4,7 @@ import "./globals.css";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import OfflineSyncManager from "@/components/OfflineSyncManager";
+import SWRProvider from "@/components/SWRProvider";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
@@ -43,8 +44,10 @@ export default function RootLayout({
         <div className="app-container">
           <MaintenanceGuard>
             <BackButtonHandler />
-            <OfflineSyncManager />
-            {children}
+            <SWRProvider>
+              <OfflineSyncManager />
+              {children}
+            </SWRProvider>
           </MaintenanceGuard>
         </div>
       </body>

@@ -1,36 +1,31 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
+import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function CourseDashboard({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const [course, setCourse] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  
   const resolvedParams = use(params);
 
+  
+  const fetcher = async () => {
+    const { data, error } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
+    if (error) throw error;
+    return data;
+  };
+  const { data: course, error } = useSWR(`course_${resolvedParams.id}`, fetcher);
+  const loading = !course && !error;
+
   useEffect(() => {
-    fetchCourse();
-  }, [resolvedParams.id]);
-
-  const fetchCourse = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("courses")
-      .select("*")
-      .eq("id", resolvedParams.id)
-      .single();
-
-    if (data && !error) {
-      setCourse(data);
-    } else {
-      console.error("Error fetching course", error);
+    if (error) {
       alert("تعذر تحميل بيانات المقرر");
       router.push("/");
     }
-    setLoading(false);
-  };
+  }, [error]);
+  ;
 
   if (loading) {
     return (
