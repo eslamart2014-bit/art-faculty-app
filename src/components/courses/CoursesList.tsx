@@ -311,9 +311,6 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
               )}
             </div>
             
-            <div style={{ fontSize: "20px", color: "var(--primary)" }}>
-              🡰
-            </div>
           </div>
         </div>
       ))}
