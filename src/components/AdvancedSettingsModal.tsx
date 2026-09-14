@@ -20,7 +20,9 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
+  const [term1End, setTerm1End] = useState("");
   const [term2Start, setTerm2Start] = useState("");
+  const [term2End, setTerm2End] = useState("");
   const [loading, setLoading] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
@@ -135,6 +137,8 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
     if (data) {
       if (data.term1_start) setTerm1Start(data.term1_start);
       if (data.term2_start) setTerm2Start(data.term2_start);
+      if (data.term1_end) setTerm1End(data.term1_end);
+      if (data.term2_end) setTerm2End(data.term2_end);
       if (data.is_maintenance_mode !== undefined) setIsMaintenance(data.is_maintenance_mode);
       if (data.maintenance_message) setMaintenanceMessage(data.maintenance_message);
     }
@@ -171,6 +175,8 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
       id: 1,
       term1_start: term1Start || null,
       term2_start: term2Start || null,
+      term1_end: term1End || null,
+      term2_end: term2End || null,
       updated_at: new Date().toISOString()
     });
 

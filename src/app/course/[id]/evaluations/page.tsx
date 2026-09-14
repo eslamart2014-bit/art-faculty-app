@@ -55,6 +55,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const resolvedParams = use(params);
   
   const [course, setCourse] = useState<any>(null);
+  const [systemTerms, setSystemTerms] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // Camera state

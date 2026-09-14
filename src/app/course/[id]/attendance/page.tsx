@@ -24,6 +24,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const resolvedParams = use(params);
   
   const [course, setCourse] = useState<any>(null);
+  const [systemTerms, setSystemTerms] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [makeupStudents, setMakeupStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);

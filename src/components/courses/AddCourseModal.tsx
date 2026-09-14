@@ -83,9 +83,6 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
   };
 
   const toggleSection = (sec: string) => {
-  useEffect(() => {
-    window.history.pushState({ modal: true }, "");
-  }, []);
 
     if (selectedSections.includes(sec)) {
       setSelectedSections(prev => prev.filter(s => s !== sec));

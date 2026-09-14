@@ -13,6 +13,7 @@ interface AppBarProps {
 export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarProps) {
   const [timeStr, setTimeStr] = useState<string>("");
   const [dateStr, setDateStr] = useState<string>("");
+  const [termStr, setTermStr] = useState<string>("");
 
   const [updateProgress, setUpdateProgress] = useState(0);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
@@ -40,6 +41,35 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile }: AppBarPr
     };
     updateTime();
     const interval = setInterval(updateTime, 60000);
+    
+    const fetchTerm = async () => {
+      const { data } = await supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle();
+      if (data) {
+        const now = new Date();
+        const t1s = data.term1_start ? new Date(data.term1_start) : null;
+        const t1e = data.term1_end ? new Date(data.term1_end) : null;
+        const t2s = data.term2_start ? new Date(data.term2_start) : null;
+        const t2e = data.term2_end ? new Date(data.term2_end) : null;
+
+        const getWeekStr = (start: Date, end: Date | null, termName: string) => {
+          if (now < start) return `لم يبدأ ${termName} بعد`;
+          if (end && now > end) return `انتهى ${termName}`;
+          
+          const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          const week = Math.floor(diffDays / 7) + 1;
+          const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر"];
+          return `الأسبوع ${arabicNumbers[week - 1] || week} من ${termName}`;
+        };
+
+        if (t2s && now >= t2s) {
+          setTermStr(getWeekStr(t2s, t2e, "الترم الثاني"));
+        } else if (t1s) {
+          setTermStr(getWeekStr(t1s, t1e, "الترم الأول"));
+        }
+      }
+    };
+    fetchTerm();
+  
 
     // Register service worker
     if ('serviceWorker' in navigator) {

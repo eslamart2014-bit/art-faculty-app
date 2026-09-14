@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -12,7 +11,8 @@ interface CoursesListProps {
 
 export default function CoursesList({ user, refreshTrigger }: CoursesListProps) {
   const router = useRouter();
-  
+  const [courses, setCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
   // Menu and Modals state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -23,42 +23,40 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [colleagueName, setColleagueName] = useState("");
   const [isSharing, setIsSharing] = useState(false);
 
-  
-  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
-
-  
-  // --- SWR Caching ---
-  const fetcher = async () => {
-    const [coursesRes, profilesRes] = await Promise.all([
-      supabase.from("courses").select("*").or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, full_name")
-    ]);
-    
-    let activeCourses = [];
-    if (coursesRes.data) {
-      activeCourses = coursesRes.data.filter(c => !c.custom_week_names?.__archived && !(c.custom_week_names?.__hidden_for || []).includes(user.id));
-    }
-    
-    const pMap: Record<string, string> = {};
-    if (profilesRes.data) {
-      profilesRes.data.forEach(p => pMap[p.id] = p.full_name);
-    }
-    
-    return { courses: activeCourses, profilesMap: pMap };
-  };
-
-  const { data: cachedData, mutate } = useSWR(user ? `courses_list_${user.id}` : null, fetcher, {
-    fallbackData: { courses: [], profilesMap: {} }
-  });
-
-  const courses = cachedData?.courses || [];
-  const profilesMap = cachedData?.profilesMap || {};
-  const loading = !cachedData;
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    mutate();
-  }, [refreshTrigger, mutate]);
-;
+    fetchCourses();
+    fetchProfiles();
+  }, [user.id, refreshTrigger]);
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase.from("profiles").select("id, full_name");
+    if (data) {
+      const map: Record<string, string> = {};
+      data.forEach(p => map[p.id] = p.full_name);
+      setProfilesMap(map);
+    }
+  };
+
+  const fetchCourses = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("courses")
+      .select("*")
+      .or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`)
+      .order("created_at", { ascending: false });
+
+    if (data && !error) {
+      // Filter out archived courses and courses hidden for this user
+      const activeCourses = data.filter(c => 
+        !c.custom_week_names?.__archived && 
+        !(c.custom_week_names?.__hidden_for || []).includes(user.id)
+      );
+      setCourses(activeCourses);
+    }
+    setLoading(false);
+  };
 
   const handleMenuClick = (e: React.MouseEvent, courseId: string) => {
     e.stopPropagation();
@@ -78,7 +76,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     };
 
     // Optimistic UI update
-    mutate();
+    setCourses(courses.map(c => c.id === course.id ? { ...c, custom_week_names: updatedCustom } : c));
     
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", course.id);
   };
@@ -94,7 +92,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     if (!newName.trim() || !courseToRename) return;
     
     // Optimistic UI update
-    mutate();
+    setCourses(courses.map(c => c.id === courseToRename.id ? { ...c, name: newName } : c));
     setCourseToRename(null);
 
     await supabase.from("courses").update({ name: newName }).eq("id", courseToRename.id);
@@ -111,7 +109,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const currentCustom = courseToDelete.custom_week_names || {};
     const updatedCustom = { ...currentCustom, __archived: true };
 
-    mutate();
+    setCourses(courses.filter(c => c.id !== courseToDelete.id));
     
     await supabase.from("archives").insert({
       user_id: user?.id,
@@ -130,7 +128,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const hiddenFor = currentCustom.__hidden_for || [];
     const updatedCustom = { ...currentCustom, __hidden_for: [...hiddenFor, user.id] };
 
-    mutate();
+    setCourses(courses.filter(c => c.id !== courseToDelete.id));
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
     setCourseToDelete(null);
   };
@@ -140,7 +138,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const sharedWith = courseToDelete.shared_with || [];
     const newShared = sharedWith.filter((id: string) => id !== user.id);
 
-    mutate();
+    setCourses(courses.filter(c => c.id !== courseToDelete.id));
     await supabase.from("courses").update({ shared_with: newShared }).eq("id", courseToDelete.id);
     setCourseToDelete(null);
   };
@@ -191,11 +189,6 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         <div 
           key={course.id} 
           onClick={() => router.push(`/course/${course.id}`)}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            setActiveMenuId(course.id);
-            if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
-          }}
           style={{ 
             background: "var(--surface)", 
             padding: "15px", 
@@ -249,6 +242,13 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
             )}
             
             <div style={{ position: "relative" }}>
+              <span 
+                onClick={(e) => handleMenuClick(e, course.id)}
+                style={{ fontSize: "24px", color: "var(--text-muted)", cursor: "pointer", padding: "0 10px", position: "relative", zIndex: activeMenuId === course.id ? 101 : 1 }}
+              >
+                ⋮
+              </span>
+              
               {activeMenuId === course.id && (
                 <>
                   <div 
@@ -258,7 +258,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                   <div 
                     style={{
                       position: "absolute",
-                      top: "10px",
+                      top: "35px",
                       left: "0",
                       background: "#2a2a2a",
                       border: "1px solid #444",
@@ -271,7 +271,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     onClick={(e) => e.stopPropagation()}
                   >
                   <div 
-                    onClick={(e) => { e.stopPropagation(); openRenameModal(e, course); }}
+                    onClick={(e) => openRenameModal(e, course)}
                     style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#333"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -279,7 +279,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     ✏️ تعديل اسم المقرر
                   </div>
                   <div 
-                    onClick={(e) => { e.stopPropagation(); togglePinAttendance(e, course); }}
+                    onClick={(e) => togglePinAttendance(e, course)}
                     style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#333"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -287,7 +287,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     {course.custom_week_names?.__pinned_attendance ? "📌 إلغاء الكاميرا" : "📷 تثبيت زر الحضور"}
                   </div>
                   <div 
-                    onClick={(e) => { e.stopPropagation(); openDeleteModal(e, course); }}
+                    onClick={(e) => openDeleteModal(e, course)}
                     style={{ padding: "12px 15px", cursor: "pointer", fontSize: "13px", color: "#f44336" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#3a2020"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
@@ -300,17 +300,20 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                        setCourseToShare(course);
                        setActiveMenuId(null);
                     }}
-                    style={{ padding: "12px 15px", cursor: "pointer", fontSize: "13px", color: "#4CAF50", borderTop: "1px solid #333" }}
+                    style={{ padding: "12px 15px", cursor: "pointer", borderTop: "1px solid #333", fontSize: "13px", color: "#4CAF50" }}
                     onMouseOver={(e) => e.currentTarget.style.background = "#2a3b2c"}
                     onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
                   >
-                    🤝 مشاركة المقرر
+                    🤝 طلب مشاركة المقرر مع زميل
                   </div>
                   </div>
                 </>
               )}
             </div>
             
+            <div style={{ fontSize: "20px", color: "var(--primary)" }}>
+              🡰
+            </div>
           </div>
         </div>
       ))}
