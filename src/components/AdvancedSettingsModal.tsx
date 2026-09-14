@@ -348,24 +348,26 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                 قم بتحديد تواريخ بداية كل ترم. سيقوم النظام بحساب رقم الأسبوع تلقائياً بناءً على هذه التواريخ ودمجها في التقارير (PDF).
               </p>
               
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>الترم الأول</label>
-                <input 
-                  type="date" 
-                  value={term1Start} 
-                  onChange={(e) => setTerm1Start(e.target.value)}
-                  style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }}
-                />
+              <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>بداية الترم الأول</label>
+                  <input type="date" value={term1Start} onChange={(e) => setTerm1Start(e.target.value)} style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>نهاية الترم الأول</label>
+                  <input type="date" value={term1End} onChange={(e) => setTerm1End(e.target.value)} style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }} />
+                </div>
               </div>
 
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>الترم الثاني</label>
-                <input 
-                  type="date" 
-                  value={term2Start} 
-                  onChange={(e) => setTerm2Start(e.target.value)}
-                  style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }}
-                />
+              <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>بداية الترم الثاني</label>
+                  <input type="date" value={term2Start} onChange={(e) => setTerm2Start(e.target.value)} style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>نهاية الترم الثاني</label>
+                  <input type="date" value={term2End} onChange={(e) => setTerm2End(e.target.value)} style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px" }} />
+                </div>
               </div>
 
               <button 
