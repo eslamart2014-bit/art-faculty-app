@@ -106,10 +106,11 @@ export default function Home() {
   return (
     <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column" }}>
       <PwaInstallPrompt />
-      <AppBar 
-        user={user} 
+      <AppBar
+        user={user}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
+        refreshTrigger={refreshTrigger}
       />
       
       <ProfileModal 

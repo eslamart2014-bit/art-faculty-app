@@ -74,25 +74,54 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const [totalWeeksCount, setTotalWeeksCount] = useState(0);
 
   const generateWeeks = () => {
-    const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر"];
+    const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"];
     
-    // Find the term start date. Use created_at.
-    const startCourseDate = new Date(course?.created_at || new Date());
-    const dayOfWeek = startCourseDate.getDay();
+    let termStartDateStr: string | null = null;
+    const courseCreatedAt = course?.created_at ? new Date(course.created_at) : new Date();
+
+    if (systemTerms) {
+      const t2s = systemTerms.term2_start;
+      const t1s = systemTerms.term1_start;
+      
+      if (t2s && (courseCreatedAt >= new Date(t2s + "T00:00:00") || new Date() >= new Date(t2s + "T00:00:00"))) {
+        termStartDateStr = t2s;
+      } else if (t1s) {
+        termStartDateStr = t1s;
+      }
+    }
+
+    let startRefDate: Date;
+    if (termStartDateStr) {
+      const [y, m, d] = termStartDateStr.split('-').map(Number);
+      startRefDate = new Date(y, m - 1, d, 0, 0, 0);
+    } else {
+      startRefDate = course?.created_at ? new Date(course.created_at) : new Date();
+    }
+
+    const dayOfWeek = startRefDate.getDay();
     const daysToSubtract = (dayOfWeek + 1) % 7; 
-    const termStart = new Date(startCourseDate);
-    termStart.setDate(startCourseDate.getDate() - daysToSubtract);
-    termStart.setHours(0,0,0,0);
+    const termStart = new Date(startRefDate);
+    termStart.setDate(startRefDate.getDate() - daysToSubtract);
+    termStart.setHours(0, 0, 0, 0);
 
     const { startOfWeek: currentWeekStart } = getCurrentWeekRange();
     
-    const weeksList = [];
+    const weeksList: any[] = [];
     let current = new Date(termStart);
     let index = 0;
     
-    // If termStart is somehow after current week, force at least one iteration to include current week
     if (current > currentWeekStart) {
-      current = new Date(currentWeekStart);
+      const key = current.toISOString().split('T')[0];
+      const end = new Date(current);
+      end.setDate(current.getDate() + 6);
+      const startStr = current.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
+      const endStr = end.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
+      weeksList.push({
+        key,
+        defaultName: "الأسبوع الأول",
+        subtitle: `من ${startStr} إلى ${endStr}`,
+      });
+      return weeksList;
     }
     
     while (current <= currentWeekStart) {
@@ -119,6 +148,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     return weeksList.reverse();
   };
 
+
+  useEffect(() => {
+    if (course) {
+      const weeks = generateWeeks();
+      if (weeks.length > 0 && !weeks.some(w => w.key === selectedWeekKey)) {
+        setSelectedWeekKey(weeks[0].key);
+      }
+    }
+  }, [course, systemTerms]);
+
   useEffect(() => {
     fetchData();
   }, [resolvedParams.id, selectedWeekKey]);
@@ -132,11 +171,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const fetchData = async () => {
     setLoading(true);
     
-    const { data: courseData, error: courseError } = await supabase
-      .from("courses")
-      .select("*")
-      .eq("id", resolvedParams.id)
-      .single();
+    const [courseRes, termsRes] = await Promise.all([
+      supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
+      supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
+    ]);
+    const courseData = courseRes.data;
+    const courseError = courseRes.error;
+    if (termsRes.data) {
+      setSystemTerms(termsRes.data);
+    }
 
     if (courseError || !courseData) {
       alert("تعذر تحميل بيانات المقرر");

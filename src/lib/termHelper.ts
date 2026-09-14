@@ -1,40 +1,51 @@
 import { supabase } from "@/lib/supabase";
 
 export async function getSystemTerms() {
-  const { data } = await supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle();
+  const { data } = await supabase
+    .from("system_settings")
+    .select("term1_start, term2_start, term1_end, term2_end")
+    .eq("id", 1)
+    .maybeSingle();
   return data;
 }
 
-export async function getTermAndWeekInfo(targetDateStr: string = new Date().toISOString()) {
-  const targetDate = new Date(targetDateStr);
+const parseDateOnly = (dStr: string | null) => {
+  if (!dStr) return null;
+  const parts = dStr.split('-');
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0);
+};
+
+export async function getTermAndWeekInfo(targetDateInput?: string | Date) {
   const data = await getSystemTerms();
   if (!data) return "";
 
-  const term1 = data.term1_start ? new Date(data.term1_start) : null;
-  const term1End = data.term1_end ? new Date(data.term1_end) : null;
-  const term2 = data.term2_start ? new Date(data.term2_start) : null;
-  const term2End = data.term2_end ? new Date(data.term2_end) : null;
+  const now = targetDateInput ? new Date(targetDateInput) : new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-  let activeTermStart = null;
-  let termName = "";
+  const t1s = parseDateOnly(data.term1_start);
+  const t1e = parseDateOnly(data.term1_end);
+  const t2s = parseDateOnly(data.term2_start);
+  const t2e = parseDateOnly(data.term2_end);
 
-  if (term2 && targetDate >= term2) {
-    if (term2End && targetDate > term2End) return "انتهى الترم الثاني";
-    activeTermStart = term2;
-    termName = "الترم الثاني";
-  } else if (term1 && targetDate >= term1) {
-    if (term1End && targetDate > term1End) return "انتهى الترم الأول";
-    activeTermStart = term1;
-    termName = "الترم الأول";
-  } else {
-    return "لم يبدأ الترم بعد";
+  const arabicNumbers = [
+    "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن",
+    "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر",
+    "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"
+  ];
+
+  if (t2s && today >= t2s) {
+    if (t2e && today > t2e) return "انتهى الترم الثاني";
+    const diffDays = Math.floor((today.getTime() - t2s.getTime()) / (1000 * 60 * 60 * 24));
+    const weekNumber = Math.floor(diffDays / 7) + 1;
+    return `الأسبوع ${arabicNumbers[weekNumber - 1] || weekNumber} من الترم الثاني`;
+  } else if (t1e && today > t1e) {
+    return "لم يبدأ الترم الثاني بعد";
+  } else if (t1s) {
+    if (today < t1s) return "لم يبدأ الترم الأول بعد";
+    const diffDays = Math.floor((today.getTime() - t1s.getTime()) / (1000 * 60 * 60 * 24));
+    const weekNumber = Math.floor(diffDays / 7) + 1;
+    return `الأسبوع ${arabicNumbers[weekNumber - 1] || weekNumber} من الترم الأول`;
   }
 
-  const diffTime = Math.abs(targetDate.getTime() - activeTermStart.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const weekNumber = Math.ceil((diffDays + 1) / 7);
-
-  const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر"];
-  
-  return `الأسبوع ${arabicNumbers[weekNumber - 1] || weekNumber} من ${termName}`;
+  return "";
 }
