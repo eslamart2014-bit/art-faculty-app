@@ -25,37 +25,88 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
 
   const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
 
+  // 0ms Instant Local Cache load for offline-first responsiveness
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      try {
+        const cachedCourses = localStorage.getItem(`cached_courses_${user.id}`);
+        if (cachedCourses) {
+          setCourses(JSON.parse(cachedCourses));
+          setLoading(false);
+        }
+        const cachedProfiles = localStorage.getItem('cached_profiles_map');
+        if (cachedProfiles) {
+          setProfilesMap(JSON.parse(cachedProfiles));
+        }
+      } catch (e) {}
+    }
+  }, [user.id]);
+
   useEffect(() => {
     fetchCourses();
     fetchProfiles();
   }, [user.id, refreshTrigger]);
 
   const fetchProfiles = async () => {
-    const { data } = await supabase.from("profiles").select("id, full_name");
-    if (data) {
-      const map: Record<string, string> = {};
-      data.forEach(p => map[p.id] = p.full_name);
-      setProfilesMap(map);
-    }
+    try {
+      const { data } = await supabase.from("profiles").select("id, full_name");
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach(p => map[p.id] = p.full_name);
+        setProfilesMap(map);
+        try { localStorage.setItem('cached_profiles_map', JSON.stringify(map)); } catch (e) {}
+      }
+    } catch (e) {}
   };
 
   const fetchCourses = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("courses")
-      .select("*")
-      .or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`)
-      .order("created_at", { ascending: false });
+    // Only show full loading if we have zero cached courses
+    if (courses.length === 0) setLoading(true);
 
-    if (data && !error) {
-      // Filter out archived courses and courses hidden for this user
-      const activeCourses = data.filter(c => 
-        !c.custom_week_names?.__archived && 
-        !(c.custom_week_names?.__hidden_for || []).includes(user.id)
-      );
-      setCourses(activeCourses);
+    try {
+      const { data, error } = await supabase
+        .from("courses")
+        .select("*")
+        .or(`teacher_id.eq.${user.id},shared_with.cs.{${user.id}}`)
+        .order("created_at", { ascending: false });
+
+      if (data && !error) {
+        // Filter out archived courses and courses hidden for this user
+        const activeCourses = data.filter(c => 
+          !c.custom_week_names?.__archived && 
+          !(c.custom_week_names?.__hidden_for || []).includes(user.id)
+        );
+        setCourses(activeCourses);
+        try {
+          localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(activeCourses));
+        } catch (e) {}
+
+        // Pre-warm local cache for each course's students in the background
+        activeCourses.forEach(async (cItem) => {
+          try {
+            const cacheKey = `cache_attendance_${cItem.id}`;
+            const existingCache = localStorage.getItem(cacheKey);
+            if (!existingCache) {
+              const { data: studentsData } = await supabase
+                .from("students")
+                .select("*")
+                .eq("academic_year", cItem.academic_year);
+              if (studentsData) {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                  course: cItem,
+                  students: studentsData,
+                  attendance: []
+                }));
+              }
+            }
+          } catch (err) {}
+        });
+      }
+    } catch (e) {
+      console.log("Offline mode: using cached courses list");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleMenuClick = (e: React.MouseEvent, courseId: string) => {
@@ -76,7 +127,9 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     };
 
     // Optimistic UI update
-    setCourses(courses.map(c => c.id === course.id ? { ...c, custom_week_names: updatedCustom } : c));
+    const updatedCourses = courses.map(c => c.id === course.id ? { ...c, custom_week_names: updatedCustom } : c);
+    setCourses(updatedCourses);
+    try { localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(updatedCourses)); } catch (e) {}
     
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", course.id);
   };
@@ -92,7 +145,9 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     if (!newName.trim() || !courseToRename) return;
     
     // Optimistic UI update
-    setCourses(courses.map(c => c.id === courseToRename.id ? { ...c, name: newName } : c));
+    const updatedCourses = courses.map(c => c.id === courseToRename.id ? { ...c, name: newName } : c);
+    setCourses(updatedCourses);
+    try { localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(updatedCourses)); } catch (e) {}
     setCourseToRename(null);
 
     await supabase.from("courses").update({ name: newName }).eq("id", courseToRename.id);
