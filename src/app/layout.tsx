@@ -5,6 +5,7 @@ import MaintenanceGuard from "@/components/MaintenanceGuard";
 import BackButtonHandler from "@/components/BackButtonHandler";
 import OfflineSyncManager from "@/components/OfflineSyncManager";
 import SWRProvider from "@/components/SWRProvider";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
           <MaintenanceGuard>
             <BackButtonHandler />
             <SWRProvider>
+              <ServiceWorkerRegister />
               <OfflineSyncManager />
               {children}
             </SWRProvider>

@@ -18,8 +18,6 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
   const [termStr, setTermStr] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  const [updateProgress, setUpdateProgress] = useState(0);
-  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -63,61 +61,7 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
     updateTime();
     const interval = setInterval(updateTime, 60000);
 
-    // Register service worker with force update check
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
-        reg.update().catch(() => {});
-      }).catch(console.error);
-
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_UPDATED') {
-          setShowUpdateBanner(true);
-          setUpdateProgress(100);
-          setTimeout(() => window.location.reload(), 800);
-        }
-      });
-
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
-    }
-
-    // Force version update check
-    const checkVersion = async () => {
-      try {
-        const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
-        const data = await res.json();
-        const stored = localStorage.getItem('appVersion');
-        
-        if (stored !== data.version) {
-          setShowUpdateBanner(true);
-          let progress = 0;
-          const interval = setInterval(() => {
-            progress += 10;
-            setUpdateProgress(progress);
-            if (progress >= 100) {
-              clearInterval(interval);
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.ready.then(reg => {
-                  reg.active?.postMessage('CLEAR_CACHE');
-                });
-              }
-              caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).finally(() => {
-                localStorage.setItem('appVersion', data.version);
-                window.location.reload();
-              });
-            }
-          }, 60);
-        }
-      } catch (err) {
-        console.log('Version check skipped in offline mode');
-      }
-    };
-    checkVersion();
+    
 
     const fetchUnread = async () => {
       if (!user?.id) return;
@@ -151,33 +95,6 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
 
   return (
     <>
-      {/* Force Update Banner */}
-      {showUpdateBanner && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(0,0,0,0.92)", zIndex: 99999,
-          display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-          direction: "rtl"
-        }}>
-          <div style={{ fontSize: "50px", marginBottom: "20px" }}>🔄</div>
-          <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
-            جاري تحديث التطبيق وتثبيت أحدث التحسينات...
-          </div>
-          <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "30px" }}>
-            يرجى الانتظار ثوانٍ معدودة
-          </div>
-          <div style={{ width: "80%", maxWidth: "300px", background: "#333", borderRadius: "10px", height: "12px", overflow: "hidden" }}>
-            <div style={{
-              height: "100%", borderRadius: "10px",
-              background: "linear-gradient(90deg, #2196F3, #4CAF50)",
-              width: updateProgress + "%",
-              transition: "width 0.06s linear"
-            }} />
-          </div>
-          <div style={{ color: "#4CAF50", marginTop: "12px", fontSize: "13px" }}>{updateProgress}%</div>
-        </div>
-      )}
-
       {/* Main App Bar Header */}
       <div
         style={{
