@@ -30,6 +30,19 @@ export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
+    // 0ms instant cached profile load for offline/instant launch
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_profile');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setUser(parsed);
+          setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(parsed.role) ? parsed : null);
+          setLoading(false);
+        }
+      } catch (e) {}
+    }
+
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -71,18 +84,41 @@ export default function Home() {
   }, []);
 
   const fetchProfile = async (authUser: any) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", authUser.id)
-      .maybeSingle();
-      
-    // Update last_seen in the background
-    if (data && !data.is_suspended) {
-      supabase.from("profiles").update({ last_seen: new Date().toISOString() }).eq("id", authUser.id).then();
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+        
+      if (data) {
+        const merged = { ...authUser, ...data };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('cached_profile', JSON.stringify(merged));
+        }
+        if (!data.is_suspended) {
+          supabase.from("profiles").update({ last_seen: new Date().toISOString() }).eq("id", authUser.id).then();
+        }
+        return merged;
+      }
+    } catch (e) {
+      console.log("Offline mode: could not fetch fresh profile");
     }
     
-    return { ...authUser, ...data };
+    // Offline fallback: use cached profile
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_profile');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.id === authUser.id) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    return authUser;
   };
 
   if (loading) {
@@ -117,7 +153,11 @@ export default function Home() {
         isOpen={isProfileOpen} 
         onClose={() => setIsProfileOpen(false)} 
         user={user} 
-        onUpdateProfile={(updates) => setUser({ ...user, ...updates })} 
+        onUpdateProfile={(updates) => {
+          const updated = { ...user, ...updates };
+          setUser(updated);
+          try { localStorage.setItem('cached_profile', JSON.stringify(updated)); } catch (e) {}
+        }} 
       />
       
       <div style={{ padding: "15px", flexGrow: 1, overflowY: "auto" }}>
