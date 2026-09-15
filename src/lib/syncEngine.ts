@@ -1,5 +1,24 @@
 import { supabase } from "@/lib/supabase";
 
+// Local Storage Cache Helpers
+export const getLocalCache = (key: string) => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const setLocalCache = (key: string, data: any) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {}
+};
+
+// Queue Management
 export const addToQueue = (type: string, payload: any) => {
   if (typeof window === 'undefined') return;
   const queue = JSON.parse(localStorage.getItem('offline_queue') || '[]');
@@ -14,6 +33,7 @@ export const getQueue = () => {
 };
 
 export const clearQueue = () => {
+  if (typeof window === 'undefined') return;
   localStorage.removeItem('offline_queue');
   window.dispatchEvent(new Event('offlineQueueUpdated'));
 };
@@ -34,7 +54,7 @@ export const processQueue = async () => {
     try {
       if (action.type === 'BULK_ATTENDANCE') {
         const { course_id, date, presentIds, absentIds, teacher_id } = action.payload;
-        if (absentIds.length > 0) {
+        if (absentIds && absentIds.length > 0) {
           const { data: records } = await supabase.from("attendance").select("id, student_id").in("student_id", absentIds).eq("date", date).eq("course_id", course_id);
           if (records && records.length > 0) {
             for (const r of records) {
@@ -42,7 +62,7 @@ export const processQueue = async () => {
             }
           }
         }
-        if (presentIds.length > 0) {
+        if (presentIds && presentIds.length > 0) {
           const { data: existingPresents } = await supabase.from("attendance").select("id, student_id, status").in("student_id", presentIds).eq("date", date).eq("course_id", course_id);
           for (const pid of presentIds) {
             const ex = existingPresents?.find(x => x.student_id === pid);
@@ -69,6 +89,11 @@ export const processQueue = async () => {
             await supabase.from("attendance").insert({ course_id, student_id: s.id, date, status: 'حاضر', teacher_id, created_at: action.timestamp });
           }
         }
+        success = true;
+      }
+      else if (action.type === 'CANCEL_ATTENDANCE') {
+        const { course_id, student_id, date } = action.payload;
+        await supabase.from("attendance").delete().eq("course_id", course_id).eq("student_id", student_id).eq("date", date);
         success = true;
       }
       else if (action.type === 'MANUAL_EVALUATION') {

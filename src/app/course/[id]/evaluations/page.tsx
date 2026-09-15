@@ -4,7 +4,7 @@ import { useEffect, useState, use, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { addToQueue } from "@/lib/syncEngine";
+import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 import { extractStudentCode } from "@/lib/scannerHelper";
 
@@ -57,6 +57,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [course, setCourse] = useState<any>(null);
   const [systemTerms, setSystemTerms] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = getLocalCache(`cache_evaluations_${resolvedParams.id}`);
+    if (cached) {
+      if (cached.course) setCourse(cached.course);
+      if (cached.projects) setProjects(cached.projects);
+      if (cached.totalCourseStudents) setTotalCourseStudents(cached.totalCourseStudents);
+      if (cached.projectStats) setProjectStats(cached.projectStats);
+      setLoading(false); // Instant render 0ms!
+    }
+  }, [resolvedParams.id]);
+
 
   // Camera state
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
@@ -177,39 +189,55 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   }, [resolvedParams.id]);
 
   const fetchCourse = async () => {
-    const { data } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
-    if (data) {
-      setCourse(data);
-      const customNames = data.custom_week_names || {};
-      const loadedProjects = customNames.__projects__ || [];
-      setProjects(loadedProjects);
-      await fetchStats(data);
+    if (!course) setLoading(true);
+    try {
+      const { data } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
+      if (data) {
+        setCourse(data);
+        const customNames = data.custom_week_names || {};
+        const loadedProjects = customNames.__projects__ || [];
+        setProjects(loadedProjects);
+        await fetchStats(data, loadedProjects);
+      }
+    } catch (e) {
+      console.log("Offline mode active: using cached evaluations data");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const fetchStats = async (courseData: any) => {
-    const { data: studentsData } = await supabase.from("students").select("id").eq("academic_year", courseData.academic_year);
-    const excluded = courseData.excluded_students || [];
-    const activeStudents = (studentsData || []).filter((s: any) => !excluded.includes(s.id));
-    let count = activeStudents.length;
+  const fetchStats = async (courseData: any, currentProjects: any[] = projects) => {
+    try {
+      const { data: studentsData } = await supabase.from("students").select("id").eq("academic_year", courseData.academic_year);
+      const excluded = courseData.excluded_students || [];
+      const activeStudents = (studentsData || []).filter((s: any) => !excluded.includes(s.id));
+      let count = activeStudents.length;
 
-    if (courseData.makeup_students && courseData.makeup_students.length > 0) {
-      const makeupSet = new Set(courseData.makeup_students);
-      activeStudents.forEach((s: any) => makeupSet.delete(s.id));
-      const validMakeupCount = Array.from(makeupSet).filter((id: any) => !excluded.includes(id)).length;
-      count += validMakeupCount;
-    }
-    setTotalCourseStudents(count);
-
-    const { data: evalsData } = await supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id);
-    const stats: Record<string, number> = {};
-    (evalsData || []).forEach((ev: any) => {
-      if (ev.score !== null && ev.score > 0) {
-        stats[ev.project_name] = (stats[ev.project_name] || 0) + 1;
+      if (courseData.makeup_students && courseData.makeup_students.length > 0) {
+        const makeupSet = new Set(courseData.makeup_students);
+        activeStudents.forEach((s: any) => makeupSet.delete(s.id));
+        const validMakeupCount = Array.from(makeupSet).filter((id: any) => !excluded.includes(id)).length;
+        count += validMakeupCount;
       }
-    });
-    setProjectStats(stats);
+      setTotalCourseStudents(count);
+
+      const { data: evalsData } = await supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id);
+      const stats: Record<string, number> = {};
+      (evalsData || []).forEach((ev: any) => {
+        if (ev.score !== null && ev.score > 0) {
+          stats[ev.project_name] = (stats[ev.project_name] || 0) + 1;
+        }
+      });
+      setProjectStats(stats);
+
+      // Save to local cache
+      setLocalCache(`cache_evaluations_${courseData.id}`, {
+        course: courseData,
+        projects: currentProjects,
+        totalCourseStudents: count,
+        projectStats: stats
+      });
+    } catch (e) {}
   };
 
   const saveNewProject = async () => {

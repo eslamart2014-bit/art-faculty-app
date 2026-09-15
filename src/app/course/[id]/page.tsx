@@ -20,11 +20,12 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
   const loading = !course && !error;
 
   useEffect(() => {
-    if (error) {
-      alert("تعذر تحميل بيانات المقرر");
+    // Only alert if there is no cached course data at all
+    if (error && !course) {
+      alert("تعذر تحميل بيانات المقرر، يرجى التأكد من الاتصال بالإنترنت أول مرة.");
       router.push("/");
     }
-  }, [error]);
+  }, [error, course]);
   ;
 
   if (loading) {

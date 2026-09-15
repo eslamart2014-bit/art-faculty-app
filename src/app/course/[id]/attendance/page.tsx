@@ -4,7 +4,7 @@ import { useEffect, useState, use, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { addToQueue } from "@/lib/syncEngine";
+import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
@@ -35,6 +35,22 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = getLocalCache(`cache_attendance_${resolvedParams.id}`);
+    if (cached) {
+      if (cached.course) setCourse(cached.course);
+      if (cached.systemTerms) setSystemTerms(cached.systemTerms);
+      if (cached.students) setStudents(cached.students);
+      if (cached.makeupStudents) setMakeupStudents(cached.makeupStudents);
+      if (cached.instructorName) setInstructorName(cached.instructorName);
+      if (cached.allAttendances) setAllAttendances(cached.allAttendances);
+      if (cached.attendance) setAttendance(cached.attendance);
+      if (cached.totalWeeksCount) setTotalWeeksCount(cached.totalWeeksCount);
+      setLoading(false);
+    }
+  }, [resolvedParams.id]);
+
 
   // Camera handled by QRScanner component
 
@@ -169,96 +185,98 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     return () => window.removeEventListener('refreshData', handleRefresh);
   }, [course]);
   const fetchData = async () => {
-    setLoading(true);
+    // Only show full loading if we have no cached data at all
+    if (!course) setLoading(true);
     
-    const [courseRes, termsRes] = await Promise.all([
-      supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
-      supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
-    ]);
-    const courseData = courseRes.data;
-    const courseError = courseRes.error;
-    if (termsRes.data) {
-      setSystemTerms(termsRes.data);
-    }
-
-    if (courseError || !courseData) {
-      alert("تعذر تحميل بيانات المقرر");
-      router.push("/");
-      return;
-    }
-    setCourse(courseData);
-
-    const { data: studentsData } = await supabase
-      .from("students")
-      .select("*")
-      .eq("academic_year", courseData.academic_year);
-
-    setStudents(studentsData || []);
-
-    if (courseData.makeup_students && courseData.makeup_students.length > 0) {
-      const { data: makeupData } = await supabase
-        .from("students")
-        .select("*")
-        .in("id", courseData.makeup_students);
-      setMakeupStudents(makeupData || []);
-    }
-
-    // Fetch Instructor Name from profiles table
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user) {
-      const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userData.user.id).single();
-      if (profile && profile.full_name) {
-        const title = profile.degree ? `${profile.degree}/` : '';
-        setInstructorName(`${title}${profile.full_name}`);
-      } else {
-        setInstructorName(userData.user.email || "........................");
+    try {
+      const [courseRes, termsRes] = await Promise.all([
+        supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
+        supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
+      ]);
+      const courseData = courseRes.data;
+      if (termsRes.data) {
+        setSystemTerms(termsRes.data);
       }
-    }
 
-    const { data: allAtt } = await supabase
-      .from("attendance")
-      .select("student_id, date")
-      .eq("course_id", resolvedParams.id);
-    setAllAttendances(allAtt || []);
+      if (courseData) {
+        setCourse(courseData);
 
-    const distinctWeekStarts = new Set();
-    (allAtt || []).forEach(a => {
-       const d = new Date(a.date);
-       const dayOfWeek = d.getDay();
-       const daysToSubtract = (dayOfWeek + 1) % 7; 
-       const start = new Date(d);
-       start.setDate(d.getDate() - daysToSubtract);
-       distinctWeekStarts.add(start.toISOString().split('T')[0]);
-    });
-    setTotalWeeksCount(distinctWeekStarts.size);
+        const { data: studentsData } = await supabase
+          .from("students")
+          .select("*")
+          .eq("academic_year", courseData.academic_year);
 
-    const { start: wStart, end: wEnd } = getWeekRangeFromKey(selectedWeekKey);
+        const loadedStudents = studentsData || [];
+        setStudents(loadedStudents);
 
-    const { data: attData } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("course_id", resolvedParams.id)
-      .gte("date", wStart.toISOString())
-      .lte("date", wEnd.toISOString());
-    
-    setAttendance(attData || []);
+        let loadedMakeup: any[] = [];
+        if (courseData.makeup_students && courseData.makeup_students.length > 0) {
+          const { data: makeupData } = await supabase
+            .from("students")
+            .select("*")
+            .in("id", courseData.makeup_students);
+          loadedMakeup = makeupData || [];
+          setMakeupStudents(loadedMakeup);
+        }
 
-    // Initialize previously recorded attendance as selected
-    const initialSelected = new Set<string>();
-    (attData || []).forEach(a => {
-      if (a.status === "حاضر") initialSelected.add(a.student_id);
-    });
-    setSelectedStudentIds(initialSelected);
+        let instName = instructorName;
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userData.user.id).single();
+          if (profile && profile.full_name) {
+            const title = profile.degree ? `${profile.degree}/` : '';
+            instName = `${title}${profile.full_name}`;
+            setInstructorName(instName);
+          }
+        }
 
-    if (courseData.custom_week_names && courseData.custom_week_names.__absence_limit__) {
-      setAbsenceLimit(courseData.custom_week_names.__absence_limit__.toString());
-    }
+        const { data: allAtt } = await supabase
+          .from("attendance")
+          .select("student_id, date")
+          .eq("course_id", resolvedParams.id);
+        const loadedAllAtt = allAtt || [];
+        setAllAttendances(loadedAllAtt);
 
-    setLoading(false);
+        const distinctWeekStarts = new Set();
+        loadedAllAtt.forEach((a: any) => {
+           const d = new Date(a.date);
+           const dayOfWeek = d.getDay();
+           const daysToSubtract = (dayOfWeek + 1) % 7; 
+           const start = new Date(d);
+           start.setDate(d.getDate() - daysToSubtract);
+           distinctWeekStarts.add(start.toISOString().split('T')[0]);
+        });
+        const countWeeks = distinctWeekStarts.size;
+        setTotalWeeksCount(countWeeks);
 
-    // Auto open camera if requested via query param
-    if (searchParams.get("mode") === "camera") {
-      setShowCameraScanner(true);
+        const { start: wStart, end: wEnd } = getWeekRangeFromKey(selectedWeekKey);
+
+        const { data: attData } = await supabase
+          .from("attendance")
+          .select("*")
+          .eq("course_id", resolvedParams.id)
+          .gte("date", wStart.toISOString())
+          .lte("date", wEnd.toISOString());
+        
+        const loadedAtt = attData || [];
+        setAttendance(loadedAtt);
+
+        // Update local persistent cache for instant offline access
+        setLocalCache(`cache_attendance_${resolvedParams.id}`, {
+          course: courseData,
+          systemTerms: termsRes.data,
+          students: loadedStudents,
+          makeupStudents: loadedMakeup,
+          instructorName: instName,
+          allAttendances: loadedAllAtt,
+          attendance: loadedAtt,
+          totalWeeksCount: countWeeks
+        });
+      }
+    } catch (err) {
+      console.log("Offline mode active: using cached attendance data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -296,7 +314,6 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
 
   const handleSaveAttendance = async () => {
-    setSaving(true);
     const saveDate = selectedWeekKey;
     const displayIds = getDisplayStudents().map(s => s.id);
     const toDeleteIds = displayIds.filter(id => !selectedStudentIds.has(id));
@@ -305,38 +322,54 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       !attendance.some(a => a.student_id === id && a.status === "حاضر")
     );
 
-    // Queue function
-    const doQueue = () => {
-      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
-      alert("ضعف في الاتصال. تم حفظ البيانات مؤقتاً وسيتم الرفع تلقائياً.");
-      setSaving(false);
-    };
-
-    if (!navigator.onLine) return doQueue();
-
-    if (toDeleteIds.length > 0) {
-      const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
-      for (const rec of recordsToDelete) {
-        const { error: delErr } = await supabase.from("attendance").delete().eq("id", rec.id);
-        if (delErr) return doQueue();
-      }
-    }
-
-    if (toInsertIds.length > 0) {
-      const inserts = toInsertIds.map(id => ({
+    // 1. Instant Optimistic UI update! (0ms!)
+    const updatedAttendance = attendance
+      .filter(a => !toDeleteIds.includes(a.student_id))
+      .concat(toInsertIds.map(id => ({
+        id: "temp_" + id + "_" + Date.now(),
         course_id: course.id,
         student_id: id,
         date: saveDate,
         status: "حاضر",
         teacher_id: course.teacher_id
-      }));
-      const { error: insErr } = await supabase.from("attendance").insert(inserts);
-      if (insErr) return doQueue();
+      })));
+    
+    setAttendance(updatedAttendance);
+    vibrateSuccess();
+
+    // Update local cache immediately
+    const cached = getLocalCache(`cache_attendance_${course.id}`);
+    if (cached) {
+      cached.attendance = updatedAttendance;
+      setLocalCache(`cache_attendance_${course.id}`, cached);
     }
 
-    alert("تم حفظ الحضور بنجاح!");
-    await fetchData(); 
-    setSaving(false);
+    // 2. Background Sync
+    if (!navigator.onLine) {
+      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+      return;
+    }
+
+    try {
+      if (toDeleteIds.length > 0) {
+        const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
+        if (recordsToDelete.length > 0) {
+          await supabase.from("attendance").delete().in("id", recordsToDelete.map(r => r.id));
+        }
+      }
+      if (toInsertIds.length > 0) {
+        const inserts = toInsertIds.map(id => ({
+          course_id: course.id,
+          student_id: id,
+          date: saveDate,
+          status: "حاضر",
+          teacher_id: course.teacher_id
+        }));
+        await supabase.from("attendance").insert(inserts);
+      }
+    } catch (err) {
+      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+    }
   };
 
   // --- CROSS-COURSE MAKEUP LOGIC ---
@@ -428,18 +461,17 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   const saveBatchCameraAttendance = async () => {
     if (scannedStudents.length === 0) return;
-    setSavingBatch(true);
     const saveDate = selectedWeekKey;
     
+    // 1. Instant Optimistic UI (0ms!)
+    const newAtt = [...attendance];
     for (const s of scannedStudents) {
-      const existing = attendance.find(a => a.student_id === s.id && a.date === saveDate);
+      const existing = newAtt.find(a => a.student_id === s.id && a.date === saveDate);
       if (existing) {
-        if (existing.status !== "حاضر") { 
-          const { error: updErr } = await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existing.id); 
-          if (updErr) { alert("حدث خطأ في تحديث البيانات. تأكد من الإنترنت."); setSavingBatch(false); return; }
-        }
+        existing.status = "حاضر";
       } else {
-        await supabase.from("attendance").insert({
+        newAtt.push({
+          id: "temp_" + s.id + "_" + Date.now(),
           course_id: course.id,
           student_id: s.id,
           date: saveDate,
@@ -448,14 +480,42 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         });
       }
     }
+    setAttendance(newAtt);
     
+    const newSelected = new Set(selectedStudentIds);
+    scannedStudents.forEach(s => newSelected.add(s.id));
+    setSelectedStudentIds(newSelected);
+
+    // Save to local cache
+    const cached = getLocalCache(`cache_attendance_${course.id}`);
+    if (cached) {
+      cached.attendance = newAtt;
+      setLocalCache(`cache_attendance_${course.id}`, cached);
+    }
+
     vibrateSuccess();
-    alert("تم حفظ حضور هذه المجموعة بنجاح!");
-    
-    // Refresh data so the UI updates and shows them as green in their respective sections
-    await fetchData();
     closeCameraScanner();
     setSavingBatch(false);
+
+    // 2. Background Sync
+    if (!navigator.onLine) {
+      addToQueue('CAMERA_ATTENDANCE', { course_id: course.id, date: saveDate, students: scannedStudents, teacher_id: course.teacher_id });
+      return;
+    }
+
+    try {
+      for (const s of scannedStudents) {
+        await supabase.from("attendance").upsert({
+          course_id: course.id,
+          student_id: s.id,
+          date: saveDate,
+          status: "حاضر",
+          teacher_id: course.teacher_id
+        }, { onConflict: 'course_id,student_id,date' });
+      }
+    } catch (err) {
+      addToQueue('CAMERA_ATTENDANCE', { course_id: course.id, date: saveDate, students: scannedStudents, teacher_id: course.teacher_id });
+    }
   };
   // --------------------
 
