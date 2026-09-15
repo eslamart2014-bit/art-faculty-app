@@ -16,11 +16,29 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
   const [timeStr, setTimeStr] = useState<string>("");
   const [dateStr, setDateStr] = useState<string>("");
   const [termStr, setTermStr] = useState<string>("");
+  const [isOnline, setIsOnline] = useState<boolean>(true);
 
   const [updateProgress, setUpdateProgress] = useState(0);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  // Online / Offline listener
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
 
   // Time and Date interval
   useEffect(() => {
@@ -45,15 +63,17 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
     updateTime();
     const interval = setInterval(updateTime, 60000);
 
-    // Register service worker
+    // Register service worker with force update check
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        reg.update().catch(() => {});
+      }).catch(console.error);
 
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'SW_UPDATED') {
           setShowUpdateBanner(true);
           setUpdateProgress(100);
-          setTimeout(() => window.location.reload(), 1000);
+          setTimeout(() => window.location.reload(), 800);
         }
       });
 
@@ -66,17 +86,18 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
       });
     }
 
-    // Force update check
+    // Force version update check
     const checkVersion = async () => {
       try {
-        const res = await fetch('/version.json?t=' + Date.now());
+        const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
         const data = await res.json();
         const stored = localStorage.getItem('appVersion');
-        if (stored && stored !== data.version) {
+        
+        if (stored !== data.version) {
           setShowUpdateBanner(true);
           let progress = 0;
           const interval = setInterval(() => {
-            progress += 5;
+            progress += 10;
             setUpdateProgress(progress);
             if (progress >= 100) {
               clearInterval(interval);
@@ -90,20 +111,20 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
                 window.location.reload();
               });
             }
-          }, 80);
-        } else {
-          localStorage.setItem('appVersion', data.version);
+          }, 60);
         }
       } catch (err) {
-        console.error('Version check failed:', err);
+        console.log('Version check skipped in offline mode');
       }
     };
     checkVersion();
 
     const fetchUnread = async () => {
       if (!user?.id) return;
-      const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_read', false);
-      if (count !== null) setUnreadCount(count);
+      try {
+        const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_read', false);
+        if (count !== null) setUnreadCount(count);
+      } catch (e) {}
     };
     fetchUnread();
     const notifInterval = setInterval(fetchUnread, 30000);
@@ -121,7 +142,7 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
       if (isMounted && info) {
         setTermStr(info);
       }
-    }).catch(console.error);
+    }).catch(() => {});
 
     return () => {
       isMounted = false;
@@ -140,17 +161,17 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
         }}>
           <div style={{ fontSize: "50px", marginBottom: "20px" }}>🔄</div>
           <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
-            جاري تحديث التطبيق...
+            جاري تحديث التطبيق وتثبيت أحدث التحسينات...
           </div>
           <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "30px" }}>
-            يرجى الانتظار لحظة واحدة
+            يرجى الانتظار ثوانٍ معدودة
           </div>
           <div style={{ width: "80%", maxWidth: "300px", background: "#333", borderRadius: "10px", height: "12px", overflow: "hidden" }}>
             <div style={{
               height: "100%", borderRadius: "10px",
               background: "linear-gradient(90deg, #2196F3, #4CAF50)",
               width: updateProgress + "%",
-              transition: "width 0.08s linear"
+              transition: "width 0.06s linear"
             }} />
           </div>
           <div style={{ color: "#4CAF50", marginTop: "12px", fontSize: "13px" }}>{updateProgress}%</div>
@@ -163,7 +184,7 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "16px 20px",
+          padding: "14px 20px",
           background: "rgba(0,0,0,0.5)",
           borderBottom: "1px solid rgba(255,255,255,0.05)",
           direction: "rtl",
@@ -202,15 +223,46 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
           </button>
         </div>
 
-        {/* Center: Live Clock & Developer Stamp */}
+        {/* Center: Live Clock, Connection Status & Developer Stamp */}
         <div style={{ flex: 1.5, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 5px" }}>
           <div style={{ fontSize: "15px", fontWeight: "bold", color: "#4CAF50", fontFamily: "monospace", letterSpacing: "1px", whiteSpace: "nowrap" }}>
             {timeStr}
           </div>
-          <div style={{ fontSize: "10px", color: "#ccc", marginTop: "3px", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "10px", color: "#ccc", marginTop: "2px", whiteSpace: "nowrap" }}>
             {dateStr}
           </div>
-          <div style={{ fontSize: "9px", color: "#888", marginTop: "4px", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: "10px", whiteSpace: "nowrap" }}>
+
+          {/* Elegant Connection Status Badge (شارة الاتصال الأنيقة) */}
+          <div 
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              marginTop: "4px",
+              background: isOnline ? "rgba(76, 175, 80, 0.12)" : "rgba(244, 67, 54, 0.16)",
+              border: `1px solid ${isOnline ? "rgba(76, 175, 80, 0.3)" : "rgba(244, 67, 54, 0.4)"}`,
+              padding: "2px 10px",
+              borderRadius: "12px",
+              fontSize: "10px",
+              color: isOnline ? "#81C784" : "#EF5350",
+              fontWeight: "bold",
+              transition: "all 0.3s ease",
+              boxShadow: isOnline ? "0 0 8px rgba(76, 175, 80, 0.15)" : "0 0 8px rgba(244, 67, 54, 0.25)"
+            }}
+            title={isOnline ? "أنت متصل بالإنترنت، البيانات متزامنة" : "أنت غير متصل، التطبيق يعمل بكفاءة في وضع عدم الاتصال"}
+          >
+            <span style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: isOnline ? "#4CAF50" : "#F44336",
+              boxShadow: isOnline ? "0 0 6px #4CAF50" : "0 0 6px #F44336",
+              display: "inline-block"
+            }} />
+            <span>{isOnline ? "متصل بالإنترنت" : "غير متصل (أوفلاين)"}</span>
+          </div>
+
+          <div style={{ fontSize: "8px", color: "#777", marginTop: "3px", whiteSpace: "nowrap" }}>
             مطور النظام: د/ إسلام عبد اللطيف
           </div>
         </div>
@@ -269,7 +321,7 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
             width: "100%",
             background: "linear-gradient(90deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))",
             borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-            padding: "8px 20px",
+            padding: "7px 20px",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
