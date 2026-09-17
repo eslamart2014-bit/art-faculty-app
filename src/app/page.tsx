@@ -1,5 +1,7 @@
 "use client";
 
+import { preloadFacultyData } from "@/lib/preloadFacultyData";
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Login from "@/components/Login";
@@ -79,6 +81,11 @@ export default function Home() {
         setLoading(false);
       }
     });
+
+    // Fire-and-forget background preloader so user never waits on any course/attendance page
+    if (user?.id) {
+      preloadFacultyData(user.id);
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {

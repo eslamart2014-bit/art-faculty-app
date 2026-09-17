@@ -14,10 +14,48 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"attendance" | "single_project" | "all_projects" | "raw" | "grading">("attendance");
 
-  const [course, setCourse] = useState<any>(null);
-  const [students, setStudents] = useState<any[]>([]);
+  // Local-first synchronous load
+  const initialCourse = typeof window !== 'undefined'
+    ? (() => {
+        try {
+          const attCache = localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+          if (attCache) {
+            const p = JSON.parse(attCache);
+            if (p.course) return p.course;
+          }
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("cached_courses_")) {
+              const list = JSON.parse(localStorage.getItem(k) || "[]");
+              const found = list.find((c: any) => c.id === resolvedParams.id);
+              if (found) return found;
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    : null;
+
+  const [course, setCourse] = useState<any>(() => initialCourse);
+  const [students, setStudents] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const attCache = localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+        if (attCache) {
+          const p = JSON.parse(attCache);
+          if (p.students && p.students.length > 0) return p.students;
+        }
+      } catch(e) {}
+    }
+    return [];
+  });
   const [attendance, setAttendance] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>(() => {
+    if (initialCourse?.custom_week_names?.__projects__) {
+      return initialCourse.custom_week_names.__projects__.filter((p: any) => !p.is_archived);
+    }
+    return [];
+  });
   const [evaluations, setEvaluations] = useState<any[]>([]);
 
   const [weeks, setWeeks] = useState<{ key: string; name: string; subtitle: string; start: Date; end: Date }[]>([]);
@@ -37,7 +75,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   }, [resolvedParams.id]);
 
   const fetchData = async () => {
-    setLoading(true);
+    if (!initialCourse && !course) setLoading(true);
 
     // Fetch Course
     const { data: courseData } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
@@ -431,7 +469,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     { id: "grading", label: "التجميع (الكنترول)", icon: "⚙️" },
   ];
 
-  if (loading) {
+  if (loading && !course) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
         <div className="loader-circle"></div>

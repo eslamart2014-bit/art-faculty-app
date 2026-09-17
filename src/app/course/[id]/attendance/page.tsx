@@ -23,22 +23,78 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const searchParams = useSearchParams();
   const resolvedParams = use(params);
   
-  const [course, setCourse] = useState<any>(null);
-  const [systemTerms, setSystemTerms] = useState<any>(null);
-  const [students, setStudents] = useState<any[]>([]);
-  const [makeupStudents, setMakeupStudents] = useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
-  const [instructorName, setInstructorName] = useState<string>("........................");
+  // 1. Direct attendance cache read (0ms)
+  const initialAttCache = typeof window !== 'undefined'
+    ? getLocalCache(`cache_attendance_${resolvedParams.id}`)
+    : null;
+
+  // 2. Fallback: Lookup course in cached_courses
+  const fallbackCourse = !initialAttCache?.course && typeof window !== 'undefined'
+    ? (() => {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("cached_courses_")) {
+              const list = JSON.parse(localStorage.getItem(k) || "[]");
+              const found = list.find((c: any) => c.id === resolvedParams.id);
+              if (found) return found;
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    : null;
+
+  const currentCourse = initialAttCache?.course || fallbackCourse;
+
+  // 3. Fallback: Lookup students for this academic year from local store
+  const fallbackStudents = !initialAttCache?.students && currentCourse && typeof window !== 'undefined'
+    ? (() => {
+        try {
+          const yearStudents = getLocalCache(`cached_students_${currentCourse.academic_year}`) || [];
+          if (currentCourse.course_type === 'sections' && Array.isArray(currentCourse.sections) && currentCourse.sections.length > 0) {
+            return yearStudents.filter((s: any) => currentCourse.sections.includes(s.section));
+          }
+          return yearStudents;
+        } catch(e) {}
+        return [];
+      })()
+    : [];
+
+  const initialStudents = (initialAttCache?.students && initialAttCache.students.length > 0)
+    ? initialAttCache.students
+    : fallbackStudents;
+
+  const [course, setCourse] = useState<any>(() => currentCourse);
+  const [systemTerms, setSystemTerms] = useState<any>(() => initialAttCache?.systemTerms || getLocalCache("cached_system_settings") || null);
+  const [students, setStudents] = useState<any[]>(() => initialStudents);
+  const [makeupStudents, setMakeupStudents] = useState<any[]>(() => initialAttCache?.makeupStudents || []);
+  const [attendance, setAttendance] = useState<any[]>(() => initialAttCache?.attendance || []);
+  const [instructorName, setInstructorName] = useState<string>(() => initialAttCache?.instructorName || "........................");
   
-  // Selection state (instead of auto-save)
-  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  // Selection state
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(() => {
+    if (initialAttCache?.attendance) {
+      return new Set<string>(
+        (initialAttCache.attendance as any[])
+          .filter((a: any) => a.status === "حاضر")
+          .map((a: any) => String(a.student_id))
+      );
+    }
+    return new Set<string>();
+  });
   
-  const [selectedSection, setSelectedSection] = useState<string>("");
+  const [selectedSection, setSelectedSection] = useState<string>(() => {
+    if (currentCourse?.course_type === 'lectures') return 'محاضرات';
+    if (currentCourse?.sections && currentCourse.sections.length > 0) return currentCourse.sections[0];
+    return '';
+  });
+
   const [loading, setLoading] = useState(() => {
     if (typeof window !== 'undefined') {
       const isCamera = new URLSearchParams(window.location.search).get("mode") === "camera";
       if (isCamera) return false;
-      return !localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+      return !currentCourse;
     }
     return true;
   });
@@ -212,8 +268,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     return () => window.removeEventListener('refreshData', handleRefresh);
   }, [course, selectedWeekKey]);
   const fetchData = async () => {
-    // Only show full loading if we have no cached data at all
-    if (!course) setLoading(true);
+    // Silent background fetch — NEVER block screen with a loading spinner if course exists
+    if (!course && !currentCourse) setLoading(true);
     
     try {
       const [courseRes, termsRes] = await Promise.all([
@@ -797,7 +853,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     setSaving(false);
   };
 
-  if (loading && !showCameraScanner) {
+  if (loading && !course && !showCameraScanner) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
         <div className="loader-circle"></div>

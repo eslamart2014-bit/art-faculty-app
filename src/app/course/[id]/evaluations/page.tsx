@@ -54,22 +54,38 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const resolvedParams = use(params);
   
-  const [course, setCourse] = useState<any>(() => {
-    if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(`cache_evaluations_${resolvedParams.id}`);
-      if (raw) {
-        try { return JSON.parse(raw)?.course || null; } catch(e) {}
-      }
-    }
-    return null;
+  const initialEvalCache = typeof window !== 'undefined'
+    ? getLocalCache(`cache_evaluations_${resolvedParams.id}`)
+    : null;
+
+  const fallbackEvalCourse = !initialEvalCache?.course && typeof window !== 'undefined'
+    ? (() => {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("cached_courses_")) {
+              const list = JSON.parse(localStorage.getItem(k) || "[]");
+              const found = list.find((c: any) => c.id === resolvedParams.id);
+              if (found) return found;
+            }
+          }
+        } catch(e) {}
+        return null;
+      })()
+    : null;
+
+  const currentEvalCourse = initialEvalCache?.course || fallbackEvalCourse;
+
+  const [course, setCourse] = useState<any>(() => currentEvalCourse);
+  const [projects, setProjects] = useState<Project[]>(() => {
+    if (initialEvalCache?.projects && initialEvalCache.projects.length > 0) return initialEvalCache.projects;
+    const p = (currentEvalCourse?.custom_week_names as any)?.__projects__ || [];
+    return p.filter((x: any) => !x.is_archived);
   });
-  const [systemTerms, setSystemTerms] = useState<any>(null);
-  const [loading, setLoading] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !localStorage.getItem(`cache_evaluations_${resolvedParams.id}`);
-    }
-    return true;
-  });
+  const [systemTerms, setSystemTerms] = useState<any>(() => initialEvalCache?.systemTerms || getLocalCache("cached_system_settings") || null);
+  const [totalCourseStudents, setTotalCourseStudents] = useState<number>(() => initialEvalCache?.totalCourseStudents || 0);
+  const [projectStats, setProjectStats] = useState<any>(() => initialEvalCache?.projectStats || {});
+  const [loading, setLoading] = useState(() => !currentEvalCourse);
 
   useEffect(() => {
     const cached = getLocalCache(`cache_evaluations_${resolvedParams.id}`);
@@ -109,13 +125,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // Projects state
-  const [projects, setProjects] = useState<Project[]>([]);
+  // Selected project state
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  // Stats state
-  const [totalCourseStudents, setTotalCourseStudents] = useState(0);
-  const [projectStats, setProjectStats] = useState<Record<string, number>>({});
 
   // View states
   const [view, setView] = useState<'PROJECTS' | 'EVAL_MENU' | 'MANUAL' | 'CAMERA'>('PROJECTS');
