@@ -34,7 +34,14 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   
   const [selectedSection, setSelectedSection] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const isCamera = new URLSearchParams(window.location.search).get("mode") === "camera";
+      if (isCamera) return false;
+      return !localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+    }
+    return true;
+  });
 
   useEffect(() => {
     const cached = getLocalCache(`cache_attendance_${resolvedParams.id}`);
@@ -86,8 +93,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const [showWeekRenameModal, setShowWeekRenameModal] = useState(false);
   const [customWeekName, setCustomWeekName] = useState("");
 
-  // Scanner & Makeup specific state
-  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  // Scanner & Makeup specific state - instant open if ?mode=camera
+  const [showCameraScanner, setShowCameraScanner] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get("mode") === "camera";
+    }
+    return false;
+  });
   const [scannedStudents, setScannedStudents] = useState<any[]>([]);
   const [savingBatch, setSavingBatch] = useState(false);
 
@@ -785,7 +797,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     setSaving(false);
   };
 
-  if (loading) {
+  if (loading && !showCameraScanner) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
         <div className="loader-circle"></div>

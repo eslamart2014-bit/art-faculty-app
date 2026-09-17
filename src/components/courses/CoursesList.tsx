@@ -260,6 +260,16 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         <div 
           key={course.id} 
           onClick={() => router.push(`/course/${course.id}`)}
+          onMouseEnter={() => {
+            router.prefetch(`/course/${course.id}`);
+            router.prefetch(`/course/${course.id}/attendance`);
+            router.prefetch(`/course/${course.id}/evaluations`);
+          }}
+          onTouchStart={() => {
+            router.prefetch(`/course/${course.id}`);
+            router.prefetch(`/course/${course.id}/attendance`);
+            router.prefetch(`/course/${course.id}/evaluations`);
+          }}
           style={{ 
             background: "var(--surface)", 
             padding: "15px", 

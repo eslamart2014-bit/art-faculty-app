@@ -54,9 +54,22 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const resolvedParams = use(params);
   
-  const [course, setCourse] = useState<any>(null);
+  const [course, setCourse] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(`cache_evaluations_${resolvedParams.id}`);
+      if (raw) {
+        try { return JSON.parse(raw)?.course || null; } catch(e) {}
+      }
+    }
+    return null;
+  });
   const [systemTerms, setSystemTerms] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem(`cache_evaluations_${resolvedParams.id}`);
+    }
+    return true;
+  });
 
   useEffect(() => {
     const cached = getLocalCache(`cache_evaluations_${resolvedParams.id}`);
@@ -768,7 +781,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setShowEasterEgg(true);
   };
 
-  if (loading || !course) return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div className="loader-circle"></div></div>;
+  if (loading && !course) return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}><div className="loader-circle"></div></div>;
 
   return (
     <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column", background: "#121212" }}>

@@ -11,12 +11,41 @@ export default function CourseDashboard({ params }: { params: Promise<{ id: stri
   const resolvedParams = use(params);
 
   
+  const getCachedCourse = () => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("cached_courses_")) {
+          const list = JSON.parse(localStorage.getItem(k) || "[]");
+          const found = list.find((c: any) => c.id === resolvedParams.id);
+          if (found) return found;
+        }
+      }
+      const attCache = localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+      if (attCache) {
+        const parsed = JSON.parse(attCache);
+        if (parsed.course) return parsed.course;
+      }
+      const evalCache = localStorage.getItem(`cache_evaluations_${resolvedParams.id}`);
+      if (evalCache) {
+        const parsed = JSON.parse(evalCache);
+        if (parsed.course) return parsed.course;
+      }
+    } catch(e) {}
+    return undefined;
+  };
+
   const fetcher = async () => {
     const { data, error } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
     if (error) throw error;
     return data;
   };
-  const { data: course, error } = useSWR(`course_${resolvedParams.id}`, fetcher);
+  const [initialCourse] = useState(getCachedCourse);
+  const { data: course, error } = useSWR(`course_${resolvedParams.id}`, fetcher, {
+    fallbackData: initialCourse,
+    revalidateOnFocus: false
+  });
   const loading = !course && !error;
 
   useEffect(() => {

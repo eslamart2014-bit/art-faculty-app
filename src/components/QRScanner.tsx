@@ -1,61 +1,59 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-
-declare global {
-  interface Window {
-    Html5Qrcode: any;
-  }
-}
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function QRScanner({ onScan }: { onScan: (result: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
   useEffect(() => {
-    // Dynamically load html5-qrcode from CDN to avoid SSR issues
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
-    const id = "qr-scanner-" + Math.random().toString(36).slice(2);
-    const div = document.createElement('div');
+    const id = "qr-scanner-" + Math.random().toString(36).slice(2, 9);
+    const div = document.createElement("div");
     div.id = id;
-    div.style.width = '100%';
+    div.style.width = "100%";
+    div.style.height = "100%";
     if (containerRef.current) {
-      containerRef.current.innerHTML = '';
+      containerRef.current.innerHTML = "";
       containerRef.current.appendChild(div);
     }
 
-    const startScanner = () => {
-      if (!window.Html5Qrcode) return;
-      try {
-        const scanner = new window.Html5Qrcode(id);
-        scannerRef.current = scanner;
-        scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (text: string) => { onScanRef.current(text); },
-          () => {}
-        ).catch(console.error);
-      } catch (e) {
-        console.error('Scanner init error:', e);
-      }
-    };
+    let isDestroyed = false;
+    const scanner = new Html5Qrcode(id);
+    scannerRef.current = scanner;
 
-    if (window.Html5Qrcode) {
-      setTimeout(startScanner, 100);
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-      script.onload = () => setTimeout(startScanner, 100);
-      document.head.appendChild(script);
-    }
+    scanner.start(
+      { facingMode: "environment" },
+      { 
+        fps: 20, 
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      },
+      (text: string) => {
+        if (!isDestroyed) {
+          onScanRef.current(text);
+        }
+      },
+      () => {}
+    ).catch(err => {
+      if (!isDestroyed) {
+        console.warn("Scanner camera access warning:", err);
+      }
+    });
 
     return () => {
+      isDestroyed = true;
       if (scannerRef.current) {
         try {
           if (scannerRef.current.isScanning) {
-            scannerRef.current.stop().catch(() => {});
+            scannerRef.current.stop().then(() => {
+              scannerRef.current?.clear();
+            }).catch(() => {});
+          } else {
+            scannerRef.current.clear();
           }
         } catch (e) {}
       }
@@ -63,6 +61,6 @@ export default function QRScanner({ onScan }: { onScan: (result: string) => void
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", minHeight: "280px", background: "#000" }} />
+    <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "280px", background: "#000" }} />
   );
 }

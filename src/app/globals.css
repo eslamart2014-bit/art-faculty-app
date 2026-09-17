@@ -258,3 +258,25 @@ input[data-color="danger"]:checked + .slider { background-color: #E91E63; }
     display: none !important;
   }
 }
+
+
+/* Speed & Performance Optimizations */
+* {
+  touch-action: manipulation;
+}
+
+button, a, select, input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Eliminate expensive GPU blur filters on low/mid mobile devices */
+.modal-backdrop, [style*="backdrop-filter"] {
+  backdrop-filter: none !important;
+  background-color: rgba(18, 18, 18, 0.96) !important;
+}
+
+/* Isolate list layout reflows */
+.app-container, div[style*="overflowY: auto"], div[style*="overflow-y: auto"] {
+  contain: paint;
+  will-change: scroll-position;
+}

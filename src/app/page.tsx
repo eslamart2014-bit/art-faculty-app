@@ -17,9 +17,33 @@ import AdminUsersModal from "@/components/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
-  const [originalAdminUser, setOriginalAdminUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_profile');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [originalAdminUser, setOriginalAdminUser] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_profile');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return ['مدير', 'مدير مساعد'].includes(parsed.role) ? parsed : null;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('cached_profile');
+    }
+    return true;
+  });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<"users" | "roster" | null>(null);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
