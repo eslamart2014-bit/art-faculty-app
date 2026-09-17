@@ -142,6 +142,37 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     setActiveMenuId(null);
   };
 
+  const handleToggleVerifyPermission = async (user: any) => {
+    if (!isAdmin) return;
+    const actionText = user.can_verify_students ? 'سحب' : 'منح';
+    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (تأكيد هوية الطالب) لهذا المستخدم؟\nالاسم: ${user.full_name}`)) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'toggle_verify_permission', userId: user.id, adminId: adminUser.id })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        alert(`تم ${actionText} صلاحية تأكيد هوية الطالب بنجاح.`);
+        fetchData();
+      } else {
+        alert("خطأ: " + (data.error || "فشلت العملية"));
+      }
+    } catch (e) {
+      alert("حدث خطأ في الاتصال");
+    }
+    setActiveMenuId(null);
+  };
+
   const handleChangePassword = async (user: any) => {
     if (!confirm(`هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم:\n${user.full_name || user.email}؟`)) return;
 
@@ -297,6 +328,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                           {u.full_name || "بدون اسم"}
                           {u.role === 'مدير' && <span style={{ background: "#2196F3", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير</span>}
                           {u.role === 'مدير مساعد' && <span style={{ background: "#9C27B0", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير مساعد</span>}
+                          {u.can_verify_students && <span style={{ background: "#0288D1", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🪪 منسق هويات</span>}
                           {isLocked && <span style={{ background: "#f44336", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🔒 مقفول</span>}
                         </div>
                         <div style={{ color: "#888", fontSize: "12px", display: "flex", gap: "10px", alignItems: "center" }}>
@@ -349,6 +381,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                             {u.role !== 'مدير' && (
                               <button onClick={() => handleGrantAssistantRole(u)} style={{ background: "#9C27B0", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
                                 {u.role === 'مدير مساعد' ? "❌ إلغاء صلاحية مدير مساعد" : "⭐ منح صلاحية مدير مساعد"}
+                              </button>
+                            )}
+
+                            {isAdmin && (
+                              <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(33, 150, 243, 0.2)" : "#333", color: u.can_verify_students ? "#64B5F6" : "#aaa", border: `1px solid ${u.can_verify_students ? "#2196F3" : "#555"}`, padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
+                                {u.can_verify_students ? "✅ سحب صلاحية تأكيد هوية الطالب" : "🪪 منح صلاحية تأكيد هوية الطالب"}
                               </button>
                             )}
                           </>

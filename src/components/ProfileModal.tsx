@@ -120,11 +120,16 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
 
         <button 
           onClick={() => {
-            window.open("/system", "_blank");
+            if (user?.id) {
+              try {
+                localStorage.setItem("fania_active_instructor_id", user.id);
+              } catch (e) {}
+            }
+            window.open(`/instructor${user?.id ? `?instructor_id=${user.id}` : ''}`, "_blank");
           }}
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "linear-gradient(135deg, #2563eb, #10b981)", color: "#fff", border: "none", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "0.2s", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "linear-gradient(135deg, #1976D2, #00897B)", color: "#fff", border: "none", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "0.2s", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
         >
-          <span>🎓</span> الانتقال السريع لبوابة الطلاب
+          <span>🎨</span> الانتقال لبوابة أعمال مقرراتي (المعرض والبحث)
         </button>
       </div>
     </div>

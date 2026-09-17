@@ -42,15 +42,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
-
-    // Pass security checks, proceed with action
-
     // Fetch target user to prevent Assistant from modifying Manager
     const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
     if (profile.role === 'مدير مساعد' && targetProfile?.role === 'مدير') {
       return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
     }
-
 
     if (action === 'unlock') {
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -67,9 +63,7 @@ export async function POST(request: Request) {
       
       if (error) throw error;
       
-      // Also unlock the account if it was locked
       await supabaseAdmin.from('profiles').update({ failed_attempts: 0, locked_until: null }).eq('id', userId);
-      
       return NextResponse.json({ success: true });
     }
 
@@ -77,7 +71,6 @@ export async function POST(request: Request) {
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
       
       if (profile.role === 'مدير مساعد') {
-        // Soft delete: freeze the account and hide from assistant by prefixing the name
         const { data: userToDelete } = await supabaseAdmin.from('profiles').select('full_name').eq('id', userId).single();
         const currentName = userToDelete?.full_name || 'بدون اسم';
         const newName = currentName.startsWith('[محذوف]') ? currentName : `[محذوف] ${currentName}`;
@@ -87,7 +80,6 @@ export async function POST(request: Request) {
           full_name: newName
         }).eq('id', userId);
       } else {
-        // Hard delete for Manager
         const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
         if (error) throw error;
       }
@@ -96,7 +88,6 @@ export async function POST(request: Request) {
     }
 
     if (action === 'grant_role') {
-      // Only full admin can grant/revoke roles
       if (profile.role !== 'مدير') {
         return NextResponse.json({ error: 'Forbidden: Only admin can change roles' }, { status: 403 });
       }
@@ -110,6 +101,41 @@ export async function POST(request: Request) {
 
       if (roleError) throw roleError;
       return NextResponse.json({ success: true });
+    }
+
+    if (action === 'toggle_verify_permission') {
+      if (!['مدير', 'مدير مساعد'].includes(profile.role)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+
+      const { data: targetUser } = await supabaseAdmin
+        .from('profiles')
+        .select('can_verify_students, full_name')
+        .eq('id', userId)
+        .single();
+
+      const newPerm = !targetUser?.can_verify_students;
+
+      const { error: permError } = await supabaseAdmin
+        .from('profiles')
+        .update({ can_verify_students: newPerm })
+        .eq('id', userId);
+
+      if (permError) throw permError;
+
+      // Sync with portal_coordinators
+      if (newPerm && targetUser?.full_name) {
+        try {
+          await supabaseAdmin.from('portal_coordinators').upsert({
+            name: targetUser.full_name,
+            title: 'منسق تأكيد هوية الطلاب',
+            is_active: true
+          }, { onConflict: 'name' });
+        } catch (e) {}
+      }
+
+      return NextResponse.json({ success: true, can_verify_students: newPerm });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

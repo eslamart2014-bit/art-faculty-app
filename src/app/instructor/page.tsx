@@ -19,6 +19,8 @@ import {
   BookOpen
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
+import QRScanner from "@/components/QRScanner";
+import { extractStudentCode } from "@/lib/scannerHelper";
 
 export default function InstructorPage() {
   // 1. Instructor Identity & Selection
@@ -48,6 +50,8 @@ export default function InstructorPage() {
 
   // 6. Action status & feedback
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   // Fetch initial instructors list
@@ -176,6 +180,90 @@ export default function InstructorPage() {
 
     return () => clearTimeout(timer);
   }, [searchQuery, selectedInstructor]);
+
+  
+  // Export Submissions as Mobile-Scrolling Formatted PDF
+  const handleExportMobilePdf = async () => {
+    if (!submissions || submissions.length === 0) {
+      alert("لا توجد أعمال مرفوعة في هذا المشروع لتحميلها كـ PDF");
+      return;
+    }
+    setIsExportingPdf(true);
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      
+      const container = document.createElement("div");
+      container.style.width = "380px";
+      container.style.background = "#0f172a";
+      container.style.color = "#ffffff";
+      container.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+      container.style.direction = "rtl";
+      container.style.padding = "10px";
+
+      let html = `
+        <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 2px solid #3b82f6; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 20px; page-break-after: always;">
+          <div style="font-size: 13px; color: #94a3b8; margin-bottom: 4px;">جامعة حلوان - كلية التربية الفنية</div>
+          <h1 style="font-size: 18px; color: #38bdf8; margin: 0 0 10px 0;">ألبوم أعمال ومشاريع الطلاب</h1>
+          <div style="background: rgba(59, 130, 246, 0.15); border-radius: 8px; padding: 12px; margin: 12px 0;">
+            <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 4px;">المقرر: ${selectedCourse?.name || ""}</div>
+            <div style="font-size: 13px; color: #34d399; font-weight: bold;">المشروع: ${selectedProjectName}</div>
+            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">أستاذ / معيد المقرر: ${selectedInstructor?.full_name || ""}</div>
+          </div>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 15px;">
+            إجمالي الأعمال: ${submissions.length} عمل • تاريخ التصدير: ${new Date().toLocaleDateString("ar-EG")}
+          </div>
+          <div style="margin-top: 25px; font-size: 11px; color: #38bdf8;">نسخة مخصصة لتصفح شاشات الهواتف الذكية 📱</div>
+        </div>
+      `;
+
+      submissions.forEach((sub, i) => {
+        const img = sub.images?.[0]?.url || sub.photo_url || "";
+        html += `
+          <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; margin-bottom: 20px; page-break-after: ${i === submissions.length - 1 ? 'avoid' : 'always'}; page-break-inside: avoid; text-align: right;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px;">
+              <div>
+                <div style="font-size: 15px; font-weight: bold; color: #ffffff;">${sub.student_name}</div>
+                <div style="font-size: 12px; color: #38bdf8;">كود: ${formatStudentCode(sub.student_code)} • سكشن: ${sub.section || "1"}</div>
+              </div>
+              ${sub.score !== null ? `<div style="background: #059669; color: #fff; font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 6px;">درجة: ${sub.score}</div>` : ''}
+            </div>
+
+            ${img ? `
+              <div style="width: 100%; border-radius: 8px; overflow: hidden; background: #000; text-align: center; margin-bottom: 10px;">
+                <img src="${img}" crossorigin="anonymous" style="width: 100%; max-height: 480px; object-fit: contain; display: block;" />
+              </div>
+            ` : `
+              <div style="padding: 40px; text-align: center; color: #64748b; font-size: 13px;">لا توجد صورة للعمل</div>
+            `}
+
+            <div style="font-size: 10px; color: #64748b; display: flex; justify-content: space-between; padding-top: 6px; border-top: 1px dashed #334155;">
+              <span>مشروع: ${selectedProjectName}</span>
+              <span>${sub.created_at ? new Date(sub.created_at).toLocaleDateString("ar-EG") : ""}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      document.body.appendChild(container);
+
+      const opt: any = {
+        margin: [6, 6, 6, 6],
+        filename: `اعمال_${selectedCourse?.name || 'مقرر'}_${selectedProjectName}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, allowTaint: true, logging: false },
+        jsPDF: { unit: 'mm', format: [120, 220], orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(container).save();
+      document.body.removeChild(container);
+    } catch (err: any) {
+      console.error("PDF Export error:", err);
+      alert("تعذر تصدير ملف الـ PDF: " + (err?.message || "خطأ غير متوقع"));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Action: Allow Student to Retake / Change Artwork Photo
   const handleAllowRetake = async (studentCode: string, courseId: string, projectName: string, studentName: string) => {
@@ -422,18 +510,52 @@ export default function InstructorPage() {
 
             </div>
 
-            {/* Quick Stats Bar */}
+            {/* Quick Stats Bar & PDF Export */}
             {selectedCourse && selectedProjectName && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #2a374f", fontSize: "12px" }}>
-                <span style={{ background: "rgba(56, 189, 248, 0.1)", color: "#38bdf8", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
-                  المقرر: {selectedCourse.name}
-                </span>
-                <span style={{ background: "rgba(16, 185, 129, 0.1)", color: "#34d399", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
-                  إجمالي الأعمال المرفوعة: {submissions.length}
-                </span>
-                <span style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", padding: "4px 10px", borderRadius: "8px" }}>
-                  السكاشن المشمولة: {selectedCourse.sections?.join("، ") || "الكل"}
-                </span>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px", marginTop: "14px", paddingTop: "12px", borderTop: "1px solid #2a374f", fontSize: "12px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  <span style={{ background: "rgba(56, 189, 248, 0.1)", color: "#38bdf8", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
+                    المقرر: {selectedCourse.name}
+                  </span>
+                  <span style={{ background: "rgba(16, 185, 129, 0.1)", color: "#34d399", padding: "4px 10px", borderRadius: "8px", fontWeight: "bold" }}>
+                    إجمالي الأعمال: {submissions.length}
+                  </span>
+                  <span style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", padding: "4px 10px", borderRadius: "8px" }}>
+                    السكاشن: {selectedCourse.sections?.join("، ") || "الكل"}
+                  </span>
+                </div>
+
+                {submissions.length > 0 && (
+                  <button
+                    onClick={handleExportMobilePdf}
+                    disabled={isExportingPdf}
+                    style={{
+                      background: "linear-gradient(135deg, #059669, #10b981)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      fontSize: "12px",
+                      cursor: isExportingPdf ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)"
+                    }}
+                  >
+                    {isExportingPdf ? (
+                      <>
+                        <div style={{ width: "12px", height: "12px", border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                        <span>جاري تجهيز PDF...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📥 تحميل ملف الأعمال كـ PDF (مقاس الجوال)</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -547,18 +669,60 @@ export default function InstructorPage() {
             <label style={{ display: "block", color: "#94a3b8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
               ابحث عن الطالب بالكود الجامعي أو بالاسم:
             </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="أدخل كود الطالب (مثال: 0001) أو اكتب جزءاً من اسمه..."
-                style={{ width: "100%", padding: "14px 18px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "12px", color: "#fff", fontSize: "15px" }}
-              />
-              {isSearching && (
-                <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              )}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <div style={{ position: "relative", flex: 1 }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="أدخل كود الطالب (مثال: 0001) أو اكتب اسمه..."
+                  style={{ width: "100%", padding: "14px 18px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "12px", color: "#fff", fontSize: "15px" }}
+                />
+                {isSearching && (
+                  <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                )}
+              </div>
+
+              <button
+                onClick={() => setIsCameraOpen(!isCameraOpen)}
+                style={{
+                  padding: "14px 18px",
+                  background: isCameraOpen ? "#ef4444" : "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                <span>{isCameraOpen ? "✕ إغلاق" : "📷 مسح QR"}</span>
+              </button>
             </div>
+
+            {isCameraOpen && (
+              <div style={{ marginTop: "14px", background: "#000", borderRadius: "14px", overflow: "hidden", border: "2px solid #2563eb", padding: "10px", textAlign: "center" }}>
+                <div style={{ color: "#38bdf8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
+                  وجه الكاميرا نحو باركود QR الخاص بالطالب للبحث التلقائي
+                </div>
+                <div style={{ width: "100%", maxWidth: "320px", height: "260px", margin: "0 auto", borderRadius: "10px", overflow: "hidden" }}>
+                  <QRScanner
+                    onScan={(decoded) => {
+                      const code = extractStudentCode(decoded);
+                      if (code) {
+                        setSearchQuery(code);
+                        setIsCameraOpen(false);
+                        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(100);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             <div style={{ color: "#64748b", fontSize: "11px", marginTop: "8px" }}>
               💡 يتيح لك البحث استعراض صورة بطاقة الرقم القومي لمطابقة وجه الطالب، وفحص أعماله في مقرراتك فقط.
             </div>

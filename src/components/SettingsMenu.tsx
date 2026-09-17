@@ -12,6 +12,8 @@ interface SettingsMenuProps {
   onOpenAddCourse: () => void;
   onOpenArchive: () => void;
   onOpenSuggestions: () => void;
+  onOpenStudentPortalHub?: () => void;
+  onOpenIdentityVerification?: () => void;
 }
 
 export default function SettingsMenu({
@@ -23,7 +25,9 @@ export default function SettingsMenu({
   onOpenAdvancedSettings,
   onOpenAddCourse,
   onOpenArchive,
-  onOpenSuggestions
+  onOpenSuggestions,
+  onOpenStudentPortalHub,
+  onOpenIdentityVerification
 }: SettingsMenuProps) {
   useEffect(() => {
     window.history.pushState({ modal: true }, "");
@@ -95,6 +99,16 @@ export default function SettingsMenu({
           }
         `}</style>
 
+        {(["مدير", "مدير مساعد"].includes(user?.role) || user?.can_verify_students) && (
+          <div 
+            className="settings-item" 
+            onClick={() => { onClose(); if (onOpenIdentityVerification) onOpenIdentityVerification(); else window.open("/coordinator", "_blank"); }}
+            style={{ background: "rgba(33, 150, 243, 0.12)", color: "#90CAF9", fontWeight: "bold" }}
+          >
+            <span style={{ marginLeft: "10px", fontSize: "18px" }}>🪪</span> تأكيد هوية الطالب (الرقم السري والبطاقة)
+          </div>
+        )}
+
         {["مدير", "مدير مساعد"].includes(user?.role) && (
           <div className="settings-item" onClick={() => { onClose(); onOpenAdminPanel(); }}>
             <span style={{ marginLeft: "10px" }}>🛡️</span> إدارة المستخدمين والتراخيص
@@ -118,12 +132,17 @@ export default function SettingsMenu({
         <div className="settings-item" onClick={() => { onClose(); onOpenArchive(); }}>
           <span style={{ marginLeft: "10px" }}>🗄️</span> الأرشيف
         </div>
-        <div className="settings-item" onClick={() => { onClose(); window.open("/instructor", "_blank"); }}>
-          <span style={{ marginLeft: "10px" }}>🖼️</span> أعمال ومشاريع الطلاب (المعيدين)
-        </div>
-        <div className="settings-item" onClick={() => { onClose(); window.open("/student-portal", "_blank"); }}>
-          <span style={{ marginLeft: "10px" }}>🎓</span> بوابة الطلاب والـ QR
-        </div>
+
+        {["مدير", "مدير مساعد"].includes(user?.role) && (
+          <div 
+            className="settings-item" 
+            onClick={() => { onClose(); if (onOpenStudentPortalHub) onOpenStudentPortalHub(); else window.open("/student-portal", "_blank"); }}
+            style={{ color: "#81C784", fontWeight: "bold" }}
+          >
+            <span style={{ marginLeft: "10px" }}>🎓</span> بوابة الطلاب
+          </div>
+        )}
+
         <div className="settings-item" onClick={() => { onClose(); onOpenSuggestions(); }}>
           <span style={{ marginLeft: "10px" }}>💡</span> اقتراحات التطوير
         </div>

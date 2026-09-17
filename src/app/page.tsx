@@ -17,6 +17,7 @@ import ArchiveModal from "@/components/ArchiveModal";
 import SuggestionsChatModal from "@/components/SuggestionsChatModal";
 import AdminUsersModal from "@/components/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
+import StudentPortalHubModal from "@/components/StudentPortalHubModal";
 
 export default function Home() {
   const [user, setUser] = useState<any>(() => {
@@ -53,6 +54,7 @@ export default function Home() {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
   const [isAdvancedSettingsOpen, setIsAdvancedSettingsOpen] = useState(false);
+  const [isPortalHubOpen, setIsPortalHubOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
@@ -237,6 +239,8 @@ export default function Home() {
           onOpenAddCourse={() => setIsAddCourseOpen(true)}
           onOpenArchive={() => setIsArchiveOpen(true)}
           onOpenSuggestions={() => setIsSuggestionsOpen(true)}
+          onOpenStudentPortalHub={() => setIsPortalHubOpen(true)}
+          onOpenIdentityVerification={() => window.open('/coordinator', '_blank')}
         />
       )}
 
@@ -263,6 +267,13 @@ export default function Home() {
       <AdvancedSettingsModal
         isOpen={isAdvancedSettingsOpen}
         onClose={() => setIsAdvancedSettingsOpen(false)}
+      />
+
+      <StudentPortalHubModal
+        isOpen={isPortalHubOpen}
+        onClose={() => setIsPortalHubOpen(false)}
+        user={user}
+        onOpenIdentityModal={() => window.open('/coordinator', '_blank')}
       />
     </div>
   );
