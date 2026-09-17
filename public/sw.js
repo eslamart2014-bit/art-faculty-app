@@ -1,5 +1,5 @@
-// Service Worker v3.1.0 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.1.2';
+// Service Worker v3.1.3 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.1.3';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
