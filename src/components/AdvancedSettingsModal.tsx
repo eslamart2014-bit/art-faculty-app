@@ -25,6 +25,8 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   const [loading, setLoading] = useState(false);
   const [isMaintenance, setIsMaintenance] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [maintenanceScope, setMaintenanceScope] = useState<"faculty" | "portal" | "all">("faculty");
+  const [rawTelegramConfig, setRawTelegramConfig] = useState<any>(null);
   
   // Global Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -136,6 +138,12 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
       if (data.term2_end) setTerm2End(data.term2_end);
       if (data.is_maintenance_mode !== undefined) setIsMaintenance(data.is_maintenance_mode);
       if (data.maintenance_message) setMaintenanceMessage(data.maintenance_message);
+      if (data.telegram_config) {
+        setRawTelegramConfig(data.telegram_config);
+        if (data.telegram_config.maintenance_scope) {
+          setMaintenanceScope(data.telegram_config.maintenance_scope);
+        }
+      }
     }
     setLoading(false);
   };
@@ -161,24 +169,63 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   };
 
   const toggleMaintenance = async (newState: boolean) => {
-    const confirmMsg = newState 
-      ? "تنبيه خطير: هل أنت متأكد من تفعيل وضع الصيانة؟ سيتم حجب التطبيق عن جميع المستخدمين فوراً ولن يتمكنوا من الدخول حتى تقوم بتعطيله." 
-      : "هل أنت متأكد من إنهاء وضع الصيانة؟ سيعود التطبيق للعمل طبيعياً لدى الجميع فوراً.";
+    let confirmMsg = "";
+    if (newState) {
+      const scopeLabel = maintenanceScope === 'faculty' 
+        ? "نظام أعضاء هيئة التدريس فقط (بوابة الطلاب ستظل مفتوحة)" 
+        : maintenanceScope === 'portal' 
+        ? "بوابة الطلاب فقط (نظام التدريس سيظل مفتوحاً)" 
+        : "النظام بالكامل (تطبيق التدريس + بوابة الطلاب)";
+      confirmMsg = `تنبيه: هل أنت متأكد من تفعيل وضع الصيانة على: [${scopeLabel}]؟\nلن يتمكن المستخدمون المشمولون من الدخول حتى تقوم بإيقاف الصيانة. (حسابات الإدارة مستثناة دائماً).`;
+    } else {
+      confirmMsg = "هل أنت متأكد من إنهاء وضع الصيانة؟ سيعود النظام للعمل بصورة طبيعية لدى الجميع فوراً.";
+    }
+
     if (!confirm(confirmMsg)) return;
 
     setLoading(true);
+    const updatedTelegramConfig = {
+      ...(rawTelegramConfig || {}),
+      maintenance_scope: maintenanceScope
+    };
+
     const { error } = await supabase.from("system_settings").upsert({
       id: 1,
       is_maintenance_mode: newState,
       maintenance_message: maintenanceMessage || "التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار...",
+      telegram_config: updatedTelegramConfig,
       updated_at: new Date().toISOString()
     });
 
     if (!error) {
       setIsMaintenance(newState);
-      alert(newState ? "تم تفعيل وضع الصيانة بنجاح. التطبيق محجوب الآن." : "تم إنهاء وضع الصيانة بنجاح.");
+      setRawTelegramConfig(updatedTelegramConfig);
+      alert(newState ? "تم تفعيل وضع الصيانة بنجاح وفق النطاق المحدد." : "تم إنهاء وضع الصيانة بنجاح وعاد النظام للعمل طبيعياً.");
     } else {
       alert("حدث خطأ أثناء تغيير وضع الصيانة");
+    }
+    setLoading(false);
+  };
+
+  const saveMaintenanceConfig = async () => {
+    setLoading(true);
+    const updatedTelegramConfig = {
+      ...(rawTelegramConfig || {}),
+      maintenance_scope: maintenanceScope
+    };
+
+    const { error } = await supabase.from("system_settings").upsert({
+      id: 1,
+      maintenance_message: maintenanceMessage || "التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار...",
+      telegram_config: updatedTelegramConfig,
+      updated_at: new Date().toISOString()
+    });
+
+    if (!error) {
+      setRawTelegramConfig(updatedTelegramConfig);
+      alert("تم حفظ إعدادات نطاق الصيانة والرسالة بنجاح!");
+    } else {
+      alert("حدث خطأ أثناء الحفظ");
     }
     setLoading(false);
   };
@@ -482,36 +529,145 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
         {/* Maintenance Settings Tab */}
         {activeTab === "maintenance" && (
           <div>
-            <div style={{ background: "#222", padding: "20px", borderRadius: "10px", border: "1px solid #f44336", marginBottom: "20px" }}>
-              <h3 style={{ color: "#f44336", marginTop: 0, display: "flex", alignItems: "center" }}>
-                <span style={{ fontSize: "24px", marginLeft: "10px" }}>🚧</span> وضع الصيانة الفوري
-              </h3>
+            <div style={{ background: "#222", padding: "20px", borderRadius: "14px", border: `1px solid ${isMaintenance ? "#f44336" : "#333"}`, marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+                <h3 style={{ color: isMaintenance ? "#f44336" : "#4CAF50", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "22px" }}>🚧</span> وضع الصيانة والتحكم في النطاق
+                </h3>
+                <div style={{
+                  background: isMaintenance ? "rgba(244, 67, 54, 0.15)" : "rgba(76, 175, 80, 0.15)",
+                  color: isMaintenance ? "#ef5350" : "#81c784",
+                  border: `1px solid ${isMaintenance ? "#f44336" : "#4CAF50"}`,
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  fontSize: "13px",
+                  fontWeight: "bold"
+                }}>
+                  {isMaintenance ? (
+                    maintenanceScope === "faculty" ? "⚠️ نشط: نظام أعضاء هيئة التدريس فقط" :
+                    maintenanceScope === "portal" ? "⚠️ نشط: بوابة الطلاب فقط" : "⛔ نشط: النظام بالكامل"
+                  ) : "🟢 النظام يعمل طبيعياً للجميع"}
+                </div>
+              </div>
+
               <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "20px", lineHeight: "1.6" }}>
-                عند تفعيل هذا الوضع، سيتم <strong>طرد جميع المستخدمين العاديين فوراً</strong> من التطبيق وستظهر لهم الشاشة السوداء. لن يتمكن أحد غيرك (وغير المسؤولين) من تصفح التطبيق حتى تقوم بتعطيله.
+                يمكنك تحديد <strong>الجزء أو النطاق المحدد</strong> الذي ترغب في وضعه قيد الصيانة، لمنع إيقاف خدمات الطلاب عند تحديث نظام أعضاء هيئة التدريس، والعكس. 
+                <span style={{ color: "#64B5F6", display: "block", marginTop: "4px" }}>
+                  🛡️ <strong>ملاحظة أمان:</strong> حسابات المديرين والمديرين المساعدين مستثناة دائماً من شاشة الصيانة لتتمكن من إدارة النظام والتعديل في أي وقت.
+                </span>
               </p>
+
+              {/* Scope Selection */}
+              <div style={{ marginBottom: "22px" }}>
+                <label style={{ display: "block", color: "#fff", marginBottom: "10px", fontWeight: "bold", fontSize: "14px" }}>
+                  اختر نطاق الصيانة المطلوب:
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "12px" }}>
+                  {/* Option 1: Faculty only */}
+                  <div 
+                    onClick={() => setMaintenanceScope("faculty")}
+                    style={{
+                      background: maintenanceScope === "faculty" ? "rgba(33, 150, 243, 0.15)" : "#161616",
+                      border: `2px solid ${maintenanceScope === "faculty" ? "#2196F3" : "#333"}`,
+                      borderRadius: "10px",
+                      padding: "14px",
+                      cursor: "pointer",
+                      transition: "0.2s"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold", color: maintenanceScope === "faculty" ? "#64B5F6" : "#fff", marginBottom: "6px" }}>
+                      <span>👨‍🏫 نظام أعضاء هيئة التدريس فقط</span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#888", lineHeight: "1.5" }}>
+                      حجب تسجيل الحضور والدرجات والمقررات عن الزملاء أثناء التحديث، بينما <strong>تظل بوابة الطلاب والـ QR تعمل كالمعتاد</strong>.
+                    </div>
+                  </div>
+
+                  {/* Option 2: Student Portal only */}
+                  <div 
+                    onClick={() => setMaintenanceScope("portal")}
+                    style={{
+                      background: maintenanceScope === "portal" ? "rgba(156, 39, 176, 0.15)" : "#161616",
+                      border: `2px solid ${maintenanceScope === "portal" ? "#AB47BC" : "#333"}`,
+                      borderRadius: "10px",
+                      padding: "14px",
+                      cursor: "pointer",
+                      transition: "0.2s"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold", color: maintenanceScope === "portal" ? "#BA68C8" : "#fff", marginBottom: "6px" }}>
+                      <span>🎓 بوابة الطلاب العامة والـ QR فقط</span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#888", lineHeight: "1.5" }}>
+                      حجب بوابة الطلاب فقط (أثناء ضبط الكشوف أو التدقيق)، مع <strong>استمرار عمل تطبيق التدريس للأساتذة والمعيدين</strong>.
+                    </div>
+                  </div>
+
+                  {/* Option 3: All */}
+                  <div 
+                    onClick={() => setMaintenanceScope("all")}
+                    style={{
+                      background: maintenanceScope === "all" ? "rgba(244, 67, 54, 0.15)" : "#161616",
+                      border: `2px solid ${maintenanceScope === "all" ? "#f44336" : "#333"}`,
+                      borderRadius: "10px",
+                      padding: "14px",
+                      cursor: "pointer",
+                      transition: "0.2s"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "bold", color: maintenanceScope === "all" ? "#ef5350" : "#fff", marginBottom: "6px" }}>
+                      <span>🌐 النظام بالكامل (التطبيق + بوابة الطلاب)</span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#888", lineHeight: "1.5" }}>
+                      حجب شامل لجميع الأنظمة والبوابات والخدمات لجميع المستخدمين والطلاب في آن واحد.
+                    </div>
+                  </div>
+                </div>
+              </div>
               
+              {/* Message Input */}
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>الرسالة التي ستظهر للمستخدمين:</label>
+                <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold" }}>
+                  الرسالة التوضيحية للمستخدمين المحجوبين:
+                </label>
                 <textarea 
                   value={maintenanceMessage} 
                   onChange={e => setMaintenanceMessage(e.target.value)}
                   placeholder="مثال: التطبيق يخضع لصيانة وتحديثات الآن. يرجى الانتظار..."
                   rows={3}
-                  style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #555", color: "#fff", borderRadius: "5px", resize: "none" }}
+                  style={{ width: "100%", padding: "12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px", resize: "none", fontSize: "14px" }}
                 />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              {/* Action Buttons */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <button
+                  onClick={saveMaintenanceConfig}
+                  disabled={loading}
+                  style={{
+                    padding: "10px 18px",
+                    background: "#333",
+                    color: "#fff",
+                    border: "1px solid #555",
+                    borderRadius: "8px",
+                    fontWeight: "bold",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    fontSize: "13px"
+                  }}
+                >
+                  حفظ خيارات النطاق والرسالة 💾
+                </button>
+
                 <button 
                   onClick={() => toggleMaintenance(!isMaintenance)}
                   style={{ 
-                    padding: "8px 16px", 
-                    background: isMaintenance ? "#f44336" : "#4CAF50", 
+                    padding: "12px 24px", 
+                    background: isMaintenance ? "#4CAF50" : "#f44336", 
                     color: "#fff", 
                     border: "none", 
-                    borderRadius: "5px", 
+                    borderRadius: "8px", 
                     fontWeight: "bold",
-                    cursor: "pointer",
+                    cursor: loading ? "not-allowed" : "pointer",
                     fontSize: "14px",
                     display: "flex",
                     alignItems: "center",
@@ -519,7 +675,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                   }}
                   disabled={loading}
                 >
-                  {loading ? "جاري التطبيق..." : isMaintenance ? "إيقاف وضع الصيانة ❌" : "تفعيل وضع الصيانة ✅"}
+                  {loading ? "جاري التطبيق..." : isMaintenance ? "إيقاف وإنهاء وضع الصيانة ❌" : "تفعيل وضع الصيانة بالنطاق المحدد ✅"}
                 </button>
               </div>
             </div>
