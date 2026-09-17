@@ -280,3 +280,17 @@ button, a, select, input {
   contain: paint;
   will-change: scroll-position;
 }
+
+/* Subtle native tactile feedback on press */
+button:active, [role="button"]:active, .clickable:active {
+  transform: scale(0.97);
+  transition: transform 0.05s ease;
+}
+
+/* Ensure no white borders from QR scanner library */
+#qr-shaded-region, [id^="qr-shaded-region"] {
+  display: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+

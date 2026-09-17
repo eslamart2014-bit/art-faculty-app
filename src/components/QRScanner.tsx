@@ -29,7 +29,6 @@ export default function QRScanner({ onScan }: { onScan: (result: string) => void
       { facingMode: "environment" },
       { 
         fps: 20, 
-        qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0
       },
       (text: string) => {
@@ -61,6 +60,23 @@ export default function QRScanner({ onScan }: { onScan: (result: string) => void
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "280px", background: "#000" }} />
+    <>
+      <style>{`
+        #qr-shaded-region,
+        [id^="qr-shaded-region"],
+        #qr-shaded-region div {
+          display: none !important;
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
+        }
+        video {
+          object-fit: cover !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}</style>
+      <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "260px", background: "#000" }} />
+    </>
   );
 }

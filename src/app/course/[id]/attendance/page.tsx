@@ -162,7 +162,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const [showMakeupModal, setShowMakeupModal] = useState(false);
   const [makeupInputCode, setMakeupInputCode] = useState("");
   const [makeupCameraActive, setMakeupCameraActive] = useState(false);
-  const [scannerPulse, setScannerPulse] = useState(false);
+  const [scannerStatus, setScannerStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [scannerStatusText, setScannerStatusText] = useState<string>("");
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const { startOfWeek, endOfWeek } = getCurrentWeekRange();
@@ -515,26 +516,54 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
 
   // --- CAMERA LOGIC ---
-  const vibrateSuccess = () => { if (navigator.vibrate) navigator.vibrate(100); };
-  const vibrateError = () => { if (navigator.vibrate) navigator.vibrate([50, 100, 50]); };
+  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([60, 40, 60]); };
+  const vibrateError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([80, 50, 80, 50, 80]); };
 
   const handleCameraScan = async (decodedText: string) => {
     if (!decodedText || !showCameraScanner) return;
-    
-    setScannerPulse(true);
-    setTimeout(() => setScannerPulse(false), 300);
+    if (scannerStatus !== 'idle') return; // Debounce during active feedback
 
     const cleanCode = extractStudentCode(decodedText);
+    if (!cleanCode) {
+      setScannerStatus('error');
+      setScannerStatusText("كود غير صالح ❌");
+      vibrateError();
+      setTimeout(() => {
+        setScannerStatus('idle');
+        setScannerStatusText("");
+      }, 800);
+      return;
+    }
+
     const student = await checkStudentLocalOrGlobal(cleanCode);
     if (student) {
-      setScannedStudents((prev) => {
-        if (prev.some(s => s.id === student.id)) {
-          vibrateError();
-          return prev;
-        }
-        vibrateSuccess();
-        return [...prev, student];
-      });
+      if (scannedStudents.some(s => s.id === student.id)) {
+        setScannerStatus('error');
+        setScannerStatusText(`طالب مسجل بالفعل: ${student.full_name} ⚠️`);
+        vibrateError();
+        setTimeout(() => {
+          setScannerStatus('idle');
+          setScannerStatusText("");
+        }, 800);
+        return;
+      }
+
+      setScannerStatus('success');
+      setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
+      vibrateSuccess();
+      setScannedStudents(prev => [...prev, student]);
+      setTimeout(() => {
+        setScannerStatus('idle');
+        setScannerStatusText("");
+      }, 800);
+    } else {
+      setScannerStatus('error');
+      setScannerStatusText("طالب غير مسجل في المقرر ❌");
+      vibrateError();
+      setTimeout(() => {
+        setScannerStatus('idle');
+        setScannerStatusText("");
+      }, 800);
     }
   };
 
@@ -1206,16 +1235,55 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           <div style={{ background: "black", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
             <QRScanner onScan={(result) => { if (result) handleCameraScan(result); }} />
             
-            {/* Target Overlay UI */}
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", border: "3px solid", borderColor: scannerPulse ? "#2196F3" : "rgba(33, 150, 243, 0.7)", borderRadius: "20px", pointerEvents: "none", boxShadow: scannerPulse ? "0 0 15px #2196F3, 0 0 0 4000px rgba(0,0,0,0.5)" : "0 0 0 4000px rgba(0,0,0,0.5)", transition: "all 0.2s" }}></div>
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "220px", height: "220px", pointerEvents: "none" }}>
-               <div style={{ position: "absolute", top: "-3px", left: "-3px", width: "30px", height: "30px", borderTop: "4px solid #2196F3", borderLeft: "4px solid #2196F3", borderTopLeftRadius: "15px" }}></div>
-               <div style={{ position: "absolute", top: "-3px", right: "-3px", width: "30px", height: "30px", borderTop: "4px solid #2196F3", borderRight: "4px solid #2196F3", borderTopRightRadius: "15px" }}></div>
-               <div style={{ position: "absolute", bottom: "-3px", left: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #2196F3", borderLeft: "4px solid #2196F3", borderBottomLeftRadius: "15px" }}></div>
-               <div style={{ position: "absolute", bottom: "-3px", right: "-3px", width: "30px", height: "30px", borderBottom: "4px solid #2196F3", borderRight: "4px solid #2196F3", borderBottomRightRadius: "15px" }}></div>
-            </div>
+            {/* Single Interactive Target Overlay UI */}
+            {(() => {
+              const borderColor = scannerStatus === 'success' ? '#4CAF50' : scannerStatus === 'error' ? '#f44336' : '#2196F3';
+              const shadowGlow = scannerStatus === 'success' 
+                ? '0 0 25px #4CAF50, 0 0 0 4000px rgba(0,0,0,0.55)' 
+                : scannerStatus === 'error' 
+                ? '0 0 25px #f44336, 0 0 0 4000px rgba(0,0,0,0.55)' 
+                : '0 0 15px rgba(33, 150, 243, 0.4), 0 0 0 4000px rgba(0,0,0,0.5)';
+              const transformScale = scannerStatus === 'success' ? 'translate(-50%, -50%) scale(1.04)' : scannerStatus === 'error' ? 'translate(-50%, -50%) scale(0.97)' : 'translate(-50%, -50%) scale(1)';
 
-            <div style={{ position: "absolute", bottom: "10px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "5px 15px", borderRadius: "15px", fontSize: "12px", fontWeight: "bold", zIndex: 10 }}>وجه الكاميرا داخل الإطار الأزرق</div>
+              return (
+                <>
+                  <div style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: transformScale,
+                    width: "220px",
+                    height: "220px",
+                    border: `3px solid ${borderColor}`,
+                    borderRadius: "20px",
+                    pointerEvents: "none",
+                    boxShadow: shadowGlow,
+                    transition: "all 0.22s cubic-bezier(0.4, 0, 0.2, 1)"
+                  }}>
+                    <div style={{ position: "absolute", top: "-3px", left: "-3px", width: "30px", height: "30px", borderTop: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderTopLeftRadius: "15px", transition: "border-color 0.2s" }}></div>
+                    <div style={{ position: "absolute", top: "-3px", right: "-3px", width: "30px", height: "30px", borderTop: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderTopRightRadius: "15px", transition: "border-color 0.2s" }}></div>
+                    <div style={{ position: "absolute", bottom: "-3px", left: "-3px", width: "30px", height: "30px", borderBottom: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderBottomLeftRadius: "15px", transition: "border-color 0.2s" }}></div>
+                    <div style={{ position: "absolute", bottom: "-3px", right: "-3px", width: "30px", height: "30px", borderBottom: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderBottomRightRadius: "15px", transition: "border-color 0.2s" }}></div>
+                  </div>
+
+                  <div style={{
+                    position: "absolute",
+                    bottom: "10px",
+                    background: scannerStatus === 'success' ? "rgba(76, 175, 80, 0.95)" : scannerStatus === 'error' ? "rgba(244, 67, 54, 0.95)" : "rgba(0,0,0,0.7)",
+                    color: "#fff",
+                    padding: "6px 16px",
+                    borderRadius: "15px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    zIndex: 10,
+                    transition: "all 0.2s",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
+                  }}>
+                    {scannerStatusText || (scannerStatus === 'success' ? "تم التعرف بنجاح! ✅" : scannerStatus === 'error' ? "خطأ في الرصد ❌" : "وجه الكاميرا داخل الإطار الأزرق")}
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div style={{ padding: "15px", background: "#2d2d2d", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #444", direction: "rtl" }}>

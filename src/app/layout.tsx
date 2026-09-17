@@ -6,6 +6,7 @@ import BackButtonHandler from "@/components/BackButtonHandler";
 import OfflineSyncManager from "@/components/OfflineSyncManager";
 import SWRProvider from "@/components/SWRProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import GlobalHaptics from "@/components/GlobalHaptics";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
         <div className="app-container">
           <MaintenanceGuard>
             <BackButtonHandler />
+            <GlobalHaptics />
             <SWRProvider>
               <ServiceWorkerRegister />
               <OfflineSyncManager />
