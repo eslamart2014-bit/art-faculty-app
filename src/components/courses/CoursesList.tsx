@@ -81,26 +81,42 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
           localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(activeCourses));
         } catch (e) {}
 
-        // Pre-warm local cache for each course's students in the background
-        activeCourses.forEach(async (cItem) => {
-          try {
-            const cacheKey = `cache_attendance_${cItem.id}`;
-            const existingCache = localStorage.getItem(cacheKey);
-            if (!existingCache) {
-              const { data: studentsData } = await supabase
-                .from("students")
-                .select("*")
-                .eq("academic_year", cItem.academic_year);
-              if (studentsData) {
-                localStorage.setItem(cacheKey, JSON.stringify({
-                  course: cItem,
-                  students: studentsData,
-                  attendance: []
-                }));
+        // HIGH-6 FIX: Pre-warm local cache with size guards to prevent localStorage exhaustion
+        // Only pre-warm the first 6 active courses sequentially
+        (async () => {
+          for (const cItem of activeCourses.slice(0, 6)) {
+            try {
+              const cacheKey = `cache_attendance_${cItem.id}`;
+              const existingCache = localStorage.getItem(cacheKey);
+              if (!existingCache) {
+                let query = supabase
+                  .from("students")
+                  .select("id, full_name, student_code, academic_year, section")
+                  .eq("academic_year", cItem.academic_year)
+                  .eq("is_active", true);
+
+                if (cItem.course_type === 'sections' && Array.isArray(cItem.sections) && cItem.sections.length > 0) {
+                  query = query.in("section", cItem.sections);
+                }
+
+                const { data: studentsData } = await query;
+                if (studentsData && studentsData.length > 0) {
+                  localStorage.setItem(cacheKey, JSON.stringify({
+                    course: cItem,
+                    students: studentsData,
+                    attendance: []
+                  }));
+                }
+              }
+            } catch (err: any) {
+              // If quota exceeded, break early to preserve existing cache
+              if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+                console.warn("Storage quota reached during pre-warm, stopping.");
+                break;
               }
             }
-          } catch (err) {}
-        });
+          }
+        })();
       }
     } catch (e) {
       console.log("Offline mode: using cached courses list");

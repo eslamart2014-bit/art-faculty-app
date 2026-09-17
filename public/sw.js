@@ -10,9 +10,11 @@ const CORE_ASSETS = [
 ];
 
 // Install: pre-cache core app shell
+// LOW-6 FIX: Do NOT call skipWaiting() unconditionally here.
+// Waiting for all open tabs to close prevents disrupting active users mid-session.
+// skipWaiting() is called only in response to SKIP_WAITING message (below).
 self.addEventListener('install', event => {
   console.log('[SW] Installing v2.1 (Offline-First Engine)...');
-  self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
       return cache.addAll(CORE_ASSETS).catch(err => {

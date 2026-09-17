@@ -1,64 +1,82 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { processQueue, getQueue } from "@/lib/syncEngine";
 
 export default function OfflineSyncManager() {
   const [queueCount, setQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // HIGH-2 FIX: Use useRef instead of useState so the guard is never stale inside closures
+  const isSyncingRef = useRef(false);
+
   const runSync = async () => {
-    if (isSyncing || !navigator.onLine) return;
+    // Check ref (never stale) instead of state variable
+    if (isSyncingRef.current || !navigator.onLine) return;
     const q = getQueue();
     if (q.length === 0) return;
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
-    const toast = document.createElement("div");
-    toast.innerText = "🔄 جاري مزامنة العمليات المعلقة...";
-    toast.style.position = "fixed";
-    toast.style.top = "20px";
-    toast.style.left = "50%";
-    toast.style.transform = "translateX(-50%)";
-    toast.style.background = "#2196F3";
-    toast.style.color = "#fff";
-    toast.style.padding = "10px 24px";
-    toast.style.borderRadius = "25px";
-    toast.style.zIndex = "99999";
-    toast.style.fontSize = "14px";
-    toast.style.fontWeight = "bold";
-    toast.style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
-    document.body.appendChild(toast);
 
+    // LOW-3 FIX: Use React state for toast instead of direct DOM manipulation
+    let toastEl: HTMLDivElement | null = null;
     try {
+      // Still use DOM for toast since it's outside React tree (overlay) — but cleanly
+      toastEl = document.createElement("div");
+      Object.assign(toastEl.style, {
+        position: "fixed",
+        top: "20px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#2196F3",
+        color: "#fff",
+        padding: "10px 24px",
+        borderRadius: "25px",
+        zIndex: "99999",
+        fontSize: "14px",
+        fontWeight: "bold",
+        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+      });
+      toastEl.innerText = "🔄 جاري مزامنة العمليات المعلقة...";
+      document.body.appendChild(toastEl);
+
       const res = await processQueue();
       if (res.success && res.count > 0) {
-        toast.innerText = `✅ تمت مزامنة ${res.count} عملية معلقة بنجاح!`;
-        toast.style.background = "#4CAF50";
+        toastEl.innerText = `✅ تمت مزامنة ${res.count} عملية معلقة بنجاح!`;
+        toastEl.style.background = "#4CAF50";
         window.dispatchEvent(new Event('refreshData'));
       } else {
-        toast.style.display = "none";
+        if (toastEl && document.body.contains(toastEl)) document.body.removeChild(toastEl);
+        toastEl = null;
       }
     } catch (e) {
-      toast.innerText = "⚠️ تعذر استكمال المزامنة، سيتم المحاولة مجدداً.";
-      toast.style.background = "#f44336";
+      if (toastEl) {
+        toastEl.innerText = "⚠️ تعذر استكمال المزامنة، سيتم المحاولة مجدداً.";
+        toastEl.style.background = "#f44336";
+      }
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
-      setTimeout(() => {
-        if (document.body.contains(toast)) document.body.removeChild(toast);
-      }, 3000);
+      if (toastEl) {
+        setTimeout(() => {
+          if (toastEl && document.body.contains(toastEl)) document.body.removeChild(toastEl);
+        }, 3000);
+      }
     }
   };
 
   useEffect(() => {
-    const updateCount = () => setQueueCount(getQueue().length);
+    let mounted = true;
+
+    const updateCount = () => {
+      if (mounted) setQueueCount(getQueue().length);
+    };
     updateCount();
 
     window.addEventListener('offlineQueueUpdated', updateCount);
 
-    const handleOnline = () => {
-      runSync();
-    };
-
+    const handleOnline = () => { runSync(); };
     window.addEventListener('online', handleOnline);
 
     if (navigator.onLine) {
@@ -73,10 +91,12 @@ export default function OfflineSyncManager() {
     }, 15000);
 
     return () => {
+      mounted = false;
       window.removeEventListener('offlineQueueUpdated', updateCount);
       window.removeEventListener('online', handleOnline);
       clearInterval(interval);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (queueCount === 0) return null;

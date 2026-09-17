@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 
+// MED-1 FIX: Module-level flag to prevent double-reload race condition
+// (shared across SW_UPDATED message + controllerchange event + version checker)
+let _reloading = false;
+
+function safeReload() {
+  if (_reloading) return;
+  _reloading = true;
+  window.location.reload();
+}
+
 export default function ServiceWorkerRegister() {
   const [updateProgress, setUpdateProgress] = useState(0);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
@@ -15,22 +25,19 @@ export default function ServiceWorkerRegister() {
       reg.update().catch(() => {});
     }).catch(console.error);
 
-    // Listen for SW updates message
+    // Listen for SW updates message — use safeReload to prevent double reload
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'SW_UPDATED') {
         setShowUpdateBanner(true);
         setUpdateProgress(100);
-        setTimeout(() => window.location.reload(), 800);
+        setTimeout(() => safeReload(), 800);
       }
     };
     navigator.serviceWorker.addEventListener('message', handleMessage);
 
-    let refreshing = false;
+    // controllerchange can fire alongside SW_UPDATED — safeReload prevents double reload
     const handleControllerChange = () => {
-      if (!refreshing) {
-        refreshing = true;
-        window.location.reload();
-      }
+      safeReload();
     };
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
@@ -42,13 +49,15 @@ export default function ServiceWorkerRegister() {
         const stored = localStorage.getItem('appVersion');
 
         if (stored && stored !== data.version) {
+          // Already reloading? skip
+          if (_reloading) return;
           setShowUpdateBanner(true);
           let progress = 0;
-          const interval = setInterval(() => {
+          const progressInterval = setInterval(() => {
             progress += 10;
             setUpdateProgress(progress);
             if (progress >= 100) {
-              clearInterval(interval);
+              clearInterval(progressInterval);
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then(reg => {
                   reg.active?.postMessage('CLEAR_CACHE');
@@ -56,7 +65,7 @@ export default function ServiceWorkerRegister() {
               }
               caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).finally(() => {
                 localStorage.setItem('appVersion', data.version);
-                window.location.reload();
+                safeReload();
               });
             }
           }, 50);
@@ -67,12 +76,12 @@ export default function ServiceWorkerRegister() {
     };
 
     checkVersion();
-    const interval = setInterval(checkVersion, 60000); // Check every minute
+    const versionInterval = setInterval(checkVersion, 60000); // Check every minute
 
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleMessage);
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-      clearInterval(interval);
+      clearInterval(versionInterval);
     };
   }, []);
 

@@ -21,6 +21,21 @@ async function sendTelegramMessage(botToken: string, chatId: string | number, te
 
 export async function POST(request: Request) {
   try {
+    // MED-3 FIX: Require authenticated teacher/admin to send notifications
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    }
+    const { data: callerProfile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    if (!callerProfile || (callerProfile.role !== 'مدير' && callerProfile.role !== 'معلم')) {
+      return NextResponse.json({ error: 'Forbidden — Staff only' }, { status: 403 });
+    }
+
     const { courseId, projectName, startDate, endDate } = await request.json();
     if (!courseId || !projectName) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });

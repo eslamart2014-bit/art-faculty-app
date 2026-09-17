@@ -94,7 +94,11 @@ export default function Home() {
       if (data) {
         const merged = { ...authUser, ...data };
         if (typeof window !== 'undefined') {
-          localStorage.setItem('cached_profile', JSON.stringify(merged));
+          // HIGH-5 FIX: Strip sensitive security fields before caching in localStorage
+          // These fields must NEVER be used for security decisions from cache anyway
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { failed_attempts, locked_until, is_suspended, aud, app_metadata, user_metadata, ...safeProfile } = merged;
+          localStorage.setItem('cached_profile', JSON.stringify(safeProfile));
         }
         if (!data.is_suspended) {
           supabase.from("profiles").update({ last_seen: new Date().toISOString() }).eq("id", authUser.id).then();
@@ -156,7 +160,12 @@ export default function Home() {
         onUpdateProfile={(updates) => {
           const updated = { ...user, ...updates };
           setUser(updated);
-          try { localStorage.setItem('cached_profile', JSON.stringify(updated)); } catch (e) {}
+          try {
+            // Strip sensitive fields (same as fetchProfile cache logic)
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { failed_attempts, locked_until, is_suspended, aud, app_metadata, user_metadata, ...safeUpdated } = updated;
+            localStorage.setItem('cached_profile', JSON.stringify(safeUpdated));
+          } catch (e) {}
         }} 
       />
       

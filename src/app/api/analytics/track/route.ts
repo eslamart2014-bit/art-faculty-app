@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-// Using anon key because it's a public endpoint, or we can use admin to bypass RLS.
-// Since we have RLS enabled and public insert is allowed, anon key is fine.
+// Use anon key — this is a public endpoint, service role key MUST NOT be used here
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {

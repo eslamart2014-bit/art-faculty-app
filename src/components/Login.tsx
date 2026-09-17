@@ -46,7 +46,14 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         setIsLocked(true);
         setError("تم قفل الحساب بسبب تجاوز 3 محاولات خاطئة. يرجى مراجعة الإدارة.");
         try {
-          await fetch('/api/auth/lock', { method: 'POST', body: JSON.stringify({ email }) });
+          await fetch('/api/auth/lock', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-internal-secret': 'art-faculty-lock-internal-2026'
+            },
+            body: JSON.stringify({ email })
+          });
         } catch (err) {}
       } else {
         setError(`بيانات الدخول غير صحيحة. (تبقت لك ${3 - newAttempts} محاولات)`);
@@ -132,9 +139,14 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
     // or we just explicitly upsert the profile with their new data.
     if (authUser) {
       try {
+        // Get the current session token to authenticate the server call
+        const { data: { session } } = await supabase.auth.getSession();
         const res = await fetch('/api/auth/register-profile', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          },
           body: JSON.stringify({ 
             userId: authUser.id, 
             email: email, 

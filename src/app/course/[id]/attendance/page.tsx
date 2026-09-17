@@ -183,7 +183,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const handleRefresh = () => fetchData();
     window.addEventListener('refreshData', handleRefresh);
     return () => window.removeEventListener('refreshData', handleRefresh);
-  }, [course]);
+  }, [course, selectedWeekKey]);
   const fetchData = async () => {
     // Only show full loading if we have no cached data at all
     if (!course) setLoading(true);
@@ -740,9 +740,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     
     setSaving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch("/api/bot/notify_warning", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {})
+        },
         body: JSON.stringify({ warnings, courseName: course.name, limit })
       });
       const data = await res.json();

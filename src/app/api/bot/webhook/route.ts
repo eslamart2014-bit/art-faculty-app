@@ -102,6 +102,16 @@ export async function POST(request: Request) {
 
     // Fetch token & permissions
     const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
+    
+    // HIGH-4 FIX: Verify Telegram Webhook Secret Token if configured
+    const webhookSecret = sysData?.telegram_config?.webhook_secret;
+    if (webhookSecret) {
+      const headerSecret = request.headers.get('x-telegram-bot-api-secret-token');
+      if (headerSecret !== webhookSecret) {
+        return NextResponse.json({ error: 'Unauthorized webhook' }, { status: 401 });
+      }
+    }
+
     const botToken = sysData?.telegram_config?.token;
     const showScoresToStudents = sysData?.telegram_config?.show_project_scores_to_students !== false;
     const showAttendanceToStudents = sysData?.telegram_config?.show_attendance_to_students !== false;
@@ -953,6 +963,10 @@ export async function POST(request: Request) {
         const projId = withoutPrefix.slice(underscoreIdx + 1);
 
         const { data: course } = await supabase.from('courses').select('*').eq('id', crsId).limit(1).maybeSingle();
+        // HIGH-7 FIX: Authorization check for course statistics
+        if (profile.role !== 'مدير' && course?.teacher_id !== profile.id && (!course?.shared_with || !course.shared_with.includes(profile.id))) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عذراً، ليس لديك صلاحية لعرض إحصائيات هذا المقرر.' });
+        }
         const projects = ((course?.custom_week_names as any)?.__projects__ || []);
         const project = projects.find((p: any) => p.id === projId);
         const projName = project ? project.name : 'المشروع';
@@ -1023,6 +1037,11 @@ export async function POST(request: Request) {
       if (data.startsWith('view_course_')) {
         const courseId = data.replace('view_course_', '');
         const { data: course } = await supabase.from('courses').select('*').eq('id', courseId).limit(1).maybeSingle();
+        // HIGH-7 FIX: Authorization check for course artworks
+        if (!course) return NextResponse.json({ ok: true });
+        if (profile.role !== 'مدير' && course.teacher_id !== profile.id && (!course.shared_with || !course.shared_with.includes(profile.id))) {
+          return NextResponse.json({ method: 'sendMessage', chat_id: chatId, text: 'عذراً، ليس لديك صلاحية لعرض أعمال هذا المقرر.' });
+        }
         
         if (botToken) {
           await sendTelegramMessage(botToken, chatId, `جاري تجميع أعمال مقرر (${course?.name || ''})... يرجى الانتظار ⏳`);

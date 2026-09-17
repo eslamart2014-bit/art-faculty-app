@@ -163,10 +163,21 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   const clearAnalytics = async () => {
     if (!confirm("هل أنت متأكد من مسح جميع إحصائيات البوابة بالكامل؟")) return;
     setLoadingAnalytics(true);
-    await fetch('/api/analytics/clear', { method: 'POST' });
-    setAnalytics([]);
-    setLoadingAnalytics(false);
-    alert("تم مسح الإحصائيات بنجاح!");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch('/api/analytics/clear', {
+        method: 'POST',
+        headers: {
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+        }
+      });
+      setAnalytics([]);
+      alert("تم مسح الإحصائيات بنجاح!");
+    } catch (e) {
+      alert("حدث خطأ أثناء مسح الإحصائيات.");
+    } finally {
+      setLoadingAnalytics(false);
+    }
   };
 
   const saveSettings = async () => {
@@ -212,10 +223,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
   };
 
   const toggleScanner = () => {
-  useEffect(() => {
-    window.history.pushState({ modal: true }, "");
-  }, []);
-
     setIsScanning(!isScanning);
   };
 

@@ -328,9 +328,13 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     
     // Broadcast to students if requested
     if (sendBroadcastOnSave) {
+      const { data: { session } } = await supabase.auth.getSession();
       await fetch('/api/bot/notify_course', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+        },
         body: JSON.stringify({
           courseId: course?.id,
           projectName: editProjectName,
@@ -590,15 +594,19 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }));
 
     for (const s of scannedStudents) {
+      // LOW-7 FIX: Clamp score between 0 and max_score
+      const rawScore = s.score !== null ? Number(s.score) : 0;
+      const validScore = Math.min(Math.max(isNaN(rawScore) ? 0 : rawScore, 0), selectedProject.max_score);
+
       const { data: existing } = await supabase.from("evaluations").select("id, score").eq("course_id", course.id).eq("student_id", s.student.id).eq("project_name", selectedProject.name).maybeSingle();
       if (existing) {
-        if (existing.score !== (s.score !== null ? s.score : 0)) { await supabase.from("evaluations").update({ score: s.score !== null ? s.score : 0, created_at: new Date().toISOString() }).eq("id", existing.id); }
+        if (existing.score !== validScore) { await supabase.from("evaluations").update({ score: validScore, created_at: new Date().toISOString() }).eq("id", existing.id); }
       } else {
         await supabase.from("evaluations").insert({
           course_id: course.id,
           student_id: s.student.id,
           project_name: selectedProject.name,
-          score: s.score !== null ? s.score : 0,
+          score: validScore,
           max_score: selectedProject.max_score,
           teacher_id: course.teacher_id
         });
@@ -693,15 +701,20 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }, { onConflict: 'course_id,student_id,project_name' });
 
     // Send Telegram Notification
-    fetch('/api/bot/notify_eval', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentId: targetStudent.id,
-        projectName: selectedProject.name,
-        score: scoreNum,
-        projectShowScore: selectedProject.show_score
-      })
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      fetch('/api/bot/notify_eval', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+        },
+        body: JSON.stringify({
+          studentId: targetStudent.id,
+          projectName: selectedProject.name,
+          score: scoreNum,
+          projectShowScore: selectedProject.show_score
+        })
+      });
     });
 
     vibrateSuccess();

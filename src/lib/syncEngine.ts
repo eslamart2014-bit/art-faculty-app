@@ -22,7 +22,11 @@ export const setLocalCache = (key: string, data: any) => {
 export const addToQueue = (type: string, payload: any) => {
   if (typeof window === 'undefined') return;
   const queue = JSON.parse(localStorage.getItem('offline_queue') || '[]');
-  queue.push({ id: Date.now().toString(), type, payload, timestamp: new Date().toISOString() });
+  // MED-6 FIX: Use crypto.randomUUID() to prevent ID collision when Date.now() same ms
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  queue.push({ id, type, payload, timestamp: new Date().toISOString() });
   localStorage.setItem('offline_queue', JSON.stringify(queue));
   window.dispatchEvent(new Event('offlineQueueUpdated'));
 };
@@ -38,9 +42,17 @@ export const clearQueue = () => {
   window.dispatchEvent(new Event('offlineQueueUpdated'));
 };
 
+// HIGH-1 FIX: Module-level mutex to prevent concurrent processQueue() executions
+let _isProcessing = false;
+
 export const processQueue = async () => {
   if (typeof window === 'undefined' || !navigator.onLine) return { success: false, count: 0 };
   
+  // Mutex guard — bail if already running (prevents race condition from multiple triggers)
+  if (_isProcessing) return { success: false, count: 0 };
+  _isProcessing = true;
+
+  try {
   const queue = getQueue();
   if (queue.length === 0) return { success: true, count: 0 };
 
@@ -143,4 +155,8 @@ export const processQueue = async () => {
   window.dispatchEvent(new Event('offlineQueueUpdated'));
   
   return { success: true, count: processedCount };
+  } finally {
+    // Always release the mutex so future calls can proceed
+    _isProcessing = false;
+  }
 };

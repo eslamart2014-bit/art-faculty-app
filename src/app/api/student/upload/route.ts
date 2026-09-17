@@ -42,27 +42,44 @@ export async function POST(request: Request) {
     const { data: sysData } = await supabase.from("system_settings").select("telegram_config").eq("id", 1).maybeSingle();
     const botToken = sysData?.telegram_config?.token;
 
-    // 1. Fetch current student details
+    // 1. Fetch current student details & verify active status
     const { data: currentStudent } = await supabase
       .from("students")
-      .select("id, full_name, student_code, academic_year, section, telegram_id")
+      .select("id, full_name, student_code, academic_year, section, telegram_id, is_active")
       .eq("id", stuId)
       .maybeSingle();
 
-    // 2. Fetch course details to get project_name & teacher_id
+    if (!currentStudent || currentStudent.is_active === false) {
+      return NextResponse.json({ error: "الطالب غير مسجل أو حسابه غير نشط" }, { status: 403 });
+    }
+
+    // 2. Fetch course details & verify student eligibility
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .select("id, name, academic_year, custom_week_names, teacher_id")
+      .select("id, name, academic_year, course_type, sections, custom_week_names, teacher_id")
       .eq("id", crsId)
       .maybeSingle();
 
-    if (courseError) {
-      console.error("Error fetching course:", courseError);
+    if (!course || courseError) {
+      return NextResponse.json({ error: "المقرر الدراسي غير موجود" }, { status: 404 });
+    }
+
+    // HIGH-3 FIX: Prevent uploading to another student's/year's courses
+    if (course.academic_year !== currentStudent.academic_year) {
+      return NextResponse.json({ error: "الطالب غير مقيد بالفرقة الدراسية لهذا المقرر" }, { status: 403 });
+    }
+    if (course.course_type === 'sections' && Array.isArray(course.sections) && course.sections.length > 0) {
+      if (!course.sections.includes(currentStudent.section)) {
+        return NextResponse.json({ error: "المقرر غير متاح لسكشن الطالب" }, { status: 403 });
+      }
     }
 
     const projects = (course?.custom_week_names as any)?.__projects__ || [];
     const project = projects.find((p: any) => p.id === projId);
-    const projectName = project ? project.name : "مشروع";
+    if (!project) {
+      return NextResponse.json({ error: "المشروع المطلوب غير متاح في هذا المقرر" }, { status: 404 });
+    }
+    const projectName = project.name || "مشروع";
 
     // 3. Convert base64 data to Buffer and upload
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
