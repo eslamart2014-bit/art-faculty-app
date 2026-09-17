@@ -45,11 +45,26 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       if (cached.makeupStudents) setMakeupStudents(cached.makeupStudents);
       if (cached.instructorName) setInstructorName(cached.instructorName);
       if (cached.allAttendances) setAllAttendances(cached.allAttendances);
-      if (cached.attendance) setAttendance(cached.attendance);
+      if (cached.attendance) {
+        setAttendance(cached.attendance);
+        const presentIds = new Set<string>(
+          (cached.attendance as any[])
+            .filter((a: any) => a.status === "حاضر")
+            .map((a: any) => String(a.student_id))
+        );
+        setSelectedStudentIds(presentIds);
+      }
       if (cached.totalWeeksCount) setTotalWeeksCount(cached.totalWeeksCount);
       setLoading(false);
     }
   }, [resolvedParams.id]);
+
+  // Auto-open camera scanner if navigated from camera shortcut (?mode=camera)
+  useEffect(() => {
+    if (searchParams.get("mode") === "camera") {
+      setShowCameraScanner(true);
+    }
+  }, [searchParams]);
 
 
   // Camera handled by QRScanner component
@@ -260,6 +275,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         
         const loadedAtt = attData || [];
         setAttendance(loadedAtt);
+        const presentIds = new Set<string>(
+          (loadedAtt as any[])
+            .filter((a: any) => a.status === "حاضر")
+            .map((a: any) => String(a.student_id))
+        );
+        setSelectedStudentIds(presentIds);
 
         // Update local persistent cache for instant offline access
         setLocalCache(`cache_attendance_${resolvedParams.id}`, {
@@ -300,12 +321,6 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const toggleSelection = (id: string) => {
     const newSet = new Set(selectedStudentIds);
     if (newSet.has(id)) {
-      // Prevent un-toggling if already saved in DB for this week
-      const isSaved = attendance.some(a => a.student_id === id && a.status === "حاضر");
-      if (isSaved) {
-        alert("هذا الطالب مسجل كحاضر بالفعل. للإلغاء استخدم الضغط المطول على اسم الطالب.");
-        return;
-      }
       newSet.delete(id);
     } else {
       newSet.add(id);
@@ -314,61 +329,69 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
 
   const handleSaveAttendance = async () => {
-    const saveDate = selectedWeekKey;
-    const displayIds = getDisplayStudents().map(s => s.id);
-    const toDeleteIds = displayIds.filter(id => !selectedStudentIds.has(id));
-    const toInsertIds = displayIds.filter(id => 
-      selectedStudentIds.has(id) && 
-      !attendance.some(a => a.student_id === id && a.status === "حاضر")
-    );
-
-    // 1. Instant Optimistic UI update! (0ms!)
-    const updatedAttendance = attendance
-      .filter(a => !toDeleteIds.includes(a.student_id))
-      .concat(toInsertIds.map(id => ({
-        id: "temp_" + id + "_" + Date.now(),
-        course_id: course.id,
-        student_id: id,
-        date: saveDate,
-        status: "حاضر",
-        teacher_id: course.teacher_id
-      })));
-    
-    setAttendance(updatedAttendance);
-    vibrateSuccess();
-
-    // Update local cache immediately
-    const cached = getLocalCache(`cache_attendance_${course.id}`);
-    if (cached) {
-      cached.attendance = updatedAttendance;
-      setLocalCache(`cache_attendance_${course.id}`, cached);
-    }
-
-    // 2. Background Sync
-    if (!navigator.onLine) {
-      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
-      return;
-    }
-
+    setSaving(true);
     try {
-      if (toDeleteIds.length > 0) {
-        const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
-        if (recordsToDelete.length > 0) {
-          await supabase.from("attendance").delete().in("id", recordsToDelete.map(r => r.id));
-        }
-      }
-      if (toInsertIds.length > 0) {
-        const inserts = toInsertIds.map(id => ({
+      const saveDate = selectedWeekKey;
+      const displayIds = getDisplayStudents().map(s => s.id);
+      const toDeleteIds = displayIds.filter(id => 
+        !selectedStudentIds.has(id) && 
+        attendance.some(a => a.student_id === id && a.status === "حاضر")
+      );
+      const toInsertIds = displayIds.filter(id => 
+        selectedStudentIds.has(id) && 
+        !attendance.some(a => a.student_id === id && a.status === "حاضر")
+      );
+
+      // 1. Instant Optimistic UI update! (0ms!)
+      const updatedAttendance = attendance
+        .filter(a => !toDeleteIds.includes(a.student_id))
+        .concat(toInsertIds.map(id => ({
+          id: "temp_" + id + "_" + Date.now(),
           course_id: course.id,
           student_id: id,
           date: saveDate,
           status: "حاضر",
           teacher_id: course.teacher_id
-        }));
-        await supabase.from("attendance").insert(inserts);
+        })));
+      
+      setAttendance(updatedAttendance);
+      vibrateSuccess();
+
+      // Update local cache immediately
+      const cached = getLocalCache(`cache_attendance_${course.id}`);
+      if (cached) {
+        cached.attendance = updatedAttendance;
+        setLocalCache(`cache_attendance_${course.id}`, cached);
       }
-    } catch (err) {
-      addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+
+      // 2. Background Sync
+      if (!navigator.onLine) {
+        addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+        return;
+      }
+
+      try {
+        if (toDeleteIds.length > 0) {
+          const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
+          if (recordsToDelete.length > 0) {
+            await supabase.from("attendance").delete().in("id", recordsToDelete.map(r => r.id));
+          }
+        }
+        if (toInsertIds.length > 0) {
+          const inserts = toInsertIds.map(id => ({
+            course_id: course.id,
+            student_id: id,
+            date: saveDate,
+            status: "حاضر",
+            teacher_id: course.teacher_id
+          }));
+          await supabase.from("attendance").insert(inserts);
+        }
+      } catch (err) {
+        addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
