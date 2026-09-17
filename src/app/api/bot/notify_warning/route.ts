@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       .eq('id', 1)
       .maybeSingle();
 
-    const botToken = sysData?.telegram_config?.token;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || sysData?.telegram_config?.token;
     if (!botToken) {
       return NextResponse.json({ error: 'Bot token not configured' }, { status: 500 });
     }

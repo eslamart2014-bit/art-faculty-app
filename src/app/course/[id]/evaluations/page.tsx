@@ -1024,19 +1024,19 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                           🗑️ إلغاء واعتماد إعادة الرفع
                         </button>
                         
-                        {targetStudent.telegram_id && (
-                          <button 
-                            onClick={() => resetTelegramLink(targetStudent.id, targetStudent.full_name)}
-                            style={{ width: "auto", margin: 0, background: "rgba(255, 152, 0, 0.15)", color: "#ff9800", border: "1px solid #ff9800", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
-                          >
-                            🔓 فك تليجرام
-                          </button>
-                        )}
+                        <button 
+                          onClick={() => {
+                            window.open(`/instructor?search=${targetStudent.student_code}`, "_blank");
+                          }}
+                          style={{ width: "auto", margin: 0, background: "rgba(37, 99, 235, 0.15)", color: "#38bdf8", border: "1px solid #3b82f6", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          👁️ فحص في البوابة
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <div style={{ textAlign: "center", padding: "8px 0", color: "#aaa", fontSize: "12px" }}>
-                      ⏳ لم يقم الطالب برفع صورة لهذا المشروع عبر البوت بعد.
+                      ⏳ لم يقم الطالب برفع صورة لهذا المشروع عبر بوابة الطلاب بعد.
                     </div>
                   )}
                 </div>
@@ -1477,9 +1477,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             <div style={{ background: "#2a2a2a", borderRadius: "8px", padding: "10px", marginBottom: "16px", textAlign: "right" }}>
               <button 
                 onClick={() => setShowTelegramSettings(!showTelegramSettings)}
-                style={{ width: "100%", background: "none", border: "none", color: "#2196F3", fontWeight: "bold", fontSize: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: 0 }}
+                style={{ width: "100%", background: "none", border: "none", color: "#38bdf8", fontWeight: "bold", fontSize: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: 0 }}
               >
-                <span>✈️ إعدادات التليجرام للطالب</span>
+                <span>🎓 إعدادات بوابة الطلاب للمشروع</span>
                 <span>{showTelegramSettings ? "▲" : "▼"}</span>
               </button>
               
@@ -1487,7 +1487,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer" }}>
                     <input type="checkbox" checked={editProjectIsActive} onChange={e => setEditProjectIsActive(e.target.checked)} />
-                    تفعيل استقبال المشروع عبر البوت
+                    تفعيل استقبال صور المشروع عبر بوابة الطلاب
                   </label>
                   
                   {editProjectIsActive && (
@@ -1505,7 +1505,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
                       <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}>
                         <input type="checkbox" checked={editProjectShowScore} onChange={e => setEditProjectShowScore(e.target.checked)} />
-                        عرض وإرسال الدرجة للطالب فور تقييمه
+                        إظهار الدرجة للطالب في بوابته فور تقييمه
                       </label>
 
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>

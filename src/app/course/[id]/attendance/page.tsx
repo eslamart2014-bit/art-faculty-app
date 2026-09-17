@@ -1395,8 +1395,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             <button onClick={handlePrintWarnings} style={{ width: "100%", background: "#F44336", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px" }}>
               <span>📄</span> استخراج قائمة المنذرين بصيغة PDF
             </button>
-            <button onClick={handleSendTelegramWarnings} disabled={saving} style={{ width: "100%", background: "#2196F3", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px", opacity: saving ? 0.7 : 1 }}>
-              <span>✈️</span> إرسال إنذار عبر التليجرام للمتجاوزين
+            <button onClick={handleSendTelegramWarnings} disabled={saving} style={{ width: "100%", background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px", opacity: saving ? 0.7 : 1 }}>
+              <span>📢</span> إرسال إنذار لبوابة الطلاب للمتجاوزين
             </button>
           </div>
         </div>

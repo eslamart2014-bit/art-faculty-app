@@ -118,6 +118,12 @@ export default function SettingsMenu({
         <div className="settings-item" onClick={() => { onClose(); onOpenArchive(); }}>
           <span style={{ marginLeft: "10px" }}>🗄️</span> الأرشيف
         </div>
+        <div className="settings-item" onClick={() => { onClose(); window.open("/instructor", "_blank"); }}>
+          <span style={{ marginLeft: "10px" }}>🖼️</span> أعمال ومشاريع الطلاب (المعيدين)
+        </div>
+        <div className="settings-item" onClick={() => { onClose(); window.open("/student-portal", "_blank"); }}>
+          <span style={{ marginLeft: "10px" }}>🎓</span> بوابة الطلاب والـ QR
+        </div>
         <div className="settings-item" onClick={() => { onClose(); onOpenSuggestions(); }}>
           <span style={{ marginLeft: "10px" }}>💡</span> اقتراحات التطوير
         </div>

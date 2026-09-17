@@ -114,8 +114,28 @@ export default function TelegramSettingsTab() {
   return (
     <div style={{ direction: 'rtl' }}>
       <h2 style={{ color: "#fff", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
-        <span>🤖</span> إعدادات البوت والتحكم في صلاحيات الطلاب
+        <span>🎓</span> إعدادات بوابة الطلاب والمخزن السحابي الصامت
       </h2>
+
+      {/* QUICK ACCESS LINKS */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+        <a 
+          href="http://localhost:3005" 
+          target="_blank"
+          rel="noreferrer"
+          style={{ background: "#1e293b", border: "1px solid #3b82f6", borderRadius: "10px", padding: "14px", color: "#38bdf8", textDecoration: "none", fontWeight: "bold", textAlign: "center", fontSize: "14px" }}
+        >
+          🌐 فتح بوابة الطلاب الرئيسية
+        </a>
+        <a 
+          href="http://localhost:3005/instructor" 
+          target="_blank"
+          rel="noreferrer"
+          style={{ background: "#1e293b", border: "1px solid #10b981", borderRadius: "10px", padding: "14px", color: "#34d399", textDecoration: "none", fontWeight: "bold", textAlign: "center", fontSize: "14px" }}
+        >
+          👨‍🏫 فتح بوابة المدرسين والمعيدين
+        </a>
+      </div>
 
       {error && (
         <div style={{ background: "#f44336", color: "#fff", padding: "10px", borderRadius: "5px", marginBottom: "15px", fontSize: "14px" }}>
@@ -126,7 +146,7 @@ export default function TelegramSettingsTab() {
       {/* STUDENT VISIBILITY & PERMISSIONS SECTION */}
       <div style={{ background: "#1a1a1a", padding: "20px", borderRadius: "12px", border: "1px solid #333", marginBottom: "25px" }}>
         <h3 style={{ margin: "0 0 15px 0", color: "#FF9800", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>🔒</span> تحكم المدير في البيانات الظاهرة للطلاب عبر البوت:
+          <span>🔒</span> تحكم المدير في البيانات الظاهرة للطلاب عبر بوابة الطلاب:
         </h3>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -200,36 +220,52 @@ export default function TelegramSettingsTab() {
           </div>
 
           <div style={{ background: "#111", padding: "15px", borderRadius: "8px", border: "1px dashed #555", marginBottom: "20px" }}>
-            <strong style={{ color: "#2196F3", display: "block", marginBottom: "10px" }}>🔗 روابط الدخول السريعة:</strong>
+            <strong style={{ color: "#2196F3", display: "block", marginBottom: "12px" }}>🔗 روابط الدخول والوصول للنظام:</strong>
             
             <div style={{ marginBottom: "15px" }}>
-              <div style={{ fontSize: "13px", color: "#888", marginBottom: "5px" }}>رابط دخول الزملاء (المعلمين):</div>
+              <div style={{ fontSize: "13px", color: "#888", marginBottom: "5px" }}>🎓 رابط بوابة الطلاب (الكارت الذكي والـ QR):</div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <input 
                   type="text" 
                   readOnly 
-                  value={`https://t.me/${botData.botInfo.username}?start=staff`} 
+                  value={typeof window !== "undefined" ? `${window.location.origin}/student-portal` : "/student-portal"} 
                   style={{ flex: 1, padding: "8px", background: "#222", color: "#fff", border: "1px solid #444", borderRadius: "5px", direction: "ltr" }}
                 />
                 <button 
-                  onClick={() => navigator.clipboard.writeText(`https://t.me/${botData.botInfo.username}?start=staff`)}
-                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 15px", borderRadius: "5px", cursor: "pointer" }}
+                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/student-portal`)}
+                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 15px", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
+                >نسخ</button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <div style={{ fontSize: "13px", color: "#888", marginBottom: "5px" }}>📱 رابط نظام فنية للطلاب (تسجيل الدخول ورفع الأعمال):</div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value={typeof window !== "undefined" ? `${window.location.origin}/system` : "/system"} 
+                  style={{ flex: 1, padding: "8px", background: "#222", color: "#fff", border: "1px solid #444", borderRadius: "5px", direction: "ltr" }}
+                />
+                <button 
+                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/system`)}
+                  style={{ background: "#10b981", color: "#fff", border: "none", padding: "0 15px", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
                 >نسخ</button>
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: "13px", color: "#888", marginBottom: "5px" }}>رابط دخول الطلاب (البوابة):</div>
+              <div style={{ fontSize: "13px", color: "#888", marginBottom: "5px" }}>👨‍🏫 رابط بوابة المعيدين والمدرسين (فحص وتسليم الأعمال):</div>
               <div style={{ display: "flex", gap: "10px" }}>
                 <input 
                   type="text" 
                   readOnly 
-                  value={`https://t.me/${botData.botInfo.username}?start=student`} 
+                  value={typeof window !== "undefined" ? `${window.location.origin}/instructor` : "/instructor"} 
                   style={{ flex: 1, padding: "8px", background: "#222", color: "#fff", border: "1px solid #444", borderRadius: "5px", direction: "ltr" }}
                 />
                 <button 
-                  onClick={() => navigator.clipboard.writeText(`https://t.me/${botData.botInfo.username}?start=student`)}
-                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 15px", borderRadius: "5px", cursor: "pointer" }}
+                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/instructor`)}
+                  style={{ background: "#8b5cf6", color: "#fff", border: "none", padding: "0 15px", borderRadius: "5px", cursor: "pointer", fontWeight: "bold" }}
                 >نسخ</button>
               </div>
             </div>

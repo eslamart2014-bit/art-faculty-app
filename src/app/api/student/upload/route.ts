@@ -39,8 +39,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch Telegram Bot Token
-    const { data: sysData } = await supabase.from("system_settings").select("telegram_config").eq("id", 1).maybeSingle();
-    const botToken = sysData?.telegram_config?.token;
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
     // 1. Fetch current student details & verify active status
     const { data: currentStudent } = await supabase

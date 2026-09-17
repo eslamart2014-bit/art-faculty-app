@@ -10,7 +10,7 @@ export async function preloadFacultyData(userId: string) {
     // 1. Preload system settings in background
     supabase
       .from("system_settings")
-      .select("term1_start, term2_start, term1_end, term2_end, telegram_config")
+      .select("term1_start, term2_start, term1_end, term2_end, is_maintenance_mode, maintenance_message")
       .eq("id", 1)
       .maybeSingle()
       .then(({ data }) => {

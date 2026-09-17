@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
+import { formatStudentCode } from '@/lib/codeHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,52 +9,55 @@ export async function GET(request: Request) {
   const query = (searchParams.get('q') || '').trim();
   const level = (searchParams.get('level') || '').trim();
 
-  if (!query || query.length < 2) {
+  // إذا لم يكن هناك استعلام ولا فرقة محددة
+  if (!query && (!level || level === 'الكل')) {
     return NextResponse.json({ students: [] });
   }
 
-  // Use anon key - students table is public readable
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: 'Missing env vars', students: [] }, { status: 500 });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
   try {
-    let dbQuery = supabase
+    let dbQuery = supabaseAdmin
       .from('students')
       .select('id, full_name, student_code, academic_year, section');
 
-    if (/^\d+$/.test(query)) {
-      // Numeric search: match student_code that contains the query
-      // e.g. searching "1" matches "001", "011", "100", "1" etc.
-      dbQuery = dbQuery.ilike('student_code', `%${query}%`);
-    } else {
-      // Name search
-      dbQuery = dbQuery.ilike('full_name', `%${query}%`);
+    // 1. فلترة بالفرقة الدراسية (مطابقة تامة لكافة الفرق الأربعة)
+    if (level && level !== 'الكل') {
+      if (level.includes('أول') || level.includes('اول')) {
+        dbQuery = dbQuery.ilike('academic_year', '%اول%');
+      } else if (level.includes('ثان') || level.includes('تاني')) {
+        dbQuery = dbQuery.ilike('academic_year', '%ثاني%');
+      } else if (level.includes('ثالث') || level.includes('تالت')) {
+        dbQuery = dbQuery.ilike('academic_year', '%ثالث%');
+      } else if (level.includes('رابع')) {
+        dbQuery = dbQuery.ilike('academic_year', '%رابع%');
+      } else {
+        const clean = level.replace('الفرقة ', '').replace('السنة ', '').trim();
+        dbQuery = dbQuery.ilike('academic_year', `%${clean}%`);
+      }
     }
 
-    // Apply level filter
-    if (level && level !== 'الكل' && level !== '') {
-      const levelNum = level.replace('السنة ', '').trim();
-      dbQuery = dbQuery.ilike('academic_year', `%${levelNum}%`);
+    // 2. فلترة بالبحث (اسم أو كود)
+    if (query) {
+      if (/^\d+$/.test(query)) {
+        // بحث برقم الكود
+        dbQuery = dbQuery.ilike('student_code', `%${query}%`);
+      } else {
+        // بحث باسم الطالب
+        dbQuery = dbQuery.ilike('full_name', `%${query}%`);
+      }
     }
 
-    const { data, error } = await dbQuery.limit(30);
+    const { data, error } = await dbQuery
+      .order('student_code', { ascending: true })
+      .limit(30);
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Students search error:', error);
       return NextResponse.json({ error: error.message, students: [] }, { status: 500 });
     }
 
     return NextResponse.json({ students: data || [] });
   } catch (err: any) {
-    console.error('Search error:', err);
+    console.error('Search unexpected error:', err);
     return NextResponse.json({ error: err.message, students: [] }, { status: 500 });
   }
 }

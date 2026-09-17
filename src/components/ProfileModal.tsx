@@ -119,21 +119,12 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
         </button>
 
         <button 
-          onClick={async () => {
-            const token = crypto.randomUUID();
-            await supabase.from("profiles").update({ telegram_link_token: token }).eq("id", user.id);
-            
-            // Get Bot Username from Settings
-            const { data } = await supabase.from("system_settings").select("telegram_config").eq("id", 1).maybeSingle();
-            if (data?.telegram_config?.botInfo?.username) {
-              window.open(`https://t.me/${data.telegram_config.botInfo.username}?start=${token}`, '_blank');
-            } else {
-              alert("لم يتم ربط البوت بالنظام بعد. يرجى مراجعة مدير النظام.");
-            }
+          onClick={() => {
+            window.open("/system", "_blank");
           }}
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#2196F3", color: "#fff", border: "none", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "0.2s", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "linear-gradient(135deg, #2563eb, #10b981)", color: "#fff", border: "none", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "0.2s", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
         >
-          <span>✈️</span> تفعيل الدخول عبر تليجرام
+          <span>🎓</span> الانتقال السريع لبوابة الطلاب
         </button>
       </div>
     </div>

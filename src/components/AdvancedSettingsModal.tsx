@@ -342,7 +342,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
         <button 
           onClick={() => setActiveTab("telegram")}
           style={{ flex: 1, padding: "10px", background: activeTab === "telegram" ? "#333" : "transparent", color: activeTab === "telegram" ? "#2196F3" : "#888", border: "none", borderBottom: activeTab === "telegram" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px", minWidth: "90px" }}
-        >تليجرام ✈️</button>
+        >بوابة الطلاب 🎓</button>
       </div>
 
       <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto" }}>
