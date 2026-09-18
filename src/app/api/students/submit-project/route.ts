@@ -16,6 +16,7 @@ export async function POST(request: Request) {
       project_name,
       images,
       device_info,
+      pin_code,
     } = body;
 
     if (!student_code || !course_id || !project_name || !images || images.length === 0) {
@@ -23,6 +24,33 @@ export async function POST(request: Request) {
         { error: 'بيانات الرفع غير مكتملة أو لم يتم التقاط صور للعمل الفني' },
         { status: 400 }
       );
+    }
+
+    // التحقق الأمني من هوية الطالب والرقم السري
+    const { data: studentRecord } = await supabaseAdmin
+      .from('students')
+      .select('id, full_name, student_code, telegram_browser_id')
+      .eq('student_code', student_code)
+      .maybeSingle();
+
+    if (!studentRecord) {
+      return NextResponse.json({ error: 'الطالب غير مسجل في الكلية' }, { status: 404 });
+    }
+
+    if (studentRecord.telegram_browser_id) {
+      try {
+        const acc = JSON.parse(studentRecord.telegram_browser_id);
+        const expectedPin = acc.pin_code;
+        const isActivated = acc.is_pin_used || acc.status === 'active';
+        if (isActivated && expectedPin) {
+          if (!pin_code || pin_code.trim() !== expectedPin.trim()) {
+            return NextResponse.json(
+              { error: 'غير مصرح: الرقم السري غير صحيح أو انتهت جلستك. يرجى تسجيل الدخول مجدداً.' },
+              { status: 401 }
+            );
+          }
+        }
+      } catch (e) {}
     }
 
     // 1. التحقق من عدم وجود تسليم سابق لهذا المشروع

@@ -87,7 +87,7 @@ export default function SystemPage() {
         setCurrentStudent(parsed);
         setAccountStatus((cachedStatus as any) || "active");
         if (cachedStatus === "active") {
-          loadDashboard(parsed.student_code);
+          loadDashboard(parsed.student_code, parsed.pin_code);
         }
       } catch (e) {
         console.error(e);
@@ -144,9 +144,11 @@ export default function SystemPage() {
     } catch (e) {}
   };
 
-  const loadDashboard = async (code: string) => {
+  const loadDashboard = async (code: string, pin?: string) => {
     try {
-      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}`);
+      const activePin = pin || currentStudent?.pin_code || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("fania_student_session") || '{}')?.pin_code : '');
+      const pinParam = activePin ? `&pin=${encodeURIComponent(activePin)}` : '';
+      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}`);
       const data = await res.json();
       if (data.student) {
         setDashboardData(data);
@@ -383,7 +385,7 @@ export default function SystemPage() {
       localStorage.setItem("fania_account_status", "active");
       setCurrentStudent(data.student);
       setAccountStatus("active");
-      loadDashboard(data.student.student_code);
+      loadDashboard(data.student.student_code, data.student.pin_code);
     } catch (err: any) {
       setErrorMsg(err.message || "خطأ في الشبكة");
     } finally {
@@ -423,7 +425,7 @@ export default function SystemPage() {
       localStorage.setItem("fania_account_status", "active");
       setAccountStatus("active");
       alert(data.message);
-      loadDashboard(currentStudent.student_code);
+      loadDashboard(currentStudent.student_code, enteredPin);
     } catch (err: any) {
       setErrorMsg(err.message || "خطأ في التحقق");
     } finally {
@@ -455,7 +457,8 @@ export default function SystemPage() {
           course_name: selectedCourseForEval.courseName,
           project_name: selectedProject,
           images: projectPhotos,
-          device_info: deviceInfo
+          device_info: deviceInfo,
+          pin_code: currentStudent?.pin_code || enteredPin || '',
         })
       });
 
@@ -468,7 +471,7 @@ export default function SystemPage() {
 
       alert(data.message);
       setProjectPhotos([]);
-      loadDashboard(currentStudent.student_code);
+      loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
     } catch (e: any) {
       alert("خطأ أثناء الرفع: " + e.message);
     } finally {
@@ -499,7 +502,7 @@ export default function SystemPage() {
       if (res.ok) {
         alert("تم إرسال شكواك بنجاح وسيتم النظر فيها قريباً.");
         setComplaintText("");
-        loadDashboard(currentStudent.student_code);
+        loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
       } else {
         alert(data.error || "تعذر إرسال الشكوى");
       }

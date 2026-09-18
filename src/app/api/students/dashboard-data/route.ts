@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get('code') || '').trim();
+  const pin = (searchParams.get('pin') || '').trim();
 
   if (!code) {
     return NextResponse.json({ error: 'Missing student code' }, { status: 400 });
@@ -18,13 +19,42 @@ export async function GET(request: Request) {
     // 1. جلب بيانات الطالب
     const { data: student, error: stErr } = await supabaseAdmin
       .from('students')
-      .select('id, full_name, student_code, academic_year, section')
+      .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
       .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
       .maybeSingle();
 
     if (stErr || !student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
+
+    // التحقق الأمني: التحقق من الرقم السري إذا كان الحساب مفعلاً
+    let accountData: any = null;
+    if (student.telegram_browser_id) {
+      try {
+        accountData = JSON.parse(student.telegram_browser_id);
+      } catch (e) {}
+    }
+
+    const expectedPin = accountData?.pin_code;
+    const isActivated = accountData?.is_pin_used || accountData?.status === 'active';
+
+    if (isActivated && expectedPin) {
+      if (!pin || pin !== expectedPin) {
+        return NextResponse.json(
+          { error: 'غير مصرح: يجب تسجيل الدخول بالرقم السري للوصول إلى لوحة بيانات الطالب.' },
+          { status: 401 }
+        );
+      }
+    }
+
+    // كائن طالب آمن ومجرد من أي بيانات حساسة
+    const safeStudent = {
+      id: student.id,
+      full_name: student.full_name,
+      student_code: student.student_code,
+      academic_year: student.academic_year,
+      section: student.section,
+    };
 
     // 2. جلب المقررات التابعة لفرقة وسكشن الطالب
     const { data: allCourses } = await supabaseAdmin
@@ -104,7 +134,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     return NextResponse.json({
-      student,
+      student: safeStudent,
       attendance: attendanceByCourse,
       projects: projectsByCourse,
       complaints: complaints || [],
