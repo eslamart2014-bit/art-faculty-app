@@ -116,14 +116,14 @@ CREATE POLICY "staff_modify_students" ON public.students
         EXISTS (
             SELECT 1 FROM public.profiles 
             WHERE profiles.id = auth.uid() 
-            AND profiles.role IN ('مدير', 'مدير مساعد', 'عضو هيئة تدريس', 'معيد')
+            AND profiles.role::text IN ('مدير', 'مدير مساعد', 'عضو هيئة تدريس')
         )
     )
     WITH CHECK (
         EXISTS (
             SELECT 1 FROM public.profiles 
             WHERE profiles.id = auth.uid() 
-            AND profiles.role IN ('مدير', 'مدير مساعد', 'عضو هيئة تدريس', 'معيد')
+            AND profiles.role::text IN ('مدير', 'مدير مساعد', 'عضو هيئة تدريس')
         )
     );
 
@@ -202,7 +202,7 @@ CREATE POLICY "staff_update_own_profile" ON public.profiles
         auth.uid() = id 
         OR EXISTS (
             SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role = 'مدير'
+            WHERE profiles.id = auth.uid() AND profiles.role::text = 'مدير'
         )
     );
 
@@ -211,7 +211,7 @@ CREATE POLICY "admin_manage_profiles" ON public.profiles
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role = 'مدير'
+            WHERE profiles.id = auth.uid() AND profiles.role::text = 'مدير'
         )
     );
 
@@ -224,7 +224,7 @@ CREATE POLICY "admin_manage_invitations" ON public.invitations
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role IN ('مدير', 'مدير مساعد')
+            WHERE profiles.id = auth.uid() AND profiles.role::text IN ('مدير', 'مدير مساعد')
         )
     );
 
@@ -273,7 +273,7 @@ CREATE POLICY "admin_manage_settings" ON public.system_settings
     USING (
         EXISTS (
             SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role = 'مدير'
+            WHERE profiles.id = auth.uid() AND profiles.role::text = 'مدير'
         )
     );
 
