@@ -33,27 +33,30 @@ export default function CoordinatorPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    // جلب قائمة المنسقين
-    fetch("/api/coordinators")
-      .then(r => r.json())
-      .then(d => {
-        if (d.coordinators) {
-          setCoordinatorsList(d.coordinators);
-          if (d.coordinators.length > 0) {
-            setCoordinatorName(d.coordinators[0].name);
-          }
+    let nameSet = false;
+    try {
+      const cached = localStorage.getItem("cached_profile");
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p.full_name) {
+          setCoordinatorName(p.full_name);
+          nameSet = true;
         }
-      })
-      .catch(console.error);
+      }
+    } catch (e) {}
 
-    const savedCoord = localStorage.getItem("fania_coordinator_name");
-    if (savedCoord) setCoordinatorName(savedCoord);
+    if (!nameSet) {
+      import("@/lib/supabase").then(({ supabase }) => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            supabase.from("profiles").select("full_name").eq("id", user.id).single().then(({ data }) => {
+              if (data?.full_name) setCoordinatorName(data.full_name);
+            });
+          }
+        });
+      });
+    }
   }, []);
-
-  const handleCoordinatorChange = (name: string) => {
-    setCoordinatorName(name);
-    localStorage.setItem("fania_coordinator_name", name);
-  };
 
   const handleLookup = async (codeToSearch?: string) => {
     const target = codeToSearch || searchCode;
@@ -121,11 +124,14 @@ export default function CoordinatorPage() {
     setIsScanning(true);
     setTimeout(() => {
       try {
-        const scanner = new Html5Qrcode("qr-reader-container");
+        const scanner = new Html5Qrcode("qr-reader-container", {
+          useBarCodeDetectorIfSupported: true,
+          verbose: false
+        });
         scannerRef.current = scanner;
         scanner.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 250 } },
+          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
           (decodedText) => {
             const extracted = extractStudentCode(decodedText);
             if (extracted) {
@@ -137,14 +143,14 @@ export default function CoordinatorPage() {
           () => {}
         ).catch(err => {
           console.warn(err);
-          alert("تعذر فتح الكاميرا للمسح");
+          alert("تعذر فتح الكاميرا للمسح، يرجى التأكد من منح الإذن.");
           setIsScanning(false);
         });
       } catch (e) {
         console.error(e);
         setIsScanning(false);
       }
-    }, 200);
+    }, 150);
   };
 
   const stopScanner = () => {
@@ -171,22 +177,29 @@ export default function CoordinatorPage() {
 
       <div className="glass-card" style={{ padding: "20px", marginBottom: "18px" }}>
         
-        {/* اختيار اسم المنسق القائم بالعملية */}
+        {/* المنسق الحالي المسؤول عن الصرف */}
         <div style={{ marginBottom: "16px" }}>
           <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
             المنسق الحالي المسؤول عن الصرف:
           </label>
-          <select 
-            value={coordinatorName} 
-            onChange={(e) => handleCoordinatorChange(e.target.value)}
-            style={{ fontWeight: "bold", color: "#38bdf8" }}
-          >
-            {coordinatorsList.map(c => (
-              <option key={c.id} value={c.name} style={{ background: "#141b29", color: "#fff" }}>
-                {c.name} ({c.title || "منسق"})
-              </option>
-            ))}
-          </select>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            background: "rgba(56, 189, 248, 0.1)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            color: "#38bdf8",
+            fontWeight: "bold",
+            fontSize: "14px"
+          }}>
+            <span style={{ fontSize: "16px" }}>👤</span>
+            <span>{coordinatorName || "جاري التعرف على الحساب..."}</span>
+            <span style={{ marginRight: "auto", fontSize: "11px", background: "rgba(56, 189, 248, 0.2)", padding: "3px 8px", borderRadius: "6px", color: "#7dd3fc" }}>
+              منسق معتمد
+            </span>
+          </div>
         </div>
 
         {/* خانة إدخال الكود + زر الكاميرا */}
@@ -194,31 +207,31 @@ export default function CoordinatorPage() {
           <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
             البحث بكود الطالب أو مسح بطاقة الـ QR:
           </label>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
             <input 
               type="text"
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
               placeholder="اكتب كود الطالب (0001)..."
               onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              style={{ flex: 1, fontWeight: "bold" }}
+              style={{ flex: 1, fontWeight: "bold", height: "46px", boxSizing: "border-box" }}
             />
             <button 
               onClick={() => handleLookup()}
               disabled={loading}
               className="btn-primary"
-              style={{ width: "50px", padding: "0" }}
+              style={{ width: "46px", height: "46px", padding: "0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
               title="بحث"
             >
-              <Search size={18} />
+              <Search size={20} />
             </button>
             <button 
               onClick={startScanner}
               className="btn-primary"
-              style={{ width: "50px", padding: "0", background: "linear-gradient(135deg, #10b981, #059669)" }}
+              style={{ width: "46px", height: "46px", padding: "0", background: "linear-gradient(135deg, #10b981, #059669)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
               title="مسح بالكاميرا"
             >
-              <Camera size={18} />
+              <Camera size={20} />
             </button>
           </div>
         </div>

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       // 1. البحث عن الطالب في جدول الطلاب
       const { data: student, error: stErr } = await supabaseAdmin
         .from('students')
-        .select('id, full_name, student_code, academic_year, section')
+        .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
         .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
         .maybeSingle();
 
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // 2. البحث عن الحساب المسجل في student_accounts
+      // 2. البحث عن الحساب المسجل في student_accounts أو telegram_browser_id
       let account: any = null;
       try {
         const { data } = await supabaseAdmin
@@ -35,6 +35,12 @@ export async function POST(request: Request) {
           .maybeSingle();
         account = data;
       } catch (e) {}
+
+      if (!account && (student as any).telegram_browser_id) {
+        try {
+          account = JSON.parse((student as any).telegram_browser_id);
+        } catch (e) {}
+      }
 
       if (!account) {
         account = localStore.getAccount(student.student_code);
@@ -97,6 +103,30 @@ export async function POST(request: Request) {
           .select('*')
           .single();
         updatedAccount = res.data;
+      } catch (e) {}
+
+      // تحديث حالة إصدار الرقم السري في students.telegram_browser_id لضمان البقاء والاستدامة السحابية
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+        if (st) {
+          let curr: any = {};
+          try { curr = JSON.parse(st.telegram_browser_id || '{}'); } catch(e){}
+          const merged = {
+            ...curr,
+            id_card_verified: true,
+            pin_issued_by: coordinator_name || 'منسق النظام',
+            pin_issued_at: new Date().toISOString()
+          };
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(merged) })
+            .eq('id', st.id);
+          if (!updatedAccount) updatedAccount = merged;
+        }
       } catch (e) {}
 
       if (!updatedAccount) {

@@ -268,59 +268,8 @@ export default function StudentPortalHubModal({
           </div>
         </div>
 
-        {/* Section 3: Identity Verification & Secret PIN (Coordinator) */}
-        {canVerify && (
-          <div
-            style={{
-              background: "#222",
-              border: "1px solid #2196F3",
-              borderRadius: "14px",
-              padding: "16px",
-              marginBottom: "16px"
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ background: "rgba(33, 150, 243, 0.25)", color: "#2196F3", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
-                  🪪
-                </div>
-                <div>
-                  <div style={{ color: "#90CAF9", fontWeight: "bold", fontSize: "15px" }}>محطة تأكيد هوية الطلاب وصرف الأرقام السرية</div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>مطابقة بطاقات الرقم القومي مع صور الطلاب، تأكيد الهويات، وصرف/إعادة تعيين الرقم السري الثابت.</div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  onClose();
-                  if (onOpenIdentityModal) {
-                    onOpenIdentityModal();
-                  } else {
-                    window.open("/coordinator", "_blank");
-                  }
-                }}
-                style={{
-                  background: "#2196F3",
-                  color: "#fff",
-                  border: "none",
-                  padding: "10px 18px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px"
-                }}
-              >
-                🔍 فحص وصرف الأرقام السرية
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Section 4: Admin Portal Control & Audit Logs */}
-        {isAdmin && (
+        {/* Section 3: Admin Portal Control & Audit Logs (Primary Admin Only) */}
+        {user?.role === "مدير" && (
           <div
             style={{
               background: "#222",

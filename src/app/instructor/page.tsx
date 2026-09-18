@@ -54,6 +54,78 @@ export default function InstructorPage() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
+  // Current logged in user & role
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [editingScoreStudent, setEditingScoreStudent] = useState<{ studentCode: string; currentScore: number | null } | null>(null);
+  const [scoreInput, setScoreInput] = useState<string>("");
+  const [savingScore, setSavingScore] = useState(false);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("cached_profile");
+      if (cached) {
+        setCurrentUser(JSON.parse(cached));
+      }
+    } catch (e) {}
+
+    import("@/lib/supabase").then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase.from("profiles").select("*").eq("id", user.id).single().then(({ data }) => {
+            if (data) setCurrentUser(data);
+          });
+        }
+      });
+    });
+  }, []);
+
+  const isPrimaryAdmin = currentUser?.role === "مدير";
+
+  const handleSaveScore = async (studentCode: string) => {
+    if (scoreInput === "" || isNaN(Number(scoreInput))) {
+      alert("يرجى إدخال درجة صحيحة");
+      return;
+    }
+    const numScore = Number(scoreInput);
+    setSavingScore(true);
+
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      const { data: st } = await supabase.from("students").select("id").eq("student_code", studentCode).maybeSingle();
+      if (!st) {
+        alert("لم يتم العثور على الطالب في قاعدة البيانات");
+        setSavingScore(false);
+        return;
+      }
+
+      const { error } = await supabase.from("evaluations").upsert({
+        course_id: selectedCourseId,
+        student_id: st.id,
+        project_name: selectedProjectName,
+        score: numScore,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "course_id,student_id,project_name" });
+
+      if (error) {
+        console.error("Evaluation save error:", error);
+        alert("تعذر حفظ الدرجة: " + error.message);
+      } else {
+        setSubmissions(prev => prev.map(s => {
+          if (s.student_code === studentCode) {
+            return { ...s, score: numScore, status: "graded" };
+          }
+          return s;
+        }));
+        setEditingScoreStudent(null);
+        setFeedbackMsg(`✓ تم رصد وتحديث الدرجة (${numScore}) بنجاح.`);
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
   // Fetch initial instructors list
   useEffect(() => {
     fetchInstructors();
@@ -202,7 +274,7 @@ export default function InstructorPage() {
 
       let html = `
         <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 2px solid #3b82f6; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 20px; page-break-after: always;">
-          <div style="font-size: 13px; color: #94a3b8; margin-bottom: 4px;">جامعة حلوان - كلية التربية الفنية</div>
+          <div style="font-size: 14px; font-weight: bold; color: #94a3b8; margin-bottom: 4px;">جامعة قنا • كلية التربية النوعية</div>
           <h1 style="font-size: 18px; color: #38bdf8; margin: 0 0 10px 0;">ألبوم أعمال ومشاريع الطلاب</h1>
           <div style="background: rgba(59, 130, 246, 0.15); border-radius: 8px; padding: 12px; margin: 12px 0;">
             <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 4px;">المقرر: ${selectedCourse?.name || ""}</div>
@@ -356,39 +428,39 @@ export default function InstructorPage() {
 
         {/* Instructor Identity Selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ textAlign: "left" }}>
-            <span style={{ fontSize: "11px", color: "#94a3b8", display: "block" }}>الحساب النشط:</span>
-            <select
-              value={selectedInstructor?.id || ""}
-              onChange={(e) => {
-                const found = instructors.find(i => i.id === e.target.value);
-                if (found) handleSelectInstructor(found);
-              }}
-              style={{ padding: "6px 12px", background: "#1e293b", border: "1px solid #3b82f6", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", outline: "none", cursor: "pointer" }}
-            >
-              {instructors.map(inst => (
-                <option key={inst.id} value={inst.id}>
-                  {inst.degree ? `${inst.degree}/ ` : ""}{inst.full_name} ({inst.role})
-                </option>
-              ))}
-            </select>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "2px" }}>الحساب النشط:</span>
+            {isPrimaryAdmin ? (
+              <select
+                value={selectedInstructor?.id || ""}
+                onChange={(e) => {
+                  const found = instructors.find(i => i.id === e.target.value);
+                  if (found) handleSelectInstructor(found);
+                }}
+                style={{ padding: "6px 12px", background: "#1e293b", border: "1px solid #3b82f6", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", outline: "none", cursor: "pointer" }}
+              >
+                {instructors.map(inst => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.degree ? `${inst.degree}/ ` : ""}{inst.full_name} ({inst.role})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "6px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>👤</span>
+                <span>{selectedInstructor?.degree ? `${selectedInstructor.degree}/ ` : ""}{selectedInstructor?.full_name || currentUser?.full_name}</span>
+              </div>
+            )}
           </div>
 
           <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.06)", border: "1px solid #2a374f", color: "#94a3b8", padding: "8px 12px", borderRadius: "10px", textDecoration: "none", fontSize: "12px" }}>
             <ChevronLeft size={16} />
-            <span>بوابة الطلاب</span>
+            <span>الرئيسية</span>
           </Link>
         </div>
       </header>
 
-      {/* Security Scope Notice */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(37, 99, 235, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)", padding: "10px 16px", borderRadius: "12px", marginBottom: "18px", fontSize: "12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#38bdf8" }}>
-          <Sparkles size={16} />
-          <span><b>نظام الخصوصية المشدد:</b> يتم عرض المقررات والأعمال المسندة إليك فقط ({myCourses.length} مقررات).</span>
-        </div>
-        <span style={{ color: "#94a3b8" }}>{selectedInstructor?.full_name}</span>
-      </div>
+
 
       {/* Feedback message banner */}
       {feedbackMsg && (
@@ -575,7 +647,7 @@ export default function InstructorPage() {
               </p>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "14px" }}>
               {submissions.map((sub: any, idx: number) => {
                 const firstImg = sub.images?.[0]?.url || sub.photo_url || "";
                 const isActionLoading = actionLoading === `${sub.student_code}_${sub.project_name}`;
@@ -613,7 +685,7 @@ export default function InstructorPage() {
 
                         <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(0,0,0,0.7)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
                           <Eye size={12} />
-                          <span>تكبير اللوحة</span>
+                          <span>تكبير الصورة</span>
                         </div>
 
                         {/* Status Badge */}
@@ -640,16 +712,102 @@ export default function InstructorPage() {
                       </div>
                     </div>
 
+                    {/* Multiple images row if student uploaded multiple */}
+                    {sub.images && sub.images.length > 1 && (
+                      <div style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "4px 0", marginBottom: "8px" }}>
+                        {sub.images.map((imgObj: any, iIdx: number) => (
+                          <div 
+                            key={iIdx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewImage({
+                                url: imgObj.url,
+                                title: `عمل الطالب: ${sub.student_name} (${iIdx + 1}/${sub.images.length})`,
+                                subTitle: `كود: ${formatStudentCode(sub.student_code)} • سكشن: ${sub.section || "1"}`
+                              });
+                              setRotationDegrees(0);
+                            }}
+                            style={{
+                              width: "42px",
+                              height: "42px",
+                              borderRadius: "6px",
+                              overflow: "hidden",
+                              border: "1px solid #3b82f6",
+                              cursor: "pointer",
+                              flexShrink: 0
+                            }}
+                            title="عرض اللقطة"
+                          >
+                            <img src={imgObj.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Inline Grading Form / Button */}
+                    <div style={{ marginBottom: "8px" }}>
+                      {editingScoreStudent?.studentCode === sub.student_code ? (
+                        <div style={{ background: "#1a2436", border: "1px solid #3b82f6", padding: "8px", borderRadius: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+                          <input 
+                            type="number"
+                            value={scoreInput}
+                            onChange={e => setScoreInput(e.target.value)}
+                            placeholder="الدرجة"
+                            style={{ width: "65px", padding: "6px", borderRadius: "6px", background: "#0d131f", border: "1px solid #475569", color: "#fff", fontWeight: "bold", textAlign: "center" }}
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleSaveScore(sub.student_code)}
+                            disabled={savingScore}
+                            style={{ flex: 1, padding: "6px 8px", background: "#10b981", border: "none", borderRadius: "6px", color: "#fff", fontWeight: "bold", cursor: "pointer", fontSize: "12px" }}
+                          >
+                            {savingScore ? "حفظ..." : "✓ حفظ"}
+                          </button>
+                          <button
+                            onClick={() => setEditingScoreStudent(null)}
+                            style={{ padding: "6px 8px", background: "#334155", border: "none", borderRadius: "6px", color: "#94a3b8", cursor: "pointer", fontSize: "12px" }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingScoreStudent({ studentCode: sub.student_code, currentScore: sub.score });
+                            setScoreInput(sub.score !== null ? String(sub.score) : "");
+                          }}
+                          style={{
+                            width: "100%",
+                            background: sub.score !== null ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                            border: `1px solid ${sub.score !== null ? "#10b981" : "#3b82f6"}`,
+                            color: sub.score !== null ? "#34d399" : "#60a5fa",
+                            padding: "7px 10px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <span>✏️</span>
+                          <span>{sub.score !== null ? `تعديل الدرجة (${sub.score})` : "رصد الدرجة لهذا العمل"}</span>
+                        </button>
+                      )}
+                    </div>
+
                     {/* Action Button: Allow Retake */}
                     <div>
                       <button
                         onClick={() => handleAllowRetake(sub.student_code, selectedCourseId, selectedProjectName, sub.student_name)}
                         disabled={isActionLoading}
                         className="btn-secondary"
-                        style={{ width: "100%", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "#f87171", fontSize: "12px", padding: "9px" }}
+                        style={{ width: "100%", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "#f87171", fontSize: "11px", padding: "7px" }}
                       >
-                        <RefreshCw size={14} className={isActionLoading ? "spin" : ""} />
-                        <span>{isActionLoading ? "جاري فك القفل..." : "🔄 السماح بتغيير الصورة / إعادة التصوير"}</span>
+                        <RefreshCw size={12} className={isActionLoading ? "spin" : ""} />
+                        <span>{isActionLoading ? "جاري فك القفل..." : "🔄 فك قفل إعادة التصوير"}</span>
                       </button>
                     </div>
 

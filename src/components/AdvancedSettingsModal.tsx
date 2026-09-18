@@ -8,14 +8,19 @@ import { extractStudentCode } from "@/lib/scannerHelper";
 interface AdvancedSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  user?: any;
+  onOpenRoster?: () => void;
+  onOpenPortalHub?: () => void;
 }
 
-export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSettingsModalProps) {
+export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRoster, onOpenPortalHub }: AdvancedSettingsModalProps) {
   useEffect(() => {
     window.history.pushState({ modal: true }, "");
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares">("study");
+  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares" | "roster" | "portal">("study");
+  const [portalStats, setPortalStats] = useState({ totalStudents: 0, registeredAccounts: 0, submissionsCount: 0 });
+  const [copiedPortalLink, setCopiedPortalLink] = useState(false);
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
@@ -54,7 +59,24 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
       fetchShareRequests();
       fetchProfiles();
     }
+    if (isOpen && activeTab === "portal") {
+      fetchPortalStats();
+    }
   }, [isOpen, activeTab]);
+
+  const fetchPortalStats = async () => {
+    try {
+      const { count: totalSt } = await supabase.from("students").select("id", { count: "exact", head: true });
+      const { count: regAcc } = await supabase.from("students").select("id", { count: "exact", head: true }).not("telegram_browser_id", "is", null);
+      setPortalStats({
+        totalStudents: totalSt || 0,
+        registeredAccounts: regAcc || 0,
+        submissionsCount: 0
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchShareRequests = async () => {
     setLoading(true);
@@ -326,22 +348,30 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
       </div>
 
-      <div style={{ display: "flex", background: "#222", borderBottom: "1px solid #333" }}>
+      <div style={{ display: "flex", background: "#222", borderBottom: "1px solid #333", overflowX: "auto", whiteSpace: "nowrap" }}>
         <button 
           onClick={() => setActiveTab("study")}
-          style={{ flex: 1, padding: "10px", background: activeTab === "study" ? "#333" : "transparent", color: activeTab === "study" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "study" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "study" ? "#333" : "transparent", color: activeTab === "study" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "study" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
         >الدراسة والتواريخ 📅</button>
         <button 
           onClick={() => setActiveTab("search")}
-          style={{ flex: 1, padding: "10px", background: activeTab === "search" ? "#333" : "transparent", color: activeTab === "search" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "search" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "search" ? "#333" : "transparent", color: activeTab === "search" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "search" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
         >البحث الشامل 🔍</button>
         <button 
+          onClick={() => setActiveTab("roster")}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "roster" ? "#333" : "transparent", color: activeTab === "roster" ? "#00BCD4" : "#888", border: "none", borderBottom: activeTab === "roster" ? "2px solid #00BCD4" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
+        >كشوف الطلاب 📋</button>
+        <button 
+          onClick={() => setActiveTab("portal")}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "portal" ? "#333" : "transparent", color: activeTab === "portal" ? "#FF9800" : "#888", border: "none", borderBottom: activeTab === "portal" ? "2px solid #FF9800" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
+        >بوابة الطلاب 🎓</button>
+        <button 
           onClick={() => setActiveTab("shares")}
-          style={{ flex: 1, padding: "10px", background: activeTab === "shares" ? "#333" : "transparent", color: activeTab === "shares" ? "#4CAF50" : "#888", border: "none", borderBottom: activeTab === "shares" ? "2px solid #4CAF50" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "shares" ? "#333" : "transparent", color: activeTab === "shares" ? "#4CAF50" : "#888", border: "none", borderBottom: activeTab === "shares" ? "2px solid #4CAF50" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
         >طلبات المشاركة 🤝</button>
         <button 
           onClick={() => setActiveTab("maintenance")}
-          style={{ flex: 1, padding: "10px", background: activeTab === "maintenance" ? "#333" : "transparent", color: activeTab === "maintenance" ? "#f44336" : "#888", border: "none", borderBottom: activeTab === "maintenance" ? "2px solid #f44336" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "maintenance" ? "#333" : "transparent", color: activeTab === "maintenance" ? "#f44336" : "#888", border: "none", borderBottom: activeTab === "maintenance" ? "2px solid #f44336" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
         >وضع الصيانة 🚧</button>
       </div>
 
@@ -731,6 +761,138 @@ export default function AdvancedSettingsModal({ isOpen, onClose }: AdvancedSetti
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+
+        {/* Roster Tab */}
+        {activeTab === "roster" && (
+          <div style={{ background: "#222", padding: "30px 20px", borderRadius: "12px", border: "1px solid #333", textAlign: "center" }}>
+            <div style={{ fontSize: "44px", marginBottom: "12px" }}>📋</div>
+            <h3 style={{ color: "#fff", margin: "0 0 8px 0", fontSize: "18px" }}>إدارة كشوف وقوائم الطلاب</h3>
+            <p style={{ color: "#aaa", fontSize: "14px", maxWidth: "520px", margin: "0 auto 24px auto", lineHeight: "1.7" }}>
+              استيراد كشوف الطلاب من ملفات Excel، وتحديث الأكواد والفرق الدراسية، وإدارة حالات النشاط والحذف وتصدير الكشوف بصيغة Excel و PDF.
+            </p>
+            <button
+              onClick={() => {
+                onClose();
+                if (onOpenRoster) onOpenRoster();
+              }}
+              style={{
+                background: "#00BCD4",
+                color: "#000",
+                border: "none",
+                padding: "12px 28px",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: "bold",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <span>📂</span> فتح لوحة إدارة الكشوف الكاملة
+            </button>
+          </div>
+        )}
+
+        {/* Portal Tab */}
+        {activeTab === "portal" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Quick Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px" }}>
+              <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "14px", borderRadius: "10px", textAlign: "center" }}>
+                <div style={{ fontSize: "11px", color: "#90CAF9" }}>إجمالي الطلاب المقيدين</div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                  {portalStats.totalStudents || "--"}
+                </div>
+              </div>
+              <div style={{ background: "#1a2a1a", border: "1px solid #2e4a2e", padding: "14px", borderRadius: "10px", textAlign: "center" }}>
+                <div style={{ fontSize: "11px", color: "#81C784" }}>حسابات الطلاب المسجلة</div>
+                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                  {portalStats.registeredAccounts || "0"}
+                </div>
+              </div>
+            </div>
+
+            {/* Public Student Portal */}
+            <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                <div style={{ background: "rgba(33, 150, 243, 0.2)", color: "#2196F3", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                  🎓
+                </div>
+                <div>
+                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>بوابة الطلاب العامة (بوابة فنية)</div>
+                  <div style={{ color: "#888", fontSize: "12px" }}>الرابط المخصص للطلاب لاستخراج كارت الـ QR ومتابعة الحضور.</div>
+                </div>
+              </div>
+              <div style={{ background: "#151515", border: "1px dashed #444", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "10px", flexWrap: "wrap" }}>
+                <span style={{ color: "#64B5F6", fontSize: "13px", direction: "ltr" }}>
+                  {typeof window !== "undefined" ? `${window.location.origin}/student-portal` : "/student-portal"}
+                </span>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(typeof window !== "undefined" ? `${window.location.origin}/student-portal` : "/student-portal");
+                        setCopiedPortalLink(true);
+                        setTimeout(() => setCopiedPortalLink(false), 2000);
+                      }
+                    }}
+                    style={{ background: copiedPortalLink ? "#4CAF50" : "#333", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                  >
+                    {copiedPortalLink ? "✓ تم النسخ" : "📋 نسخ"}
+                  </button>
+                  <button
+                    onClick={() => window.open("/student-portal", "_blank")}
+                    style={{ background: "#2196F3", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                  >
+                    🌐 فتح
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Instructor Gallery */}
+            <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ background: "rgba(76, 175, 80, 0.2)", color: "#4CAF50", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                  🖼️
+                </div>
+                <div>
+                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>معرض أعمال ومشاريع الطلاب</div>
+                  <div style={{ color: "#888", fontSize: "12px" }}>فحص الأعمال وتقييم مشاريع الطلاب للمدرسين والمعيدين.</div>
+                </div>
+              </div>
+              <button
+                onClick={() => { onClose(); window.open("/instructor", "_blank"); }}
+                style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                🎨 الانتقال للمعرض
+              </button>
+            </div>
+
+            {/* Admin Portal Control (Only Primary Admin) */}
+            {user?.role === "مدير" && (
+              <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ background: "rgba(156, 39, 176, 0.2)", color: "#AB47BC", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                    🛡️
+                  </div>
+                  <div>
+                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>لوحة إدارة حسابات الطلاب المركزية</div>
+                    <div style={{ color: "#888", fontSize: "12px" }}>متابعة سجلات التدقيق، فك أجهزة الطلاب، وإلغاء الحسابات.</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { onClose(); window.open("/admin-portal", "_blank"); }}
+                  style={{ background: "#7B1FA2", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  ⚙️ لوحة الإدارة
+                </button>
               </div>
             )}
           </div>

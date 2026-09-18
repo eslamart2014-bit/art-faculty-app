@@ -267,6 +267,15 @@ export default function Home() {
       <AdvancedSettingsModal
         isOpen={isAdvancedSettingsOpen}
         onClose={() => setIsAdvancedSettingsOpen(false)}
+        user={user}
+        onOpenRoster={() => {
+          setIsAdvancedSettingsOpen(false);
+          setActiveAdminModal("roster");
+        }}
+        onOpenPortalHub={() => {
+          setIsAdvancedSettingsOpen(false);
+          setIsPortalHubOpen(true);
+        }}
       />
 
       <StudentPortalHubModal

@@ -23,6 +23,10 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [generatedPasswordData, setGeneratedPasswordData] = useState<{pass: string, email: string} | null>(null);
 
+  const isPrimaryAdmin = adminUser?.role === 'مدير';
+  const isAssistant = adminUser?.role === 'مدير مساعد';
+  const isAdmin = isPrimaryAdmin;
+
   useEffect(() => {
     if (isOpen && adminUser) {
       fetchData();
@@ -108,9 +112,6 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     }
     setActiveMenuId(null);
   };
-
-  const isAdmin = adminUser?.role === 'مدير';
-  const isAssistant = adminUser?.role === 'مدير مساعد';
 
   const handleGrantAssistantRole = async (user: any) => {
     if (!isAdmin) return;
@@ -384,7 +385,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                               </button>
                             )}
 
-                            {isAdmin && (
+                            {isPrimaryAdmin && (
                               <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(33, 150, 243, 0.2)" : "#333", color: u.can_verify_students ? "#64B5F6" : "#aaa", border: `1px solid ${u.can_verify_students ? "#2196F3" : "#555"}`, padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
                                 {u.can_verify_students ? "✅ سحب صلاحية تأكيد هوية الطالب" : "🪪 منح صلاحية تأكيد هوية الطالب"}
                               </button>

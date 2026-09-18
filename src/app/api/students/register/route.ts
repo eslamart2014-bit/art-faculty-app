@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. التحقق من الحساب في جدول student_accounts
+    // 2. التحقق من الحساب في جدول student_accounts أو telegram_browser_id
     let existingAccount: any = null;
     try {
       const { data } = await supabaseAdmin
@@ -50,6 +50,12 @@ export async function POST(request: Request) {
         .maybeSingle();
       existingAccount = data;
     } catch (e) {}
+
+    if (!existingAccount && (studentRecord as any).telegram_browser_id) {
+      try {
+        existingAccount = JSON.parse((studentRecord as any).telegram_browser_id);
+      } catch (e) {}
+    }
 
     if (!existingAccount) {
       existingAccount = localStore.getAccount(studentRecord.student_code);
@@ -120,6 +126,16 @@ export async function POST(request: Request) {
       }
     } catch (e) {
       localStore.upsertAccount(payload);
+    }
+
+    // حفظ فوري ومستدام في جدول students كحاوية JSON آمنة ومزامنة عبر السحاب
+    try {
+      await supabaseAdmin
+        .from('students')
+        .update({ telegram_browser_id: JSON.stringify(payload) })
+        .eq('id', studentRecord.id);
+    } catch (e) {
+      console.error('Error updating students.telegram_browser_id:', e);
     }
 
     // 6. تسجيل النشاط الأمني

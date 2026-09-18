@@ -46,6 +46,8 @@ export default function SystemPage() {
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
   const [idCardPhoto, setIdCardPhoto] = useState<string | null>(null);
   const [showIdCamera, setShowIdCamera] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [tempIdCardPreview, setTempIdCardPreview] = useState<string | null>(null);
 
   // PIN Verification State
   const [enteredPin, setEnteredPin] = useState("");
@@ -185,6 +187,28 @@ export default function SystemPage() {
     setShowIdCamera(false);
     setShowArtworkCamera(false);
     setLightingWarning(false);
+    setTorchOn(false);
+    setTempIdCardPreview(null);
+  };
+
+  const toggleTorch = async () => {
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        const capabilities = (track.getCapabilities && track.getCapabilities()) as any;
+        if (capabilities && capabilities.torch) {
+          try {
+            const next = !torchOn;
+            await (track as any).applyConstraints({ advanced: [{ torch: next }] });
+            setTorchOn(next);
+          } catch (e) {
+            console.error("Torch error:", e);
+          }
+        } else {
+          alert("فلاش الكاميرا غير مدعوم على هذا الجهاز أو المتصفح");
+        }
+      }
+    }
   };
 
   // التقاط صورة بطاقة الرقم القومي
@@ -201,8 +225,19 @@ export default function SystemPage() {
 
     // ضغط فوري إلى WebP خفيف جداً
     const compressed = await compressImageToWebP(rawDataUrl, 1000, 0.75);
-    setIdCardPhoto(compressed.dataUrl);
-    stopCamera();
+    setTempIdCardPreview(compressed.dataUrl);
+  };
+
+  const confirmIdCardPhoto = () => {
+    if (tempIdCardPreview) {
+      setIdCardPhoto(tempIdCardPreview);
+      setTempIdCardPreview(null);
+      stopCamera();
+    }
+  };
+
+  const retakeIdCardPhoto = () => {
+    setTempIdCardPreview(null);
   };
 
   // التقاط صورة العمل الفني للمشروع
@@ -1248,24 +1283,72 @@ export default function SystemPage() {
       {showIdCamera && (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#000", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "#fff", fontWeight: "bold" }}>تصوير وجه بطاقة الرقم القومي</span>
-            <button onClick={stopCamera} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>✕</button>
-          </div>
-
-          <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", margin: "14px 0", borderRadius: "16px", border: "2px solid #38bdf8" }}>
-            <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", width: "85%", height: "60%", border: "2px dashed #10b981", borderRadius: "14px", pointerEvents: "none" }} />
-          </div>
-
-          <div style={{ textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "10px" }}>
-              ضع البطاقة داخل الإطار الأخضر وتأكد من وضوح الصورة والبيانات
+            <span style={{ color: "#fff", fontWeight: "bold" }}>
+              {tempIdCardPreview ? "مراجعة وتأكيد صورة البطاقة" : "تصوير وجه بطاقة الرقم القومي"}
+            </span>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {!tempIdCardPreview && (
+                <button 
+                  type="button" 
+                  onClick={toggleTorch} 
+                  style={{ background: torchOn ? "#eab308" : "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                >
+                  <span>{torchOn ? "🔦 الفلاش مفعّل" : "💡 تشغيل الفلاش"}</span>
+                </button>
+              )}
+              <button onClick={stopCamera} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>✕</button>
             </div>
-            <button 
-              onClick={captureIdCard}
-              style={{ width: "66px", height: "66px", borderRadius: "50%", background: "#fff", border: "4px solid #10b981", cursor: "pointer" }}
-            />
           </div>
+
+          {tempIdCardPreview ? (
+            /* شاشة معاينة الصورة للتأكيد قبل الاعتماد */
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", margin: "14px 0" }}>
+              <div style={{ position: "relative", width: "100%", maxHeight: "65vh", borderRadius: "16px", overflow: "hidden", border: "3px solid #10b981", background: "#111" }}>
+                <img src={tempIdCardPreview} alt="معاينة البطاقة" style={{ width: "100%", height: "100%", maxHeight: "65vh", objectFit: "contain", display: "block" }} />
+              </div>
+              <div style={{ color: "#fbbf24", fontSize: "13px", marginTop: "12px", textAlign: "center" }}>
+                🔍 تأكد من وضوح الصورة وظهور كافة البيانات والرقم القومي بوضوح تام قبل التأكيد.
+              </div>
+            </div>
+          ) : (
+            /* الكاميرا الحية */
+            <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", margin: "14px 0", borderRadius: "16px", border: "2px solid #38bdf8" }}>
+              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", width: "85%", height: "60%", border: "2px dashed #10b981", borderRadius: "14px", pointerEvents: "none" }} />
+            </div>
+          )}
+
+          {tempIdCardPreview ? (
+            /* أزرار التأكيد أو إعادة الالتقاط */
+            <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+              <button
+                type="button"
+                onClick={retakeIdCardPhoto}
+                style={{ flex: 1, padding: "14px", background: "rgba(239, 68, 68, 0.2)", border: "1px solid #ef4444", color: "#fca5a5", borderRadius: "10px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+              >
+                🔄 إعادة التقاط
+              </button>
+              <button
+                type="button"
+                onClick={confirmIdCardPhoto}
+                style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg, #10b981, #059669)", border: "none", color: "#fff", borderRadius: "10px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+              >
+                ✓ اعتماد واستخدام الصورة
+              </button>
+            </div>
+          ) : (
+            /* زر التقاط الصورة */
+            <div style={{ textAlign: "center" }}>
+              <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "10px" }}>
+                ضع البطاقة داخل الإطار الأخضر وتأكد من وضوح الصورة والبيانات
+              </div>
+              <button 
+                type="button"
+                onClick={captureIdCard}
+                style={{ width: "66px", height: "66px", borderRadius: "50%", background: "#fff", border: "4px solid #10b981", cursor: "pointer" }}
+              />
+            </div>
+          )}
         </div>
       )}
 

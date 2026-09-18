@@ -104,8 +104,8 @@ export async function POST(request: Request) {
     }
 
     if (action === 'toggle_verify_permission') {
-      if (!['مدير', 'مدير مساعد'].includes(profile.role)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      if (profile.role !== 'مدير') {
+        return NextResponse.json({ error: 'صلاحية حصرية للمدير العام فقط' }, { status: 403 });
       }
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
 

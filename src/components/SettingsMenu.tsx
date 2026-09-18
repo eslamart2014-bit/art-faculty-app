@@ -99,7 +99,7 @@ export default function SettingsMenu({
           }
         `}</style>
 
-        {(["مدير", "مدير مساعد"].includes(user?.role) || user?.can_verify_students) && (
+        {(user?.role === "مدير" || user?.can_verify_students) && (
           <div 
             className="settings-item" 
             onClick={() => { onClose(); if (onOpenIdentityVerification) onOpenIdentityVerification(); else window.open("/coordinator", "_blank"); }}
@@ -116,14 +116,9 @@ export default function SettingsMenu({
         )}
 
         {user?.role === "مدير" && (
-          <>
-            <div className="settings-item" onClick={() => { onClose(); onOpenRoster(); }}>
-              <span style={{ marginLeft: "10px" }}>📋</span> إدارة كشوف الطلاب
-            </div>
-            <div className="settings-item" onClick={() => { onClose(); onOpenAdvancedSettings(); }}>
-              <span style={{ marginLeft: "10px" }}>🧩</span> إعدادات متقدمة
-            </div>
-          </>
+          <div className="settings-item" onClick={() => { onClose(); onOpenAdvancedSettings(); }}>
+            <span style={{ marginLeft: "10px" }}>🧩</span> إعدادات متقدمة (الكشوف، البوابة، التواريخ)
+          </div>
         )}
 
         <div className="settings-item" onClick={() => { onClose(); onOpenAddCourse(); }}>
@@ -132,16 +127,6 @@ export default function SettingsMenu({
         <div className="settings-item" onClick={() => { onClose(); onOpenArchive(); }}>
           <span style={{ marginLeft: "10px" }}>🗄️</span> الأرشيف
         </div>
-
-        {["مدير", "مدير مساعد"].includes(user?.role) && (
-          <div 
-            className="settings-item" 
-            onClick={() => { onClose(); if (onOpenStudentPortalHub) onOpenStudentPortalHub(); else window.open("/student-portal", "_blank"); }}
-            style={{ color: "#81C784", fontWeight: "bold" }}
-          >
-            <span style={{ marginLeft: "10px" }}>🎓</span> بوابة الطلاب
-          </div>
-        )}
 
         <div className="settings-item" onClick={() => { onClose(); onOpenSuggestions(); }}>
           <span style={{ marginLeft: "10px" }}>💡</span> اقتراحات التطوير
