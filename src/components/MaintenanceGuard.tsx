@@ -241,80 +241,82 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             ستختفي هذه الشاشة تلقائياً ويعود النظام للعمل فور اكتمال التحديثات.
           </p>
 
-          {/* Emergency Admin Login Button & Box */}
-          <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: "1px solid #2a374f" }}>
-            {!showAdminLogin ? (
-              <button
-                onClick={() => setShowAdminLogin(true)}
-                style={{
-                  background: "transparent",
-                  border: "1px solid #3b82f6",
-                  color: "#38bdf8",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px"
-                }}
-              >
-                <span>🔑</span> تسجيل دخول كمسؤول النظام (Admin Bypass)
-              </button>
-            ) : (
-              <form onSubmit={handleAdminLogin} style={{ textAlign: "right", marginTop: "10px" }}>
-                <div style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "12px", textAlign: "center" }}>
-                  دخول الطوارئ لمديري النظام 🛡️
-                </div>
-
-                {loginError && (
-                  <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid #ef4444", color: "#fca5a5", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "12px" }}>
-                    {loginError}
+          {/* Emergency Admin Login Button & Box (Hidden on Student Routes) */}
+          {!isStudentRoute && (
+            <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: "1px solid #2a374f" }}>
+              {!showAdminLogin ? (
+                <button
+                  onClick={() => setShowAdminLogin(true)}
+                  style={{
+                    background: "transparent",
+                    border: "1px solid #3b82f6",
+                    color: "#38bdf8",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <span>🔑</span> تسجيل دخول كمسؤول النظام (Admin Bypass)
+                </button>
+              ) : (
+                <form onSubmit={handleAdminLogin} style={{ textAlign: "right", marginTop: "10px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "12px", textAlign: "center" }}>
+                    دخول الطوارئ لمديري النظام 🛡️
                   </div>
-                )}
 
-                <div style={{ marginBottom: "10px" }}>
-                  <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>البريد الإلكتروني للادمن:</label>
-                  <input
-                    type="email"
-                    value={adminEmail}
-                    onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="admin@faculty.edu"
-                    style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
-                  />
-                </div>
+                  {loginError && (
+                    <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid #ef4444", color: "#fca5a5", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "12px" }}>
+                      {loginError}
+                    </div>
+                  )}
 
-                <div style={{ marginBottom: "14px" }}>
-                  <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>كلمة المرور:</label>
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="••••••••"
-                    style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
-                  />
-                </div>
+                  <div style={{ marginBottom: "10px" }}>
+                    <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>البريد الإلكتروني للادمن:</label>
+                    <input
+                      type="email"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      placeholder="admin@faculty.edu"
+                      style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
+                    />
+                  </div>
 
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    type="submit"
-                    disabled={loggingIn}
-                    style={{ flex: 1, padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: loggingIn ? "not-allowed" : "pointer" }}
-                  >
-                    {loggingIn ? "جاري التحقق..." : "تأكيد الدخول وفك الحجب ✅"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAdminLogin(false)}
-                    style={{ padding: "10px 14px", background: "#334155", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+                  <div style={{ marginBottom: "14px" }}>
+                    <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>كلمة المرور:</label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="submit"
+                      disabled={loggingIn}
+                      style={{ flex: 1, padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: loggingIn ? "not-allowed" : "pointer" }}
+                    >
+                      {loggingIn ? "جاري التحقق..." : "تأكيد الدخول وفك الحجب ✅"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminLogin(false)}
+                      style={{ padding: "10px 14px", background: "#334155", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
 
         <style>{`

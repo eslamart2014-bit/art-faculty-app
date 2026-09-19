@@ -18,8 +18,11 @@ import {
   Sparkles, 
   UploadCloud, 
   ChevronLeft,
+  ChevronDown,
   X,
-  Smartphone
+  Smartphone,
+  ImageIcon,
+  FolderOpen
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
@@ -56,6 +59,12 @@ export default function SystemPage() {
   const [activeTab, setActiveTab] = useState<"attendance" | "evaluation" | "warnings" | "complaints">("attendance");
   const [dashboardData, setDashboardData] = useState<any>(null);
 
+  // Collapsible Course Accordion & Modals
+  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
+  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
+  const [customProjectDialog, setCustomProjectDialog] = useState<{ isOpen: boolean; course: any } | null>(null);
+  const [customProjectTitle, setCustomProjectTitle] = useState("");
+
   // Project Submission & Camera State
   const [selectedCourseForEval, setSelectedCourseForEval] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<any>(null);
@@ -70,9 +79,20 @@ export default function SystemPage() {
   const [complaintText, setComplaintText] = useState("");
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
-  // Camera video elements
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Camera video elements & refs
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const idFileInputRef = useRef<HTMLInputElement>(null);
+  const artworkFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Callback ref to guarantee stream is attached as soon as video mounts
+  const setVideoRef = (el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current) {
+      el.srcObject = streamRef.current;
+      el.play().catch(e => console.log("video play err:", e));
+    }
+  };
 
   // 1. Initial Load: Check cached session & fetch coordinators
   useEffect(() => {
@@ -108,30 +128,34 @@ export default function SystemPage() {
     const timer = setTimeout(async () => {
       setIsLookingUpCode(true);
       setLookupMessage(null);
+
       try {
-        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(trimmed)}`);
+        const cleanCode = formatStudentCode(trimmed);
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(cleanCode)}`);
         const data = await res.json();
-        if (data.success && data.student) {
-          setMatchedStudent(data.student);
-          setRegName(data.student.full_name);
-          if (data.isAlreadyActive) {
-            setLookupMessage("⚠️ هذا الحساب مسجل ومفعل بالفعل! يرجى الضغط على 'تسجيل الدخول' أعلاه.");
-          } else if (data.isPending) {
-            setLookupMessage("ℹ️ بياناتك مسجلة مسبقاً وبانتظار تفعيل الرقم السري من المنسق.");
+
+        if (res.ok && data.found) {
+          if (data.is_already_registered) {
+            setMatchedStudent(data.student);
+            setRegName(data.student.full_name);
+            setLookupMessage("هذا الكود مسجل بالفعل في المنظومة. يمكنك الانتقال إلى شاشة الدخول بالرقم السري.");
           } else {
+            setMatchedStudent(data.student);
+            setRegName(data.student.full_name);
             setLookupMessage(null);
           }
         } else {
           setMatchedStudent(null);
           setRegName("");
-          setLookupMessage(data.message || "كود الطالب غير موجود في كشوف الكلية");
+          setLookupMessage(data.message || "الكود غير مسجل في كشوف الكلية الرسمية.");
         }
       } catch (err) {
         setMatchedStudent(null);
+        setLookupMessage("تعذر التحقق من الكود، تأكد من الاتصال بالإنترنت.");
       } finally {
         setIsLookingUpCode(false);
       }
-    }, 400);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [regCode]);
@@ -146,7 +170,13 @@ export default function SystemPage() {
 
   const loadDashboard = async (code: string, pin?: string) => {
     try {
-      const activePin = pin || currentStudent?.pin_code || (typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("fania_student_session") || '{}')?.pin_code : '');
+      const sessionStr = typeof window !== 'undefined' ? localStorage.getItem("fania_student_session") : null;
+      let sessionObj: any = {};
+      try {
+        if (sessionStr) sessionObj = JSON.parse(sessionStr);
+      } catch (e) {}
+
+      const activePin = pin || sessionObj?.pin_code || currentStudent?.pin_code || enteredPin || '';
       const pinParam = activePin ? `&pin=${encodeURIComponent(activePin)}` : '';
       const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}`);
       const data = await res.json();
@@ -158,26 +188,56 @@ export default function SystemPage() {
     }
   };
 
-  // 2. Camera Management for ID & Artwork
+  // 2. Camera Management with Relaxed Fallbacks
   const startCamera = async (type: "id" | "artwork") => {
     setErrorMsg("");
     try {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
+
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: { ideal: "environment" }, 
+            width: { ideal: 1920 }, 
+            height: { ideal: 1080 } 
+          },
+          audio: false
+        });
+      } catch (err1) {
+        console.warn("Retrying with relaxed camera constraints...", err1);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+            audio: false
+          });
+        } catch (err2) {
+          console.warn("Retrying with basic video constraint...", err2);
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
+      }
+
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
       if (type === "id") setShowIdCamera(true);
       else setShowArtworkCamera(true);
+
+      if (videoRef.current && stream) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(console.error);
+      }
     } catch (err: any) {
       console.error("Camera access error:", err);
-      alert("تعذر فتح الكاميرا، يرجى السماح بالوصول إلى الكاميرا من إعدادات المتصفح.");
+      const useFile = confirm("تعذر فتح الكاميرا الحية على جهازك. هل ترغب في اختيار أو التقاط الصورة عبر تطبيق الكاميرا في هاتفك مباشرة؟");
+      if (useFile) {
+        if (type === "id") {
+          idFileInputRef.current?.click();
+        } else {
+          artworkFileInputRef.current?.click();
+        }
+      }
     }
   };
 
@@ -249,7 +309,6 @@ export default function SystemPage() {
     const width = video.videoWidth || 1280;
     const height = video.videoHeight || 720;
 
-    // التحقق من اتجاه الكاميرا (رأسي أو أفقي فقط وفق المقرر)
     const isPortrait = height > width;
     if (cameraOrientationRequired === "portrait" && !isPortrait) {
       alert("تنبيه: يجب تدوير الهاتف لالتقاط الصورة بالوضع الرأسي (Portrait) وفق تعليمات هذا المشروع!");
@@ -269,7 +328,6 @@ export default function SystemPage() {
     ctx.drawImage(video, 0, 0, width, height);
     const rawDataUrl = canvas.toDataURL("image/jpeg", 0.9);
 
-    // ضغط فوري وفحص الإضاءة وحساب البصمة الرقمية
     const compressed = await compressImageToWebP(rawDataUrl, 1400, 0.78);
 
     if (!compressed.isGoodLighting) {
@@ -293,24 +351,73 @@ export default function SystemPage() {
     stopCamera();
   };
 
+  // Fallback Handlers for native file input
+  const handleIdFileFallback = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const rawDataUrl = ev.target?.result as string;
+        if (rawDataUrl) {
+          const compressed = await compressImageToWebP(rawDataUrl, 1000, 0.75);
+          setTempIdCardPreview(compressed.dataUrl);
+          setShowIdCamera(true);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert("حدث خطأ أثناء قراءة الصورة: " + err.message);
+    }
+  };
+
+  const handleArtworkFileFallback = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const rawDataUrl = ev.target?.result as string;
+        if (rawDataUrl) {
+          const compressed = await compressImageToWebP(rawDataUrl, 1400, 0.78);
+          setProjectPhotos(prev => [
+            ...prev,
+            {
+              dataUrl: compressed.dataUrl,
+              dhash: compressed.dhash,
+              width: compressed.width,
+              height: compressed.height,
+              orientation: "portrait",
+              timestamp: new Date().toISOString()
+            }
+          ]);
+          stopCamera();
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      alert("حدث خطأ أثناء قراءة الصورة: " + err.message);
+    }
+  };
+
   // 3. New Registration Submission
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
 
-    if (!regCode || !regMobile) {
-      setErrorMsg("يرجى إدخال الكود ورقم الموبايل");
+    if (!matchedStudent) {
+      setErrorMsg("يرجى إدخال كود طالب صحيح من كشوف الكلية");
       return;
     }
 
-    if (!matchedStudent) {
-      setErrorMsg("يرجى التأكد من كتابة كود طالب صحيح ومسجل في كشوف الكلية");
+    if (!regMobile || regMobile.length < 10) {
+      setErrorMsg("يرجى كتابة رقم موبايل صحيح للتواصل");
       return;
     }
 
     if (!idCardPhoto) {
-      setErrorMsg("يجب تصوير وجه بطاقة الهوية / الرقم القومي بوضوح للاستمرار");
+      setErrorMsg("تصوير وجه بطاقة الرقم القومي إجباري لإتمام التسجيل");
       return;
     }
 
@@ -393,7 +500,7 @@ export default function SystemPage() {
     }
   };
 
-  // 5. Complete PIN Verification
+  // 5. Complete PIN Verification & Save Full Session
   const handleVerifyPinSubmit = async () => {
     if (!enteredPin || !currentStudent) {
       setErrorMsg("يرجى كتابة الرقم السري المكون من 8 خانات");
@@ -422,10 +529,20 @@ export default function SystemPage() {
         return;
       }
 
+      const updatedStudent = {
+        ...currentStudent,
+        ...(data.student || {}),
+        pin_code: enteredPin,
+        status: "active",
+        is_pin_used: true
+      };
+
+      localStorage.setItem("fania_student_session", JSON.stringify(updatedStudent));
       localStorage.setItem("fania_account_status", "active");
+      setCurrentStudent(updatedStudent);
       setAccountStatus("active");
-      alert(data.message);
-      loadDashboard(currentStudent.student_code, enteredPin);
+      alert(data.message || "تم تفعيل الحساب بنجاح!");
+      loadDashboard(updatedStudent.student_code, enteredPin);
     } catch (err: any) {
       setErrorMsg(err.message || "خطأ في التحقق");
     } finally {
@@ -500,7 +617,7 @@ export default function SystemPage() {
 
       const data = await res.json();
       if (res.ok) {
-        alert("تم إرسال شكواك بنجاح وسيتم النظر فيها قريباً.");
+        alert("تم إرسال شكواك بنجاح وسيتم إشعار الإدارة فوراً والنظر فيها.");
         setComplaintText("");
         loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
       } else {
@@ -527,21 +644,48 @@ export default function SystemPage() {
   // ==========================================
   if (currentStudent && accountStatus === "pending") {
     return (
-      <div style={{ minHeight: "100vh", padding: "18px", maxWidth: "480px", margin: "0 auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      <div style={{ minHeight: "100vh", padding: "16px", maxWidth: "480px", margin: "0 auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
         
-        {/* شريط أعلى به اسم الطالب وزر خروج */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#141b29", borderRadius: "14px", border: "1px solid #2a374f", marginBottom: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "rgba(59, 130, 246, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#38bdf8" }}>
-              <UserCheck size={20} />
+        {/* شريط أعلى به اسم الطالب وزر خروج أنيق */}
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          gap: "10px",
+          padding: "10px 14px", 
+          background: "#141b29", 
+          borderRadius: "14px", 
+          border: "1px solid #2a374f", 
+          marginBottom: "16px" 
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+            <div style={{ width: "36px", height: "36px", minWidth: "36px", borderRadius: "10px", background: "rgba(59, 130, 246, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#38bdf8" }}>
+              <UserCheck size={18} />
             </div>
-            <div>
-              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{currentStudent.full_name}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentStudent.full_name}</div>
               <div style={{ color: "#94a3b8", fontSize: "11px" }}>كود: {formatStudentCode(currentStudent.student_code)}</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn-secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>
-            <LogOut size={14} />
+          <button 
+            onClick={handleLogout} 
+            title="تسجيل الخروج"
+            style={{ 
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 10px", 
+              fontSize: "12px", 
+              fontWeight: "bold",
+              background: "rgba(239, 68, 68, 0.12)",
+              color: "#f87171",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              borderRadius: "8px",
+              cursor: "pointer",
+              flexShrink: 0
+            }}
+          >
+            <LogOut size={13} />
             <span>خروج</span>
           </button>
         </div>
@@ -626,39 +770,113 @@ export default function SystemPage() {
     return (
       <div style={{ minHeight: "100vh", padding: "16px", maxWidth: "520px", margin: "0 auto" }}>
         
-        {/* هيدر الطالب */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: "#141b29", borderRadius: "16px", border: "1px solid #2a374f", marginBottom: "18px", boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg, #2563eb, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold", fontSize: "18px" }}>
-              {currentStudent.full_name.charAt(0)}
+        {/* هيدر الطالب منسق ومرتب */}
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          gap: "10px",
+          padding: "10px 14px", 
+          background: "#141b29", 
+          borderRadius: "16px", 
+          border: "1px solid #2a374f", 
+          marginBottom: "16px", 
+          boxShadow: "0 8px 24px rgba(0,0,0,0.3)" 
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+            <div style={{ 
+              width: "38px", 
+              height: "38px", 
+              minWidth: "38px",
+              borderRadius: "10px", 
+              background: "linear-gradient(135deg, #2563eb, #10b981)", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center", 
+              color: "#fff", 
+              fontWeight: "bold", 
+              fontSize: "16px",
+              boxShadow: "0 2px 8px rgba(37, 99, 235, 0.3)"
+            }}>
+              {currentStudent.full_name?.charAt(0) || "ط"}
             </div>
-            <div>
-              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>{currentStudent.full_name}</div>
-              <div style={{ color: "#38bdf8", fontSize: "12px", display: "flex", gap: "6px" }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ 
+                color: "#fff", 
+                fontWeight: "bold", 
+                fontSize: "14px", 
+                whiteSpace: "nowrap", 
+                overflow: "hidden", 
+                textOverflow: "ellipsis" 
+              }}>
+                {currentStudent.full_name}
+              </div>
+              <div style={{ color: "#38bdf8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 <span>كود: {formatStudentCode(currentStudent.student_code)}</span>
-                <span>•</span>
-                <span>{currentStudent.academic_year}</span>
+                <span style={{ opacity: 0.5 }}>•</span>
+                <span style={{ color: "#94a3b8" }}>{currentStudent.academic_year}</span>
               </div>
             </div>
           </div>
 
-          <button onClick={handleLogout} className="btn-secondary" style={{ padding: "8px 14px", fontSize: "12px" }}>
-            <LogOut size={15} />
+          <button 
+            onClick={handleLogout} 
+            title="تسجيل الخروج"
+            style={{ 
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "6px 10px", 
+              fontSize: "12px", 
+              fontWeight: "bold",
+              background: "rgba(239, 68, 68, 0.12)",
+              color: "#f87171",
+              border: "1px solid rgba(239, 68, 68, 0.25)",
+              borderRadius: "8px",
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: "all 0.2s ease"
+            }}
+          >
+            <LogOut size={13} />
             <span>خروج</span>
           </button>
         </div>
 
-        {/* أزرار التنقل الرئيسية الأربعة */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-          
+        {/* كارت البطاقة الجامعية الذكية مع QR كود */}
+        <div className="glass-card animate-fade-in" style={{ padding: "16px", marginBottom: "16px", background: "linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(16, 185, 129, 0.15))" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "bold" }}>بطاقة إثبات الحضور والتقييم الذكية</div>
+              <div style={{ fontSize: "15px", color: "#fff", fontWeight: "bold", marginTop: "2px" }}>{currentStudent.full_name}</div>
+              <div style={{ fontSize: "12px", color: "#38bdf8", marginTop: "4px" }}>
+                الفرقة: {currentStudent.academic_year} • السكشن: {currentStudent.section || "1"}
+              </div>
+            </div>
+
+            {/* صورة بطاقة الرقم القومي المصغرة */}
+            {currentStudent.id_card_image && (
+              <div 
+                onClick={() => setPreviewModalImage(currentStudent.id_card_image)}
+                title="اضغط للتكبير"
+                style={{ width: "50px", height: "50px", borderRadius: "8px", overflow: "hidden", border: "2px solid #38bdf8", cursor: "pointer", flexShrink: 0 }}
+              >
+                <img src={currentStudent.id_card_image} alt="البطاقة" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* شريط التبويبات الرئيسي */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
           <button 
             onClick={() => setActiveTab("attendance")}
             style={{ 
-              padding: "14px 10px", 
-              borderRadius: "14px", 
-              border: activeTab === "attendance" ? "2px solid #3b82f6" : "1px solid #2a374f", 
-              background: activeTab === "attendance" ? "rgba(37, 99, 235, 0.2)" : "#141b29", 
-              color: activeTab === "attendance" ? "#60a5fa" : "#94a3b8",
+              padding: "12px", 
+              borderRadius: "12px", 
+              border: activeTab === "attendance" ? "1px solid #3b82f6" : "1px solid #2a374f", 
+              background: activeTab === "attendance" ? "rgba(59, 130, 246, 0.2)" : "#141b29", 
+              color: activeTab === "attendance" ? "#38bdf8" : "#94a3b8",
               fontWeight: "bold",
               display: "flex",
               alignItems: "center",
@@ -674,9 +892,9 @@ export default function SystemPage() {
           <button 
             onClick={() => setActiveTab("evaluation")}
             style={{ 
-              padding: "14px 10px", 
-              borderRadius: "14px", 
-              border: activeTab === "evaluation" ? "2px solid #10b981" : "1px solid #2a374f", 
+              padding: "12px", 
+              borderRadius: "12px", 
+              border: activeTab === "evaluation" ? "1px solid #10b981" : "1px solid #2a374f", 
               background: activeTab === "evaluation" ? "rgba(16, 185, 129, 0.2)" : "#141b29", 
               color: activeTab === "evaluation" ? "#34d399" : "#94a3b8",
               fontWeight: "bold",
@@ -694,9 +912,9 @@ export default function SystemPage() {
           <button 
             onClick={() => setActiveTab("warnings")}
             style={{ 
-              padding: "14px 10px", 
-              borderRadius: "14px", 
-              border: activeTab === "warnings" ? "2px solid #f59e0b" : "1px solid #2a374f", 
+              padding: "12px", 
+              borderRadius: "12px", 
+              border: activeTab === "warnings" ? "1px solid #f59e0b" : "1px solid #2a374f", 
               background: activeTab === "warnings" ? "rgba(245, 158, 11, 0.2)" : "#141b29", 
               color: activeTab === "warnings" ? "#fbbf24" : "#94a3b8",
               fontWeight: "bold",
@@ -708,15 +926,15 @@ export default function SystemPage() {
             }}
           >
             <AlertTriangle size={18} />
-            <span>إنذارات الحضور</span>
+            <span>إنذارات الغياب</span>
           </button>
 
           <button 
             onClick={() => setActiveTab("complaints")}
             style={{ 
-              padding: "14px 10px", 
-              borderRadius: "14px", 
-              border: activeTab === "complaints" ? "2px solid #ec4899" : "1px solid #2a374f", 
+              padding: "12px", 
+              borderRadius: "12px", 
+              border: activeTab === "complaints" ? "1px solid #ec4899" : "1px solid #2a374f", 
               background: activeTab === "complaints" ? "rgba(236, 72, 153, 0.2)" : "#141b29", 
               color: activeTab === "complaints" ? "#f472b6" : "#94a3b8",
               fontWeight: "bold",
@@ -730,7 +948,6 @@ export default function SystemPage() {
             <MessageSquare size={18} />
             <span>الشكاوى والمقترحات</span>
           </button>
-
         </div>
 
         {/* 1. تبويب سجل الحضور والغياب */}
@@ -776,7 +993,7 @@ export default function SystemPage() {
 
                     {c.records?.length > 0 && (
                       <div style={{ marginTop: "10px", borderTop: "1px solid #1a2336", paddingTop: "8px" }}>
-                        <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "6px" }}>تواريخ المحاضرات المسجلة:</div>
+                        <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "6px" }}>تواريخ المحاضرات والسكاشن المسجلة:</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                           {c.records.map((r: any, idx: number) => (
                             <span key={idx} style={{ 
@@ -803,7 +1020,7 @@ export default function SystemPage() {
           </div>
         )}
 
-        {/* 2. تبويب التقييم والمشاريع ورفع اللوحات */}
+        {/* 2. تبويب التقييم والمشاريع ورفع اللوحات بنظام Accordion الذكي */}
         {activeTab === "evaluation" && (
           <div className="animate-fade-in">
             <h3 style={{ fontSize: "16px", color: "#fff", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -811,61 +1028,270 @@ export default function SystemPage() {
               <span>المقررات والمشاريع العملية:</span>
             </h3>
 
-            {dashboardData?.projects?.map((courseObj: any) => (
-              <div key={courseObj.courseId} className="glass-card" style={{ padding: "16px", marginBottom: "14px" }}>
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px", marginBottom: "12px", borderBottom: "1px solid #1e293b", paddingBottom: "8px" }}>
-                  {courseObj.courseName}
-                </div>
+            {dashboardData?.projects?.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {dashboardData.projects.map((courseObj: any, idx: number) => {
+                  const isExpanded = expandedCourses[courseObj.courseId] ?? (idx === 0);
+                  const assignedProjectsCount = courseObj.projects?.length || 0;
+                  const submissionsCount = courseObj.submissions?.length || 0;
 
-                {/* استعراض المشاريع أو المهام */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {/* مشاريع مسجلة مسبقاً */}
-                  {courseObj.submissions?.map((sub: any) => (
-                    <div key={sub.id} style={{ background: "#0d131f", padding: "12px", borderRadius: "10px", border: "1px solid #2a374f" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                        <span style={{ color: "#e2e8f0", fontWeight: "bold", fontSize: "14px" }}>{sub.project_name}</span>
-                        <span style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "8px", background: sub.score !== null ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)", color: sub.score !== null ? "#34d399" : "#fbbf24", fontWeight: "bold" }}>
-                          {sub.score !== null ? `الدرجة: ${sub.score}` : "في انتظار التقييم"}
-                        </span>
-                      </div>
-
-                      {/* معرض صور العمل المرفوع */}
-                      <div style={{ display: "flex", gap: "8px", overflowX: "auto", padding: "6px 0" }}>
-                        {sub.images?.map((img: any, i: number) => (
-                          <div key={i} style={{ width: "80px", height: "80px", borderRadius: "8px", overflow: "hidden", border: "1px solid #334155", flexShrink: 0 }}>
-                            <img src={img.url} alt="عمل فني" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          </div>
-                        ))}
-                      </div>
-
-                      <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
-                        تاريخ الرفع: {new Date(sub.created_at).toLocaleDateString("ar-EG")} • يمكنك العودة لاحقاً لمتابعة رصد الدرجة
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* زر رفع مشروع جديد */}
-                  <div style={{ marginTop: "6px" }}>
-                    <button 
-                      onClick={() => {
-                        const pName = prompt("أدخل اسم المشروع أو العمل الفني الذي ترغب في تصويره ورفعه:");
-                        if (pName && pName.trim()) {
-                          setSelectedCourseForEval(courseObj);
-                          setSelectedProject(pName.trim());
-                          setProjectPhotos([]);
-                          startCamera("artwork");
-                        }
+                  return (
+                    <div 
+                      key={courseObj.courseId} 
+                      className="glass-card" 
+                      style={{ 
+                        borderRadius: "16px", 
+                        overflow: "hidden", 
+                        border: isExpanded ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid #2a374f",
+                        transition: "all 0.2s ease"
                       }}
-                      className="btn-primary"
-                      style={{ background: "linear-gradient(135deg, #2563eb, #06b6d4)", fontSize: "13px", padding: "10px" }}
                     >
-                      <Camera size={16} />
-                      <span>تصوير ورفع مشروع جديد لهذا المقرر</span>
-                    </button>
-                  </div>
-                </div>
+                      {/* رأس المقرر قابل للضغط للفتح والإغلاق */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCourses(prev => ({ ...prev, [courseObj.courseId]: !isExpanded }))}
+                        style={{
+                          width: "100%",
+                          textAlign: "right",
+                          background: isExpanded ? "rgba(30, 41, 59, 0.7)" : "#141b29",
+                          border: "none",
+                          padding: "16px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          cursor: "pointer",
+                          color: "#fff",
+                          transition: "background 0.2s ease"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "10px",
+                            background: isExpanded ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                            color: isExpanded ? "#38bdf8" : "#94a3b8",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0
+                          }}>
+                            <Award size={18} />
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontWeight: "bold", fontSize: "15px", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {courseObj.courseName}
+                            </div>
+                            <div style={{ color: "#94a3b8", fontSize: "11px", display: "flex", gap: "6px", marginTop: "2px", flexWrap: "wrap" }}>
+                              <span>{courseObj.academicYear || "الفرقة الحالية"}</span>
+                              <span>•</span>
+                              <span style={{ color: "#38bdf8" }}>{assignedProjectsCount} مشاريع مطلوبة</span>
+                              <span>•</span>
+                              <span style={{ color: "#34d399" }}>{submissionsCount} أعمال مرفوعة</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ 
+                          width: "30px", 
+                          height: "30px", 
+                          borderRadius: "50%", 
+                          background: "rgba(255,255,255,0.06)", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center", 
+                          color: "#94a3b8",
+                          flexShrink: 0,
+                          transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.2s ease"
+                        }}>
+                          <ChevronDown size={18} />
+                        </div>
+                      </button>
+
+                      {/* محتوى المقرر عند الفتح */}
+                      {isExpanded && (
+                        <div style={{ padding: "16px", borderTop: "1px solid #1e293b", background: "#0b101b" }}>
+                          
+                          {/* 1. المشاريع والتكليفات المضافة من أستاذ المقرر */}
+                          <div style={{ marginBottom: "18px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "10px" }}>
+                              <Sparkles size={15} />
+                              <span>المشاريع والتكليفات المحددة من أستاذ المقرر:</span>
+                            </div>
+
+                            {courseObj.projects && courseObj.projects.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                {courseObj.projects.map((proj: any) => {
+                                  const isGraded = proj.score !== null && proj.score !== undefined;
+                                  const isSubmitted = proj.is_submitted || isGraded || (proj.submissions && proj.submissions.length > 0);
+
+                                  return (
+                                    <div 
+                                      key={proj.id} 
+                                      style={{ 
+                                        background: "#141b29", 
+                                        padding: "14px", 
+                                        borderRadius: "12px", 
+                                        border: isSubmitted ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid #2a374f",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "10px"
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                                        <div>
+                                          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
+                                            {proj.name}
+                                          </div>
+                                          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+                                            الدرجة العظمى: <b style={{ color: "#fbbf24" }}>{proj.max_score || 10} درجات</b>
+                                          </div>
+                                        </div>
+
+                                        <span style={{
+                                          fontSize: "11px",
+                                          padding: "3px 8px",
+                                          borderRadius: "8px",
+                                          fontWeight: "bold",
+                                          background: isGraded ? "rgba(16, 185, 129, 0.2)" : isSubmitted ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.05)",
+                                          color: isGraded ? "#34d399" : isSubmitted ? "#38bdf8" : "#94a3b8"
+                                        }}>
+                                          {isGraded ? `الدرجة: ${proj.score} / ${proj.max_score}` : isSubmitted ? "قيد المراجعة والتقييم" : "لم يُرفع بعد"}
+                                        </span>
+                                      </div>
+
+                                      {/* زر تصوير ورفع هذا المشروع المحدد مباشرة بدون مطالبات */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedCourseForEval(courseObj);
+                                          setSelectedProject(proj.name);
+                                          setCameraOrientationRequired(proj.camera_mode || "portrait");
+                                          setProjectPhotos([]);
+                                          startCamera("artwork");
+                                        }}
+                                        style={{
+                                          width: "100%",
+                                          padding: "10px",
+                                          background: isSubmitted 
+                                            ? "linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(16, 185, 129, 0.7))" 
+                                            : "linear-gradient(135deg, #2563eb, #10b981)",
+                                          color: "#fff",
+                                          border: "none",
+                                          borderRadius: "10px",
+                                          fontWeight: "bold",
+                                          fontSize: "13px",
+                                          cursor: "pointer",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          gap: "6px"
+                                        }}
+                                      >
+                                        <Camera size={16} />
+                                        <span>{isSubmitted ? "📷 تصوير أو تحديث تسليم هذا المشروع" : "📷 تصوير ورفع هذا المشروع الآن"}</span>
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div style={{ background: "#141b29", padding: "14px", borderRadius: "10px", textAlign: "center", color: "#94a3b8", fontSize: "12px", border: "1px dashed #2a374f" }}>
+                                لم يقم أستاذ المقرر بإدراج تكليفات محددة بعد، يمكنك تصوير ورفع عملك الحر عبر الزر أدناه.
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 2. معرض وسجل الأعمال المرفوعة من الطالب لهذا المقرر */}
+                          <div style={{ marginBottom: "16px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#34d399", fontWeight: "bold", fontSize: "13px", marginBottom: "10px" }}>
+                              <CheckCircle2 size={15} />
+                              <span>أعمالك ومشاريعك المرفوعة لهذا المقرر ({submissionsCount}):</span>
+                            </div>
+
+                            {courseObj.submissions && courseObj.submissions.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                {courseObj.submissions.map((sub: any) => (
+                                  <div key={sub.id} style={{ background: "#141b29", padding: "12px", borderRadius: "12px", border: "1px solid #2a374f" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                                      <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{sub.project_name}</span>
+                                      <span style={{ 
+                                        fontSize: "11px", 
+                                        padding: "3px 8px", 
+                                        borderRadius: "8px", 
+                                        background: sub.score !== null && sub.score !== undefined ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)", 
+                                        color: sub.score !== null && sub.score !== undefined ? "#34d399" : "#fbbf24", 
+                                        fontWeight: "bold" 
+                                      }}>
+                                        {sub.score !== null && sub.score !== undefined ? `الدرجة: ${sub.score}` : "في انتظار التقييم"}
+                                      </span>
+                                    </div>
+
+                                    {/* معرض صور العمل المرفوع */}
+                                    <div style={{ display: "flex", gap: "8px", overflowX: "auto", padding: "4px 0" }}>
+                                      {sub.images?.map((img: any, i: number) => (
+                                        <div 
+                                          key={i} 
+                                          onClick={() => setPreviewModalImage(img.url)}
+                                          title="اضغط لتكبير الصورة"
+                                          style={{ width: "80px", height: "80px", borderRadius: "8px", overflow: "hidden", border: "1px solid #334155", flexShrink: 0, cursor: "pointer", position: "relative" }}
+                                        >
+                                          <img src={img.url} alt="عمل فني" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px" }}>
+                                      تاريخ الرفع: {new Date(sub.created_at).toLocaleDateString("ar-EG")} • يمكنك المتابعة لمعرفة الدرجة المرصودة
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ background: "#141b29", padding: "12px", borderRadius: "10px", textAlign: "center", color: "#64748b", fontSize: "12px" }}>
+                                لم تقم برفع أي أعمال لهذا المقرر بعد.
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. زر رفع عمل حر / تكليف إضافي غير مدرج */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomProjectDialog({ isOpen: true, course: courseObj });
+                              setCustomProjectTitle("");
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "10px",
+                              background: "rgba(255, 255, 255, 0.05)",
+                              border: "1px dashed #38bdf8",
+                              color: "#38bdf8",
+                              borderRadius: "10px",
+                              fontWeight: "bold",
+                              fontSize: "12px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px"
+                            }}
+                          >
+                            <span>+ تصوير عمل إضافي أو تكليف حر لهذا المقرر</span>
+                          </button>
+
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              <div className="glass-card" style={{ padding: "24px", textAlign: "center", color: "#94a3b8" }}>
+                لا توجد مقررات دراسية مسجلة لك حالياً.
+              </div>
+            )}
           </div>
         )}
 
@@ -931,10 +1357,10 @@ export default function SystemPage() {
                   نص الشكوى أو المقترح:
                 </label>
                 <textarea 
-                  rows={3}
                   value={complaintText}
                   onChange={(e) => setComplaintText(e.target.value)}
-                  placeholder="اكتب تفاصيل الشكوى أو المقترح بوضوح..."
+                  placeholder="اكتب تفاصيل الشكوى أو مقترح التطوير هنا..."
+                  rows={4}
                   required
                 />
               </div>
@@ -974,7 +1400,7 @@ export default function SystemPage() {
           </div>
         )}
 
-        {/* نافذة كاميرا تصوير المشروع الإجبارية */}
+        {/* نافذة كاميرا تصوير المشروع */}
         {showArtworkCamera && (
           <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#000", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "20px" }}>
             
@@ -983,14 +1409,24 @@ export default function SystemPage() {
               <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
                 تصوير عمل: {selectedProject}
               </div>
-              <button onClick={stopCamera} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>
-                ✕
-              </button>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <button 
+                  type="button" 
+                  onClick={() => artworkFileInputRef.current?.click()}
+                  style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                >
+                  <FolderOpen size={14} />
+                  <span>أو اختر صورة من جهازك</span>
+                </button>
+                <button onClick={stopCamera} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* شاشة الفيديو */}
             <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", margin: "14px 0", borderRadius: "16px", border: "2px solid #38bdf8" }}>
-              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <video ref={setVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               
               {/* إطار دليلي للكاميرا */}
               <div style={{ position: "absolute", inset: "20px", border: "2px dashed rgba(255,255,255,0.5)", borderRadius: "12px", pointerEvents: "none" }} />
@@ -999,7 +1435,7 @@ export default function SystemPage() {
             {/* بار التقاط سفلي */}
             <div style={{ textAlign: "center" }}>
               <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "12px" }}>
-                تأكد من وضوح الإضاءة واكتمال حدود اللوحة داخل الإطار
+                تأكد من وضوح الإضاءة واكتمال حدود اللوحة أو العمل الفني داخل الإطار
               </div>
               <button 
                 onClick={captureArtworkPhoto}
@@ -1050,6 +1486,98 @@ export default function SystemPage() {
             </div>
           </div>
         )}
+
+        {/* نافذة إدخال اسم عمل حر / تكليف إضافي */}
+        {customProjectDialog?.isOpen && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+            <div className="glass-card animate-fade-in" style={{ maxWidth: "420px", width: "100%", padding: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <h3 style={{ margin: 0, color: "#fff", fontSize: "15px" }}>
+                  تصوير عمل أو تكليف حر: {customProjectDialog.course?.courseName}
+                </h3>
+                <button onClick={() => setCustomProjectDialog(null)} style={{ background: "none", border: "none", color: "#aaa", fontSize: "20px", cursor: "pointer" }}>✕</button>
+              </div>
+
+              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", marginBottom: "6px" }}>
+                اسم العمل الفني أو التكليف:
+              </label>
+              <input
+                type="text"
+                placeholder="مثال: لوحة تشكيلية / مجسم معادن / تكليف أسبوعي..."
+                value={customProjectTitle}
+                onChange={(e) => setCustomProjectTitle(e.target.value)}
+                style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #334155", borderRadius: "8px", color: "#fff", marginBottom: "16px" }}
+              />
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customProjectTitle.trim()) {
+                      alert("يرجى كتابة اسم العمل الفني أولاً!");
+                      return;
+                    }
+                    const courseObj = customProjectDialog.course;
+                    const pTitle = customProjectTitle.trim();
+                    setCustomProjectDialog(null);
+                    setSelectedCourseForEval(courseObj);
+                    setSelectedProject(pTitle);
+                    setProjectPhotos([]);
+                    startCamera("artwork");
+                  }}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: "10px" }}
+                >
+                  📷 فتح الكاميرا الآن
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomProjectDialog(null)}
+                  className="btn-secondary"
+                  style={{ padding: "10px 16px" }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* نافذة تكبير الصورة (Full Preview Modal) */}
+        {previewModalImage && (
+          <div 
+            onClick={() => setPreviewModalImage(null)}
+            style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", cursor: "zoom-out" }}
+          >
+            <div style={{ maxWidth: "90vw", maxHeight: "90vh", position: "relative" }}>
+              <img src={previewModalImage} alt="عرض مكبر" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: "12px", objectFit: "contain" }} />
+              <button 
+                onClick={() => setPreviewModalImage(null)}
+                style={{ position: "absolute", top: "-15px", right: "-15px", background: "#ef4444", border: "none", color: "#fff", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontWeight: "bold" }}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Hidden file inputs for fallbacks */}
+        <input 
+          type="file" 
+          ref={idFileInputRef} 
+          accept="image/*" 
+          capture="environment" 
+          style={{ display: "none" }} 
+          onChange={handleIdFileFallback} 
+        />
+        <input 
+          type="file" 
+          ref={artworkFileInputRef} 
+          accept="image/*" 
+          capture="environment" 
+          style={{ display: "none" }} 
+          onChange={handleArtworkFileFallback} 
+        />
 
       </div>
     );
@@ -1204,15 +1732,25 @@ export default function SystemPage() {
                   </button>
                 </div>
               ) : (
-                <button 
-                  type="button"
-                  onClick={() => startCamera("id")}
-                  style={{ width: "100%", padding: "18px", background: "#1a2336", border: "2px dashed #3b82f6", borderRadius: "12px", color: "#38bdf8", fontWeight: "bold", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", cursor: "pointer" }}
-                >
-                  <Camera size={26} />
-                  <span>فتح الكاميرا لتصوير وجه البطاقة</span>
-                  <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "normal" }}>تأكد من وضوح الصورة وتطابق الاسم مع الكود</span>
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <button 
+                    type="button"
+                    onClick={() => startCamera("id")}
+                    style={{ width: "100%", padding: "16px", background: "#1a2336", border: "2px dashed #3b82f6", borderRadius: "12px", color: "#38bdf8", fontWeight: "bold", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", cursor: "pointer" }}
+                  >
+                    <Camera size={26} />
+                    <span>فتح الكاميرا لتصوير وجه البطاقة</span>
+                    <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "normal" }}>تأكد من وضوح الصورة وتطابق الاسم مع الكود</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => idFileInputRef.current?.click()}
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #334155", color: "#94a3b8", padding: "8px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                  >
+                    <FolderOpen size={14} />
+                    <span>أو اختر صورة من جهازك / الكاميرا مباشرة</span>
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1291,13 +1829,23 @@ export default function SystemPage() {
             </span>
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               {!tempIdCardPreview && (
-                <button 
-                  type="button" 
-                  onClick={toggleTorch} 
-                  style={{ background: torchOn ? "#eab308" : "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
-                >
-                  <span>{torchOn ? "🔦 الفلاش مفعّل" : "💡 تشغيل الفلاش"}</span>
-                </button>
+                <>
+                  <button 
+                    type="button" 
+                    onClick={() => idFileInputRef.current?.click()}
+                    style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                  >
+                    <FolderOpen size={14} />
+                    <span>ملف من الجهاز</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={toggleTorch} 
+                    style={{ background: torchOn ? "#eab308" : "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "6px 12px", borderRadius: "20px", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}
+                  >
+                    <span>{torchOn ? "🔦 الفلاش مفعّل" : "💡 الفلاش"}</span>
+                  </button>
+                </>
               )}
               <button onClick={stopCamera} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px" }}>✕</button>
             </div>
@@ -1316,7 +1864,7 @@ export default function SystemPage() {
           ) : (
             /* الكاميرا الحية */
             <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", margin: "14px 0", borderRadius: "16px", border: "2px solid #38bdf8" }}>
-              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <video ref={setVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               <div style={{ position: "absolute", width: "85%", height: "60%", border: "2px dashed #10b981", borderRadius: "14px", pointerEvents: "none" }} />
             </div>
           )}
@@ -1354,6 +1902,24 @@ export default function SystemPage() {
           )}
         </div>
       )}
+
+      {/* Hidden file inputs for fallbacks */}
+      <input 
+        type="file" 
+        ref={idFileInputRef} 
+        accept="image/*" 
+        capture="environment" 
+        style={{ display: "none" }} 
+        onChange={handleIdFileFallback} 
+      />
+      <input 
+        type="file" 
+        ref={artworkFileInputRef} 
+        accept="image/*" 
+        capture="environment" 
+        style={{ display: "none" }} 
+        onChange={handleArtworkFileFallback} 
+      />
 
       <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px", marginTop: "20px" }}>
         نظام فنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن

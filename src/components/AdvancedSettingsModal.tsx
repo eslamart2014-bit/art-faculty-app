@@ -348,31 +348,46 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
       </div>
 
-      <div style={{ display: "flex", background: "#222", borderBottom: "1px solid #333", overflowX: "auto", whiteSpace: "nowrap" }}>
-        <button 
-          onClick={() => setActiveTab("study")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "study" ? "#333" : "transparent", color: activeTab === "study" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "study" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >الدراسة والتواريخ 📅</button>
-        <button 
-          onClick={() => setActiveTab("search")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "search" ? "#333" : "transparent", color: activeTab === "search" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "search" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >البحث الشامل 🔍</button>
-        <button 
-          onClick={() => setActiveTab("roster")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "roster" ? "#333" : "transparent", color: activeTab === "roster" ? "#00BCD4" : "#888", border: "none", borderBottom: activeTab === "roster" ? "2px solid #00BCD4" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >كشوف الطلاب 📋</button>
-        <button 
-          onClick={() => setActiveTab("portal")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "portal" ? "#333" : "transparent", color: activeTab === "portal" ? "#FF9800" : "#888", border: "none", borderBottom: activeTab === "portal" ? "2px solid #FF9800" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >بوابة الطلاب 🎓</button>
-        <button 
-          onClick={() => setActiveTab("shares")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "shares" ? "#333" : "transparent", color: activeTab === "shares" ? "#4CAF50" : "#888", border: "none", borderBottom: activeTab === "shares" ? "2px solid #4CAF50" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >طلبات المشاركة 🤝</button>
-        <button 
-          onClick={() => setActiveTab("maintenance")}
-          style={{ flex: "1 0 auto", padding: "10px 14px", background: activeTab === "maintenance" ? "#333" : "transparent", color: activeTab === "maintenance" ? "#f44336" : "#888", border: "none", borderBottom: activeTab === "maintenance" ? "2px solid #f44336" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}
-        >وضع الصيانة 🚧</button>
+      <div style={{ 
+        display: "flex", 
+        flexWrap: "wrap", 
+        gap: "8px", 
+        padding: "12px 16px", 
+        background: "#161c28", 
+        borderBottom: "1px solid #2a374f" 
+      }}>
+        {[
+          { id: "study", label: "الدراسة والتواريخ 📅", color: "#38bdf8" },
+          { id: "search", label: "البحث الشامل 🔍", color: "#38bdf8" },
+          { id: "roster", label: "كشوف الطلاب 📋", color: "#00BCD4" },
+          { id: "portal", label: "بوابة الطلاب 🎓", color: "#f59e0b" },
+          { id: "shares", label: "طلبات المشاركة 🤝", color: "#10b981" },
+          { id: "maintenance", label: "وضع الصيانة 🚧", color: "#ef4444" },
+        ].map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id as any)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "10px",
+                border: isActive ? `1px solid ${t.color}` : "1px solid rgba(255,255,255,0.08)",
+                background: isActive ? `${t.color}22` : "rgba(255,255,255,0.03)",
+                color: isActive ? "#fff" : "#94a3b8",
+                fontWeight: isActive ? "bold" : "normal",
+                cursor: "pointer",
+                fontSize: "13px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease"
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto" }}>

@@ -39,6 +39,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // 2. ترحيل الشكوى إلى صندوق المقترحات والمحادثات (suggestions_chat) ليراها الأدمن مباشرة
+    try {
+      await supabaseAdmin.from('suggestions_chat').insert({
+        user_id: student_code,
+        message: `📨 [شكوى/مقترح طلابي - ${target_entity}]:\nالطالب: ${student_name} (كود: ${student_code} - الفرقة: ${academic_year || 'غير محدد'})\n\n${content}`,
+        is_admin: false,
+        read_by_admin: false,
+        read_by_user: true,
+      });
+    } catch (chatErr) {
+      console.warn('Could not forward complaint to suggestions_chat:', chatErr);
+    }
+
+    // 3. إرسال إشعار فوري لجميع مديري النظام
+    try {
+      const { data: admins } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .in('role', ['مدير', 'مدير مساعد', 'admin', 'أدمن']);
+
+      if (admins && admins.length > 0) {
+        const notifs = admins.map((adm: any) => ({
+          user_id: adm.id,
+          title: 'شكوى / مقترح طلابي جديد 📬',
+          message: `وصلت شكوى جديدة من الطالب: ${student_name} (${student_code}) موجهة إلى: ${target_entity}.\nالموضوع: ${subject || 'شكوى / مقترح طلابي'}`,
+        }));
+        await supabaseAdmin.from('notifications').insert(notifs);
+      }
+    } catch (notifErr) {
+      console.warn('Could not create admin notification for complaint:', notifErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'تم إرسال الشكوى بنجاح وسيتم النظر فيها من قبل الجهة المختصة.',

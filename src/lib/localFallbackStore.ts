@@ -106,6 +106,14 @@ export const localStore = {
     writeDB(db);
   },
 
+  deleteAccount(code: string) {
+    const db = readDB();
+    db.student_accounts = db.student_accounts.filter(
+      (a) => a.student_code !== code && a.student_code !== code.padStart(4, '0')
+    );
+    writeDB(db);
+  },
+
   addAuditLog(log: any) {
     this.saveAuditLog(log);
   },
