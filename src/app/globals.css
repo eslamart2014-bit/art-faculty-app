@@ -48,18 +48,43 @@ a {
 
 /* Button Reset & Styling */
 button {
-  width: 100%;
-  padding: 14px;
+  box-sizing: border-box;
   background-color: var(--primary);
   color: var(--text-inverse);
   border: none;
   border-radius: 10px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
-  margin-top: 5px;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.1s;
   touch-action: manipulation;
+}
+
+button:not(.btn-compact):not(.icon-btn):not([data-compact]):not([style*="display: inline"]):not([style*="width: auto"]):not([style*="width:fit-content"]) {
+  width: 100%;
+  padding: 14px;
+  margin-top: 5px;
+}
+
+.btn-compact {
+  width: auto !important;
+  padding: 6px 12px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  font-size: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border-radius: 8px !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 button:active {

@@ -40,6 +40,13 @@ export async function GET(request: Request) {
       account = data;
     } catch (e) {}
 
+    // التحقق من الحساب المخزن في جدول students (telegram_browser_id)
+    if (!account && student.telegram_browser_id) {
+      try {
+        account = JSON.parse(student.telegram_browser_id);
+      } catch (e) {}
+    }
+
     if (!account) {
       account = localStore.getAccount(student.student_code);
     }
@@ -85,6 +92,30 @@ export async function GET(request: Request) {
           allAccounts = res.data || [];
         } catch (e) {}
 
+        // جلب الحسابات أيضاً من جدول students لمن سجلوا عبر telegram_browser_id
+        try {
+          const { data: stAll } = await supabaseAdmin
+            .from('students')
+            .select('student_code, full_name, telegram_browser_id')
+            .neq('student_code', student.student_code)
+            .not('telegram_browser_id', 'is', null);
+
+          (stAll || []).forEach((stItem: any) => {
+            if (!allAccounts.some(a => a.student_code === stItem.student_code)) {
+              try {
+                const parsed = JSON.parse(stItem.telegram_browser_id);
+                if (parsed && parsed.devices) {
+                  allAccounts.push({
+                    student_code: stItem.student_code,
+                    full_name: stItem.full_name,
+                    devices: parsed.devices,
+                  });
+                }
+              } catch (e) {}
+            }
+          });
+        } catch (e) {}
+
         if (allAccounts.length === 0) {
           allAccounts = localStore.getAllAccounts().filter(a => a.student_code !== student.student_code);
         }
@@ -107,7 +138,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 5. جلب أعمال ومشاريع الطالب
+    // 5. جلب أعمال ومشاريع الطالب من student_submissions ومن evaluations
     let studentSubmissions: any[] = [];
     try {
       const res = await supabaseAdmin
@@ -120,6 +151,38 @@ export async function GET(request: Request) {
     if (studentSubmissions.length === 0) {
       studentSubmissions = localStore.getSubmissions(student.student_code);
     }
+
+    // دمج أعمال الطالب المسجلة في evaluations بصور أو تقييمات
+    try {
+      const { data: evals } = await supabaseAdmin
+        .from('evaluations')
+        .select('id, course_id, project_name, score, max_score, photo_url, created_at')
+        .eq('student_id', student.id);
+
+      if (evals && evals.length > 0) {
+        evals.forEach((ev: any) => {
+          if (ev.photo_url) {
+            const alreadyInSubs = studentSubmissions.some((s: any) =>
+              s.project_name === ev.project_name && s.course_id === ev.course_id
+            );
+            if (!alreadyInSubs) {
+              studentSubmissions.push({
+                id: ev.id,
+                student_code: student.student_code,
+                student_name: student.full_name,
+                course_id: ev.course_id,
+                project_name: ev.project_name,
+                images: [{ url: ev.photo_url }],
+                status: 'evaluated',
+                score: ev.score,
+                max_score: ev.max_score,
+                created_at: ev.created_at || new Date().toISOString(),
+              });
+            }
+          }
+        });
+      }
+    } catch (e) {}
 
     // 6. محرك الذكاء الاصطناعي لفحص تشابه اللوحات الفنية (AI Art Plagiarism Engine)
     const plagiarismMatches: any[] = [];

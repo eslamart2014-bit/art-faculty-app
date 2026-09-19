@@ -15,6 +15,27 @@ function normalizeArabic(str: string = ''): string {
     .toLowerCase();
 }
 
+function formatInstructorTitle(profile: any): string {
+  if (!profile) return 'أستاذ / معيد المقرر';
+  const name = (profile.full_name || '').trim();
+  const degree = (profile.degree || '').trim();
+  const role = (profile.role || '').trim();
+
+  let prefix = '';
+  if (name.startsWith('د.') || name.startsWith('د/') || name.startsWith('أ.د') || name.startsWith('م.') || name.startsWith('م/')) {
+    prefix = '';
+  } else if (degree.includes('دكتور') || degree.includes('أستاذ') || role.includes('مدرس') || role.includes('دكتور')) {
+    prefix = 'د. ';
+  } else if (role.includes('معيد') || degree.includes('معيد')) {
+    prefix = 'م. ';
+  } else if (role.includes('مساعد') || degree.includes('مساعد')) {
+    prefix = 'م.م. ';
+  }
+
+  const degLabel = degree || (role.includes('معيد') ? 'معيد' : (role.includes('مدرس') ? 'مدرس' : 'مدرس المقرر'));
+  return `${prefix}${name} (${degLabel})`;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get('code') || '').trim();
@@ -67,20 +88,20 @@ export async function GET(request: Request) {
       section: student.section,
     };
 
-    // 2. جلب سجلات الحضور أولاً
+    // 2. جلب سجلات الحضور
     const { data: attendanceRecords } = await supabaseAdmin
       .from('attendance')
       .select('id, course_id, date, status')
       .eq('student_id', student.id)
       .order('date', { ascending: false });
 
-    // 3. جلب التقييمات المسجلة من الأساتذة
+    // 3. جلب التقييمات والأعمال المسجلة من الأساتذة بكامل تفاصيلها بما فيها صور الأعمال (photo_url)
     const { data: teacherEvals } = await supabaseAdmin
       .from('evaluations')
-      .select('course_id, project_name, score')
+      .select('id, course_id, project_name, score, max_score, photo_url, created_at')
       .eq('student_id', student.id);
 
-    // 4. جلب أعمال ومشاريع الطالب المرفوعة
+    // 4. جلب أعمال ومشاريع الطالب المرفوعة عبر البوابة
     let studentSubmissions: any[] = [];
     const { data: subData } = await supabaseAdmin
       .from('student_submissions')
@@ -100,29 +121,64 @@ export async function GET(request: Request) {
       }
     } catch (e) {}
 
-    // 5. جلب المقررات التابعة لفرقة وسكشن الطالب مع المشاريع المعتمدة (custom_week_names)
+    // دمج أعمال الطالب المقيدة في evaluations بصور (photo_url) مع submissions ليراها الطالب فورياً في البوابة
+    if (teacherEvals && teacherEvals.length > 0) {
+      teacherEvals.forEach((ev: any) => {
+        if (ev.photo_url) {
+          const exists = studentSubmissions.some(
+            (s: any) => s.course_id === ev.course_id && s.project_name === ev.project_name
+          );
+          if (!exists) {
+            studentSubmissions.push({
+              id: ev.id,
+              student_code: student.student_code,
+              student_name: student.full_name,
+              course_id: ev.course_id,
+              project_name: ev.project_name,
+              images: [{ url: ev.photo_url }],
+              status: 'evaluated',
+              score: ev.score,
+              max_score: ev.max_score,
+              created_at: ev.created_at || new Date().toISOString(),
+            });
+          }
+        }
+      });
+    }
+
+    // 5. جلب المقررات مع المعيدين والأساتذة
     const { data: allCourses } = await supabaseAdmin
       .from('courses')
-      .select('id, name, academic_year, sections, course_type, custom_week_names');
+      .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id');
+
+    // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة
+    const teacherIds = Array.from(new Set((allCourses || []).map((c: any) => c.teacher_id).filter(Boolean)));
+    let teacherProfilesMap: Record<string, any> = {};
+    if (teacherIds.length > 0) {
+      const { data: tProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, role, degree')
+        .in('id', teacherIds);
+      (tProfiles || []).forEach((tp: any) => {
+        teacherProfilesMap[tp.id] = tp;
+      });
+    }
 
     const normStudentYear = normalizeArabic(student.academic_year || '');
     const normStudentSec = normalizeArabic(student.section || '');
 
     const matchedCourses = (allCourses || []).filter((c: any) => {
-      // إذا كان للطالب أي سجل حضور أو تقييم أو تسليم في هذا المقرر، أدرجه فورياً
       const hasAtt = (attendanceRecords || []).some((r: any) => r.course_id === c.id);
       const hasEval = (teacherEvals || []).some((e: any) => e.course_id === c.id);
       const hasSub = studentSubmissions.some((s: any) => s.course_id === c.id);
       if (hasAtt || hasEval || hasSub) return true;
 
-      // مطابقة الفرقة الأكاديمية مع تطبيع الحروف العربية
       const normCourseYear = normalizeArabic(c.academic_year || '');
       const yearMatch =
         normCourseYear.includes(normStudentYear) ||
         normStudentYear.includes(normCourseYear);
       if (!yearMatch) return false;
 
-      // مطابقة السكشن
       if (c.course_type === 'lectures' || !c.sections || c.sections.length === 0) return true;
       const secMatch = (c.sections || []).some((sec: string) => {
         const normSec = normalizeArabic(sec);
@@ -159,32 +215,47 @@ export async function GET(request: Request) {
       };
     });
 
-    // 7. دمج المقررات بالمشاريع المعتمدة والمرفوعة والتقييمات
+    // 7. دمج المقررات بالمشاريع المعتمدة والمعيدين والمدرسين
     const projectsByCourse = matchedCourses.map((course: any) => {
       const evals = (teacherEvals || []).filter((e: any) => e.course_id === course.id);
       const subs = studentSubmissions.filter((s: any) => s.course_id === course.id);
 
+      const prof = teacherProfilesMap[course.teacher_id];
+      const instructorName = prof?.full_name || 'عضو هيئة التدريس';
+      const instructorDegree = prof?.degree || prof?.role || 'مدرس المقرر';
+      const instructorTitle = formatInstructorTitle(prof);
+
       // استخراج المشاريع المعتمدة التي حددها الأستاذ في custom_week_names.__projects__
       const rawAssigned = course.custom_week_names?.__projects__ || [];
-      const assignedProjects = rawAssigned.map((proj: any) => {
-        const pTitle = proj.title || proj.name || 'مشروع';
-        const pScore = proj.max_score || proj.maxScore || 10;
-        const sub = subs.find((s: any) => s.project_name === pTitle);
-        const ev = evals.find((e: any) => e.project_name === pTitle);
+      const assignedProjects = rawAssigned
+        .filter((p: any) => !p.is_archived)
+        .map((proj: any) => {
+          const pTitle = proj.title || proj.name || 'مشروع فني';
+          const pScore = proj.max_score || proj.maxScore || 10;
+          const cameraMode = proj.camera_mode || '2d';
+          const requiredPhotos = proj.required_photos || (cameraMode === '3d' ? 2 : 1);
 
-        return {
-          id: proj.id || pTitle,
-          title: pTitle,
-          maxScore: pScore,
-          submission: sub || null,
-          evaluation: ev || null,
-          status: ev ? 'evaluated' : (sub ? 'submitted' : 'pending'),
-        };
-      });
+          const sub = subs.find((s: any) => s.project_name === pTitle);
+          const ev = evals.find((e: any) => e.project_name === pTitle);
+
+          return {
+            id: proj.id || pTitle,
+            title: pTitle,
+            maxScore: pScore,
+            cameraMode,
+            requiredPhotos,
+            submission: sub || null,
+            evaluation: ev || null,
+            status: (ev && ev.score !== null && ev.score !== undefined) ? 'evaluated' : (sub ? 'submitted' : 'pending'),
+          };
+        });
 
       return {
         courseId: course.id,
         courseName: course.name,
+        instructorName,
+        instructorDegree,
+        instructorTitle,
         evaluations: evals,
         submissions: subs,
         assignedProjects,

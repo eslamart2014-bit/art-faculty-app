@@ -348,19 +348,26 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
       </div>
 
-      <div style={{ 
-        display: "flex", 
-        flexWrap: "wrap", 
-        gap: "8px", 
-        padding: "12px 16px", 
-        background: "#161c28", 
-        borderBottom: "1px solid #2a374f" 
-      }}>
+      <div 
+        className="no-scrollbar"
+        style={{ 
+          display: "flex", 
+          flexWrap: "nowrap", 
+          overflowX: "auto", 
+          whiteSpace: "nowrap", 
+          gap: "8px", 
+          padding: "12px 16px", 
+          background: "#161c28", 
+          borderBottom: "1px solid #2a374f",
+          scrollbarWidth: "none",
+          WebkitOverflowScrolling: "touch"
+        }}
+      >
         {[
           { id: "study", label: "الدراسة والتواريخ 📅", color: "#38bdf8" },
           { id: "search", label: "البحث الشامل 🔍", color: "#38bdf8" },
           { id: "roster", label: "كشوف الطلاب 📋", color: "#00BCD4" },
-          { id: "portal", label: "بوابة الطلاب 🎓", color: "#f59e0b" },
+          { id: "portal", label: "بوابة الطلاب والأمان 🎓", color: "#f59e0b" },
           { id: "shares", label: "طلبات المشاركة 🤝", color: "#10b981" },
           { id: "maintenance", label: "وضع الصيانة 🚧", color: "#ef4444" },
         ].map(t => {
@@ -369,8 +376,10 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id as any)}
+              className="btn-compact"
               style={{
-                padding: "8px 14px",
+                flexShrink: 0,
+                padding: "8px 16px",
                 borderRadius: "10px",
                 border: isActive ? `1px solid ${t.color}` : "1px solid rgba(255,255,255,0.08)",
                 background: isActive ? `${t.color}22` : "rgba(255,255,255,0.03)",
@@ -817,6 +826,53 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
         {/* Portal Tab */}
         {activeTab === "portal" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            
+            {/* جناج الأمان وكشف الاحتيال المتقدم */}
+            <div style={{
+              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15))",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+              borderRadius: "14px",
+              padding: "16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "12px"
+            }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🚨</span> جناح الأمان الأكاديمي: كشف الغش والاحتيال وتطابق الأعمال
+                </div>
+                <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "4px", lineHeight: "1.6" }}>
+                  فحص أجهزة الموبايل المشتركة (كشف فتح أكثر من حساب على نفس الهاتف)، خوارزمية مطابقة اللوحات والمجسمات الفنية، وبحث وفرمتة الحسابات المشبوهة.
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  onClose();
+                  if (onOpenPortalHub) onOpenPortalHub();
+                }}
+                className="btn-compact"
+                style={{
+                  background: "linear-gradient(135deg, #ef4444, #b91c1c)",
+                  color: "#fff",
+                  padding: "10px 20px",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  border: "none",
+                  boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)"
+                }}
+              >
+                <span>🛡️</span> فتح لوحة كشف الاحتيال والتلاعب
+              </button>
+            </div>
+
             {/* Quick Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px" }}>
               <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "14px", borderRadius: "10px", textAlign: "center" }}>
