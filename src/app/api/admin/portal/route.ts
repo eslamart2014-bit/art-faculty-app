@@ -156,7 +156,7 @@ export async function GET(request: Request) {
     try {
       const { data: evals } = await supabaseAdmin
         .from('evaluations')
-        .select('id, course_id, project_name, score, max_score, photo_url, created_at')
+        .select('id, course_id, project_name, score, photo_url, created_at')
         .eq('student_id', student.id);
 
       if (evals && evals.length > 0) {

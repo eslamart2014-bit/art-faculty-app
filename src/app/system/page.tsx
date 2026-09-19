@@ -232,7 +232,13 @@ export default function SystemPage() {
       }
 
       const pinParam = activePin ? `&pin=${encodeURIComponent(activePin)}` : "";
-      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}`);
+      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        }
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -244,6 +250,14 @@ export default function SystemPage() {
         }
       } else {
         setDashboardData(data);
+        // تزامن فوري لكائن المقرر المختار لتحديث الأعمال والمشاريع تلقائياً
+        if (data.projects) {
+          setSelectedCourseForEval((prevCourse: any) => {
+            if (!prevCourse) return prevCourse;
+            const fresh = data.projects.find((c: any) => c.courseId === prevCourse.courseId);
+            return fresh || prevCourse;
+          });
+        }
         if (data.student) {
           const mergedStudent = { ...(currentStudent || {}), ...data.student };
           if (activePin) mergedStudent.pin_code = activePin;
@@ -523,6 +537,7 @@ export default function SystemPage() {
     setUploadingProject(true);
     try {
       const deviceInfo = getOrCreateDeviceInfo();
+      const projTitle = (activeProjectForUpload.title || activeProjectForUpload.name || '').trim();
       const res = await fetch("/api/students/submit-project", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -532,7 +547,7 @@ export default function SystemPage() {
           pin_code: currentStudent?.pin_code || enteredPin || "",
           course_id: selectedCourseForEval.courseId,
           course_name: selectedCourseForEval.courseName,
-          project_name: activeProjectForUpload.title || activeProjectForUpload.name,
+          project_name: projTitle,
           images: capturedPhotos,
           device_info: deviceInfo
         })
@@ -542,11 +557,75 @@ export default function SystemPage() {
       if (!res.ok) {
         alert(data.error || "فشل رفع المشروع إلى السحابة");
       } else {
-        alert("✓ تم رفع العمل الفني بنجاح وأصبح متاحاً للأستاذ للتقييم في النظام الرئيسي!");
+        // كائن التسليم الجديد للتحديث اللحظي المباشر في الواجهة
+        const newSubObj = data.submission || {
+          id: "sub_" + Date.now(),
+          student_code: currentStudent.student_code,
+          student_name: currentStudent.full_name,
+          course_id: selectedCourseForEval.courseId,
+          course_name: selectedCourseForEval.courseName,
+          project_name: projTitle,
+          images: capturedPhotos.map((p: any) => ({ url: p.url || p.dataUrl || p })),
+          status: "pending_evaluation",
+          score: null,
+          created_at: new Date().toISOString()
+        };
+
+        // 1. تحديث فوري لكائن المقرر المختار ليظهر العمل في التاب فوراً ويختفي زر الرفع
+        setSelectedCourseForEval((prev: any) => {
+          if (!prev) return prev;
+          const oldSubs = (prev.submissions || []).filter((s: any) => (s.project_name || '').trim() !== projTitle);
+          const updatedSubs = [newSubObj, ...oldSubs];
+          const updatedAssigned = (prev.assignedProjects || []).map((p: any) => {
+            if ((p.title || '').trim() === projTitle) {
+              return { ...p, status: "submitted", submission: newSubObj };
+            }
+            return p;
+          });
+          return {
+            ...prev,
+            submissions: updatedSubs,
+            assignedProjects: updatedAssigned
+          };
+        });
+
+        // 2. تحديث فوري لبيانات لوحة الطالب dashboardData
+        setDashboardData((prevData: any) => {
+          if (!prevData || !prevData.projects) return prevData;
+          return {
+            ...prevData,
+            projects: prevData.projects.map((c: any) => {
+              if (c.courseId === selectedCourseForEval.courseId) {
+                const oldSubs = (c.submissions || []).filter((s: any) => (s.project_name || '').trim() !== projTitle);
+                const updatedSubs = [newSubObj, ...oldSubs];
+                const updatedAssigned = (c.assignedProjects || []).map((p: any) => {
+                  if ((p.title || '').trim() === projTitle) {
+                    return { ...p, status: "submitted", submission: newSubObj };
+                  }
+                  return p;
+                });
+                return {
+                  ...c,
+                  submissions: updatedSubs,
+                  assignedProjects: updatedAssigned
+                };
+              }
+              return c;
+            })
+          };
+        });
+
+        // 3. تثبيت التاب النشط على المشروع المرفوع ليرى الطالب صورته فوراً
+        setSelectedProjectTab(projTitle);
+
         setShowArtworkCamera(false);
         setCapturedPhotos([]);
         setCurrentPhotoStep(1);
         setActiveProjectForUpload(null);
+
+        alert("✓ تم تسليم العمل الفني بنجاح!\nالعمل الآن محفوظ في تبويب المشروع وبانتظار رصد الدرجة من أستاذ المقرر.");
+
+        // 4. مزامنة البيانات في الخلفية
         loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
       }
     } catch (e: any) {
@@ -954,21 +1033,49 @@ export default function SystemPage() {
             </div>
           </div>
 
-          <button 
-            onClick={handleLogout} 
-            className="btn-compact"
-            title="تسجيل الخروج"
-            style={{ 
-              background: "rgba(239, 68, 68, 0.12)",
-              color: "#f87171",
-              border: "1px solid rgba(239, 68, 68, 0.25)",
-              padding: "6px 12px",
-              cursor: "pointer"
-            }}
-          >
-            <LogOut size={13} />
-            <span>خروج</span>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button 
+              onClick={() => loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin)} 
+              className="btn-compact"
+              disabled={loading}
+              title="تحديث البيانات فورياً"
+              style={{ 
+                background: "rgba(56, 189, 248, 0.12)",
+                color: "#38bdf8",
+                border: "1px solid rgba(56, 189, 248, 0.25)",
+                padding: "6px 11px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "12px",
+                fontWeight: "bold"
+              }}
+            >
+              <RotateCw size={13} className={loading ? "animate-spin" : ""} />
+              <span>تحديث</span>
+            </button>
+
+            <button 
+              onClick={handleLogout} 
+              className="btn-compact"
+              title="تسجيل الخروج"
+              style={{ 
+                background: "rgba(239, 68, 68, 0.12)",
+                color: "#f87171",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+                padding: "6px 12px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                fontSize: "12px"
+              }}
+            >
+              <LogOut size={13} />
+              <span>خروج</span>
+            </button>
+          </div>
         </div>
 
         {/* تابات التنقل الرئيسية لشاشة الطالب (صف أفقي سلس بدون التواء) */}
@@ -1176,6 +1283,8 @@ export default function SystemPage() {
 
                   {activeCourseAssignedProjects.map((p: any) => {
                     const isTabActive = selectedProjectTab === p.title;
+                    const isProjSubmitted = p.status === "submitted" || p.status === "evaluated" || p.submission || activeCourseSubmissions.some((s: any) => (s.project_name || '').trim() === (p.title || '').trim());
+                    const isProjGraded = p.status === "evaluated" || (p.evaluation && p.evaluation.score !== null && Number(p.evaluation.score) > 0);
                     return (
                       <button
                         key={p.id}
@@ -1192,11 +1301,11 @@ export default function SystemPage() {
                           fontWeight: isTabActive ? "bold" : "normal",
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: "4px"
+                          gap: "5px"
                         }}
                       >
                         <span>{p.title}</span>
-                        <span>{p.status === "evaluated" ? "✅" : p.status === "submitted" ? "⏳" : "⚠️"}</span>
+                        <span>{isProjGraded ? "✅" : (isProjSubmitted ? "⏳" : "⚠️")}</span>
                       </button>
                     );
                   })}
@@ -1207,7 +1316,7 @@ export default function SystemPage() {
                   
                   {/* رسالة إرشادية للمشروع المختار من الأستاذ */}
                   {selectedProjectTab !== "all" && (() => {
-                    const targetAssigned = activeCourseAssignedProjects.find((p: any) => p.title === selectedProjectTab);
+                    const targetAssigned = activeCourseAssignedProjects.find((p: any) => (p.title || '').trim() === (selectedProjectTab || '').trim());
                     if (!targetAssigned) return null;
 
                     return (
@@ -1236,14 +1345,23 @@ export default function SystemPage() {
                   {/* الأعمال والتقييمات المسلمة لهذا المشروع */}
                   {filteredSubmissions.length > 0 ? (
                     filteredSubmissions.map((sub: any) => {
-                      const isGraded = sub.score !== null && sub.score !== undefined;
+                      const isGraded = sub.score !== null && sub.score !== undefined && Number(sub.score) > 0;
+                      
+                      let imageList: any[] = [];
+                      if (Array.isArray(sub.images)) {
+                        imageList = sub.images;
+                      } else if (typeof sub.images === 'string') {
+                        try { imageList = JSON.parse(sub.images); } catch(e) { imageList = []; }
+                      } else if (sub.images && typeof sub.images === 'object') {
+                        imageList = [sub.images];
+                      }
 
                       return (
                         <div 
                           key={sub.id}
                           style={{
                             alignSelf: "flex-end",
-                            maxWidth: "88%",
+                            maxWidth: "92%",
                             background: "linear-gradient(135deg, #102318, #0e2b1d)",
                             border: "1px solid rgba(16, 185, 129, 0.4)",
                             borderRadius: "14px 14px 2px 14px",
@@ -1253,45 +1371,60 @@ export default function SystemPage() {
                             gap: "8px"
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
                             <span style={{ color: "#34d399", fontWeight: "bold", fontSize: "13px" }}>
                               {sub.project_name}
                             </span>
                             <span style={{ 
                               fontSize: "11px", 
                               fontWeight: "bold", 
-                              padding: "2px 8px", 
+                              padding: "3px 9px", 
                               borderRadius: "6px",
                               background: isGraded ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.2)",
-                              color: isGraded ? "#34d399" : "#fbbf24"
+                              color: isGraded ? "#34d399" : "#fbbf24",
+                              border: isGraded ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid rgba(245, 158, 11, 0.4)"
                             }}>
-                              {isGraded ? `تم التقييم: ${sub.score} درجة` : "بانتظار رصد الدرجة"}
+                              {isGraded ? `تم التقييم: ${sub.score} درجة ✅` : "بانتظار رصد الدرجة من أستاذ المقرر ⏳"}
                             </span>
                           </div>
 
                           {/* صور العمل الفني المسلم */}
                           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                            {sub.images?.map((img: any, i: number) => (
-                              <div
-                                key={i}
-                                onClick={() => setPreviewModalImage(img.url)}
-                                title="اضغط للتكبير"
-                                style={{ width: "90px", height: "90px", borderRadius: "8px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", background: "#000" }}
-                              >
-                                <img src={img.url} alt="عمل فني" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                              </div>
-                            ))}
+                            {imageList.map((img: any, i: number) => {
+                              const imgUrl = typeof img === 'string' ? img : (img?.url || img?.dataUrl || '');
+                              if (!imgUrl) return null;
+                              return (
+                                <div
+                                  key={i}
+                                  onClick={() => setPreviewModalImage(imgUrl)}
+                                  title="اضغط للتكبير والمراجعة"
+                                  style={{ width: "95px", height: "95px", borderRadius: "8px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.2)", cursor: "pointer", background: "#000", position: "relative" }}
+                                >
+                                  <img src={imgUrl} alt="عمل فني" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                                  <div style={{ position: "absolute", bottom: "2px", right: "2px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "9px", padding: "1px 4px", borderRadius: "3px" }}>
+                                    🔍 تكبير
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
 
-                          <div style={{ fontSize: "10px", color: "#86efac", textAlign: "left" }}>
-                            {sub.created_at ? new Date(sub.created_at).toLocaleDateString("ar-EG") : "تم التسليم"} ✓✓
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "10px", color: "#86efac", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "6px" }}>
+                            <span>
+                              {sub.created_at ? new Date(sub.created_at).toLocaleDateString("ar-EG") : "تم التسليم"} ✓✓
+                            </span>
+                            <span style={{ color: "#94a3b8" }}>
+                              {isGraded ? "تم الاعتماد والرصد بنجاح" : "قيد المراجعة لدى أستاذ المقرر"}
+                            </span>
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <div style={{ textAlign: "center", padding: "24px", color: "#94a3b8", fontSize: "13px" }}>
-                      لم تقم برفع عمل فني لهذا المشروع بعد. استخدم الزر أدناه لتصوير عملك ورفعه فورياً للأستاذ!
+                    <div style={{ textAlign: "center", padding: "28px 14px", color: "#94a3b8", fontSize: "13px", background: "rgba(255,255,255,0.02)", borderRadius: "12px", border: "1px dashed rgba(255,255,255,0.1)" }}>
+                      <div style={{ fontSize: "28px", marginBottom: "8px" }}>📸</div>
+                      <div>لم تقم برفع عمل فني لهذا المشروع بعد.</div>
+                      <div style={{ color: "#38bdf8", fontSize: "11px", marginTop: "4px" }}>اضغط على زر التقاط أدناه لتصوير عملك لايف ورفعه فورياً للأستاذ!</div>
                     </div>
                   )}
 
@@ -1300,41 +1433,52 @@ export default function SystemPage() {
                 {/* الشريط السفلي الثابت (Action Bar) مع ميزة قفل المشروع بعد التسليم */}
                 <div style={{ padding: "12px 14px", background: "#141b29", borderTop: "1px solid #2a374f" }}>
                   {(() => {
-                    const activeAssigned = activeCourseAssignedProjects.find((p: any) => p.title === selectedProjectTab) || activeCourseAssignedProjects[0];
+                    const activeAssigned = activeCourseAssignedProjects.find((p: any) => (p.title || '').trim() === (selectedProjectTab || '').trim()) || (selectedProjectTab === "all" ? null : activeCourseAssignedProjects[0]);
                     
                     // التحقق مما إذا كان الطالب قد رفع هذا المشروع بالفعل
                     const isAlreadySubmitted = activeAssigned && (
                       activeAssigned.status === "submitted" ||
                       activeAssigned.status === "evaluated" ||
                       activeAssigned.submission ||
-                      activeCourseSubmissions.some((s: any) => s.project_name === activeAssigned.title)
+                      activeCourseSubmissions.some((s: any) => (s.project_name || '').trim() === (activeAssigned.title || '').trim())
                     );
 
                     if (isAlreadySubmitted) {
+                      const isGraded = activeAssigned.status === "evaluated" || (activeAssigned.evaluation && activeAssigned.evaluation.score !== null && Number(activeAssigned.evaluation.score) > 0);
+                      const currentScore = activeAssigned.evaluation?.score ?? activeAssigned.score;
+
                       return (
                         <div style={{
                           width: "100%",
                           padding: "12px 16px",
-                          background: "rgba(16, 185, 129, 0.12)",
-                          border: "1px solid rgba(16, 185, 129, 0.4)",
+                          background: isGraded ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
+                          border: isGraded ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid rgba(245, 158, 11, 0.4)",
                           borderRadius: "12px",
                           textAlign: "center",
-                          color: "#34d399",
+                          color: isGraded ? "#34d399" : "#fbbf24",
                           display: "flex",
                           flexDirection: "column",
                           gap: "4px"
                         }}>
                           <div style={{ fontWeight: "bold", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                            <span>🔒</span>
+                            <span>{isGraded ? "✅" : "⏳"}</span>
                             <span>
-                              {activeAssigned?.status === "evaluated"
-                                ? `تم تقييم هذا المشروع: (${activeAssigned.evaluation?.score ?? activeAssigned.score} من ${activeAssigned.maxScore}) ✓`
-                                : "تم تسليم هذا المشروع بنجاح (قيد التقييم من الأستاذ) ⏳"}
+                              {isGraded
+                                ? `تم تقييم هذا المشروع: (${currentScore} من ${activeAssigned.maxScore}) ✓`
+                                : "تم تسليم هذا المشروع بنجاح — بانتظار رصد الدرجة من أستاذ المقرر ⏳"}
                             </span>
                           </div>
                           <div style={{ color: "#94a3b8", fontSize: "11px" }}>
                             تم قفل الرفع لمنع تكرار التسليم. إذا أردت إعادة التصوير، يرجى طلب فك القفل من أستاذ المقرر.
                           </div>
+                        </div>
+                      );
+                    }
+
+                    if (selectedProjectTab === "all" && activeCourseAssignedProjects.length > 0) {
+                      return (
+                        <div style={{ textAlign: "center", padding: "10px", color: "#94a3b8", fontSize: "12px" }}>
+                          👈 يرجى اختيار تبويب المشروع من الشريط بالأعلى لتصويره وتسليمه
                         </div>
                       );
                     }

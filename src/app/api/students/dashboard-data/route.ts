@@ -98,7 +98,7 @@ export async function GET(request: Request) {
     // 3. جلب التقييمات والأعمال المسجلة من الأساتذة بكامل تفاصيلها بما فيها صور الأعمال (photo_url)
     const { data: teacherEvals } = await supabaseAdmin
       .from('evaluations')
-      .select('id, course_id, project_name, score, max_score, photo_url, created_at')
+      .select('id, course_id, project_name, score, photo_url, created_at')
       .eq('student_id', student.id);
 
     // 4. جلب أعمال ومشاريع الطالب المرفوعة عبر البوابة
@@ -126,9 +126,10 @@ export async function GET(request: Request) {
       teacherEvals.forEach((ev: any) => {
         if (ev.photo_url) {
           const exists = studentSubmissions.some(
-            (s: any) => s.course_id === ev.course_id && s.project_name === ev.project_name
+            (s: any) => s.course_id === ev.course_id && (s.project_name || '').trim() === (ev.project_name || '').trim()
           );
           if (!exists) {
+            const hasGradedScore = ev.score !== null && ev.score !== undefined;
             studentSubmissions.push({
               id: ev.id,
               student_code: student.student_code,
@@ -136,9 +137,8 @@ export async function GET(request: Request) {
               course_id: ev.course_id,
               project_name: ev.project_name,
               images: [{ url: ev.photo_url }],
-              status: 'evaluated',
+              status: hasGradedScore ? 'evaluated' : 'pending_evaluation',
               score: ev.score,
-              max_score: ev.max_score,
               created_at: ev.created_at || new Date().toISOString(),
             });
           }
@@ -230,13 +230,16 @@ export async function GET(request: Request) {
       const assignedProjects = rawAssigned
         .filter((p: any) => !p.is_archived)
         .map((proj: any) => {
-          const pTitle = proj.title || proj.name || 'مشروع فني';
+          const pTitle = (proj.title || proj.name || 'مشروع فني').trim();
           const pScore = proj.max_score || proj.maxScore || 10;
           const cameraMode = proj.camera_mode || '2d';
           const requiredPhotos = proj.required_photos || (cameraMode === '3d' ? 2 : 1);
 
-          const sub = subs.find((s: any) => s.project_name === pTitle);
-          const ev = evals.find((e: any) => e.project_name === pTitle);
+          const sub = subs.find((s: any) => (s.project_name || '').trim() === pTitle);
+          const ev = evals.find((e: any) => (e.project_name || '').trim() === pTitle);
+
+          const isGraded = ev && ev.score !== null && ev.score !== undefined;
+          const isSubmitted = !!sub || (ev && !!ev.photo_url);
 
           return {
             id: proj.id || pTitle,
@@ -244,9 +247,9 @@ export async function GET(request: Request) {
             maxScore: pScore,
             cameraMode,
             requiredPhotos,
-            submission: sub || null,
+            submission: sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null),
             evaluation: ev || null,
-            status: (ev && ev.score !== null && ev.score !== undefined) ? 'evaluated' : (sub ? 'submitted' : 'pending'),
+            status: isGraded ? 'evaluated' : (isSubmitted ? 'submitted' : 'pending'),
           };
         });
 
@@ -275,9 +278,20 @@ export async function GET(request: Request) {
       projects: projectsByCourse,
       complaints: complaints || [],
       warnings: attendanceByCourse.filter((c: any) => c.hasWarning),
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
   } catch (err: any) {
     console.error('Dashboard data error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message }, {
+      status: 500,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      }
+    });
   }
 }
