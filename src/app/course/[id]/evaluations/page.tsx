@@ -586,8 +586,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       const attCount = await getAttendanceCount(student.id);
       
-      const { data: ex } = await supabase.from("evaluations")
+      let { data: ex } = await supabase.from("evaluations")
         .select("id, score, photo_url, created_at").eq("course_id", course.id).eq("student_id", student.id).eq("project_name", selectedProject?.name).maybeSingle();
+
+      // فحص تسليمات بوابة الطلاب في حال عدم توفر الصورة بجدول التقييمات
+      if (!ex?.photo_url) {
+        const { data: sub } = await supabase.from("student_submissions")
+          .select("images, created_at, score")
+          .eq("course_id", course.id)
+          .eq("student_code", student.student_code)
+          .eq("project_name", selectedProject?.name)
+          .maybeSingle();
+
+        if (sub?.images?.[0]?.url) {
+          if (!ex) {
+            ex = { id: null, score: sub.score, photo_url: sub.images[0].url, created_at: sub.created_at };
+          } else {
+            ex.photo_url = sub.images[0].url;
+          }
+        }
+      }
 
       const existingScore = (ex && ex.score !== null && ex.score > 0) ? ex.score : null;
 
@@ -713,8 +731,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const student = await checkStudentLocalOrGlobal(code);
     
     if (student) {
-      const { data: ex } = await supabase.from("evaluations")
+      let { data: ex } = await supabase.from("evaluations")
         .select("id, score, photo_url, created_at").eq("course_id", course.id).eq("student_id", student.id).eq("project_name", selectedProject?.name).maybeSingle();
+
+      // فحص تسليمات بوابة الطلاب في حال عدم توفر الصورة بجدول التقييمات
+      if (!ex?.photo_url) {
+        const { data: sub } = await supabase.from("student_submissions")
+          .select("images, created_at, score")
+          .eq("course_id", course.id)
+          .eq("student_code", student.student_code)
+          .eq("project_name", selectedProject?.name)
+          .maybeSingle();
+
+        if (sub?.images?.[0]?.url) {
+          if (!ex) {
+            ex = { id: null, score: sub.score, photo_url: sub.images[0].url, created_at: sub.created_at };
+          } else {
+            ex.photo_url = sub.images[0].url;
+          }
+        }
+      }
 
       vibrateSuccess();
       const attCount = await getAttendanceCount(student.id);

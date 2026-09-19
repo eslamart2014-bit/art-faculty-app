@@ -16,7 +16,8 @@ import {
   Eye, 
   AlertTriangle,
   ExternalLink,
-  BookOpen
+  BookOpen,
+  Camera
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
@@ -252,6 +253,25 @@ export default function InstructorPage() {
 
     return () => clearTimeout(timer);
   }, [searchQuery, selectedInstructor]);
+
+  const executeStudentSearch = async (queryOverride?: string) => {
+    const q = (queryOverride !== undefined ? queryOverride : searchQuery).trim();
+    if (!q || !selectedInstructor) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(
+        `/api/instructor/submissions?instructor_id=${selectedInstructor.id}&q=${encodeURIComponent(q)}`
+      );
+      const data = await res.json();
+      if (data.searchResults) {
+        setSearchResults(data.searchResults);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   
   // Export Submissions as Mobile-Scrolling Formatted PDF
@@ -827,30 +847,59 @@ export default function InstructorPage() {
             <label style={{ display: "block", color: "#94a3b8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
               ابحث عن الطالب بالكود الجامعي أو بالاسم:
             </label>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ position: "relative", flex: 1 }}>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") executeStudentSearch(); }}
                   placeholder="أدخل كود الطالب (مثال: 0001) أو اكتب اسمه..."
-                  style={{ width: "100%", padding: "14px 18px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "12px", color: "#fff", fontSize: "15px" }}
+                  style={{ width: "100%", padding: "12px 16px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
                 />
                 {isSearching && (
-                  <div style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                  <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
                 )}
               </div>
 
+              {/* زر البحث الفوري */}
               <button
-                onClick={() => setIsCameraOpen(!isCameraOpen)}
+                type="button"
+                onClick={() => executeStudentSearch()}
+                disabled={isSearching || !searchQuery.trim()}
+                className="btn-compact"
                 style={{
-                  padding: "14px 18px",
-                  background: isCameraOpen ? "#ef4444" : "#2563eb",
+                  padding: "12px 16px",
+                  background: "#2563eb",
                   color: "#fff",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "10px",
                   fontWeight: "bold",
-                  fontSize: "14px",
+                  fontSize: "13px",
+                  cursor: isSearching ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                <Search size={15} />
+                <span>بحث</span>
+              </button>
+
+              {/* زر الكاميرا لمسح QR */}
+              <button
+                type="button"
+                onClick={() => setIsCameraOpen(!isCameraOpen)}
+                className="btn-compact"
+                style={{
+                  padding: "12px 16px",
+                  background: isCameraOpen ? "#ef4444" : "#1e293b",
+                  color: isCameraOpen ? "#fff" : "#38bdf8",
+                  border: isCameraOpen ? "none" : "1px solid #3b82f6",
+                  borderRadius: "10px",
+                  fontWeight: "bold",
+                  fontSize: "13px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -858,7 +907,8 @@ export default function InstructorPage() {
                   whiteSpace: "nowrap"
                 }}
               >
-                <span>{isCameraOpen ? "✕ إغلاق" : "📷 مسح QR"}</span>
+                <Camera size={15} />
+                <span>{isCameraOpen ? "إغلاق ✕" : "مسح QR 📷"}</span>
               </button>
             </div>
 

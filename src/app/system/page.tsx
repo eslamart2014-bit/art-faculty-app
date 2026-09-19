@@ -91,6 +91,7 @@ export default function SystemPage() {
     isReady: false
   });
   const [uploadingProject, setUploadingProject] = useState(false);
+  const [isShutterFlashing, setIsShutterFlashing] = useState(false);
 
   // Complaint Form
   const [complaintTarget, setComplaintTarget] = useState("أستاذ المقرر");
@@ -467,15 +468,22 @@ export default function SystemPage() {
     return canvas.toDataURL("image/jpeg", 0.9);
   };
 
-  // Snap Artwork Photo (Multi-photo support, Live Only)
+  // Snap Artwork Photo (Multi-photo support, Live Only, Always responsive)
   const handleSnapArtworkPhoto = async () => {
-    if (!cameraFrameState.isReady) {
-      alert(cameraFrameState.message || "يرجى تثبيت يدك وضبط وضعية الهاتف للتصوير.");
+    const rawData = captureVideoFrame();
+    if (!rawData) {
+      alert("تعذر التقاط الصورة من تدفق الكاميرا، يرجى المحاولة مرة أخرى.");
       return;
     }
 
-    const rawData = captureVideoFrame();
-    if (!rawData) return;
+    // Shutter haptics
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try { navigator.vibrate(80); } catch(e) {}
+    }
+
+    // Trigger visual shutter flash
+    setIsShutterFlashing(true);
+    setTimeout(() => setIsShutterFlashing(false), 120);
 
     try {
       const compressed = await compressImageToWebP(rawData, 1280, 0.85);
@@ -494,16 +502,17 @@ export default function SystemPage() {
       if (nextList.length < requiredPhotosCount) {
         setCurrentPhotoStep(nextList.length + 1);
       } else {
-        // All required photos captured!
+        // All required photos captured! Close camera & open review modal immediately!
         stopCamera();
+        setShowArtworkCamera(false);
       }
     } catch (e) {
       console.error(e);
-      alert("حدث خطأ أثناء معالجة الصورة");
+      alert("حدث خطأ أثناء معالجة وضغط الصورة");
     }
   };
 
-  // Submit Artwork Photos to API
+  // Submit Artwork Photos to API (Connected with Telegram & Supabase Evaluations)
   const handleSubmitArtwork = async () => {
     if (!currentStudent || !selectedCourseForEval || !activeProjectForUpload) return;
     if (capturedPhotos.length < requiredPhotosCount) {
@@ -519,6 +528,7 @@ export default function SystemPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_code: currentStudent.student_code,
+          student_name: currentStudent.full_name,
           pin_code: currentStudent?.pin_code || enteredPin || "",
           course_id: selectedCourseForEval.courseId,
           course_name: selectedCourseForEval.courseName,
@@ -530,16 +540,17 @@ export default function SystemPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "فشل رفع المشروع");
+        alert(data.error || "فشل رفع المشروع إلى السحابة");
       } else {
-        alert("✓ تم رفع العمل الفني بنجاح وأصبح متاحاً للأستاذ للتقييم!");
+        alert("✓ تم رفع العمل الفني بنجاح وأصبح متاحاً للأستاذ للتقييم في النظام الرئيسي!");
         setShowArtworkCamera(false);
         setCapturedPhotos([]);
         setCurrentPhotoStep(1);
+        setActiveProjectForUpload(null);
         loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
       }
     } catch (e: any) {
-      alert("خطأ: " + e.message);
+      alert("خطأ أثناء رفع المشروع: " + e.message);
     } finally {
       setUploadingProject(false);
     }
@@ -1286,10 +1297,47 @@ export default function SystemPage() {
 
                 </div>
 
-                {/* الشريط السفلي الثابت (Action Bar) */}
+                {/* الشريط السفلي الثابت (Action Bar) مع ميزة قفل المشروع بعد التسليم */}
                 <div style={{ padding: "12px 14px", background: "#141b29", borderTop: "1px solid #2a374f" }}>
                   {(() => {
                     const activeAssigned = activeCourseAssignedProjects.find((p: any) => p.title === selectedProjectTab) || activeCourseAssignedProjects[0];
+                    
+                    // التحقق مما إذا كان الطالب قد رفع هذا المشروع بالفعل
+                    const isAlreadySubmitted = activeAssigned && (
+                      activeAssigned.status === "submitted" ||
+                      activeAssigned.status === "evaluated" ||
+                      activeAssigned.submission ||
+                      activeCourseSubmissions.some((s: any) => s.project_name === activeAssigned.title)
+                    );
+
+                    if (isAlreadySubmitted) {
+                      return (
+                        <div style={{
+                          width: "100%",
+                          padding: "12px 16px",
+                          background: "rgba(16, 185, 129, 0.12)",
+                          border: "1px solid rgba(16, 185, 129, 0.4)",
+                          borderRadius: "12px",
+                          textAlign: "center",
+                          color: "#34d399",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px"
+                        }}>
+                          <div style={{ fontWeight: "bold", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <span>🔒</span>
+                            <span>
+                              {activeAssigned?.status === "evaluated"
+                                ? `تم تقييم هذا المشروع: (${activeAssigned.evaluation?.score ?? activeAssigned.score} من ${activeAssigned.maxScore}) ✓`
+                                : "تم تسليم هذا المشروع بنجاح (قيد التقييم من الأستاذ) ⏳"}
+                            </span>
+                          </div>
+                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>
+                            تم قفل الرفع لمنع تكرار التسليم. إذا أردت إعادة التصوير، يرجى طلب فك القفل من أستاذ المقرر.
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <button
@@ -1579,6 +1627,21 @@ export default function SystemPage() {
 
             {/* معاينة الفيديو المباشر للكاميرا بدون أي وميض أو اهتزاز */}
             <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: "#000" }}>
+              {/* وميض الالتقاط البصري للشاشة (Shutter Flash) */}
+              {isShutterFlashing && (
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "#ffffff",
+                  zIndex: 999999,
+                  opacity: 0.92,
+                  pointerEvents: "none",
+                  transition: "opacity 0.12s ease-out"
+                }} />
+              )}
               <video
                 ref={setVideoRef}
                 autoPlay
@@ -1649,27 +1712,28 @@ export default function SystemPage() {
                 ))}
               </div>
 
-              {/* زر الالتقاط الدائري الذي يضيء بالأخضر عند ثبات واستقرار العمل */}
+              {/* زر الالتقاط الدائري الفوري - يستجيب دائماً مع وميض بصري وهزة خفيفة */}
               <button
                 type="button"
                 onClick={handleSnapArtworkPhoto}
-                disabled={!cameraFrameState.isReady}
                 style={{
-                  width: "66px",
-                  height: "66px",
+                  width: "68px",
+                  height: "68px",
                   borderRadius: "50%",
-                  background: cameraFrameState.isReady ? "#fff" : "#475569",
-                  border: "4px solid rgba(255,255,255,0.4)",
-                  cursor: cameraFrameState.isReady ? "pointer" : "not-allowed",
+                  background: cameraFrameState.isReady ? "#fff" : "rgba(255,255,255,0.85)",
+                  border: `4px solid ${cameraFrameState.frameColor}`,
+                  cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: cameraFrameState.isReady ? "0 0 25px rgba(16, 185, 129, 0.7)" : "none",
-                  transition: "all 0.2s ease"
+                  boxShadow: cameraFrameState.isReady ? "0 0 25px rgba(16, 185, 129, 0.8)" : "0 0 10px rgba(0,0,0,0.5)",
+                  transition: "all 0.15s ease",
+                  transform: "scale(1)",
+                  outline: "none"
                 }}
-                title={cameraFrameState.isReady ? "انقر لالتقاط الصورة" : "اضبط الهاتف وثبت يدك لتفعيل زر الالتقاط"}
+                title="انقر لالتقاط العمل الفني مباشرة"
               >
-                <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: cameraFrameState.isReady ? "#10b981" : "#334155" }} />
+                <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: cameraFrameState.isReady ? "#10b981" : "#475569", transition: "background 0.2s" }} />
               </button>
 
               {/* مؤشر أمني إجباري يوضح أن النظام يفرض التصوير الحي المباشر فقط */}

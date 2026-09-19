@@ -79,17 +79,23 @@ export async function POST(request: Request) {
     }
 
     // 2. معالجة ورفع الصور عبر محرك التخزين الصامت
+    const studentFullName = student_name || studentRecord.full_name || 'طالب';
     const processedImages: any[] = [];
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
-      let finalUrl = img.dataUrl;
+      const rawBase64 = img.url || img.dataUrl || (typeof img === 'string' ? img : '');
+      let finalUrl = rawBase64;
 
-      if (img.dataUrl && img.dataUrl.startsWith('data:image')) {
+      if (rawBase64 && rawBase64.startsWith('data:image')) {
+        const storagePath = `${studentRecord.id}/${course_id}/${encodeURIComponent(project_name)}_${Date.now()}_${i + 1}.webp`;
         const uploadRes = await uploadImageToStorage(
-          img.dataUrl,
-          `مشروع: ${project_name} - الطالب: ${student_name} (${student_code}) - صورة #${i + 1}`
+          rawBase64,
+          `مشروع: ${project_name} - الطالب: ${studentFullName} (${student_code}) - صورة #${i + 1}`,
+          undefined,
+          undefined,
+          storagePath
         );
-        if (uploadRes.success) {
+        if (uploadRes.success && uploadRes.url) {
           finalUrl = uploadRes.url;
         }
       }
@@ -104,12 +110,14 @@ export async function POST(request: Request) {
       });
     }
 
+    const primaryPhotoUrl = processedImages[0]?.url || '';
+
     // 3. حفظ التسليم في جدول student_submissions
     let newSub: any = null;
     const subPayload = {
       id: 'sub_' + Math.random().toString(36).substring(2, 9),
       student_code,
-      student_name,
+      student_name: studentFullName,
       course_id,
       course_name,
       project_name,
@@ -132,7 +140,29 @@ export async function POST(request: Request) {
       newSub = localStore.saveSubmission(subPayload);
     }
 
-    // 4. تسجيل العملية في سجل الأنشطة الأمني
+    // 4. الربط المباشر مع جدول evaluations في النظام الأساسي حتى يظهر العمل لأستاذ المقرر فوراً
+    try {
+      const { data: courseData } = await supabaseAdmin
+        .from('courses')
+        .select('teacher_id')
+        .eq('id', course_id)
+        .maybeSingle();
+
+      await supabaseAdmin.from('evaluations').upsert({
+        course_id,
+        student_id: studentRecord.id,
+        project_name,
+        score: 0,
+        teacher_id: courseData?.teacher_id || null,
+        photo_url: primaryPhotoUrl,
+        ai_status: processedImages[0]?.dhash ? `hash:${processedImages[0].dhash}` : 'submitted_via_portal',
+        created_at: new Date().toISOString()
+      }, { onConflict: 'course_id,student_id,project_name' });
+    } catch (evalErr) {
+      console.warn('Evaluations upsert warning:', evalErr);
+    }
+
+    // 5. تسجيل العملية في سجل الأنشطة الأمني
     try {
       await supabaseAdmin.from('portal_audit_logs').insert({
         student_code,
@@ -143,6 +173,7 @@ export async function POST(request: Request) {
           course_name,
           project_name,
           photosCount: processedImages.length,
+          photoUrl: primaryPhotoUrl,
           submittedAt: new Date().toISOString(),
         },
       });
