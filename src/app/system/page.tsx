@@ -26,6 +26,7 @@ import {
   ArrowRight,
   Sun,
   RotateCw,
+  ShieldCheck,
   Check
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
@@ -68,10 +69,11 @@ export default function SystemPage() {
   const [selectedProjectTab, setSelectedProjectTab] = useState<string>("all");
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
 
-  // Smart Camera State (Orientation, Anti-shake, Multi-photo)
+  // Smart Camera State (Strict Live Camera, 2D/3D Mode, Anti-flicker)
   const [showArtworkCamera, setShowArtworkCamera] = useState(false);
   const [activeProjectForUpload, setActiveProjectForUpload] = useState<any>(null);
-  const [cameraOrientationRequired, setCameraOrientationRequired] = useState<"portrait" | "landscape">("portrait");
+  const [cameraMode, setCameraMode] = useState<"2d" | "3d">("2d");
+  const [orientationFrame, setOrientationFrame] = useState<"portrait" | "landscape">("portrait");
   const [capturedPhotos, setCapturedPhotos] = useState<any[]>([]);
   const [currentPhotoStep, setCurrentPhotoStep] = useState(1);
   const [requiredPhotosCount, setRequiredPhotosCount] = useState(1);
@@ -83,7 +85,7 @@ export default function SystemPage() {
     isReady: boolean;
   }>({
     quality: "shaky",
-    orientationMatches: false,
+    orientationMatches: true,
     message: "جاري تهيئة الكاميرا وفحص الزاوية والإضاءة...",
     frameColor: "#f59e0b",
     isReady: false
@@ -99,18 +101,49 @@ export default function SystemPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const frameAnalysisLoopRef = useRef<number | null>(null);
+  const frameAnalysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const gyroListenerRef = useRef<((e: DeviceOrientationEvent) => void) | null>(null);
+  const gyroActiveRef = useRef(false);
+  const isGyroLevelRef = useRef(true);
+  const gyroMessageRef = useRef("");
+  const lastFrameStateRef = useRef<{
+    quality: "good" | "dark" | "shaky";
+    orientationMatches: boolean;
+    message: string;
+    frameColor: string;
+    isReady: boolean;
+  }>({
+    quality: "shaky",
+    orientationMatches: true,
+    message: "جاري تهيئة الكاميرا وفحص الزاوية والإضاءة...",
+    frameColor: "#f59e0b",
+    isReady: false
+  });
   const idFileInputRef = useRef<HTMLInputElement>(null);
-  const artworkFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Callback ref to guarantee stream attaches to video element
+  // Safe ref setter: NEVER reassign srcObject if it's already set to the stream to eliminate flickering!
   const setVideoRef = (el: HTMLVideoElement | null) => {
     videoRef.current = el;
-    if (el && streamRef.current) {
+    if (el && streamRef.current && el.srcObject !== streamRef.current) {
       el.srcObject = streamRef.current;
       el.play().catch(e => console.log("video play err:", e));
     }
   };
+
+  // Auto-detect screen rotation for camera frame aspect ratio
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== "undefined") {
+        setOrientationFrame(window.innerWidth > window.innerHeight ? "landscape" : "portrait");
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("orientationchange", handleResize);
+    };
+  }, []);
 
   // Restore Session on Mount
   useEffect(() => {
@@ -225,96 +258,132 @@ export default function SystemPage() {
     }
   };
 
-  // Real-time camera quality & orientation analyzer loop
-  const startQualityAnalysisLoop = (orientationRequired: "portrait" | "landscape") => {
-    if (frameAnalysisLoopRef.current) {
-      cancelAnimationFrame(frameAnalysisLoopRef.current);
+  // Real-time camera quality & anti-shake analyzer loop (Throttled, No 60fps flicker)
+  const startQualityAnalysisLoop = (mode: "2d" | "3d") => {
+    if (frameAnalysisIntervalRef.current) {
+      clearInterval(frameAnalysisIntervalRef.current);
+      frameAnalysisIntervalRef.current = null;
+    }
+    if (gyroListenerRef.current) {
+      window.removeEventListener("deviceorientation", gyroListenerRef.current);
+      gyroListenerRef.current = null;
     }
 
-    const checkFrame = () => {
-      if (!videoRef.current || !canvasRef.current) {
-        frameAnalysisLoopRef.current = requestAnimationFrame(checkFrame);
-        return;
+    gyroActiveRef.current = false;
+    isGyroLevelRef.current = true;
+    gyroMessageRef.current = "";
+
+    // Gyro fallback timer: if no sensor data received after 1800ms, do not block student
+    const gyroTimer = setTimeout(() => {
+      if (!gyroActiveRef.current) {
+        isGyroLevelRef.current = true;
       }
+    }, 1800);
 
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
+    const handleDeviceOrientation = (event: DeviceOrientationEvent) => {
+      const beta = event.beta;
+      const gamma = event.gamma;
+      if (beta === null || gamma === null) return;
 
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        canvas.width = 120;
-        canvas.height = 90;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, 120, 90);
-          const imgData = ctx.getImageData(0, 0, 120, 90);
-          const data = imgData.data;
+      gyroActiveRef.current = true;
+      clearTimeout(gyroTimer);
 
-          // 1. Average Brightness
-          let totalBrightness = 0;
-          for (let i = 0; i < data.length; i += 4) {
-            totalBrightness += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-          }
-          const avgBrightness = totalBrightness / (data.length / 4);
-
-          // 2. Sharpness / Variance check
-          let variance = 0;
-          for (let i = 0; i < data.length - 8; i += 8) {
-            variance += Math.abs(data[i] - data[i + 4]);
-          }
-          const avgVariance = variance / (data.length / 8);
-
-          // 3. Orientation check
-          const isVideoLandscape = video.videoWidth > video.videoHeight;
-          const isScreenLandscape = typeof window !== "undefined" && (window.innerWidth > window.innerHeight);
-          const isCurrentlyLandscape = isVideoLandscape || isScreenLandscape;
-          const neededLandscape = orientationRequired === "landscape";
-          const orientationMatches = neededLandscape ? isCurrentlyLandscape : !isCurrentlyLandscape;
-
-          let quality: "good" | "dark" | "shaky" = "good";
-          let message = "✅ الوضعية ممتازة وثابتة - يمكنك التقاط الصورة!";
-          let frameColor = "#10b981"; // Green
-
-          if (!orientationMatches) {
-            quality = "shaky";
-            frameColor = "#ef4444"; // Red
-            message = neededLandscape 
-              ? "🔄 يرجى تدوير الهاتف للوضع الأفقي (Landscape)" 
-              : "📱 يرجى حمل الهاتف في الوضع الرأسي (Portrait)";
-          } else if (avgBrightness < 36) {
-            quality = "dark";
-            frameColor = "#ef4444"; // Red
-            message = "🌙 الإضاءة ضعيفة جداً - يرجى تشغيل الفلاش أو الاقتراب من الضوء";
-          } else if (avgVariance < 5) {
-            quality = "shaky";
-            frameColor = "#f59e0b"; // Yellow
-            message = "⚡ الصورة غير واضحة أو مهتزة - ثبت يدك على العمل الفني";
-          }
-
-          setCameraFrameState({
-            quality,
-            orientationMatches,
-            message,
-            frameColor,
-            isReady: quality === "good" && orientationMatches
-          });
-        }
+      if (mode === "3d") {
+        // 3D Sculpture: phone upright in front of the sculpture (|beta| ~ 90)
+        const isUpright = Math.abs(Math.abs(beta) - 90) < 35 && Math.abs(gamma) < 40;
+        isGyroLevelRef.current = isUpright;
+        gyroMessageRef.current = isUpright ? "" : "📱 وجّه الهاتف عمودياً وثابتاً أمام المجسم";
+      } else {
+        // 2D Flat work: phone flat over table (|beta| < 35 & |gamma| < 35)
+        // OR upright in front of easel/wall (|beta| ~ 90)
+        const isFlat = Math.abs(beta) < 35 && Math.abs(gamma) < 35;
+        const isUpright = Math.abs(Math.abs(beta) - 90) < 35 && Math.abs(gamma) < 40;
+        const isOk = isFlat || isUpright;
+        isGyroLevelRef.current = isOk;
+        gyroMessageRef.current = isOk ? "" : "📱 وازِ الهاتف مع العمل الفني (أفقياً فوقه أو عمودياً أمامه)";
       }
-
-      frameAnalysisLoopRef.current = requestAnimationFrame(checkFrame);
     };
 
-    frameAnalysisLoopRef.current = requestAnimationFrame(checkFrame);
+    gyroListenerRef.current = handleDeviceOrientation;
+    window.addEventListener("deviceorientation", handleDeviceOrientation);
+
+    // Frame evaluation run at steady 350ms interval (completely prevents screen tremor and battery drain)
+    const checkFrame = () => {
+      if (!videoRef.current || !canvasRef.current) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (video.videoWidth <= 0 || video.videoHeight <= 0) return;
+
+      canvas.width = 120;
+      canvas.height = 90;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, 120, 90);
+      const imgData = ctx.getImageData(0, 0, 120, 90);
+      const data = imgData.data;
+
+      // 1. Average Brightness
+      let totalBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        totalBrightness += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+      }
+      const avgBrightness = totalBrightness / (data.length / 4);
+
+      // 2. Sharpness / Variance check
+      let variance = 0;
+      for (let i = 0; i < data.length - 8; i += 8) {
+        variance += Math.abs(data[i] - data[i + 4]);
+      }
+      const avgVariance = variance / (data.length / 8);
+
+      let quality: "good" | "dark" | "shaky" = "good";
+      let message = "✅ الوضعية ممتازة وثابتة — اضغط زر الالتقاط 📸";
+      let frameColor = "#10b981"; // Green
+      let isReady = true;
+
+      if (avgBrightness < 28) {
+        quality = "dark";
+        frameColor = "#ef4444";
+        message = "🌙 الإضاءة ضعيفة — اقترب من مصدر إضاءة أو شغّل الفلاش 🔦";
+        isReady = false;
+      } else if (avgVariance < 3.2) {
+        quality = "shaky";
+        frameColor = "#f59e0b";
+        message = "⚡ الصورة غير واضحة أو مهتزة — ثبّت يدك جيداً";
+        isReady = false;
+      } else if (gyroActiveRef.current && !isGyroLevelRef.current) {
+        quality = "shaky";
+        frameColor = "#f59e0b";
+        message = gyroMessageRef.current || "يرجى وزن وضعية الهاتف أمام العمل الفني";
+        isReady = false;
+      }
+
+      // ONLY trigger React re-render when state changes!
+      if (
+        lastFrameStateRef.current.isReady !== isReady ||
+        lastFrameStateRef.current.quality !== quality ||
+        lastFrameStateRef.current.frameColor !== frameColor ||
+        lastFrameStateRef.current.message !== message
+      ) {
+        const nextState = { quality, orientationMatches: true, message, frameColor, isReady };
+        lastFrameStateRef.current = nextState;
+        setCameraFrameState(nextState);
+      }
+    };
+
+    frameAnalysisIntervalRef.current = setInterval(checkFrame, 350);
   };
 
-  // Start Camera Stream
-  const startCamera = async (type: "id" | "artwork", orientation: "portrait" | "landscape" = "portrait") => {
+  // Start Camera Stream (Live Camera Only)
+  const startCamera = async (type: "id" | "artwork", mode: "2d" | "3d" = "2d") => {
     stopCamera();
     try {
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: "environment",
-          width: orientation === "landscape" ? { ideal: 1920 } : { ideal: 1080 },
-          height: orientation === "landscape" ? { ideal: 1080 } : { ideal: 1920 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         },
         audio: false
       };
@@ -327,28 +396,33 @@ export default function SystemPage() {
         setTempIdCardPreview(null);
       } else {
         setShowArtworkCamera(true);
-        startQualityAnalysisLoop(orientation);
+        startQualityAnalysisLoop(mode);
       }
 
-      if (videoRef.current) {
+      if (videoRef.current && videoRef.current.srcObject !== stream) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(e => console.log("video play err:", e));
       }
     } catch (err) {
-      console.warn("Camera getUserMedia error, falling back to file picker:", err);
+      console.warn("Camera getUserMedia error:", err);
       if (type === "id") {
         idFileInputRef.current?.click();
       } else {
-        artworkFileInputRef.current?.click();
+        alert("⚠️ تنبيه أمني: يشترط النظام التقاط الصورة مباشرة عبر كاميرا الهاتف لتوثيق أعمال الطلاب ومنع استخدام صور سابقة أو منتحلة. يرجى تفعيل إذن الكاميرا في متصفحك والمحاولة مرة أخرى.");
+        setShowArtworkCamera(false);
       }
     }
   };
 
   // Stop Camera Stream
   const stopCamera = () => {
-    if (frameAnalysisLoopRef.current) {
-      cancelAnimationFrame(frameAnalysisLoopRef.current);
-      frameAnalysisLoopRef.current = null;
+    if (frameAnalysisIntervalRef.current) {
+      clearInterval(frameAnalysisIntervalRef.current);
+      frameAnalysisIntervalRef.current = null;
+    }
+    if (gyroListenerRef.current) {
+      window.removeEventListener("deviceorientation", gyroListenerRef.current);
+      gyroListenerRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -393,7 +467,7 @@ export default function SystemPage() {
     return canvas.toDataURL("image/jpeg", 0.9);
   };
 
-  // Snap Artwork Photo (Multi-photo support)
+  // Snap Artwork Photo (Multi-photo support, Live Only)
   const handleSnapArtworkPhoto = async () => {
     if (!cameraFrameState.isReady) {
       alert(cameraFrameState.message || "يرجى تثبيت يدك وضبط وضعية الهاتف للتصوير.");
@@ -410,7 +484,7 @@ export default function SystemPage() {
         dhash: compressed.dhash,
         width: compressed.width,
         height: compressed.height,
-        orientation: cameraOrientationRequired,
+        orientation: orientationFrame,
         step: currentPhotoStep
       };
 
@@ -427,41 +501,6 @@ export default function SystemPage() {
       console.error(e);
       alert("حدث خطأ أثناء معالجة الصورة");
     }
-  };
-
-  // Handle Native File Upload Fallback for Artwork
-  const handleArtworkFileFallback = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target?.result as string;
-      if (base64) {
-        try {
-          const compressed = await compressImageToWebP(base64, 1280, 0.85);
-          const newPhoto = {
-            url: compressed.dataUrl,
-            dhash: compressed.dhash,
-            width: compressed.width,
-            height: compressed.height,
-            orientation: cameraOrientationRequired,
-            step: currentPhotoStep
-          };
-          const nextList = [...capturedPhotos, newPhoto];
-          setCapturedPhotos(nextList);
-
-          if (nextList.length < requiredPhotosCount) {
-            setCurrentPhotoStep(nextList.length + 1);
-          } else {
-            setShowArtworkCamera(false);
-          }
-        } catch (err) {
-          alert("حدث خطأ أثناء ضغط الصورة");
-        }
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   // Submit Artwork Photos to API
@@ -506,15 +545,19 @@ export default function SystemPage() {
     }
   };
 
-  // Open Smart Camera for a specific Assigned Project
+  // Open Smart Camera for a specific Assigned Project (Strict Live Camera)
   const handleOpenSmartCameraForProject = (proj: any) => {
     setActiveProjectForUpload(proj);
-    const mode = proj.cameraMode || proj.camera_mode || "portrait";
+    const mode: "2d" | "3d" = (proj.cameraMode || proj.camera_mode) === "3d" ? "3d" : "2d";
+    setCameraMode(mode);
     const reqPhotos = proj.requiredPhotos || proj.required_photos || (mode === "3d" ? 2 : 1);
-    setCameraOrientationRequired(mode);
     setRequiredPhotosCount(reqPhotos);
     setCapturedPhotos([]);
     setCurrentPhotoStep(1);
+
+    const isLandscape = typeof window !== "undefined" && window.innerWidth > window.innerHeight;
+    setOrientationFrame(isLandscape ? "landscape" : "portrait");
+
     startCamera("artwork", mode);
   };
 
@@ -1256,7 +1299,7 @@ export default function SystemPage() {
                           } else {
                             handleOpenSmartCameraForProject({
                               title: selectedCourseForEval.courseName + " - عمل فني",
-                              cameraMode: "portrait",
+                              cameraMode: "2d",
                               requiredPhotos: 1
                             });
                           }
@@ -1431,7 +1474,7 @@ export default function SystemPage() {
         )}
 
         {/* ========================================================= */}
-        {/* نافذة الكاميرا الذكية المتفق عليها (Smart Camera Modal) */}
+        {/* نافذة الكاميرا المباشرة الذكية - لايف فقط بدون رفع ملفات */}
         {/* ========================================================= */}
         {showArtworkCamera && (
           <div style={{
@@ -1446,45 +1489,74 @@ export default function SystemPage() {
             flexDirection: "column",
             direction: "rtl"
           }}>
-            {/* هيدر الكاميرا بأزرار مدمجة وصغيرة */}
+            {/* هيدر الكاميرا: اسم المشروع، وضع التصوير، زر تدوير الإطار، الفلاش، والإغلاق */}
             <div style={{
               position: "absolute",
               top: 0,
               left: 0,
               right: 0,
-              padding: "12px 16px",
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)",
+              padding: "10px 14px",
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)",
               zIndex: 10,
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center"
+              alignItems: "center",
+              gap: "8px"
             }}>
               <div>
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
-                  📷 تصوير: {activeProjectForUpload?.title || "العمل الفني"}
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>📷 {activeProjectForUpload?.title || "العمل الفني"}</span>
+                  <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: cameraMode === "3d" ? "rgba(168, 85, 247, 0.3)" : "rgba(56, 189, 248, 0.3)", color: cameraMode === "3d" ? "#c084fc" : "#38bdf8", border: "1px solid currentColor" }}>
+                    {cameraMode === "3d" ? "مجسم 3D" : "مسطح 2D"}
+                  </span>
                 </div>
-                <div style={{ color: "#38bdf8", fontSize: "11px" }}>
-                  التقاط صورة ({currentPhotoStep} من {requiredPhotosCount})
+                <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+                  الزاوية ({currentPhotoStep} من {requiredPhotosCount})
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                {/* زر التبديل الفوري بين الإطار الرأسي والأفقي */}
+                <button
+                  type="button"
+                  onClick={() => setOrientationFrame(prev => prev === "portrait" ? "landscape" : "portrait")}
+                  className="btn-compact"
+                  style={{
+                    background: "rgba(255,255,255,0.18)",
+                    color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.3)",
+                    padding: "6px 10px",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px"
+                  }}
+                  title="تبديل اتجاه الإطار بين طولي وعرضي"
+                >
+                  <RotateCw size={13} />
+                  <span>{orientationFrame === "portrait" ? "إطار طولي 📱" : "إطار عرضي 🔄"}</span>
+                </button>
+
+                {/* زر كشاف الفلاش */}
                 <button
                   type="button"
                   onClick={toggleTorch}
                   className="btn-compact"
                   style={{
-                    background: torchOn ? "#fbbf24" : "rgba(255,255,255,0.2)",
+                    background: torchOn ? "#fbbf24" : "rgba(255,255,255,0.18)",
                     color: torchOn ? "#000" : "#fff",
                     border: "none",
                     padding: "6px 10px",
+                    fontSize: "11px",
                     cursor: "pointer"
                   }}
                 >
-                  <Sun size={15} />
+                  <Sun size={14} />
                   <span>{torchOn ? "الفلاش شغال" : "فلاش"}</span>
                 </button>
 
+                {/* زر الإلغاء والخروج */}
                 <button
                   type="button"
                   onClick={() => {
@@ -1493,53 +1565,59 @@ export default function SystemPage() {
                   }}
                   className="btn-compact"
                   style={{
-                    background: "rgba(239, 68, 68, 0.3)",
-                    color: "#f87171",
-                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    background: "rgba(239, 68, 68, 0.4)",
+                    color: "#fff",
+                    border: "1px solid rgba(239, 68, 68, 0.5)",
                     padding: "6px 10px",
                     cursor: "pointer"
                   }}
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             </div>
 
-            {/* معاينة الفيديو المباشر للكاميرا */}
-            <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            {/* معاينة الفيديو المباشر للكاميرا بدون أي وميض أو اهتزاز */}
+            <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: "#000" }}>
               <video
                 ref={setVideoRef}
                 autoPlay
                 playsInline
                 muted
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  transform: "translateZ(0)",
+                  willChange: "transform"
+                }}
               />
 
-              {/* إطار التصوير التفاعلي الذكي المتغير لونه */}
+              {/* إطار التصوير التوجيهي الذكي المستقر */}
               <div style={{
                 position: "absolute",
-                width: cameraOrientationRequired === "landscape" ? "85%" : "70%",
-                height: cameraOrientationRequired === "landscape" ? "60%" : "75%",
+                width: orientationFrame === "landscape" ? "88%" : "72%",
+                height: orientationFrame === "landscape" ? "56%" : "76%",
                 border: `3px dashed ${cameraFrameState.frameColor}`,
                 borderRadius: "16px",
                 pointerEvents: "none",
-                boxShadow: `0 0 20px ${cameraFrameState.frameColor}44`,
-                transition: "border-color 0.2s ease, box-shadow 0.2s ease"
+                boxShadow: `0 0 25px ${cameraFrameState.frameColor}44`,
+                transition: "width 0.25s ease, height 0.25s ease, border-color 0.25s ease"
               }}>
-                {/* علامات أركان الإطار */}
-                <div style={{ position: "absolute", top: -3, left: -3, width: 20, height: 20, borderTop: `4px solid ${cameraFrameState.frameColor}`, borderLeft: `4px solid ${cameraFrameState.frameColor}` }} />
-                <div style={{ position: "absolute", top: -3, right: -3, width: 20, height: 20, borderTop: `4px solid ${cameraFrameState.frameColor}`, borderRight: `4px solid ${cameraFrameState.frameColor}` }} />
-                <div style={{ position: "absolute", bottom: -3, left: -3, width: 20, height: 20, borderBottom: `4px solid ${cameraFrameState.frameColor}`, borderLeft: `4px solid ${cameraFrameState.frameColor}` }} />
-                <div style={{ position: "absolute", bottom: -3, right: -3, width: 20, height: 20, borderBottom: `4px solid ${cameraFrameState.frameColor}`, borderRight: `4px solid ${cameraFrameState.frameColor}` }} />
+                {/* أركان الإطار لتحديد حدود العمل الفني بدقة */}
+                <div style={{ position: "absolute", top: -3, left: -3, width: 22, height: 22, borderTop: `4px solid ${cameraFrameState.frameColor}`, borderLeft: `4px solid ${cameraFrameState.frameColor}` }} />
+                <div style={{ position: "absolute", top: -3, right: -3, width: 22, height: 22, borderTop: `4px solid ${cameraFrameState.frameColor}`, borderRight: `4px solid ${cameraFrameState.frameColor}` }} />
+                <div style={{ position: "absolute", bottom: -3, left: -3, width: 22, height: 22, borderBottom: `4px solid ${cameraFrameState.frameColor}`, borderLeft: `4px solid ${cameraFrameState.frameColor}` }} />
+                <div style={{ position: "absolute", bottom: -3, right: -3, width: 22, height: 22, borderBottom: `4px solid ${cameraFrameState.frameColor}`, borderRight: `4px solid ${cameraFrameState.frameColor}` }} />
               </div>
 
-              {/* شريط الإرشادات العائم الفوري */}
+              {/* شريط الإرشادات الذكي الفوري المعتدل */}
               <div style={{
                 position: "absolute",
-                bottom: "100px",
+                bottom: "95px",
                 left: "20px",
                 right: "20px",
-                background: "rgba(0,0,0,0.8)",
+                background: "rgba(15, 23, 42, 0.88)",
                 border: `1px solid ${cameraFrameState.frameColor}`,
                 color: "#fff",
                 padding: "8px 14px",
@@ -1547,68 +1625,69 @@ export default function SystemPage() {
                 textAlign: "center",
                 fontSize: "12px",
                 fontWeight: "bold",
-                backdropFilter: "blur(6px)"
+                backdropFilter: "blur(8px)",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.5)"
               }}>
                 {cameraFrameState.message}
               </div>
             </div>
 
-            {/* شريط التحكم السفلي وزر الالتقاط الدائري الأبيض */}
+            {/* شريط التحكم السفلي: التقاط لايف إجباري 100% بدون أي زر لرفع ملفات */}
             <div style={{
               padding: "16px 20px",
-              background: "rgba(0,0,0,0.9)",
+              background: "rgba(0,0,0,0.92)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center"
             }}>
-              {/* مصغرات الصور الملتقطة للخطوات السابقة */}
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+              {/* مصغرات الصور السابقة للمشروع متعدد الزوايا */}
+              <div style={{ display: "flex", gap: "6px", alignItems: "center", minWidth: "60px" }}>
                 {capturedPhotos.map((p, idx) => (
-                  <div key={idx} style={{ width: "40px", height: "40px", borderRadius: "6px", overflow: "hidden", border: "2px solid #10b981", position: "relative" }}>
-                    <img src={p.url} alt="لقطة" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <div key={idx} style={{ width: "38px", height: "38px", borderRadius: "6px", overflow: "hidden", border: "2px solid #10b981", position: "relative" }}>
+                    <img src={p.url} alt="زاوية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </div>
                 ))}
               </div>
 
-              {/* زر الالتقاط الدائري الذي يتأكد من جاهزية الصورة */}
+              {/* زر الالتقاط الدائري الذي يضيء بالأخضر عند ثبات واستقرار العمل */}
               <button
                 type="button"
                 onClick={handleSnapArtworkPhoto}
                 disabled={!cameraFrameState.isReady}
                 style={{
-                  width: "64px",
-                  height: "64px",
+                  width: "66px",
+                  height: "66px",
                   borderRadius: "50%",
-                  background: cameraFrameState.isReady ? "#fff" : "#64748b",
+                  background: cameraFrameState.isReady ? "#fff" : "#475569",
                   border: "4px solid rgba(255,255,255,0.4)",
                   cursor: cameraFrameState.isReady ? "pointer" : "not-allowed",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: cameraFrameState.isReady ? "0 0 20px rgba(16, 185, 129, 0.6)" : "none",
+                  boxShadow: cameraFrameState.isReady ? "0 0 25px rgba(16, 185, 129, 0.7)" : "none",
                   transition: "all 0.2s ease"
                 }}
+                title={cameraFrameState.isReady ? "انقر لالتقاط الصورة" : "اضبط الهاتف وثبت يدك لتفعيل زر الالتقاط"}
               >
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: cameraFrameState.isReady ? "#10b981" : "#475569" }} />
+                <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: cameraFrameState.isReady ? "#10b981" : "#334155" }} />
               </button>
 
-              {/* خيار التقاط عبر تطبيق الكاميرا كبديل مباشر */}
-              <button
-                type="button"
-                onClick={() => artworkFileInputRef.current?.click()}
-                className="btn-compact"
-                style={{
-                  background: "rgba(255,255,255,0.15)",
-                  color: "#fff",
-                  padding: "8px 12px",
-                  fontSize: "11px",
-                  border: "none",
-                  cursor: "pointer"
-                }}
-              >
-                <FolderOpen size={14} />
-                <span>من الهاتف</span>
-              </button>
+              {/* مؤشر أمني إجباري يوضح أن النظام يفرض التصوير الحي المباشر فقط */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                color: "#34d399",
+                fontSize: "11px",
+                fontWeight: "bold",
+                background: "rgba(16, 185, 129, 0.12)",
+                padding: "6px 10px",
+                borderRadius: "8px",
+                border: "1px solid rgba(16, 185, 129, 0.3)"
+              }}>
+                <ShieldCheck size={14} color="#10b981" />
+                <span>تصوير مباشر 🔒</span>
+              </div>
             </div>
           </div>
         )}
@@ -1668,7 +1747,7 @@ export default function SystemPage() {
                   onClick={() => {
                     setCapturedPhotos([]);
                     setCurrentPhotoStep(1);
-                    startCamera("artwork", cameraOrientationRequired);
+                    startCamera("artwork", cameraMode);
                   }}
                   className="btn-compact"
                   style={{
@@ -1707,7 +1786,7 @@ export default function SystemPage() {
           </div>
         )}
 
-        {/* ملفات الـ Input المخفية للكاميرا البديلة وعنصر الـ canvas لفحص الجودة */}
+        {/* ملف الـ Input المخفي لبطاقة الرقم القومي وعنصر الـ canvas لفحص الجودة */}
         <input 
           type="file" 
           accept="image/*" 
@@ -1722,14 +1801,6 @@ export default function SystemPage() {
               r.readAsDataURL(f);
             }
           }}
-        />
-        <input 
-          type="file" 
-          accept="image/*" 
-          capture="environment" 
-          ref={artworkFileInputRef} 
-          style={{ display: "none" }} 
-          onChange={handleArtworkFileFallback}
         />
         <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
