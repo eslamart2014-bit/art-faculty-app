@@ -287,7 +287,7 @@ export default function InstructorPage() {
 
       let html = `
         <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 2px solid #3b82f6; border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 20px; page-break-after: always;">
-          <div style="font-size: 13px; font-weight: bold; color: #94a3b8; margin-bottom: 4px;">جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية</div>
+          <div style="font-size: 13px; font-weight: bold; color: #94a3b8; margin-bottom: 4px;">جامعة قنا • كلية التربية النوعية • قسم التربية الفنية</div>
           <h1 style="font-size: 18px; color: #38bdf8; margin: 0 0 10px 0;">ألبوم أعمال ومشاريع الطلاب</h1>
           <div style="background: rgba(59, 130, 246, 0.15); border-radius: 8px; padding: 12px; margin: 12px 0;">
             <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 4px;">المقرر: ${courseObj?.name || ""}</div>
@@ -1194,7 +1194,7 @@ export default function InstructorPage() {
       )}
 
       <footer style={{ textAlign: "center", paddingTop: "28px", paddingBottom: "20px", color: "#64748b", fontSize: "11px" }}>
-        جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+        جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
     </div>
   );

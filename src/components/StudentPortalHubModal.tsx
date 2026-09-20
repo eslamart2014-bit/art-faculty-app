@@ -385,7 +385,7 @@ export default function StudentPortalHubModal({
             <span>🎓</span> بوابة الطلاب وجناح الأمان الأكاديمي
           </h2>
           <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
-            جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+            جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
         <button

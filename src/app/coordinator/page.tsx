@@ -383,7 +383,7 @@ export default function CoordinatorPage() {
       )}
 
       <footer style={{ textAlign: "center", paddingTop: "20px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
-        جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+        جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
     </div>
   );

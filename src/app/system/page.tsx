@@ -1003,7 +1003,7 @@ export default function SystemPage() {
         </div>
 
         <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px", marginBottom: "10px" }}>
-          جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+          جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </div>
       </div>
     );
@@ -2093,7 +2093,7 @@ export default function SystemPage() {
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
         <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
-          جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+          جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </footer>
       </div>
     );
@@ -2326,7 +2326,7 @@ export default function SystemPage() {
       </div>
 
       <footer style={{ textAlign: "center", paddingTop: "16px", color: "#64748b", fontSize: "11px" }}>
-        جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+        جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
 
       {/* نافذة كاميرا بطاقة الهوية */}

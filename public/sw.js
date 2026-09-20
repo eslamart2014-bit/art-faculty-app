@@ -110,7 +110,7 @@ self.addEventListener('fetch', event => {
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>نظام التربية الفنية — جامعة جنوب الوادي (قنا) • كلية التربية النوعية</title>
+            <title>نظام التربية الفنية — جامعة قنا • كلية التربية النوعية</title>
             <style>
               body { background: #121212; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; box-sizing: border-box; }
               .card { background: #1e1e1e; border: 1px solid #333; border-radius: 16px; padding: 30px 20px; max-width: 380px; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }

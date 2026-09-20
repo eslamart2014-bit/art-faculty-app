@@ -347,7 +347,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
             <span>🧩</span> الإعدادات المتقدمة
           </h2>
           <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
-            جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+            جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
