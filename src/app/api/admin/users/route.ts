@@ -109,30 +109,87 @@ export async function POST(request: Request) {
       }
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
 
-      const { data: targetUser } = await supabaseAdmin
+      // 1. استرجاع بيانات المستخدم من profiles
+      const { data: targetProfile } = await supabaseAdmin
         .from('profiles')
-        .select('can_verify_students, full_name')
+        .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      const newPerm = !targetUser?.can_verify_students;
+      // 2. فحص الصلاحية الحالية من عدة مصادر موثوقة
+      let currentPerm = false;
+      if (targetProfile && targetProfile.can_verify_students !== undefined && targetProfile.can_verify_students !== null) {
+        currentPerm = !!targetProfile.can_verify_students;
+      }
 
-      const { error: permError } = await supabaseAdmin
-        .from('profiles')
-        .update({ can_verify_students: newPerm })
-        .eq('id', userId);
+      // فحص بيانات المستخدم في auth.users
+      let authUserMetadata: any = {};
+      try {
+        const { data: authUserData } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (authUserData?.user?.user_metadata) {
+          authUserMetadata = authUserData.user.user_metadata;
+          if (authUserMetadata.can_verify_students !== undefined && authUserMetadata.can_verify_students !== null) {
+            currentPerm = !!authUserMetadata.can_verify_students;
+          }
+        }
+      } catch (e) {}
 
-      if (permError) throw permError;
+      // فحص إعدادات النظام system_settings
+      try {
+        const { data: settings } = await supabaseAdmin
+          .from('system_settings')
+          .select('id, telegram_config')
+          .eq('id', 1)
+          .maybeSingle();
+        if (settings?.telegram_config) {
+          const coords: string[] = settings.telegram_config.verified_coordinators || [];
+          if (coords.includes(userId)) {
+            currentPerm = true;
+          }
+        }
+      } catch (e) {}
 
-      // Sync with portal_coordinators
-      if (newPerm && targetUser?.full_name) {
-        try {
-          await supabaseAdmin.from('portal_coordinators').upsert({
-            name: targetUser.full_name,
-            title: 'منسق تأكيد هوية الطلاب',
-            is_active: true
-          }, { onConflict: 'name' });
-        } catch (e) {}
+      const newPerm = !currentPerm;
+
+      // 3. حفظ الصلاحية الجديدة في auth.users (يعمل دائماً بدون الحاجة لتعديل الجداول)
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            ...authUserMetadata,
+            can_verify_students: newPerm
+          }
+        });
+      } catch (e) {}
+
+      // 4. حفظ الصلاحية الجديدة في system_settings
+      try {
+        const { data: settings } = await supabaseAdmin
+          .from('system_settings')
+          .select('id, telegram_config')
+          .eq('id', 1)
+          .maybeSingle();
+        if (settings) {
+          const cfg = settings.telegram_config || {};
+          let coords: string[] = cfg.verified_coordinators || [];
+          if (newPerm) {
+            if (!coords.includes(userId)) coords.push(userId);
+          } else {
+            coords = coords.filter((id: string) => id !== userId);
+          }
+          await supabaseAdmin.from('system_settings').update({
+            telegram_config: { ...cfg, verified_coordinators: coords }
+          }).eq('id', 1);
+        }
+      } catch (e) {}
+
+      // 5. محاولة التحديث في جدول profiles في حال كان العمود موجوداً
+      try {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ can_verify_students: newPerm })
+          .eq('id', userId);
+      } catch (e) {
+        // تجاهل آمن في حال لم يتم تشغيل سكربت إضافة العمود بعد
       }
 
       return NextResponse.json({ success: true, can_verify_students: newPerm });

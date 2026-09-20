@@ -125,7 +125,19 @@ export default function Home() {
         .maybeSingle();
         
       if (data) {
-        const merged = { ...authUser, ...data };
+        let isCoord = data.can_verify_students;
+        if (isCoord === undefined || isCoord === null) {
+          isCoord = !!authUser.user_metadata?.can_verify_students;
+          if (!isCoord) {
+            try {
+              const cachedSettingsStr = typeof window !== 'undefined' ? localStorage.getItem("cached_system_settings") : null;
+              const cachedSettings = cachedSettingsStr ? JSON.parse(cachedSettingsStr) : null;
+              const coords: string[] = cachedSettings?.telegram_config?.verified_coordinators || [];
+              if (coords.includes(authUser.id)) isCoord = true;
+            } catch (e) {}
+          }
+        }
+        const merged = { ...authUser, ...data, can_verify_students: isCoord };
         if (typeof window !== 'undefined') {
           // HIGH-5 FIX: Strip sensitive security fields before caching in localStorage
           // These fields must NEVER be used for security decisions from cache anyway

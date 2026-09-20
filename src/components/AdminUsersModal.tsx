@@ -36,9 +36,27 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   const fetchData = async () => {
     setLoading(true);
     const { data: profilesData } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+    
+    // جلب قائمة منسقي الهويات المعتمدين من إعدادات النظام لدعم الصلاحية حتى في حال عدم وجود العمود بقاعدة البيانات
+    let verifiedCoords: string[] = [];
+    try {
+      const { data: settingsData } = await supabase.from("system_settings").select("telegram_config").eq("id", 1).maybeSingle();
+      if (settingsData?.telegram_config?.verified_coordinators) {
+        verifiedCoords = settingsData.telegram_config.verified_coordinators;
+      }
+    } catch (e) {}
+
     if (profilesData) {
       const isAssistant = adminUser?.role === 'مدير مساعد';
-      setUsers(profilesData.filter(u => !(isAssistant && u.full_name?.startsWith('[محذوف]'))));
+      const mergedUsers = profilesData
+        .filter(u => !(isAssistant && u.full_name?.startsWith('[محذوف]')))
+        .map(u => ({
+          ...u,
+          can_verify_students: u.can_verify_students !== undefined && u.can_verify_students !== null
+            ? !!u.can_verify_students
+            : verifiedCoords.includes(u.id)
+        }));
+      setUsers(mergedUsers);
     }
 
     // Fetch pending invitations
