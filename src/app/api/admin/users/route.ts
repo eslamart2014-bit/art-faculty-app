@@ -36,14 +36,14 @@ export async function POST(request: Request) {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (!profile || !['مدير', 'مدير مساعد'].includes(profile.role)) {
       return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     // Fetch target user to prevent Assistant from modifying Manager
-    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).single();
+    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
     if (profile.role === 'مدير مساعد' && targetProfile?.role === 'مدير') {
       return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
     }

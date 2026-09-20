@@ -373,7 +373,7 @@ export default function CoordinatorPage() {
                 style={{ background: "linear-gradient(135deg, #10b981, #059669)", fontSize: "15px" }}
               >
                 <CheckCircle2 size={18} />
-                <span>اعتماد الهوية وتأكيد تسليم الـ PIN للطالب</span>
+                <span>تسجيل صرف وتأكيد تسليم الرقم السري للطالب 🔐</span>
               </button>
 
             </div>

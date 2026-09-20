@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       const { data: settings } = await supabaseAdmin
         .from('system_settings')
         .select('telegram_config')
-        .eq('id', 'global')
+        .eq('id', 1)
         .maybeSingle();
 
       const list = settings?.telegram_config?.verified_coordinators;
@@ -86,6 +86,10 @@ export async function GET(request: Request) {
       coordinators: assignedCoordinators,
       allCoordinators,
       totalAvailable: allCoordinators.length,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
     });
   } catch (err: any) {
     console.error('Error fetching coordinators:', err);
@@ -94,6 +98,10 @@ export async function GET(request: Request) {
         { id: '1', full_name: 'د/ إسلام عبد اللطيف حسن', role: 'مطور ومنسق المنظومة' }
       ],
       allCoordinators: [],
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
     });
   }
 }

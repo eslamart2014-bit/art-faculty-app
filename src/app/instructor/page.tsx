@@ -880,7 +880,7 @@ export default function InstructorPage() {
                   placeholder="أدخل كود الطالب (مثال: 0001) واضغط بحث، أو اكتب الاسم..."
                   style={{ width: "100%", padding: "12px 16px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
                 />
-                {isSearching && (
+                {isSearching && !/^\d+$/.test(searchQuery.trim()) && (
                   <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
                 )}
               </div>
@@ -999,9 +999,6 @@ export default function InstructorPage() {
                       <div>
                         <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>
                           {st.full_name}
-                        </div>
-                        <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                          كود: {formatStudentCode(st.student_code)}
                         </div>
                       </div>
                     </div>

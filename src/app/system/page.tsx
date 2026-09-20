@@ -974,17 +974,17 @@ export default function SystemPage() {
         </div>
 
         {/* الرسالة الإرشادية لإدخال الـ PIN */}
-        <div className="glass-card animate-fade-in" style={{ padding: "24px 18px", textAlign: "center", marginBottom: "20px" }}>
-          <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "rgba(245, 158, 11, 0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", marginBottom: "16px" }}>
+        <div className="glass-card animate-fade-in" style={{ padding: "12px 14px", textAlign: "center", marginBottom: "12px" }}>
+          <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(245, 158, 11, 0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", marginBottom: "10px" }}>
             <ShieldAlert size={32} />
           </div>
 
-          <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#ffffff", marginBottom: "12px", lineHeight: "1.5" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#ffffff", marginBottom: "8px", lineHeight: "1.3" }}>
             الحساب مسجل وبانتظار التفعيل 🔐
           </h2>
 
-          <p style={{ color: "#cbd5e1", fontSize: "13px", lineHeight: "1.7", marginBottom: "20px" }}>
-            أهلاً بك يا <b>{currentStudent.full_name}</b>. تم تسجيل بياناتك بنجاح. للحفاظ على سرية درجاتك، يرجى التوجه لأحد منسقي الكلية لمطابقة بطاقتك واستلام <b>الرقم السري (PIN)</b> المكون من 8 خانات.
+          <p style={{ color: "#cbd5e1", fontSize: "12px", lineHeight: "1.6", marginBottom: "12px" }}>
+            أهلاً بك يا <b>{currentStudent.full_name}</b>. تم تسجيل بياناتك بنجاح. يرجى التوجه إلى أحد المنسقين المحددين لك لاستلام <b>الرقم السري (PIN)</b> لتفعيل حسابك:
           </p>
 
           {errorMsg && (
@@ -1000,8 +1000,8 @@ export default function SystemPage() {
           )}
 
           {/* إدخال الـ PIN للتفعيل الفوري */}
-          <div style={{ background: "#0d131f", padding: "16px", borderRadius: "12px", border: "1px solid #1e293b", marginBottom: "20px" }}>
-            <label style={{ display: "block", color: "#38bdf8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
+          <div style={{ background: "#0d131f", padding: "12px", borderRadius: "12px", border: "1px solid #1e293b", marginBottom: "14px" }}>
+            <label style={{ display: "block", color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>
               هل استلمت الرقم السري (PIN) من المنسق؟
             </label>
             <input 
@@ -1012,9 +1012,7 @@ export default function SystemPage() {
               onChange={(e) => setEnteredPin(e.target.value)}
               style={{
                 width: "100%",
-                padding: "12px",
-                textAlign: "center",
-                fontSize: "18px",
+                padding: "10px", textAlign: "center", fontSize: "16px",
                 fontFamily: "monospace",
                 letterSpacing: "4px",
                 fontWeight: "bold",
@@ -1030,8 +1028,7 @@ export default function SystemPage() {
               disabled={loading || enteredPin.length < 4}
               style={{
                 width: "100%",
-                padding: "12px",
-                background: "linear-gradient(135deg, #10b981, #059669)",
+                padding: "10px", background: "linear-gradient(135deg, #10b981, #059669)",
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
@@ -1046,18 +1043,18 @@ export default function SystemPage() {
 
           {/* قائمة المنسقين */}
           {coordinators.length > 0 && (
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "bold", marginBottom: "8px" }}>
-                منسقو النظام المعتمدون بالكلية:
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {coordinators.map((c) => (
-                  <div key={c.id} style={{ background: "#101622", padding: "8px 12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", border: "1px solid #1e293b" }}>
-                    <span style={{ color: "#fff", fontWeight: "600" }}>{c.full_name}</span>
-                    <span style={{ color: "#38bdf8" }}>{c.role || "منسق المنظومة"}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+              {coordinators.slice(0, 2).map((c, idx) => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ background: "#1e293b", padding: "6px 12px", borderRadius: "8px", display: "inline-flex", flexDirection: "column", alignItems: "center", border: "1px solid #334155" }}>
+                    <span style={{ color: "#fff", fontWeight: "bold", fontSize: "12px" }}>{c.full_name}</span>
+                    <span style={{ color: "#38bdf8", fontSize: "10px" }}>{c.role || "منسق"}</span>
                   </div>
-                ))}
-              </div>
+                  {idx < Math.min(coordinators.length, 2) - 1 && (
+                    <span style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>أو</span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1113,7 +1110,7 @@ export default function SystemPage() {
       : activeCourseSubmissions.filter((s: any) => s.project_name === selectedProjectTab);
 
     return (
-      <div style={{ minHeight: "100vh", padding: "14px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
+      <div style={{ minHeight: "100vh", padding: "10px 14px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
         
         {/* شريط وضع تصفح الإدارة العائم */}
         {isImpersonating && (
@@ -1697,7 +1694,7 @@ export default function SystemPage() {
                       )}
 
                       {/* مربع تقييم الدرجة */}
-                      {selectedProjectForView.isGraded ? (
+                      {selectedProjectForView.isGraded && (
                         <div style={{
                           background: "linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15))",
                           border: "2px solid #10b981",
@@ -1722,25 +1719,6 @@ export default function SystemPage() {
                               ملاحظات الأستاذ: {selectedProjectForView.evaluation.notes}
                             </div>
                           )}
-                        </div>
-                      ) : (
-                        <div style={{
-                          background: "rgba(245, 158, 11, 0.12)",
-                          border: "1px solid rgba(245, 158, 11, 0.4)",
-                          borderRadius: "14px",
-                          padding: "14px",
-                          textAlign: "center",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "4px"
-                        }}>
-                          <div style={{ color: "#fbbf24", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                            <span>⏳</span>
-                            <span>الدرجة: في انتظار التقييم</span>
-                          </div>
-                          <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                            تم استلام عملك الفني بنجاح، وهو قيد المراجعة والرصد من قِبل أستاذ / معيد المقرر.
-                          </div>
                         </div>
                       )}
 
@@ -2068,7 +2046,7 @@ export default function SystemPage() {
                           background: "#141b29",
                           border: hasReply ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid #2a374f",
                           borderRadius: "14px",
-                          padding: "14px",
+                          padding: "10px 14px",
                           display: "flex",
                           flexDirection: "column",
                           gap: "10px"
@@ -2412,8 +2390,7 @@ export default function SystemPage() {
                   disabled={uploadingProject}
                   style={{
                     flex: 1,
-                    padding: "12px",
-                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    padding: "10px", background: "linear-gradient(135deg, #10b981, #059669)",
                     color: "#fff",
                     border: "none",
                     borderRadius: "10px",
@@ -2501,7 +2478,7 @@ export default function SystemPage() {
       
       <div>
         <header style={{ textAlign: "center", paddingTop: "15px", marginBottom: "16px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "56px", height: "56px", borderRadius: "16px", overflow: "hidden", marginBottom: "10px", boxShadow: "0 8px 20px rgba(37, 99, 235, 0.35)" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "48px", height: "48px", borderRadius: "14px", overflow: "hidden", marginBottom: "6px", boxShadow: "0 8px 20px rgba(37, 99, 235, 0.35)" }}>
             <img src="/icon-192.png" alt="فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
           <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#fff", marginBottom: "3px" }}>

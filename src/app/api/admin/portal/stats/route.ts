@@ -39,11 +39,15 @@ export async function GET() {
     });
 
     (studentsWithBrowserId || []).forEach((st: any) => {
-      if (st.student_code && !registeredCodes.has(st.student_code)) {
-        registeredCodes.add(st.student_code);
+      if (st.student_code && st.telegram_browser_id && st.telegram_browser_id.trim().length > 2) {
         try {
           const parsed = JSON.parse(st.telegram_browser_id || '{}');
-          if (parsed.id_card_verified) verifiedCardsCount++;
+          if (parsed && (parsed.student_code || parsed.mobile || parsed.pin_code || parsed.status)) {
+            if (!registeredCodes.has(st.student_code)) {
+              registeredCodes.add(st.student_code);
+              if (parsed.id_card_verified) verifiedCardsCount++;
+            }
+          }
         } catch (e) {}
       }
     });
@@ -63,6 +67,10 @@ export async function GET() {
       registeredAccounts: registeredCodes.size,
       verifiedCards: verifiedCardsCount,
       submissionsCount: totalSubs || 0,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
     });
   } catch (err: any) {
     console.error('Portal stats error:', err);
@@ -73,6 +81,10 @@ export async function GET() {
       verifiedCards: 0,
       submissionsCount: 0,
       error: err.message,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
     });
   }
 }

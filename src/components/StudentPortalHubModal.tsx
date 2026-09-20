@@ -24,6 +24,41 @@ interface StudentPortalHubModalProps {
   onOpenIdentityModal?: () => void;
 }
 
+function parseDeviceBrand(userAgent?: string, screen?: string): { brand: string; icon: string; osText: string } {
+  if (!userAgent || userAgent === 'unknown' || userAgent === 'browser') {
+    return { brand: 'هاتف ذكي', icon: '📱', osText: 'متصفح إنترنت محمول' };
+  }
+  const ua = userAgent.toLowerCase();
+  let brand = 'هاتف ذكي / جهاز';
+  let icon = '📱';
+  let osText = 'متصفح الإنترنت';
+
+  if (ua.includes('iphone')) {
+    brand = 'آبل آيفون (Apple iPhone)'; icon = '🍎'; osText = 'نظام iOS';
+  } else if (ua.includes('ipad')) {
+    brand = 'آبل آيباد (Apple iPad)'; icon = '🍎'; osText = 'نظام iPadOS';
+  } else if (ua.includes('samsung') || ua.includes('sm-')) {
+    brand = 'سامسونج (Samsung Galaxy)'; icon = '📱'; osText = 'أندرويد Android';
+  } else if (ua.includes('redmi') || ua.includes('xiaomi') || ua.includes('poco')) {
+    brand = 'شاومي (Xiaomi / Redmi)'; icon = '📱'; osText = 'أندرويد MIUI/HyperOS';
+  } else if (ua.includes('oppo') || ua.includes('cph')) {
+    brand = 'أوبو (Oppo Mobile)'; icon = '📱'; osText = 'أندرويد ColorOS';
+  } else if (ua.includes('vivo') || ua.includes('v2')) {
+    brand = 'فيفو (Vivo Mobile)'; icon = '📱'; osText = 'أندرويد Funtouch';
+  } else if (ua.includes('realme') || ua.includes('rmx')) {
+    brand = 'ريلمي (Realme Mobile)'; icon = '📱'; osText = 'أندرويد RealmeUI';
+  } else if (ua.includes('huawei') || ua.includes('honor')) {
+    brand = 'هواوي / هونر (Huawei / Honor)'; icon = '📱'; osText = 'أندرويد / EMUI';
+  } else if (ua.includes('android')) {
+    brand = 'هاتف أندرويد ذكي'; icon = '📱'; osText = 'نظام Android';
+  } else if (ua.includes('windows')) {
+    brand = 'كمبيوتر شخصي (PC)'; icon = '💻'; osText = 'نظام ويندوز Windows';
+  } else if (ua.includes('macintosh') || ua.includes('mac os')) {
+    brand = 'جهاز أبل ماك (MacBook / iMac)'; icon = '💻'; osText = 'نظام macOS';
+  }
+  return { brand, icon, osText };
+}
+
 export default function StudentPortalHubModal({
   isOpen,
   onClose,
@@ -140,7 +175,7 @@ export default function StudentPortalHubModal({
   const fetchPortalStats = async () => {
     setLoadingStats(true);
     try {
-      const res = await fetch("/api/admin/portal/stats");
+      const res = await fetch("/api/admin/portal/stats?_t=" + Date.now(), { cache: "no-store" });
       const data = await res.json();
 
       if (data && data.success) {
@@ -308,27 +343,34 @@ export default function StudentPortalHubModal({
 
   const formatAuditAction = (action: string, details: any = {}) => {
     switch (action) {
-      case "pin_issued_by_coordinator":
-        return `تم اعتماد الهوية وصرف الرقم السري (PIN) بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
-      case "student_registered":
-        return "قام الطالب بإنشاء الحساب لأول مرة وتصوير بطاقة الهوية";
-      case "student_login":
-        return "تسجيل دخول الطالب إلى بوابة النظام";
+      case "submit_project":
       case "upload_artwork":
       case "student_submit_project":
-        return `رفع عمل فني لمشروع (${details?.project_name || "مشروع"}) بمقرر (${details?.course_name || "مقرر"})`;
+        return `رفع عمل فني لمشروع «${details?.project_name || "مشروع"}» بمقرر «${details?.course_name || "مقرر"}»`;
+      case "login":
+      case "student_login":
+        return "تسجيل دخول الطالب إلى بوابة المنظومة";
+      case "register":
+      case "student_registered":
+        return "إنشاء الحساب لأول مرة وتصوير بطاقة الهوية الجامعية";
+      case "pin_verified_and_activated":
+        return "إدخال وتأكيد الرقم السري (PIN) وتفعيل الحساب بنجاح";
+      case "pin_issued_by_coordinator":
+        return `اعتماد الهوية وتسليم الرقم السري (PIN) بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
       case "allow_retake":
-        return `فك قفل المشروع والسماح بإعادة التصوير بواسطة عضو الهيئة المعاونة (${details?.instructor || "المعيد"})`;
+        return `فك قفل المشروع وإتاحة إعادة التصوير بواسطة (${details?.instructor || "المعيد"})`;
       case "account_wiped_by_admin":
       case "account_wiped":
-        return `فرمتة الحساب وإلغاء ارتباط الأجهزة بواسطة الإدارة (السبب: ${details?.reason || "طلب إعادة تعيين"})`;
+        return `فرمتة الحساب وإلغاء ارتباط الأجهزة بواسطة الإدارة (${details?.reason || "طلب إعادة تعيين"})`;
+      case "toggle_suspend":
+      case "suspend_account":
       case "account_suspended":
-        return "تم تعليق الحساب مؤقتاً وحظر الدخول بواسطة الإدارة";
+        return details?.status === "suspended" ? "تعليق الحساب مؤقتاً وحظر الدخول" : "فك تعليق الحساب وتنشيط الدخول";
       case "account_unsuspended":
-        return "تم فك تعليق الحساب واستئناف صلاحية الدخول بواسطة الإدارة";
+        return "فك تعليق الحساب وتنشيط الدخول بواسطة الإدارة";
       case "reset_artworks_by_admin":
       case "admin_reset_submissions":
-        return "تم تصفير وحذف كافة الأعمال والمشاريع المرفوعة للطالب بواسطة الإدارة";
+        return "تصفير وحذف الأعمال والمشاريع المرفوعة وإتاحة الرفع مجدداً";
       default:
         return action;
     }
@@ -533,6 +575,28 @@ export default function StudentPortalHubModal({
                   {stats.submissionsCount || "0"}
                 </div>
               </div>
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
+              <button
+                onClick={fetchPortalStats}
+                disabled={loadingStats}
+                style={{
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  color: "#fff",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <RefreshCw size={14} className={loadingStats ? "spin" : ""} />
+                <span>{loadingStats ? "جاري التحديث..." : "تحديث الإحصائيات"}</span>
+              </button>
             </div>
 
             {/* Section 1: Main Public Student Portal */}
@@ -1002,7 +1066,7 @@ export default function StudentPortalHubModal({
                 placeholder="أدخل كود الطالب الجامعي أو اسمه..."
                 value={searchStudentTerm}
                 onChange={(e) => setSearchStudentTerm(e.target.value)}
-                style={{ flex: 1, padding: "12px 14px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
+                style={{ flex: 1, padding: "0 14px", height: "46px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
               />
               <button
                 type="submit"
@@ -1012,7 +1076,8 @@ export default function StudentPortalHubModal({
                   background: "#7c3aed",
                   color: "#fff",
                   border: "none",
-                  padding: "0 20px",
+                  height: "46px",
+                  padding: "0 18px",
                   borderRadius: "10px",
                   fontWeight: "bold",
                   cursor: "pointer",
@@ -1134,15 +1199,25 @@ export default function StudentPortalHubModal({
                     <div>📱 <b>الأجهزة المرتبطة:</b> {searchedStudent.parsedAccount.devices?.length || 1} جهاز</div>
                     {searchedStudent.parsedAccount.devices && searchedStudent.parsedAccount.devices.length > 0 && (
                       <div style={{ marginTop: "6px", color: "#94a3b8", fontSize: "11px", background: "rgba(255,255,255,0.03)", padding: "6px 10px", borderRadius: "6px" }}>
-                        {searchedStudent.parsedAccount.devices.map((d: any, dIdx: number) => (
-                          <div key={dIdx}>
-                            • {d.browser || "متصفح الويب"} على {d.os || "الهاتف"} ({d.screen || "دقة الشاشة"}) - آخر ظهور: {d.lastSeen ? new Date(d.lastSeen).toLocaleDateString("ar-EG") : ""}
-                          </div>
-                        ))}
+                        {searchedStudent.parsedAccount.devices.map((d: any, dIdx: number) => {
+                          const devInfo = parseDeviceBrand(d.userAgent, d.screen);
+                          return (
+                            <div key={dIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px dashed rgba(255,255,255,0.06)" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span>{devInfo.icon}</span>
+                                <span style={{ fontWeight: "bold", color: "#e2e8f0", fontSize: "12px" }}>{devInfo.brand}</span>
+                                <span style={{ color: "#94a3b8", fontSize: "11px" }}>({devInfo.osText})</span>
+                              </div>
+                              <div style={{ color: "#64748b", fontSize: "10px", direction: "ltr" }}>
+                                {d.screen ? `[${d.screen}] • ` : ""}{d.lastSeen ? new Date(d.lastSeen).toLocaleDateString("ar-EG") : ""}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
-                    <div style={{ color: "#64748b", fontSize: "11px", marginTop: "6px" }}>
-                      💡 كشف نوع نظام التشغيل والمتصفح يتم تلقائياً، بينما يتطلب الـ GPS إذناً من الطالب عبر المتصفح.
+                    <div style={{ color: "#38bdf8", fontSize: "11px", marginTop: "8px", background: "rgba(56, 189, 248, 0.08)", padding: "8px 12px", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.2)" }}>
+                      ℹ️ <b>توضيح أمني:</b> يتم التعرف على طراز الجهاز وماركته ونظام التشغيل تلقائياً وفورياً من بصمة المتصفح، أما تحديد الموقع الجغرافي الدقيق (GPS) فيتطلب موافقة الطالب على تصريح المتصفح.
                     </div>
                   </div>
                 ) : (
@@ -1172,11 +1247,15 @@ export default function StudentPortalHubModal({
 
                 {/* Wipe Section */}
                 <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px" }}>
-                  <div style={{ color: "#f87171", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>
-                    ⚠️ فرمتة الحساب بالكامل (Account Wipe):
-                  </div>
-                  <div style={{ color: "#94a3b8", fontSize: "11px", marginBottom: "8px" }}>
-                    الفرمتة تقوم بإلغاء ارتباط الأجهزة بالكامل ومسح الحساب من البوابة لتمكين الطالب الأصلي من التسجيل برقم سري جديد من الصفر.
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+                    <div style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px dashed rgba(239, 68, 68, 0.2)", padding: "10px", borderRadius: "10px" }}>
+                      <div style={{ color: "#f87171", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>🚫 تعليق الحساب مؤقتاً</div>
+                      <div style={{ color: "#94a3b8", fontSize: "10px" }}>يمنع الطالب من الدخول للبوابة مع الاحتفاظ بكافة بياناته وصوره وماريعه. استخدمه أثناء فحص المخالفات.</div>
+                    </div>
+                    <div style={{ background: "rgba(168, 85, 247, 0.05)", border: "1px dashed rgba(168, 85, 247, 0.2)", padding: "10px", borderRadius: "10px" }}>
+                      <div style={{ color: "#c084fc", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>⚠️ فرمتة الحساب بالكامل</div>
+                      <div style={{ color: "#94a3b8", fontSize: "10px" }}>يحذف ارتباط الأجهزة بالكامل ويمسح الحساب من البوابة، لتمكين الطالب الأصلي من التسجيل برقم سري جديد من الصفر.</div>
+                    </div>
                   </div>
                   <input
                     type="text"
