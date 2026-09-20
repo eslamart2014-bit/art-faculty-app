@@ -30,7 +30,7 @@ export default function StudentPortalHubModal({
   user,
   onOpenIdentityModal
 }: StudentPortalHubModalProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "fraud" | "plagiarism" | "wipe">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "fraud" | "plagiarism" | "wipe" | "complaints">("overview");
 
   // General Portal Stats
   const [copiedLink, setCopiedLink] = useState(false);
@@ -57,6 +57,14 @@ export default function StudentPortalHubModal({
   const [searchedStudent, setSearchedStudent] = useState<any>(null);
   const [wipeReason, setWipeReason] = useState("");
   const [wipingAccount, setWipingAccount] = useState(false);
+
+  // Complaints State
+  const [complaintsList, setComplaintsList] = useState<any[]>([]);
+  const [loadingComplaints, setLoadingComplaints] = useState(false);
+  const [replyTextMap, setReplyTextMap] = useState<Record<string, string>>({});
+  const [sendingReplyId, setSendingReplyId] = useState<string | null>(null);
+  const [complaintFilter, setComplaintFilter] = useState<"all" | "new" | "replied">("all");
+  const [replySuccessMsg, setReplySuccessMsg] = useState("");
   const [wipeSuccessMsg, setWipeSuccessMsg] = useState("");
   const [wipeErrorMsg, setWipeErrorMsg] = useState("");
 
@@ -75,7 +83,59 @@ export default function StudentPortalHubModal({
     if (isOpen && activeTab === "plagiarism" && !plagiarismData && !loadingPlagiarism) {
       fetchPlagiarismData();
     }
+    if (isOpen && activeTab === "complaints") {
+      fetchComplaints();
+    }
   }, [isOpen, activeTab]);
+
+  const fetchComplaints = async () => {
+    setLoadingComplaints(true);
+    try {
+      const res = await fetch("/api/admin/portal/complaints");
+      const data = await res.json();
+      if (data && data.complaints) {
+        setComplaintsList(data.complaints);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingComplaints(false);
+    }
+  };
+
+  const handleSendReply = async (complaintId: string) => {
+    const text = replyTextMap[complaintId];
+    if (!text || !text.trim()) {
+      alert("يرجى كتابة نص الرد أولاً");
+      return;
+    }
+
+    setSendingReplyId(complaintId);
+    try {
+      const res = await fetch("/api/admin/portal/reply-complaint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          complaint_id: complaintId,
+          reply_text: text.trim(),
+          admin_name: user?.full_name || "إدارة المنظومة"
+        })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setReplySuccessMsg("تم إرسال الرد الرسمي للطالب بنجاح!");
+        setTimeout(() => setReplySuccessMsg(""), 3500);
+        setReplyTextMap(prev => ({ ...prev, [complaintId]: "" }));
+        fetchComplaints();
+      } else {
+        alert("فشل إرسال الرد: " + (data?.error || "خطأ غير معروف"));
+      }
+    } catch (e) {
+      alert("خطأ في الاتصال بالخادم");
+    } finally {
+      setSendingReplyId(null);
+    }
+  };
 
   const fetchPortalStats = async () => {
     setLoadingStats(true);
@@ -409,7 +469,8 @@ export default function StudentPortalHubModal({
           { id: "overview", label: "نظرة عامة وروابط 🌐", color: "#38bdf8" },
           { id: "fraud", label: "كشف الاحتيال 🚨", color: "#ef4444" },
           { id: "plagiarism", label: "كشف تطابق الأعمال 🔍", color: "#f59e0b" },
-          { id: "wipe", label: "بحث وفرمتة الحسابات 🧹", color: "#a855f7" }
+          { id: "wipe", label: "بحث وفرمتة الحسابات 🧹", color: "#a855f7" },
+          { id: "complaints", label: "صندوق الشكاوى الطلابية 📬", color: "#ec4899" }
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (

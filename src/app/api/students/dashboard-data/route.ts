@@ -193,7 +193,7 @@ export async function GET(request: Request) {
       return secMatch;
     });
 
-    // 6. تجميع الحضور لكل مقرر
+    // 6. تجميع الحضور لكل مقرر مع تنسيق التواريخ التفصيلية
     const attendanceByCourse = matchedCourses.map((course: any) => {
       const records = (attendanceRecords || []).filter((r: any) => r.course_id === course.id);
       const attended = records.filter((r: any) => r.status === 'حاضر').length;
@@ -201,7 +201,12 @@ export async function GET(request: Request) {
       const excused = records.filter((r: any) => r.status === 'إذن' || r.status === 'عذر').length;
       const total = records.length;
       const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
-      const hasWarning = absent >= 3;
+      
+      const warningLimit = course.warning_limit || course.custom_week_names?.warning_limit || 3;
+      const hasWarning = absent >= warningLimit;
+
+      const sortedRecords = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const absentDates = sortedRecords.filter((r: any) => r.status === 'غائب').map((r: any) => r.date);
 
       return {
         courseId: course.id,
@@ -211,8 +216,25 @@ export async function GET(request: Request) {
         absent,
         excused,
         rate,
+        warningLimit,
         hasWarning,
-        records: records.map((r: any) => ({ date: r.date, status: r.status })),
+        absentDates,
+        records: sortedRecords.map((r: any) => {
+          let dateStr = r.date;
+          try {
+            dateStr = new Date(r.date).toLocaleDateString('ar-EG', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            });
+          } catch(e) {}
+          return {
+            date: r.date,
+            formattedDate: dateStr,
+            status: r.status
+          };
+        }),
       };
     });
 
@@ -266,18 +288,43 @@ export async function GET(request: Request) {
       };
     });
 
-    // 8. جلب الشكاوى الخاصة بالطالب
+    // 8. جلب الشكاوى الخاصة بالطالب مع دمج ردود الإدارة
     const { data: complaints } = await supabaseAdmin
       .from('student_complaints')
       .select('*')
       .eq('student_code', student.student_code)
       .order('created_at', { ascending: false });
 
+    // جلب الردود المسجلة من إعدادات النظام
+    let complaintRepliesMap: Record<string, any> = {};
+    try {
+      const { data: settingsData } = await supabaseAdmin
+        .from('system_settings')
+        .select('telegram_config')
+        .eq('id', 1)
+        .maybeSingle();
+      if (settingsData?.telegram_config?.complaint_replies) {
+        complaintRepliesMap = settingsData.telegram_config.complaint_replies;
+      }
+    } catch (e) {}
+
+    const enrichedComplaints = (complaints || []).map((c: any) => {
+      const rep = complaintRepliesMap[c.id];
+      const hasReply = !!(c.admin_reply || rep?.reply);
+      return {
+        ...c,
+        admin_reply: c.admin_reply || rep?.reply || null,
+        replied_at: c.replied_at || rep?.replied_at || null,
+        replied_by: c.replied_by || rep?.replied_by || null,
+        status: hasReply ? 'تم الرد' : (c.status || 'جديدة')
+      };
+    });
+
     return NextResponse.json({
       student: safeStudent,
       attendance: attendanceByCourse,
       projects: projectsByCourse,
-      complaints: complaints || [],
+      complaints: enrichedComplaints,
       warnings: attendanceByCourse.filter((c: any) => c.hasWarning),
     }, {
       headers: {
