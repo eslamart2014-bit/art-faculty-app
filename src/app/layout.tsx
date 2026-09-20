@@ -11,8 +11,8 @@ import GlobalHaptics from "@/components/GlobalHaptics";
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
 export const metadata: Metadata = {
-  title: "نظام التربية الفنية",
-  description: "نظام إدارة الحضور والتقييمات للتربية الفنية",
+  title: "نظام التربية الفنية — جامعة جنوب الوادي (قنا)",
+  description: "المنظومة الرقمية لإدارة الحضور والتقييمات — قسم التربية الفنية — كلية التربية النوعية — جامعة جنوب الوادي بقنا",
   manifest: "/manifest.json",
   icons: {
     icon: "/icon-192.png",

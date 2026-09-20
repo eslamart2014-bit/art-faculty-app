@@ -193,9 +193,12 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
           />
           <div style={{ fontSize: "14px", color: "#4CAF50", fontWeight: "bold", marginTop: "10px" }}>تحديث {appVersion}</div>
         </div>
-        <h2 style={{ textAlign: "center", marginTop: "5px", marginBottom: "12px", color: "var(--primary)" }}>
+        <h2 style={{ textAlign: "center", marginTop: "5px", marginBottom: "4px", color: "var(--primary)" }}>
           نظام التربية الفنية
         </h2>
+        <div style={{ textAlign: "center", fontSize: "11px", color: "#94a3b8", marginBottom: "14px", fontWeight: "bold" }}>
+          جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+        </div>
 
         <div style={{ display: "flex", background: "rgba(255,255,255,0.08)", borderRadius: "10px", padding: "4px", marginBottom: "15px" }}>
           <button

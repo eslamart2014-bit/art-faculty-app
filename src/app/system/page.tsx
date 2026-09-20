@@ -45,6 +45,10 @@ export default function SystemPage() {
   // Coordinators list
   const [coordinators, setCoordinators] = useState<any[]>([]);
 
+  // Impersonation mode (Admin browsing as student)
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [impersonatedStudentName, setImpersonatedStudentName] = useState("");
+
   // Registration Form State & Auto Lookup
   const [regCode, setRegCode] = useState("");
   const [regName, setRegName] = useState("");
@@ -146,8 +150,28 @@ export default function SystemPage() {
     };
   }, []);
 
-  // Restore Session on Mount
+  // Restore Session or Impersonate on Mount
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const impCode = params.get("impersonate");
+      if (impCode) {
+        setIsImpersonating(true);
+        fetch(`/api/students/lookup?code=${encodeURIComponent(impCode)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.student) {
+              setCurrentStudent(data.student);
+              setImpersonatedStudentName(data.student.full_name);
+              setAccountStatus("active");
+              loadDashboard(data.student.student_code, undefined, true);
+            }
+          })
+          .catch(err => console.error(err));
+        return;
+      }
+    }
+
     try {
       const saved = localStorage.getItem("fania_student_session");
       if (saved) {
@@ -156,6 +180,8 @@ export default function SystemPage() {
           setCurrentStudent(parsed);
           setAccountStatus(parsed.is_pin_used || parsed.status === "active" ? "active" : "pending");
           loadDashboard(parsed.student_code, parsed.pin_code);
+          fetchCoordinators(parsed.student_code);
+          return;
         }
       }
     } catch (e) {}
@@ -167,9 +193,11 @@ export default function SystemPage() {
     };
   }, []);
 
-  const fetchCoordinators = async () => {
+  const fetchCoordinators = async (studentCode?: string) => {
     try {
-      const res = await fetch("/api/coordinators");
+      const code = studentCode || currentStudent?.student_code;
+      const url = code ? `/api/coordinators?student_code=${encodeURIComponent(code)}` : "/api/coordinators";
+      const res = await fetch(url);
       const data = await res.json();
       if (data.coordinators) setCoordinators(data.coordinators);
     } catch (e) {}
@@ -213,7 +241,7 @@ export default function SystemPage() {
   }, [regCode, authMode]);
 
   // Load Dashboard Data
-  const loadDashboard = async (code: string, pin?: string) => {
+  const loadDashboard = async (code: string, pin?: string, isImpersonationMode?: boolean) => {
     setLoading(true);
     setErrorMsg("");
     try {
@@ -232,7 +260,8 @@ export default function SystemPage() {
       }
 
       const pinParam = activePin ? `&pin=${encodeURIComponent(activePin)}` : "";
-      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}&_t=${Date.now()}`, {
+      const impParam = isImpersonationMode || isImpersonating ? "&impersonate=true" : "";
+      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}${impParam}&_t=${Date.now()}`, {
         cache: "no-store",
         headers: {
           "Cache-Control": "no-cache",
@@ -262,7 +291,9 @@ export default function SystemPage() {
           const mergedStudent = { ...(currentStudent || {}), ...data.student };
           if (activePin) mergedStudent.pin_code = activePin;
           setCurrentStudent(mergedStudent);
-          localStorage.setItem("fania_student_session", JSON.stringify(mergedStudent));
+          if (!isImpersonationMode && !isImpersonating) {
+            localStorage.setItem("fania_student_session", JSON.stringify(mergedStudent));
+          }
           setAccountStatus("active");
         }
       }
@@ -689,6 +720,7 @@ export default function SystemPage() {
         setSuccessMsg(data.message);
         setCurrentStudent(data.student);
         setAccountStatus("pending");
+        fetchCoordinators(data.student.student_code);
         localStorage.setItem("fania_student_session", JSON.stringify(data.student));
       }
     } catch (err: any) {
@@ -971,7 +1003,7 @@ export default function SystemPage() {
         </div>
 
         <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px", marginBottom: "10px" }}>
-          جامعة جنوب الوادي • كلية التربية النوعية • قسم التربية الفنية
+          جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
         </div>
       </div>
     );
@@ -993,6 +1025,54 @@ export default function SystemPage() {
     return (
       <div style={{ minHeight: "100vh", padding: "14px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
         
+        {/* شريط وضع تصفح الإدارة العائم */}
+        {isImpersonating && (
+          <div style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 9999,
+            background: "linear-gradient(135deg, #b91c1c, #991b1b)",
+            color: "#fff",
+            padding: "10px 14px",
+            borderRadius: "12px",
+            marginBottom: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 4px 15px rgba(0,0,0,0.4)",
+            fontSize: "12px",
+            fontWeight: "bold",
+            border: "1px solid #ef4444"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>👑</span>
+              <span>وضع تصفح الإدارة — حساب: {currentStudent.full_name} ({formatStudentCode(currentStudent.student_code)})</span>
+            </div>
+            <button
+              onClick={() => {
+                if (window.opener) {
+                  window.close();
+                } else {
+                  window.location.href = "/";
+                }
+              }}
+              className="btn-compact"
+              style={{
+                background: "rgba(255,255,255,0.2)",
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.4)",
+                padding: "4px 8px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: "bold"
+              }}
+            >
+              الرجوع للوحة الإدارة ✕
+            </button>
+          </div>
+        )}
+
         {/* شريط أعلى به اسم الطالب والفرقة وزر خروج مدمج لا يطغى على المساحة */}
         <div style={{ 
           display: "flex", 
@@ -2011,6 +2091,10 @@ export default function SystemPage() {
           }}
         />
         <canvas ref={canvasRef} style={{ display: "none" }} />
+
+        <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
+          جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+        </footer>
       </div>
     );
   }
@@ -2242,7 +2326,7 @@ export default function SystemPage() {
       </div>
 
       <footer style={{ textAlign: "center", paddingTop: "16px", color: "#64748b", fontSize: "11px" }}>
-        جامعة جنوب الوادي • كلية التربية النوعية • قسم التربية الفنية
+        جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
       </footer>
 
       {/* نافذة كاميرا بطاقة الهوية */}

@@ -314,6 +314,18 @@ export default function CoordinatorPage() {
                 </div>
               )}
 
+              {/* توثيق بيانات الصرف ومن قام بتسليم الـ PIN وتاريخه بدقة */}
+              {searchResult.account?.pin_issued_by && (
+                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", color: "#34d399", fontSize: "13px", lineHeight: "1.7" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: "4px" }}>
+                    <CheckCircle2 size={16} />
+                    <span>بيانات اعتماد وتسليم الـ PIN الموثقة:</span>
+                  </div>
+                  <div>👤 <b>صُرف بواسطة المنسق:</b> {searchResult.account.pin_issued_by}</div>
+                  <div>🕒 <b>تاريخ ووقت الصرف بالتحديد:</b> {searchResult.account.pin_issued_at ? new Date(searchResult.account.pin_issued_at).toLocaleString("ar-EG") : "غير مسجل"}</div>
+                </div>
+              )}
+
               {/* استعراض صورة بطاقة الهوية التي رفعها الطالب */}
               <div style={{ marginBottom: "16px" }}>
                 <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
@@ -370,6 +382,9 @@ export default function CoordinatorPage() {
         </div>
       )}
 
+      <footer style={{ textAlign: "center", paddingTop: "20px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
+        جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+      </footer>
     </div>
   );
 }

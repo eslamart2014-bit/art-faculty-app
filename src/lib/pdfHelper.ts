@@ -47,7 +47,7 @@ export const generatePrintableHtml = (
               <td>
                 <div class="report-header">
                   <div>
-                    جامعة قنا<br/>
+                    جامعة جنوب الوادي (قنا)<br/>
                     كلية التربية النوعية<br/>
                     قسم التربية الفنية
                   </div>

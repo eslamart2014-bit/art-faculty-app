@@ -80,24 +80,30 @@ export default function StudentPortalHubModal({
   const fetchPortalStats = async () => {
     setLoadingStats(true);
     try {
-      const [stRes, accRes, subRes] = await Promise.all([
-        supabase.from("students").select("id", { count: "exact", head: true }),
-        supabase.from("student_accounts").select("id, id_card_verified", { count: "exact" }),
-        supabase.from("student_submissions").select("id", { count: "exact", head: true })
-      ]);
+      const res = await fetch("/api/admin/portal/stats");
+      const data = await res.json();
 
-      const totalSt = stRes.count || 0;
-      const accList = (accRes as any)?.data || [];
-      const totalAcc = (accRes as any)?.count || accList.length || 0;
-      const verified = accList.filter((a: any) => a.id_card_verified).length || 0;
-      const totalSubs = (subRes as any)?.count || 0;
-
-      setStats({
-        totalStudents: totalSt,
-        registeredAccounts: totalAcc,
-        verifiedCards: verified,
-        submissionsCount: totalSubs
-      });
+      if (data && data.success) {
+        setStats({
+          totalStudents: data.totalStudents,
+          registeredAccounts: data.registeredAccounts,
+          verifiedCards: data.verifiedCards,
+          submissionsCount: data.submissionsCount
+        });
+      } else {
+        // Fallback
+        const [stRes, accRes, subRes] = await Promise.all([
+          supabase.from("students").select("id", { count: "exact", head: true }),
+          supabase.from("student_accounts").select("id, id_card_verified", { count: "exact" }),
+          supabase.from("student_submissions").select("id", { count: "exact", head: true })
+        ]);
+        setStats({
+          totalStudents: stRes.count || 0,
+          registeredAccounts: (accRes as any)?.count || 0,
+          verifiedCards: ((accRes as any)?.data || []).filter((a: any) => a.id_card_verified).length || 0,
+          submissionsCount: (subRes as any)?.count || 0
+        });
+      }
     } catch (e) {
       console.error("Error fetching portal stats:", e);
     } finally {
@@ -141,9 +147,10 @@ export default function StudentPortalHubModal({
     }
   };
 
-  const handleSearchStudentToWipe = async (e?: React.FormEvent) => {
+  const handleSearchStudentToWipe = async (e?: React.FormEvent, codeOverride?: string) => {
     if (e) e.preventDefault();
-    if (!searchStudentTerm.trim()) return;
+    const term = (codeOverride || searchStudentTerm).trim();
+    if (!term) return;
 
     setSearchingStudent(true);
     setSearchedStudent(null);
@@ -151,30 +158,119 @@ export default function StudentPortalHubModal({
     setWipeErrorMsg("");
 
     try {
-      const term = searchStudentTerm.trim();
-      const { data, error } = await supabase
-        .from("students")
-        .select("id, full_name, student_code, academic_year, section, telegram_browser_id")
-        .or(`student_code.eq.${term},full_name.ilike.%${term}%`)
-        .limit(1)
-        .maybeSingle();
+      // جلب بيانات الطالب والفحص الأمني وسجل النشاط
+      const res = await fetch(`/api/admin/portal?code=${encodeURIComponent(term)}`);
+      const portalData = await res.json();
 
-      if (error || !data) {
-        setWipeErrorMsg("لم يتم العثور على طالب بهذا الكود أو الاسم.");
-      } else {
-        let parsedAcc: any = null;
-        try {
-          if (data.telegram_browser_id) parsedAcc = JSON.parse(data.telegram_browser_id);
-        } catch (err) {}
+      if (res.ok && portalData.student) {
         setSearchedStudent({
-          ...data,
-          parsedAccount: parsedAcc
+          ...portalData.student,
+          isRegistered: portalData.isRegistered,
+          parsedAccount: portalData.account,
+          auditLogs: portalData.auditLogs || [],
+          deviceSecurity: portalData.deviceSecurity || null,
+          submissions: portalData.submissions || []
         });
+      } else {
+        // Fallback البحث المباشر
+        const { data, error } = await supabase
+          .from("students")
+          .select("id, full_name, student_code, academic_year, section, telegram_browser_id")
+          .or(`student_code.eq.${term},full_name.ilike.%${term}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (error || !data) {
+          setWipeErrorMsg("لم يتم العثور على طالب بهذا الكود أو الاسم.");
+        } else {
+          let parsedAcc: any = null;
+          try {
+            if (data.telegram_browser_id) parsedAcc = JSON.parse(data.telegram_browser_id);
+          } catch (err) {}
+          setSearchedStudent({
+            ...data,
+            parsedAccount: parsedAcc,
+            auditLogs: []
+          });
+        }
       }
     } catch (err: any) {
       setWipeErrorMsg(err.message || "حدث خطأ أثناء البحث");
     } finally {
       setSearchingStudent(false);
+    }
+  };
+
+  const handleResetArtworks = async (studentCode: string) => {
+    if (!confirm(`هل أنت متأكد تماماً من رغبتك في تصفير وحذف كافة أعمال ومشاريع الطالب (${studentCode})؟\n\nسيتم حذف الصور والتقييمات المسجلة وإتاحة رفع الأعمال من جديد للطالب.`)) return;
+    try {
+      const res = await fetch("/api/admin/portal/reset-artworks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_code: studentCode })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWipeSuccessMsg(data.message || "تم تصفير أعمال الطالب بنجاح");
+        handleSearchStudentToWipe(undefined, studentCode);
+      } else {
+        setWipeErrorMsg(data.error || "تعذر تصفير الأعمال");
+      }
+    } catch (e: any) {
+      setWipeErrorMsg("خطأ: " + e.message);
+    }
+  };
+
+  const handleToggleSuspend = async (studentCode: string, currentStatus: string) => {
+    const newStatus = currentStatus === "suspended" ? "active" : "suspended";
+    const confirmMsg = newStatus === "suspended"
+      ? `هل أنت متأكد من تعليق حساب الطالب (${studentCode}) مؤقتاً؟\nسيتعذر على الطالب تسجيل الدخول للبوابة حتى يتم فك التعليق من الإدارة.`
+      : `هل ترغب في فك تعليق الحساب وتفعيله مجدداً للطالب (${studentCode})؟`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch("/api/admin/portal/toggle-suspend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ student_code: studentCode, status: newStatus })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWipeSuccessMsg(data.message || "تم تحديث حالة الحساب بنجاح");
+        handleSearchStudentToWipe(undefined, studentCode);
+      } else {
+        setWipeErrorMsg(data.error || "تعذر تحديث الحالة");
+      }
+    } catch (e: any) {
+      setWipeErrorMsg("خطأ: " + e.message);
+    }
+  };
+
+  const formatAuditAction = (action: string, details: any = {}) => {
+    switch (action) {
+      case "pin_issued_by_coordinator":
+        return `تم اعتماد الهوية وصرف الرقم السري (PIN) بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
+      case "student_registered":
+        return "قام الطالب بإنشاء الحساب لأول مرة وتصوير بطاقة الهوية";
+      case "student_login":
+        return "تسجيل دخول الطالب إلى بوابة النظام";
+      case "upload_artwork":
+      case "student_submit_project":
+        return `رفع عمل فني لمشروع (${details?.project_name || "مشروع"}) بمقرر (${details?.course_name || "مقرر"})`;
+      case "allow_retake":
+        return `فك قفل المشروع والسماح بإعادة التصوير بواسطة عضو الهيئة المعاونة (${details?.instructor || "المعيد"})`;
+      case "account_wiped_by_admin":
+      case "account_wiped":
+        return `فرمتة الحساب وإلغاء ارتباط الأجهزة بواسطة الإدارة (السبب: ${details?.reason || "طلب إعادة تعيين"})`;
+      case "account_suspended":
+        return "تم تعليق الحساب مؤقتاً وحظر الدخول بواسطة الإدارة";
+      case "account_unsuspended":
+        return "تم فك تعليق الحساب واستئناف صلاحية الدخول بواسطة الإدارة";
+      case "reset_artworks_by_admin":
+      case "admin_reset_submissions":
+        return "تم تصفير وحذف كافة الأعمال والمشاريع المرفوعة للطالب بواسطة الإدارة";
+      default:
+        return action;
     }
   };
 
@@ -289,7 +385,7 @@ export default function StudentPortalHubModal({
             <span>🎓</span> بوابة الطلاب وجناح الأمان الأكاديمي
           </h2>
           <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
-            اللوحة الموحدة لإدارة بوابات الطلاب، كشف احتيال الأجهزة المشتركة، ومطابقة الأعمال الفنية
+            جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
         <button
@@ -850,6 +946,7 @@ export default function StudentPortalHubModal({
               <button
                 type="submit"
                 disabled={searchingStudent}
+                className="btn-compact"
                 style={{
                   background: "#7c3aed",
                   color: "#fff",
@@ -858,9 +955,10 @@ export default function StudentPortalHubModal({
                   borderRadius: "10px",
                   fontWeight: "bold",
                   cursor: "pointer",
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: "6px"
+                  gap: "6px",
+                  whiteSpace: "nowrap"
                 }}
               >
                 <Search size={16} />
@@ -883,7 +981,9 @@ export default function StudentPortalHubModal({
             {/* Student Search Result Card */}
             {searchedStudent && (
               <div style={{ background: "#141b29", border: "1px solid #2a374f", borderRadius: "14px", padding: "18px", marginBottom: "16px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "12px", marginBottom: "12px" }}>
+                
+                {/* Header */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "12px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
                   <div>
                     <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px" }}>{searchedStudent.full_name}</div>
                     <div style={{ color: "#38bdf8", fontSize: "12px", display: "flex", gap: "8px", marginTop: "2px" }}>
@@ -899,25 +999,90 @@ export default function StudentPortalHubModal({
                     </div>
                   </div>
 
-                  <span style={{ 
-                    padding: "4px 10px", 
-                    borderRadius: "12px", 
-                    fontSize: "12px", 
-                    fontWeight: "bold",
-                    background: searchedStudent.telegram_browser_id ? "rgba(245, 158, 11, 0.2)" : "rgba(16, 185, 129, 0.2)",
-                    color: searchedStudent.telegram_browser_id ? "#fbbf24" : "#34d399"
-                  }}>
-                    {searchedStudent.telegram_browser_id ? "حساب مسجل حالياً" : "حساب غير مسجل / مفكوك"}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {searchedStudent.parsedAccount?.status === "suspended" ? (
+                      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "bold", background: "rgba(239, 68, 68, 0.2)", color: "#f87171" }}>
+                        حساب معلق 🚫
+                      </span>
+                    ) : (
+                      <span style={{ 
+                        padding: "4px 10px", 
+                        borderRadius: "12px", 
+                        fontSize: "12px", 
+                        fontWeight: "bold",
+                        background: (searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "rgba(16, 185, 129, 0.2)" : "rgba(148, 163, 184, 0.2)",
+                        color: (searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "#34d399" : "#94a3b8"
+                      }}>
+                        {(searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "حساب مسجل ونشط ✅" : "حساب غير مسجل / مفكوك"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons (Browse as Student, Reset Artworks, Suspend/Unsuspend) */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px", background: "#0d131f", padding: "10px", borderRadius: "10px", border: "1px solid #1e293b" }}>
+                  {/* زر تصفح بحساب الطالب */}
+                  <button
+                    onClick={() => window.open(`/system?impersonate=${encodeURIComponent(searchedStudent.student_code)}`, "_blank")}
+                    className="btn-compact"
+                    style={{ background: "#2563eb", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
+                  >
+                    <span>👁️</span>
+                    <span>تصفح بحساب الطالب</span>
+                  </button>
+
+                  {/* زر تصفير الأعمال */}
+                  <button
+                    onClick={() => handleResetArtworks(searchedStudent.student_code)}
+                    className="btn-compact"
+                    style={{ background: "rgba(245, 158, 11, 0.15)", border: "1px solid #f59e0b", color: "#fbbf24", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
+                  >
+                    <span>🗑️</span>
+                    <span>تصفير كافة الأعمال</span>
+                  </button>
+
+                  {/* زر تعليق أو فك تعليق الحساب */}
+                  <button
+                    onClick={() => handleToggleSuspend(searchedStudent.student_code, searchedStudent.parsedAccount?.status || "active")}
+                    className="btn-compact"
+                    style={{
+                      background: searchedStudent.parsedAccount?.status === "suspended" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                      border: `1px solid ${searchedStudent.parsedAccount?.status === "suspended" ? "#10b981" : "#ef4444"}`,
+                      color: searchedStudent.parsedAccount?.status === "suspended" ? "#34d399" : "#f87171",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12px"
+                    }}
+                  >
+                    <span>{searchedStudent.parsedAccount?.status === "suspended" ? "✅" : "🚫"}</span>
+                    <span>{searchedStudent.parsedAccount?.status === "suspended" ? "فك تعليق الحساب" : "تعليق الحساب مؤقتاً"}</span>
+                  </button>
                 </div>
 
                 {/* Account details */}
                 {searchedStudent.parsedAccount ? (
-                  <div style={{ background: "#0d131f", padding: "12px", borderRadius: "10px", marginBottom: "14px", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.8" }}>
+                  <div style={{ background: "#0d131f", padding: "12px 14px", borderRadius: "10px", marginBottom: "14px", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.9" }}>
                     <div>📱 <b>رقم الموبايل المسجل:</b> {searchedStudent.parsedAccount.mobile || "غير مسجل"}</div>
-                    <div>🔐 <b>حالة الرقم السري (PIN):</b> {searchedStudent.parsedAccount.is_pin_used ? "تم تفعيله واستخدامه" : "بانتظار التفعيل"}</div>
+                    <div>🔐 <b>حالة الرقم السري (PIN):</b> {searchedStudent.parsedAccount.is_pin_used ? "تم تفعيله واستخدامه" : "بانتظار التفعيل"} {searchedStudent.parsedAccount.pin_code ? `(الكود: ${searchedStudent.parsedAccount.pin_code})` : ""}</div>
                     <div>🕒 <b>آخر نشاط للدخول:</b> {searchedStudent.parsedAccount.last_login_at ? new Date(searchedStudent.parsedAccount.last_login_at).toLocaleString("ar-EG") : "غير مسجل"}</div>
                     <div>📱 <b>الأجهزة المرتبطة:</b> {searchedStudent.parsedAccount.devices?.length || 1} جهاز</div>
+                    {searchedStudent.parsedAccount.devices && searchedStudent.parsedAccount.devices.length > 0 && (
+                      <div style={{ marginTop: "6px", color: "#94a3b8", fontSize: "11px", background: "rgba(255,255,255,0.03)", padding: "6px 10px", borderRadius: "6px" }}>
+                        {searchedStudent.parsedAccount.devices.map((d: any, dIdx: number) => (
+                          <div key={dIdx}>
+                            • {d.browser || "متصفح الويب"} على {d.os || "الهاتف"} ({d.screen || "دقة الشاشة"}) - آخر ظهور: {d.lastSeen ? new Date(d.lastSeen).toLocaleDateString("ar-EG") : ""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ color: "#64748b", fontSize: "11px", marginTop: "6px" }}>
+                      💡 كشف نوع نظام التشغيل والمتصفح يتم تلقائياً، بينما يتطلب الـ GPS إذناً من الطالب عبر المتصفح.
+                    </div>
                   </div>
                 ) : (
                   <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "14px" }}>
@@ -925,14 +1090,36 @@ export default function StudentPortalHubModal({
                   </div>
                 )}
 
+                {/* Activity Log (سجل النشاط المعرب) */}
+                {searchedStudent.auditLogs && searchedStudent.auditLogs.length > 0 && (
+                  <div style={{ background: "#0d131f", padding: "12px", borderRadius: "10px", marginBottom: "14px", border: "1px solid #1e293b" }}>
+                    <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>
+                      📋 سجل النشاط والتدقيق الأمني:
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {searchedStudent.auditLogs.slice(0, 5).map((log: any, lIdx: number) => (
+                        <div key={lIdx} style={{ fontSize: "11px", color: "#cbd5e1", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed #1e293b", paddingBottom: "4px" }}>
+                          <span>• {formatAuditAction(log.action, log.details)}</span>
+                          <span style={{ color: "#64748b", fontSize: "10px", whiteSpace: "nowrap" }}>
+                            {log.created_at ? new Date(log.created_at).toLocaleString("ar-EG") : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Wipe Section */}
                 <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px" }}>
-                  <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", marginBottom: "6px" }}>
-                    سبب الفرمتة (للتوثيق في سجل التدقيق الأمني):
-                  </label>
+                  <div style={{ color: "#f87171", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>
+                    ⚠️ فرمتة الحساب بالكامل (Account Wipe):
+                  </div>
+                  <div style={{ color: "#94a3b8", fontSize: "11px", marginBottom: "8px" }}>
+                    الفرمتة تقوم بإلغاء ارتباط الأجهزة بالكامل ومسح الحساب من البوابة لتمكين الطالب الأصلي من التسجيل برقم سري جديد من الصفر.
+                  </div>
                   <input
                     type="text"
-                    placeholder="مثال: تسجيل هاتف غريب / شكوى انتحال صفة من الطالب الحقيقي"
+                    placeholder="سبب الفرمتة (مثال: تسجيل هاتف غريب / شكوى انتحال صفة من الطالب)"
                     value={wipeReason}
                     onChange={(e) => setWipeReason(e.target.value)}
                     style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #334155", borderRadius: "8px", color: "#fff", fontSize: "13px", marginBottom: "12px" }}

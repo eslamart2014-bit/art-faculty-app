@@ -105,10 +105,9 @@ export default function HomePage() {
       ctx.textAlign = "center";
       ctx.fillStyle = "#93c5fd";
       ctx.font = "bold 32px Cairo, sans-serif";
-      ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 100);
-
+      ctx.fillText("جامعة جنوب الوادي (قنا) • كلية التربية النوعية", 500, 100);
+      ctx.font = "bold 26px 'Cairo', sans-serif";
       ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 26px Cairo, sans-serif";
       ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 145);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
@@ -219,7 +218,7 @@ export default function HomePage() {
             بوابة فنية
           </h1>
           <p style={{ color: "#94a3b8", fontSize: "13px" }}>
-            المنظومة الرقمية الذكية لطلاب كلية التربية النوعية - قسم التربية الفنية
+            المنظومة الرقمية الذكية لطلاب جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
           </p>
         </header>
 
@@ -228,7 +227,8 @@ export default function HomePage() {
           <div className="animate-fade-in" style={{ marginBottom: "24px" }}>
             <div className="student-id-card" ref={cardRef} style={{ padding: "26px 20px", textAlign: "center" }}>
               
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "4px" }}>
+                <span style={{ fontSize: "11px", color: "#c7d2fe", fontWeight: "bold" }}>جامعة جنوب الوادي (قنا)</span>
                 <span style={{ fontSize: "11px", color: "#93c5fd", fontWeight: "bold" }}>كلية التربية النوعية</span>
                 <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>قسم التربية الفنية</span>
               </div>

@@ -264,9 +264,14 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#1e1e1e", borderBottom: "1px solid #333", direction: "rtl" }}>
-        <h2 style={{ margin: 0, color: "#fff", display: "flex", alignItems: "center", gap: "10px" }}>
-          <span>🛡️</span> إدارة المستخدمين والزملاء
-        </h2>
+        <div>
+          <h2 style={{ margin: 0, color: "#fff", display: "flex", alignItems: "center", gap: "10px" }}>
+            <span>🛡️</span> إدارة المستخدمين والزملاء
+          </h2>
+          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+            جامعة جنوب الوادي (قنا) • كلية التربية النوعية • قسم التربية الفنية
+          </div>
+        </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
       </div>
 

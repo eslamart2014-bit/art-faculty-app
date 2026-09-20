@@ -42,20 +42,30 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: cErr.message }, { status: 500 });
     }
 
-    // فلترة المقررات الخاصة بهذا المعيد فقط (المالك أو المشارك معه)
+    const currentInstructor = (instructors || []).find((i: any) => i.id === instructorId);
+    const isAdmin = currentInstructor?.role === 'مدير';
+
+    // فلترة المقررات الخاصة بهذا المعيد فقط (المالك أو المشارك معه)، بينما المدير تتاح له كافة المقررات
     const myCourses = (allCourses || []).filter((c: any) => {
+      if (isAdmin) return true;
       const isOwner = c.teacher_id === instructorId;
       const isShared = Array.isArray(c.shared_with) && c.shared_with.includes(instructorId);
       return isOwner || isShared;
     });
 
     const myCourseIds = myCourses.map((c: any) => c.id);
+    const myAcademicYears = Array.from(new Set(myCourses.map((c: any) => c.academic_year).filter(Boolean)));
 
-    // 3. حالة البحث الذكي عن طالب (مقتصرة حصراً على مقررات هذا المعيد)
+    // 3. حالة البحث الذكي عن طالب (مقتصرة حصراً على الفرق والمقررات المسندة للمعيد، أو عامة للمدير)
     if (searchQuery) {
       let stQuery = supabaseAdmin
         .from('students')
         .select('id, full_name, student_code, academic_year, section');
+
+      // حصر البحث في الفرق الدراسية المسندة للمعيد ما لم يكن مديراً
+      if (!isAdmin && myAcademicYears.length > 0) {
+        stQuery = stQuery.in('academic_year', myAcademicYears);
+      }
 
       if (/^\d+$/.test(searchQuery)) {
         stQuery = stQuery.ilike('student_code', `%${searchQuery}%`);
@@ -63,7 +73,7 @@ export async function GET(request: Request) {
         stQuery = stQuery.ilike('full_name', `%${searchQuery}%`);
       }
 
-      const { data: foundStudents } = await stQuery.limit(10);
+      const { data: foundStudents } = await stQuery.limit(15);
       const studentResults: any[] = [];
 
       if (foundStudents && foundStudents.length > 0) {

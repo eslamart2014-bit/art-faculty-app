@@ -40,6 +40,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get('code') || '').trim();
   const pin = (searchParams.get('pin') || '').trim();
+  const isImpersonate = searchParams.get('impersonate') === 'true';
 
   if (!code) {
     return NextResponse.json({ error: 'Missing student code' }, { status: 400 });
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
     const expectedPin = accountData?.pin_code;
     const isActivated = accountData?.is_pin_used || accountData?.status === 'active';
 
-    if (isActivated && expectedPin) {
+    if (!isImpersonate && isActivated && expectedPin) {
       if (!pin || pin !== expectedPin) {
         return NextResponse.json(
           { error: 'غير مصرح: يجب تسجيل الدخول بالرقم السري للوصول إلى لوحة بيانات الطالب.' },

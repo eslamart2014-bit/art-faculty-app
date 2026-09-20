@@ -28,6 +28,32 @@ export async function GET() {
       });
     }
 
+    // 2. دمج كافة الصور المسجلة في جدول evaluations عبر قاعدة البيانات بالكامل
+    try {
+      const { data: legacyEvals } = await supabaseAdmin
+        .from('evaluations')
+        .select('id, course_id, project_name, photo_url, ai_status, created_at, students(full_name, student_code, academic_year)')
+        .not('photo_url', 'is', null);
+
+      if (legacyEvals && legacyEvals.length > 0) {
+        legacyEvals.forEach((ev: any) => {
+          const code = ev.students?.student_code;
+          if (code && !allSubs.some(s => s.student_code === code && s.project_name === ev.project_name)) {
+            allSubs.push({
+              id: ev.id,
+              student_code: code,
+              student_name: ev.students?.full_name || 'طالب',
+              course_id: ev.course_id,
+              course_name: 'مقرر دراسي',
+              project_name: ev.project_name || 'مشروع',
+              images: [{ url: ev.photo_url, dhash: ev.ai_status || '' }],
+              created_at: ev.created_at || new Date().toISOString(),
+            });
+          }
+        });
+      }
+    } catch (e) {}
+
     // 2. تحليل التطابق عبر محرك الفحص الذكي للتربية الفنية
     const duplicates = auditArtworkDuplicates(allSubs);
 
