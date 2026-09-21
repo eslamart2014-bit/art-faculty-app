@@ -147,13 +147,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // 5. جلب المقررات مع المعيدين والأساتذة
-    const { data: allCourses } = await supabaseAdmin
+    // 5. جلب المقررات مع المعيدين والأساتذة (فقط المقررات النشطة غير المؤرشفة)
+    const { data: allCoursesData } = await supabaseAdmin
       .from('courses')
       .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id');
 
+    // استبعاد أي مقرر مؤرشف نهائياً
+    const allCourses = (allCoursesData || []).filter((c: any) => c.custom_week_names?.__archived !== true);
+    const activeCourseIds = new Set(allCourses.map((c: any) => c.id));
+
+    // تصفية سجلات الحضور والتقييمات والتسليمات لتقتصر فقط على المقررات النشطة
+    const safeAttendanceRecords = (attendanceRecords || []).filter((r: any) => activeCourseIds.has(r.course_id));
+    const safeTeacherEvals = (teacherEvals || []).filter((e: any) => activeCourseIds.has(e.course_id));
+    const safeStudentSubmissions = studentSubmissions.filter((s: any) => activeCourseIds.has(s.course_id));
+
     // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة
-    const teacherIds = Array.from(new Set((allCourses || []).map((c: any) => c.teacher_id).filter(Boolean)));
+    const teacherIds = Array.from(new Set(allCourses.map((c: any) => c.teacher_id).filter(Boolean)));
     let teacherProfilesMap: Record<string, any> = {};
     if (teacherIds.length > 0) {
       const { data: tProfiles } = await supabaseAdmin
@@ -168,11 +177,9 @@ export async function GET(request: Request) {
     const normStudentYear = normalizeArabic(student.academic_year || '');
     const normStudentSec = normalizeArabic(student.section || '');
 
-    const matchedCourses = (allCourses || []).filter((c: any) => {
-      const hasAtt = (attendanceRecords || []).some((r: any) => r.course_id === c.id);
-      const hasEval = (teacherEvals || []).some((e: any) => e.course_id === c.id);
-      const hasSub = studentSubmissions.some((s: any) => s.course_id === c.id);
-      if (hasAtt || hasEval || hasSub) return true;
+    const matchedCourses = allCourses.filter((c: any) => {
+      // المقرر المؤرشف مستبعد تماماً
+      if (c.custom_week_names?.__archived === true) return false;
 
       const normCourseYear = normalizeArabic(c.academic_year || '');
       const yearMatch =
@@ -195,7 +202,7 @@ export async function GET(request: Request) {
 
     // 6. تجميع الحضور لكل مقرر مع تنسيق التواريخ التفصيلية
     const attendanceByCourse = matchedCourses.map((course: any) => {
-      const records = (attendanceRecords || []).filter((r: any) => r.course_id === course.id);
+      const records = safeAttendanceRecords.filter((r: any) => r.course_id === course.id);
       const attended = records.filter((r: any) => r.status === 'حاضر').length;
       const absent = records.filter((r: any) => r.status === 'غائب').length;
       const excused = records.filter((r: any) => r.status === 'إذن' || r.status === 'عذر').length;
@@ -240,8 +247,8 @@ export async function GET(request: Request) {
 
     // 7. دمج المقررات بالمشاريع المعتمدة والمعيدين والمدرسين
     const projectsByCourse = matchedCourses.map((course: any) => {
-      const evals = (teacherEvals || []).filter((e: any) => e.course_id === course.id);
-      const subs = studentSubmissions.filter((s: any) => s.course_id === course.id);
+      const evals = safeTeacherEvals.filter((e: any) => e.course_id === course.id);
+      const subs = safeStudentSubmissions.filter((s: any) => s.course_id === course.id);
 
       const prof = teacherProfilesMap[course.teacher_id];
       const instructorName = prof?.full_name || 'عضو هيئة التدريس';
@@ -261,8 +268,16 @@ export async function GET(request: Request) {
           const sub = subs.find((s: any) => (s.project_name || '').trim() === pTitle);
           const ev = evals.find((e: any) => (e.project_name || '').trim() === pTitle);
 
-          const isGraded = ev && ev.score !== null && ev.score !== undefined;
-          const isSubmitted = !!sub || (ev && !!ev.photo_url);
+          // التحقق الصارم من وجود صورة حقيقية صالحة (وليست فارغة أو محذوفة من السحابة)
+          const hasSubImages = Array.isArray(sub?.images) && sub.images.some((img: any) => {
+            const u = typeof img === 'string' ? img : img?.url;
+            return !!u && !u.includes('undefined') && !u.includes('null') && !u.startsWith('/api/media/undefined');
+          });
+          const hasPhotoUrl = !!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null');
+          const hasValidImage = hasSubImages || hasPhotoUrl;
+
+          const isGraded = ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0;
+          const isSubmitted = isGraded || (hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated'));
 
           return {
             id: proj.id || pTitle,
@@ -270,7 +285,7 @@ export async function GET(request: Request) {
             maxScore: pScore,
             cameraMode,
             requiredPhotos,
-            submission: sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null),
+            submission: hasValidImage ? (sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null)) : null,
             evaluation: ev || null,
             status: isGraded ? 'evaluated' : (isSubmitted ? 'submitted' : 'pending'),
           };
