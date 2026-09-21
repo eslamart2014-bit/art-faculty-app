@@ -1,5 +1,5 @@
-// Service Worker v3.3.0 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.3.0';
+// Service Worker v3.6.0 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.0';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -9,12 +9,10 @@ const CORE_ASSETS = [
   '/icon-192.png'
 ];
 
-// Install: pre-cache core app shell
-// LOW-6 FIX: Do NOT call skipWaiting() unconditionally here.
-// Waiting for all open tabs to close prevents disrupting active users mid-session.
-// skipWaiting() is called only in response to SKIP_WAITING message (below).
+// Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v2.1 (Offline-First Engine)...');
+  console.log('[SW] Installing v3.6.0...');
+  self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
       return cache.addAll(CORE_ASSETS).catch(err => {
