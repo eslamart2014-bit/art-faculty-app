@@ -409,12 +409,29 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const archiveProject = async () => {
     if (!longPressProject) return;
     const updatedProjects = projects.map(p => 
-      p.id === longPressProject.id ? { ...p, is_archived: true } : p
+      p.id === longPressProject.id ? { ...p, is_archived: true, is_active: false, portal_enabled: false } : p
     );
     const updatedCustomWeekNames = { ...(course.custom_week_names || {}), __projects__: updatedProjects };
     await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course.id);
     setProjects(updatedProjects);
     setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
+    setShowManageProjectModal(false);
+  };
+
+  const deleteProjectPermanently = async () => {
+    if (!longPressProject) return;
+    if (!confirm(`هل أنت متأكد من حذف مشروع "${longPressProject.name}" نهائياً؟ سيتم حذفه من كافة القوائم والبوابات.`)) return;
+    const updatedProjects = projects.filter(p => p.id !== longPressProject.id);
+    const updatedCustomWeekNames = { ...(course.custom_week_names || {}), __projects__: updatedProjects };
+    await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course.id);
+    setProjects(updatedProjects);
+    setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
+
+    try {
+      await supabase.from("student_submissions").delete().eq("course_id", course.id).eq("project_name", longPressProject.name);
+      await supabase.from("evaluations").delete().eq("course_id", course.id).eq("project_name", longPressProject.name);
+    } catch (e) {}
+
     setShowManageProjectModal(false);
   };
 
@@ -1919,7 +1936,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2563eb", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>حفظ التعديلات</button>
-              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid #ef4444", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>📦 نقل المشروع للأرشيف</button>
+              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24", border: "1px solid #f59e0b", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>📦 نقل المشروع للأرشيف</button>
+              <button onClick={deleteProjectPermanently} style={{ width: "100%", margin: 0, background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid #ef4444", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>🗑️ حذف المشروع نهائياً</button>
               <button onClick={() => setShowManageProjectModal(false)} style={{ width: "100%", margin: 0, background: "transparent", color: "#a1a1aa", border: "1px solid #3f3f46", padding: "10px", borderRadius: "8px", fontSize: "12px", cursor: "pointer" }}>إلغاء</button>
             </div>
           </div>

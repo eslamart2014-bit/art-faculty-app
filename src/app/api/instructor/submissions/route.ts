@@ -47,15 +47,45 @@ export async function GET(request: Request) {
     const isAdmin = currentInstructor?.role === 'مدير';
 
     // فلترة المقررات الخاصة بهذا المعيد فقط (المالك أو المشارك معه)، بينما المدير تتاح له كافة المقررات
-    const myCourses = (allCourses || []).filter((c: any) => {
-      if (isAdmin) return true;
-      const isOwner = c.teacher_id === instructorId;
-      const isShared = Array.isArray(c.shared_with) && c.shared_with.includes(instructorId);
-      return isOwner || isShared;
-    });
+    // مع استبعاد المقررات المحذوفة أو المؤرشفة تماماً
+    const myCourses = (allCourses || [])
+      .filter((c: any) => {
+        // استبعاد أي مقرر تم نقله للأرشيف أو حذفه
+        if (c.custom_week_names?.__archived === true) return false;
+        if (Array.isArray(c.custom_week_names?.__hidden_for) && c.custom_week_names.__hidden_for.includes(instructorId)) return false;
+
+        if (isAdmin) return true;
+        const isOwner = c.teacher_id === instructorId;
+        const isShared = Array.isArray(c.shared_with) && c.shared_with.includes(instructorId);
+        return isOwner || isShared;
+      })
+      .map((c: any) => {
+        // تصفية المشاريع داخل المقرر لاستبعاد المشاريع المؤرشفة أو المحذوفة
+        const activeProjects = (c.custom_week_names?.__projects__ || []).filter(
+          (p: any) => !p.is_archived && p.is_active !== false
+        );
+        return {
+          ...c,
+          custom_week_names: {
+            ...(c.custom_week_names || {}),
+            __projects__: activeProjects
+          }
+        };
+      });
 
     const myCourseIds = myCourses.map((c: any) => c.id);
     const myAcademicYears = Array.from(new Set(myCourses.map((c: any) => c.academic_year).filter(Boolean)));
+
+    // قائمة المفاتيح للمشاريع النشطة وغير المؤرشفة
+    const activeProjectMap = new Set<string>();
+    myCourses.forEach((c: any) => {
+      (c.custom_week_names?.__projects__ || []).forEach((p: any) => {
+        const pName = (p.name || p.title || '').trim();
+        if (pName) {
+          activeProjectMap.add(`${c.id}:::${pName}`);
+        }
+      });
+    });
 
     // 3. حالة البحث الذكي عن طالب (مقتصرة حصراً على الفرق والمقررات المسندة للمعيد، أو عامة للمدير)
     if (searchQuery) {
@@ -112,7 +142,7 @@ export async function GET(request: Request) {
           const localSubs = localStore.getSubmissions(st.student_code)
             .filter((s: any) => myCourseIds.includes(s.course_id));
 
-          // دمج التسليمات
+          // دمج التسليمات وتصفيتها حصرياً للمشاريع والمقررات النشطة غير المحذوفة
           const allStudentSubs = [...studentSubs];
           localSubs.forEach(ls => {
             if (!allStudentSubs.some(s => s.course_id === ls.course_id && s.project_name === ls.project_name)) {
@@ -120,7 +150,12 @@ export async function GET(request: Request) {
             }
           });
 
-          // أيضاً فحص جدول evaluations لمقررات هذا المعيد
+          const validStudentSubs = allStudentSubs.filter((s: any) => {
+            const pName = (s.project_name || '').trim();
+            return activeProjectMap.has(`${s.course_id}:::${pName}`);
+          });
+
+          // أيضاً فحص جدول evaluations لمقررات هذا المعيد وتصفيتها للمشاريع النشطة
           let evalRecords: any[] = [];
           try {
             const { data: evals } = await supabaseAdmin
@@ -131,11 +166,16 @@ export async function GET(request: Request) {
             evalRecords = evals || [];
           } catch (e) {}
 
+          const validEvalRecords = (evalRecords || []).filter((e: any) => {
+            const pName = (e.project_name || '').trim();
+            return activeProjectMap.has(`${e.course_id}:::${pName}`);
+          });
+
           studentResults.push({
             student: st,
             account: accountInfo,
-            submissions: allStudentSubs,
-            evaluations: evalRecords,
+            submissions: validStudentSubs,
+            evaluations: validEvalRecords,
           });
         }
       }
@@ -151,9 +191,16 @@ export async function GET(request: Request) {
     let submissions: any[] = [];
 
     if (courseId && projectName) {
-      // تحقق أمني صارم: هل المقرر يخص هذا المعيد؟
-      if (!myCourseIds.includes(courseId)) {
-        return NextResponse.json({ error: 'غير مصرح: هذا المقرر ليس مسنداً إليك' }, { status: 403 });
+      const cleanProjectName = projectName.trim();
+      const reqKey = `${courseId}:::${cleanProjectName}`;
+
+      // تحقق أمني صارم: هل المقرر يخص هذا المعيد ونشط، وهل المشروع نشط وغير مؤرشف؟
+      if (!myCourseIds.includes(courseId) || !activeProjectMap.has(reqKey)) {
+        return NextResponse.json({
+          instructors: instructors || [],
+          courses: myCourses,
+          submissions: []
+        });
       }
 
       // جلب الأعمال من student_submissions

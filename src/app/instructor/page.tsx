@@ -174,7 +174,16 @@ export default function InstructorPage() {
       const res = await fetch(`/api/instructor/submissions?instructor_id=${inst.id}`);
       const data = await res.json();
       if (data.courses) {
-        setMyCourses(data.courses);
+        const cleanCourses = (data.courses || [])
+          .filter((c: any) => c.custom_week_names?.__archived !== true)
+          .map((c: any) => ({
+            ...c,
+            custom_week_names: {
+              ...(c.custom_week_names || {}),
+              __projects__: (c.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived && p.is_active !== false)
+            }
+          }));
+        setMyCourses(cleanCourses);
       }
     } catch (e) {
       console.error(e);
@@ -398,17 +407,19 @@ export default function InstructorPage() {
   };
 
   // Flatten all projects belonging to this assistant's courses
-  const allProjectsList = myCourses.flatMap((c: any) => {
-    const projs = (c.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived);
-    return projs.map((p: any) => ({
-      courseId: c.id,
-      courseName: c.name,
-      academicYear: c.academic_year,
-      sections: c.sections || [],
-      projectName: p.name,
-      maxScore: p.max_score,
-    }));
-  });
+  const allProjectsList = myCourses
+    .filter((c: any) => c.custom_week_names?.__archived !== true)
+    .flatMap((c: any) => {
+      const projs = (c.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived && p.is_active !== false);
+      return projs.map((p: any) => ({
+        courseId: c.id,
+        courseName: c.name,
+        academicYear: c.academic_year,
+        sections: c.sections || [],
+        projectName: p.name || p.title,
+        maxScore: p.max_score || p.maxScore,
+      }));
+    });
 
   const selectedCourse = myCourses.find(c => c.id === selectedCourseId);
 
