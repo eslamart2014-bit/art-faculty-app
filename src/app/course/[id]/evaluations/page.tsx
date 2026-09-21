@@ -43,11 +43,18 @@ type Project = {
   max_score: number;
   is_archived?: boolean;
   is_active?: boolean;
+  portal_enabled?: boolean;
   start_date?: string;
   end_date?: string;
+  submission_deadline?: string;
   show_score?: boolean;
   camera_mode?: '2d' | '3d';
   required_photos?: number;
+  multi_stage_enabled?: boolean;
+  stage1_title?: string;
+  stage1_deadline?: string;
+  stage2_title?: string;
+  stage2_deadline?: string;
 };
 
 export default function EvaluationsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,20 +142,29 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectMaxScore, setNewProjectMaxScore] = useState("50");
+  const [newProjectPortalEnabled, setNewProjectPortalEnabled] = useState(true);
+  const [newProjectCameraMode, setNewProjectCameraMode] = useState<'2d'|'3d'>('2d');
+  const [newProjectRequiredPhotos, setNewProjectRequiredPhotos] = useState<number>(1);
+  const [newProjectDeadline, setNewProjectDeadline] = useState("");
+  const [newProjectMultiStage, setNewProjectMultiStage] = useState(false);
+  const [newProjectStage1Title, setNewProjectStage1Title] = useState("مرحلة التجهيز والتحضير");
+  const [newProjectStage1Deadline, setNewProjectStage1Deadline] = useState("");
+  const [newProjectStage2Title, setNewProjectStage2Title] = useState("العمل النهائي المكتمل");
+  const [newProjectStage2Deadline, setNewProjectStage2Deadline] = useState("");
 
   const [showManageProjectModal, setShowManageProjectModal] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectMaxScore, setEditProjectMaxScore] = useState("");
-  
-  // NEW TELEGRAM SETTINGS STATE
-  const [editProjectIsActive, setEditProjectIsActive] = useState(true);
-  const [editProjectStartDate, setEditProjectStartDate] = useState("");
-  const [editProjectEndDate, setEditProjectEndDate] = useState("");
-  const [editProjectShowScore, setEditProjectShowScore] = useState(true);
+  const [editProjectPortalEnabled, setEditProjectPortalEnabled] = useState(true);
+  const [editProjectDeadline, setEditProjectDeadline] = useState("");
   const [editProjectCameraMode, setEditProjectCameraMode] = useState<'2d'|'3d'>('2d');
   const [editProjectRequiredPhotos, setEditProjectRequiredPhotos] = useState<number>(1);
-  const [showTelegramSettings, setShowTelegramSettings] = useState(false);
-  const [sendBroadcastOnSave, setSendBroadcastOnSave] = useState(false);
+  const [editProjectMultiStage, setEditProjectMultiStage] = useState(false);
+  const [editProjectStage1Title, setEditProjectStage1Title] = useState("مرحلة التجهيز والتحضير");
+  const [editProjectStage1Deadline, setEditProjectStage1Deadline] = useState("");
+  const [editProjectStage2Title, setEditProjectStage2Title] = useState("العمل النهائي المكتمل");
+  const [editProjectStage2Deadline, setEditProjectStage2Deadline] = useState("");
+  const [showTelegramSettings, setShowTelegramSettings] = useState(true);
 
   const [longPressProject, setLongPressProject] = useState<Project | null>(null);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -266,6 +282,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     } catch (e) {}
   };
 
+  const getSuggestedDeadline = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 0, 0);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const saveNewProject = async () => {
     if (!newProjectName || !newProjectMaxScore) return;
     const maxScoreNum = Number(newProjectMaxScore);
@@ -276,8 +300,19 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
     const newProject: Project = {
       id: Date.now().toString(),
-      name: newProjectName,
-      max_score: maxScoreNum
+      name: newProjectName.trim(),
+      max_score: maxScoreNum,
+      portal_enabled: newProjectPortalEnabled,
+      is_active: newProjectPortalEnabled,
+      submission_deadline: newProjectDeadline || undefined,
+      end_date: newProjectDeadline || undefined,
+      camera_mode: newProjectCameraMode,
+      required_photos: newProjectRequiredPhotos,
+      multi_stage_enabled: newProjectMultiStage,
+      stage1_title: newProjectMultiStage ? (newProjectStage1Title || "مرحلة التجهيز والتحضير") : undefined,
+      stage1_deadline: newProjectMultiStage ? (newProjectStage1Deadline || undefined) : undefined,
+      stage2_title: newProjectMultiStage ? (newProjectStage2Title || "العمل النهائي المكتمل") : undefined,
+      stage2_deadline: newProjectMultiStage ? (newProjectStage2Deadline || undefined) : undefined,
     };
 
     const updatedProjects = [...projects, newProject];
@@ -298,6 +333,15 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setShowAddProjectModal(false);
     setNewProjectName("");
     setNewProjectMaxScore("50");
+    setNewProjectPortalEnabled(true);
+    setNewProjectCameraMode('2d');
+    setNewProjectRequiredPhotos(1);
+    setNewProjectDeadline("");
+    setNewProjectMultiStage(false);
+    setNewProjectStage1Title("مرحلة التجهيز والتحضير");
+    setNewProjectStage1Deadline("");
+    setNewProjectStage2Title("العمل النهائي المكتمل");
+    setNewProjectStage2Deadline("");
   };
 
   const handleProjectTouchStart = (proj: Project) => {
@@ -307,14 +351,16 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       setLongPressProject(proj);
       setEditProjectName(proj.name);
       setEditProjectMaxScore(proj.max_score.toString());
-      setEditProjectIsActive(proj.is_active ?? true);
-      setEditProjectStartDate(proj.start_date ?? "");
-      setEditProjectEndDate(proj.end_date ?? "");
-      setEditProjectShowScore(proj.show_score ?? true);
+      setEditProjectPortalEnabled(proj.portal_enabled ?? proj.is_active ?? true);
+      setEditProjectDeadline(proj.submission_deadline || proj.end_date || "");
       setEditProjectCameraMode(proj.camera_mode ?? '2d');
       setEditProjectRequiredPhotos(proj.required_photos ?? 1);
-      setShowTelegramSettings(false);
-      setSendBroadcastOnSave(false);
+      setEditProjectMultiStage(proj.multi_stage_enabled ?? false);
+      setEditProjectStage1Title(proj.stage1_title || "مرحلة التجهيز والتحضير");
+      setEditProjectStage1Deadline(proj.stage1_deadline || "");
+      setEditProjectStage2Title(proj.stage2_title || "العمل النهائي المكتمل");
+      setEditProjectStage2Deadline(proj.stage2_deadline || "");
+      setShowTelegramSettings(true);
       setShowManageProjectModal(true);
       vibrateSuccess();
     }, 600);
@@ -331,14 +377,19 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const updatedProjects = projects.map(p => 
       p.id === longPressProject.id ? { 
         ...p, 
-        name: editProjectName, 
+        name: editProjectName.trim(), 
         max_score: maxScoreNum,
-        is_active: editProjectIsActive,
-        start_date: editProjectStartDate,
-        end_date: editProjectEndDate,
-        show_score: editProjectShowScore,
+        portal_enabled: editProjectPortalEnabled,
+        is_active: editProjectPortalEnabled,
+        submission_deadline: editProjectDeadline || undefined,
+        end_date: editProjectDeadline || undefined,
         camera_mode: editProjectCameraMode,
-        required_photos: editProjectRequiredPhotos
+        required_photos: editProjectRequiredPhotos,
+        multi_stage_enabled: editProjectMultiStage,
+        stage1_title: editProjectMultiStage ? (editProjectStage1Title || "مرحلة التجهيز والتحضير") : undefined,
+        stage1_deadline: editProjectMultiStage ? (editProjectStage1Deadline || undefined) : undefined,
+        stage2_title: editProjectMultiStage ? (editProjectStage2Title || "العمل النهائي المكتمل") : undefined,
+        stage2_deadline: editProjectMultiStage ? (editProjectStage2Deadline || undefined) : undefined,
       } : p
     );
 
@@ -351,25 +402,6 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     
     setProjects(updatedProjects);
     if (course) setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
-    
-    // Broadcast to students if requested
-    if (sendBroadcastOnSave) {
-      const { data: { session } } = await supabase.auth.getSession();
-      await fetch('/api/bot/notify_course', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
-        },
-        body: JSON.stringify({
-          courseId: course?.id,
-          projectName: editProjectName,
-          startDate: editProjectStartDate,
-          endDate: editProjectEndDate
-        })
-      });
-      alert("تم إرسال إشعار للطلاب بنجاح!");
-    }
 
     setShowManageProjectModal(false);
   };
@@ -587,24 +619,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       const attCount = await getAttendanceCount(student.id);
       
-      let { data: ex } = await supabase.from("evaluations")
+      let { data: ex }: { data: any } = await supabase.from("evaluations")
         .select("id, score, photo_url, created_at").eq("course_id", course.id).eq("student_id", student.id).eq("project_name", selectedProject?.name).maybeSingle();
 
-      // فحص تسليمات بوابة الطلاب في حال عدم توفر الصورة بجدول التقييمات
-      if (!ex?.photo_url) {
-        const { data: sub } = await supabase.from("student_submissions")
-          .select("images, created_at, score")
-          .eq("course_id", course.id)
-          .eq("student_code", student.student_code)
-          .eq("project_name", selectedProject?.name)
-          .maybeSingle();
+      // فحص تسليمات بوابة الطلاب لجلب الصور ومراحل العمل
+      const { data: sub } = await supabase.from("student_submissions")
+        .select("images, created_at, score")
+        .eq("course_id", course.id)
+        .eq("student_code", student.student_code)
+        .eq("project_name", selectedProject?.name)
+        .maybeSingle();
 
-        if (sub?.images?.[0]?.url) {
-          if (!ex) {
-            ex = { id: null, score: sub.score, photo_url: sub.images[0].url, created_at: sub.created_at };
-          } else {
-            ex.photo_url = sub.images[0].url;
-          }
+      const subImages = Array.isArray(sub?.images) ? sub.images : [];
+      const primaryUrl = ex?.photo_url || subImages[0]?.url || (typeof subImages[0] === 'string' ? subImages[0] : null);
+
+      if (primaryUrl) {
+        if (!ex) {
+          ex = { id: null, score: sub?.score, photo_url: primaryUrl, created_at: sub?.created_at, images: subImages };
+        } else {
+          ex.photo_url = primaryUrl;
+          ex.images = subImages.length > 0 ? subImages : (ex.photo_url ? [{ url: ex.photo_url }] : []);
         }
       }
 
@@ -742,24 +776,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const student = await checkStudentLocalOrGlobal(code);
     
     if (student) {
-      let { data: ex } = await supabase.from("evaluations")
+      let { data: ex }: { data: any } = await supabase.from("evaluations")
         .select("id, score, photo_url, created_at").eq("course_id", course.id).eq("student_id", student.id).eq("project_name", selectedProject?.name).maybeSingle();
 
-      // فحص تسليمات بوابة الطلاب في حال عدم توفر الصورة بجدول التقييمات
-      if (!ex?.photo_url) {
-        const { data: sub } = await supabase.from("student_submissions")
-          .select("images, created_at, score")
-          .eq("course_id", course.id)
-          .eq("student_code", student.student_code)
-          .eq("project_name", selectedProject?.name)
-          .maybeSingle();
+      // فحص تسليمات بوابة الطلاب لجلب الصور ومراحل العمل
+      const { data: sub } = await supabase.from("student_submissions")
+        .select("images, created_at, score")
+        .eq("course_id", course.id)
+        .eq("student_code", student.student_code)
+        .eq("project_name", selectedProject?.name)
+        .maybeSingle();
 
-        if (sub?.images?.[0]?.url) {
-          if (!ex) {
-            ex = { id: null, score: sub.score, photo_url: sub.images[0].url, created_at: sub.created_at };
-          } else {
-            ex.photo_url = sub.images[0].url;
-          }
+      const subImages = Array.isArray(sub?.images) ? sub.images : [];
+      const primaryUrl = ex?.photo_url || subImages[0]?.url || (typeof subImages[0] === 'string' ? subImages[0] : null);
+
+      if (primaryUrl) {
+        if (!ex) {
+          ex = { id: null, score: sub?.score, photo_url: primaryUrl, created_at: sub?.created_at, images: subImages };
+        } else {
+          ex.photo_url = primaryUrl;
+          ex.images = subImages.length > 0 ? subImages : (ex.photo_url ? [{ url: ex.photo_url }] : []);
         }
       }
 
@@ -1101,15 +1137,38 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         </span>
                       </div>
 
-                      <div 
-                        onClick={() => openZoomImage(targetStudent.evalRecord.photo_url)}
-                        style={{ position: "relative", width: "100%", height: "160px", background: "#000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #333" }}
-                      >
-                        <img src={targetStudent.evalRecord.photo_url} alt="Artwork" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                        <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(0,0,0,0.8)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
-                          🔍 تكبير ومعاينة
-                        </div>
-                      </div>
+                      {(() => {
+                        const imgs = (targetStudent.evalRecord?.images && targetStudent.evalRecord.images.length > 0)
+                          ? targetStudent.evalRecord.images
+                          : [{ url: targetStudent.evalRecord.photo_url }];
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: imgs.length === 1 ? "1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: "8px" }}>
+                            {imgs.map((imgItem: any, imgIdx: number) => {
+                              const u = typeof imgItem === 'string' ? imgItem : (imgItem?.url || '');
+                              if (!u) return null;
+                              const isStage2 = imgItem?.stage === 'stage2' || (selectedProject?.multi_stage_enabled && imgIdx === 1);
+                              const stageTitle = selectedProject?.multi_stage_enabled
+                                ? (isStage2 ? (selectedProject.stage2_title || 'العمل النهائي') : (selectedProject.stage1_title || 'مرحلة التحضير'))
+                                : (imgs.length > 1 ? `صورة #${imgIdx + 1}` : 'معاينة العمل');
+                              return (
+                                <div 
+                                  key={imgIdx}
+                                  onClick={() => openZoomImage(u)}
+                                  style={{ position: "relative", width: "100%", height: "160px", background: "#000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #333" }}
+                                >
+                                  <img src={u} alt={stageTitle} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                  <div style={{ position: "absolute", top: "6px", right: "6px", background: isStage2 ? "rgba(16, 185, 129, 0.9)" : "rgba(37, 99, 235, 0.9)", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" }}>
+                                    {stageTitle}
+                                  </div>
+                                  <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(0,0,0,0.8)", color: "#fff", padding: "3px 6px", borderRadius: "4px", fontSize: "10px" }}>
+                                    🔍 تكبير
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
 
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", gap: "8px" }}>
                         <button 
@@ -1326,29 +1385,57 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 {/* BOT UPLOAD STATUS & ARTWORK PREVIEW */}
                 <div style={{ background: "#111", border: "1px solid #333", borderRadius: "8px", padding: "8px 12px", marginBottom: "10px" }}>
                   {activeScannedStudent.evalRecord?.photo_url ? (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
-                          ✅ تم رفع العمل على نظام فنية
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <div>
+                          <div style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
+                            ✅ تم رفع العمل على نظام فنية
+                          </div>
+                          <div style={{ color: "#888", fontSize: "10px", marginTop: "2px" }}>
+                            ⏱️ {formatRelativeTimeArabic(activeScannedStudent.evalRecord.created_at)}
+                          </div>
                         </div>
-                        <div style={{ color: "#888", fontSize: "10px", marginTop: "2px" }}>
-                          ⏱️ {formatRelativeTimeArabic(activeScannedStudent.evalRecord.created_at)}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         <button 
                           onClick={() => cancelArtwork(activeScannedStudent.evalRecord?.id, activeScannedStudent.student)}
                           style={{ width: "auto", margin: 0, background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "5px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
                         >
                           🗑️ إعادة تصوير
                         </button>
-                        <button 
-                          onClick={() => openZoomImage(activeScannedStudent.evalRecord.photo_url)}
-                          style={{ width: "auto", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
-                        >
-                          🖼️ معاينة وتكبير
-                        </button>
                       </div>
+
+                      {/* صور العمل الفني المرفوعة */}
+                      {(() => {
+                        const imgs = (activeScannedStudent.evalRecord?.images && activeScannedStudent.evalRecord.images.length > 0)
+                          ? activeScannedStudent.evalRecord.images
+                          : [{ url: activeScannedStudent.evalRecord.photo_url }];
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: imgs.length === 1 ? "1fr" : "repeat(auto-fit, minmax(110px, 1fr))", gap: "6px" }}>
+                            {imgs.map((imgItem: any, imgIdx: number) => {
+                              const u = typeof imgItem === 'string' ? imgItem : (imgItem?.url || '');
+                              if (!u) return null;
+                              const isStage2 = imgItem?.stage === 'stage2' || (selectedProject?.multi_stage_enabled && imgIdx === 1);
+                              const stageTitle = selectedProject?.multi_stage_enabled
+                                ? (isStage2 ? (selectedProject.stage2_title || 'العمل النهائي') : (selectedProject.stage1_title || 'مرحلة التحضير'))
+                                : (imgs.length > 1 ? `صورة #${imgIdx + 1}` : 'معاينة');
+                              return (
+                                <div 
+                                  key={imgIdx}
+                                  onClick={() => openZoomImage(u)}
+                                  style={{ position: "relative", width: "100%", height: "110px", background: "#000", borderRadius: "6px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #333" }}
+                                >
+                                  <img src={u} alt={stageTitle} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                  <div style={{ position: "absolute", top: "3px", right: "3px", background: isStage2 ? "rgba(16, 185, 129, 0.9)" : "rgba(37, 99, 235, 0.9)", color: "#fff", padding: "1px 5px", borderRadius: "3px", fontSize: "9px", fontWeight: "bold" }}>
+                                    {stageTitle}
+                                  </div>
+                                  <div style={{ position: "absolute", bottom: "3px", right: "3px", background: "rgba(0,0,0,0.8)", color: "#fff", padding: "2px 5px", borderRadius: "3px", fontSize: "9px" }}>
+                                    🔍 تكبير
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div style={{ color: "#aaa", fontSize: "11px", textAlign: "center" }}>
@@ -1494,32 +1581,158 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       {/* ADD PROJECT MODAL */}
       {showAddProjectModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "16px", borderRadius: "12px", border: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ color: "#FF9800", marginTop: 0, fontSize: "16px" }}>➕ إضافة مشروع جديد</h3>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center", padding: "12px", backdropFilter: "blur(4px)" }}>
+          <div style={{ background: "#18181b", width: "100%", maxWidth: "420px", maxHeight: "90vh", overflowY: "auto", padding: "18px", borderRadius: "16px", border: "1px solid #3f3f46", direction: "rtl", boxShadow: "0 10px 40px rgba(0,0,0,0.7)" }}>
+            <h3 style={{ color: "#f59e0b", marginTop: 0, fontSize: "17px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>➕</span>
+              <span>إضافة وتخصيص مشروع جديد</span>
+            </h3>
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>اسم المشروع:</label>
+            <label style={{ display: "block", color: "#a1a1aa", fontSize: "12px", marginBottom: "4px", textAlign: "right" }}>اسم المشروع:</label>
             <input 
               type="text" 
               placeholder="مثال: لوحة الطبيعة الصامتة" 
               value={newProjectName} 
               onChange={e => setNewProjectName(e.target.value)}
-              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "12px", textAlign: "right" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "8px", color: "#fff", marginBottom: "12px", textAlign: "right", fontSize: "14px" }}
             />
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
+            <label style={{ display: "block", color: "#a1a1aa", fontSize: "12px", marginBottom: "4px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
             <input 
               type="number" 
               inputMode="decimal"
               placeholder="50" 
               value={newProjectMaxScore} 
               onChange={e => setNewProjectMaxScore(e.target.value)}
-              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "16px", textAlign: "center", fontSize: "16px" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "8px", color: "#fff", marginBottom: "14px", textAlign: "center", fontSize: "16px", fontWeight: "bold" }}
             />
 
+            {/* إعدادات بوابة الطلاب والرفع */}
+            <div style={{ background: "#27272a", borderRadius: "12px", padding: "12px", marginBottom: "16px", border: "1px solid #3f3f46" }}>
+              <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🎓</span>
+                <span>إعدادات الرفع عبر بوابة الطلاب</span>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer", marginBottom: "10px" }}>
+                <input 
+                  type="checkbox" 
+                  checked={newProjectPortalEnabled} 
+                  onChange={e => setNewProjectPortalEnabled(e.target.checked)} 
+                  style={{ width: "16px", height: "16px", accentColor: "#38bdf8" }}
+                />
+                <span style={{ fontWeight: "bold" }}>تفعيل استقبال صور المشروع عبر بوابة الطلاب</span>
+              </label>
+
+              {newProjectPortalEnabled && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px dashed #3f3f46", paddingTop: "10px" }}>
+                  {/* نمط الصور ووضع الكاميرا */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <div>
+                      <label style={{ display: "block", color: "#a1a1aa", fontSize: "11px", marginBottom: "4px" }}>نمط الصور المطلوبة:</label>
+                      <select 
+                        value={newProjectRequiredPhotos} 
+                        onChange={(e: any) => setNewProjectRequiredPhotos(Number(e.target.value))}
+                        style={{ width: "100%", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px" }}
+                      >
+                        <option value={1}>صورة واحدة</option>
+                        <option value={2}>صورتان</option>
+                        <option value={3}>3 صور</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", color: "#a1a1aa", fontSize: "11px", marginBottom: "4px" }}>وضع الكاميرا:</label>
+                      <select 
+                        value={newProjectCameraMode} 
+                        onChange={(e: any) => setNewProjectCameraMode(e.target.value)}
+                        style={{ width: "100%", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px" }}
+                      >
+                        <option value="2d">لوحة مسطحة (2D)</option>
+                        <option value="3d">عمل مجسم (3D)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* الموعد النهائي العام */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <label style={{ color: "#a1a1aa", fontSize: "11px" }}>آخر موعد لرفع الصور (المهلة):</label>
+                      <button 
+                        type="button" 
+                        onClick={() => setNewProjectDeadline(getSuggestedDeadline())}
+                        style={{ background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "none", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", cursor: "pointer" }}
+                      >
+                        ⏱️ قبل التقييم (بعد 6 أيام)
+                      </button>
+                    </div>
+                    <input 
+                      type="datetime-local" 
+                      value={newProjectDeadline} 
+                      onChange={e => setNewProjectDeadline(e.target.value)} 
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} 
+                    />
+                  </div>
+
+                  {/* خيار العمل متعدد المراحل */}
+                  <div style={{ background: "#1c1917", border: "1px solid #78350f", borderRadius: "8px", padding: "10px" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fbbf24", fontSize: "12px", cursor: "pointer", fontWeight: "bold" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={newProjectMultiStage} 
+                        onChange={e => setNewProjectMultiStage(e.target.checked)} 
+                        style={{ width: "16px", height: "16px", accentColor: "#f59e0b" }}
+                      />
+                      <span>🎨 تقسيم الرفع لمرحلتين (مرحلة تحضير + عمل نهائي)</span>
+                    </label>
+
+                    {newProjectMultiStage && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                        <div style={{ background: "#09090b", padding: "8px", borderRadius: "6px", border: "1px solid #444" }}>
+                          <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>1️⃣ المرحلة الأولى (التحضير والتجهيز):</span>
+                          <input 
+                            type="text" 
+                            placeholder="عنوان المرحلة 1" 
+                            value={newProjectStage1Title} 
+                            onChange={e => setNewProjectStage1Title(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
+                          />
+                          <label style={{ display: "block", color: "#888", fontSize: "10px" }}>آخر موعد للمرحلة 1:</label>
+                          <input 
+                            type="datetime-local" 
+                            value={newProjectStage1Deadline} 
+                            onChange={e => setNewProjectStage1Deadline(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px" }}
+                          />
+                        </div>
+
+                        <div style={{ background: "#09090b", padding: "8px", borderRadius: "6px", border: "1px solid #444" }}>
+                          <span style={{ color: "#34d399", fontSize: "11px", fontWeight: "bold" }}>2️⃣ المرحلة الثانية (الإنهاء والعمل المكتمل):</span>
+                          <input 
+                            type="text" 
+                            placeholder="عنوان المرحلة 2" 
+                            value={newProjectStage2Title} 
+                            onChange={e => setNewProjectStage2Title(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
+                          />
+                          <label style={{ display: "block", color: "#888", fontSize: "10px" }}>آخر موعد للمرحلة 2:</label>
+                          <input 
+                            type="datetime-local" 
+                            value={newProjectStage2Deadline} 
+                            onChange={e => setNewProjectStage2Deadline(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px" }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div style={{ display: "flex", gap: "8px" }}>
-              <button onClick={saveNewProject} style={{ flex: 1, margin: 0, background: "#4CAF50", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ المشروع</button>
-              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
+              <button onClick={saveNewProject} style={{ flex: 1, margin: 0, background: "#10b981", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>حفظ المشروع</button>
+              <button onClick={() => setShowAddProjectModal(false)} style={{ flex: 1, margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "12px", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}>إلغاء</button>
             </div>
           </div>
         </div>
@@ -1557,99 +1770,157 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       {/* MANAGE PROJECT MODAL */}
       {showManageProjectModal && longPressProject && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", padding: "16px", borderRadius: "12px", border: "1px solid #2196F3", direction: "rtl", textAlign: "center" }}>
-            <h3 style={{ color: "#2196F3", marginTop: 0, fontSize: "16px" }}>⚙️ إدارة المشروع</h3>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center", padding: "12px", backdropFilter: "blur(4px)" }}>
+          <div style={{ background: "#18181b", width: "100%", maxWidth: "420px", maxHeight: "90vh", overflowY: "auto", padding: "18px", borderRadius: "16px", border: "1px solid #3b82f6", direction: "rtl", textAlign: "right", boxShadow: "0 10px 40px rgba(0,0,0,0.7)" }}>
+            <h3 style={{ color: "#38bdf8", marginTop: 0, fontSize: "17px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>⚙️</span>
+              <span>تعديل وإدارة إعدادات المشروع</span>
+            </h3>
             
+            <label style={{ display: "block", color: "#a1a1aa", fontSize: "12px", marginBottom: "4px" }}>اسم المشروع:</label>
             <input 
               type="text" 
               value={editProjectName} 
               onChange={e => setEditProjectName(e.target.value)}
-              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "12px", textAlign: "right" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "8px", color: "#fff", marginBottom: "12px", textAlign: "right", fontSize: "14px" }}
             />
             
-            <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px", textAlign: "right" }}>الدرجة القصوى للمشروع:</label>
+            <label style={{ display: "block", color: "#a1a1aa", fontSize: "12px", marginBottom: "4px" }}>الدرجة القصوى للمشروع:</label>
             <input 
               type="number" 
               inputMode="decimal"
               value={editProjectMaxScore} 
               onChange={e => setEditProjectMaxScore(e.target.value)}
-              style={{ width: "100%", padding: "10px", background: "#121212", border: "1px solid #444", borderRadius: "6px", color: "#fff", marginBottom: "16px", textAlign: "center", fontSize: "16px" }}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "8px", color: "#fff", marginBottom: "14px", textAlign: "center", fontSize: "16px", fontWeight: "bold" }}
             />
 
-            <div style={{ background: "#2a2a2a", borderRadius: "8px", padding: "10px", marginBottom: "16px", textAlign: "right" }}>
-              <button 
-                onClick={() => setShowTelegramSettings(!showTelegramSettings)}
-                style={{ width: "100%", background: "none", border: "none", color: "#38bdf8", fontWeight: "bold", fontSize: "14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", padding: 0 }}
-              >
-                <span>🎓 إعدادات بوابة الطلاب للمشروع</span>
-                <span>{showTelegramSettings ? "▲" : "▼"}</span>
-              </button>
-              
-              {showTelegramSettings && (
-                <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer" }}>
-                    <input type="checkbox" checked={editProjectIsActive} onChange={e => setEditProjectIsActive(e.target.checked)} />
-                    تفعيل استقبال صور المشروع عبر بوابة الطلاب
-                  </label>
-                  
-                  {editProjectIsActive && (
-                    <>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div>
-                          <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>من تاريخ:</label>
-                          <input type="datetime-local" value={editProjectStartDate} onChange={e => setEditProjectStartDate(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} />
+            {/* إعدادات بوابة الطلاب والرفع */}
+            <div style={{ background: "#27272a", borderRadius: "12px", padding: "12px", marginBottom: "16px", border: "1px solid #3f3f46" }}>
+              <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🎓</span>
+                <span>إعدادات الرفع عبر بوابة الطلاب</span>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer", marginBottom: "10px" }}>
+                <input 
+                  type="checkbox" 
+                  checked={editProjectPortalEnabled} 
+                  onChange={e => setEditProjectPortalEnabled(e.target.checked)} 
+                  style={{ width: "16px", height: "16px", accentColor: "#38bdf8" }}
+                />
+                <span style={{ fontWeight: "bold" }}>تفعيل استقبال صور المشروع عبر بوابة الطلاب</span>
+              </label>
+
+              {editProjectPortalEnabled && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", borderTop: "1px dashed #3f3f46", paddingTop: "10px" }}>
+                  {/* نمط الصور ووضع الكاميرا */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <div>
+                      <label style={{ display: "block", color: "#a1a1aa", fontSize: "11px", marginBottom: "4px" }}>نمط الصور المطلوبة:</label>
+                      <select 
+                        value={editProjectRequiredPhotos} 
+                        onChange={(e: any) => setEditProjectRequiredPhotos(Number(e.target.value))}
+                        style={{ width: "100%", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px" }}
+                      >
+                        <option value={1}>صورة واحدة</option>
+                        <option value={2}>صورتان</option>
+                        <option value={3}>3 صور</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", color: "#a1a1aa", fontSize: "11px", marginBottom: "4px" }}>وضع الكاميرا:</label>
+                      <select 
+                        value={editProjectCameraMode} 
+                        onChange={(e: any) => setEditProjectCameraMode(e.target.value)}
+                        style={{ width: "100%", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px" }}
+                      >
+                        <option value="2d">لوحة مسطحة (2D)</option>
+                        <option value="3d">عمل مجسم (3D)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* الموعد النهائي العام */}
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <label style={{ color: "#a1a1aa", fontSize: "11px" }}>آخر موعد لرفع الصور (المهلة):</label>
+                      <button 
+                        type="button" 
+                        onClick={() => setEditProjectDeadline(getSuggestedDeadline())}
+                        style={{ background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "none", borderRadius: "4px", padding: "2px 6px", fontSize: "10px", cursor: "pointer" }}
+                      >
+                        ⏱️ قبل التقييم (بعد 6 أيام)
+                      </button>
+                    </div>
+                    <input 
+                      type="datetime-local" 
+                      value={editProjectDeadline} 
+                      onChange={e => setEditProjectDeadline(e.target.value)} 
+                      style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#09090b", border: "1px solid #3f3f46", borderRadius: "6px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} 
+                    />
+                  </div>
+
+                  {/* خيار العمل متعدد المراحل */}
+                  <div style={{ background: "#1c1917", border: "1px solid #78350f", borderRadius: "8px", padding: "10px" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fbbf24", fontSize: "12px", cursor: "pointer", fontWeight: "bold" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={editProjectMultiStage} 
+                        onChange={e => setEditProjectMultiStage(e.target.checked)} 
+                        style={{ width: "16px", height: "16px", accentColor: "#f59e0b" }}
+                      />
+                      <span>🎨 تقسيم الرفع لمرحلتين (مرحلة تحضير + عمل نهائي)</span>
+                    </label>
+
+                    {editProjectMultiStage && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                        <div style={{ background: "#09090b", padding: "8px", borderRadius: "6px", border: "1px solid #444" }}>
+                          <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>1️⃣ المرحلة الأولى (التحضير والتجهيز):</span>
+                          <input 
+                            type="text" 
+                            placeholder="عنوان المرحلة 1" 
+                            value={editProjectStage1Title} 
+                            onChange={e => setEditProjectStage1Title(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
+                          />
+                          <label style={{ display: "block", color: "#888", fontSize: "10px" }}>آخر موعد للمرحلة 1:</label>
+                          <input 
+                            type="datetime-local" 
+                            value={editProjectStage1Deadline} 
+                            onChange={e => setEditProjectStage1Deadline(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px" }}
+                          />
                         </div>
-                        <div>
-                          <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>إلى تاريخ:</label>
-                          <input type="datetime-local" value={editProjectEndDate} onChange={e => setEditProjectEndDate(e.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "8px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px", fontFamily: "inherit" }} />
+
+                        <div style={{ background: "#09090b", padding: "8px", borderRadius: "6px", border: "1px solid #444" }}>
+                          <span style={{ color: "#34d399", fontSize: "11px", fontWeight: "bold" }}>2️⃣ المرحلة الثانية (الإنهاء والعمل المكتمل):</span>
+                          <input 
+                            type="text" 
+                            placeholder="عنوان المرحلة 2" 
+                            value={editProjectStage2Title} 
+                            onChange={e => setEditProjectStage2Title(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
+                          />
+                          <label style={{ display: "block", color: "#888", fontSize: "10px" }}>آخر موعد للمرحلة 2:</label>
+                          <input 
+                            type="datetime-local" 
+                            value={editProjectStage2Deadline} 
+                            onChange={e => setEditProjectStage2Deadline(e.target.value)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "6px", background: "#18181b", border: "1px solid #333", borderRadius: "4px", color: "#fff", fontSize: "11px" }}
+                          />
                         </div>
                       </div>
-
-                      <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "13px", cursor: "pointer", marginTop: "4px" }}>
-                        <input type="checkbox" checked={editProjectShowScore} onChange={e => setEditProjectShowScore(e.target.checked)} />
-                        إظهار الدرجة للطالب في بوابته فور تقييمه
-                      </label>
-
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>
-                        <label style={{ color: "#aaa", fontSize: "12px" }}>وضع الكاميرا:</label>
-                        <select 
-                          value={editProjectCameraMode} 
-                          onChange={(e: any) => setEditProjectCameraMode(e.target.value)}
-                          style={{ padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px" }}
-                        >
-                          <option value="2d">مسطح (2D)</option>
-                          <option value="3d">مجسم (3D)</option>
-                        </select>
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "4px" }}>
-                        <label style={{ color: "#aaa", fontSize: "12px" }}>عدد الصور المطلوبة:</label>
-                        <select 
-                          value={editProjectRequiredPhotos} 
-                          onChange={(e: any) => setEditProjectRequiredPhotos(Number(e.target.value))}
-                          style={{ padding: "6px", background: "#121212", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "12px" }}
-                        >
-                          <option value={1}>صورة واحدة</option>
-                          <option value={2}>صورتان</option>
-                          <option value={3}>3 صور</option>
-                        </select>
-                      </div>
-
-                      <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ffeb3b", fontSize: "13px", cursor: "pointer", marginTop: "4px", borderTop: "1px solid #444", paddingTop: "8px" }}>
-                        <input type="checkbox" checked={sendBroadcastOnSave} onChange={e => setSendBroadcastOnSave(e.target.checked)} />
-                        إرسال إشعار فوري للطلاب بفتح المشروع
-                      </label>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
-              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "#F44336", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>أرشفة المشروع</button>
-              <button onClick={() => setShowManageProjectModal(false)} style={{ width: "100%", margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
+              <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2563eb", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>حفظ التعديلات</button>
+              <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid #ef4444", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}>📦 نقل المشروع للأرشيف</button>
+              <button onClick={() => setShowManageProjectModal(false)} style={{ width: "100%", margin: 0, background: "transparent", color: "#a1a1aa", border: "1px solid #3f3f46", padding: "10px", borderRadius: "8px", fontSize: "12px", cursor: "pointer" }}>إلغاء</button>
             </div>
           </div>
         </div>

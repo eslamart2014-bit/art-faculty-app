@@ -269,31 +269,51 @@ export async function GET(request: Request) {
       // استخراج المشاريع المعتمدة التي حددها الأستاذ في custom_week_names.__projects__
       const rawAssigned = course.custom_week_names?.__projects__ || [];
       const assignedProjects = rawAssigned
-        .filter((p: any) => !p.is_archived)
+        .filter((p: any) => !p.is_archived && p.portal_enabled !== false && p.is_active !== false)
         .map((proj: any) => {
           const pTitle = (proj.title || proj.name || 'مشروع فني').trim();
           const pScore = proj.max_score || proj.maxScore || 10;
           const cameraMode = proj.camera_mode || '2d';
           const requiredPhotos = proj.required_photos || (cameraMode === '3d' ? 2 : 1);
+          const submissionDeadline = proj.submission_deadline || proj.end_date || null;
+          const multiStageEnabled = !!proj.multi_stage_enabled;
+          const stage1Title = proj.stage1_title || 'مرحلة التجهيز والتحضير';
+          const stage1Deadline = proj.stage1_deadline || null;
+          const stage2Title = proj.stage2_title || 'العمل النهائي المكتمل';
+          const stage2Deadline = proj.stage2_deadline || null;
 
           const sub = subs.find((s: any) => (s.project_name || '').trim() === pTitle);
           const ev = evals.find((e: any) => (e.project_name || '').trim() === pTitle);
 
           // التحقق الصارم من وجود صورة حقيقية صالحة (وليست فارغة أو محذوفة من السحابة)
-          const hasSubImages = Array.isArray(sub?.images) && sub.images.some((img: any) => {
+          const subImgList = Array.isArray(sub?.images) ? sub.images : [];
+          const hasSubImages = subImgList.some((img: any) => {
             const u = typeof img === 'string' ? img : img?.url;
             return !!u && !u.includes('undefined') && !u.includes('null') && !u.startsWith('/api/media/undefined');
           });
           const hasPhotoUrl = !!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null');
           const hasValidImage = hasSubImages || hasPhotoUrl;
 
+          const hasStage1Image = hasValidImage && (
+            subImgList.some((img: any) => img.stage === 'stage1' || !img.stage) ||
+            hasPhotoUrl
+          );
+          const hasStage2Image = hasValidImage && subImgList.some((img: any) => img.stage === 'stage2');
+
           const isGraded = !!(ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0);
           const isSubmitted = isGraded || (hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated'));
+          const isFullySubmitted = multiStageEnabled ? (hasStage1Image && hasStage2Image) : isSubmitted;
 
           const safeEval = ev ? {
             ...ev,
             score: isGraded ? Number(ev.score) : null
           } : null;
+
+          // تجهيز صور التسليم الموحدة
+          let submissionObj = null;
+          if (hasValidImage) {
+            submissionObj = sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null);
+          }
 
           return {
             id: proj.id || pTitle,
@@ -301,7 +321,16 @@ export async function GET(request: Request) {
             maxScore: pScore,
             cameraMode,
             requiredPhotos,
-            submission: hasValidImage ? (sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null)) : null,
+            submissionDeadline,
+            multiStageEnabled,
+            stage1Title,
+            stage1Deadline,
+            stage2Title,
+            stage2Deadline,
+            hasStage1Image,
+            hasStage2Image,
+            isFullySubmitted,
+            submission: submissionObj,
             evaluation: safeEval,
             score: isGraded ? Number(ev.score) : null,
             isGraded,
