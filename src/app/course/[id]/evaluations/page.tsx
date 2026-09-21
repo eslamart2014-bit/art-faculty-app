@@ -204,6 +204,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [manualScore, setManualScore] = useState("");
   const [savingManual, setSavingManual] = useState(false);
   const [searchingManual, setSearchingManual] = useState(false);
+  const [noPhotoWarning, setNoPhotoWarning] = useState<any>(null);
 
   // Easter Egg
   const [showEasterEgg, setShowEasterEgg] = useState(false);
@@ -620,7 +621,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
-        setActiveScannedStudent(studentWithData);
+        if (!ex?.photo_url) {
+          setNoPhotoWarning({
+            student,
+            attCount,
+            ex,
+            mode: 'CAMERA',
+            studentWithData
+          });
+        } else {
+          setActiveScannedStudent(studentWithData);
+        }
       }, 500);
     } else {
       setScannerStatus('error');
@@ -754,10 +765,20 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       vibrateSuccess();
       const attCount = await getAttendanceCount(student.id);
+
+      if (!ex?.photo_url) {
+        setNoPhotoWarning({
+          student,
+          attCount,
+          ex,
+          mode: 'MANUAL'
+        });
+        setSearchingManual(false);
+        return;
+      }
+
       setTargetStudent({ ...student, attCount, evalRecord: ex });
-      
       setManualScore(ex && ex.score && ex.score > 0 ? ex.score.toString() : "");
-      
       setTimeout(() => document.getElementById("manualGradeInput")?.focus(), 100);
     } else {
       setTargetStudent(null);
@@ -1583,6 +1604,59 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
               <button onClick={updateProject} style={{ width: "100%", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>حفظ التعديلات</button>
               <button onClick={() => { if(confirm("هل أنت متأكد من نقل هذا المشروع للأرشيف؟ لن يظهر في القائمة بعد الآن.")) archiveProject(); }} style={{ width: "100%", margin: 0, background: "#F44336", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", fontWeight: "bold", fontSize: "13px" }}>أرشفة المشروع</button>
               <button onClick={() => setShowManageProjectModal(false)} style={{ width: "100%", margin: 0, background: "transparent", color: "#fff", border: "1px solid #555", padding: "10px", borderRadius: "6px", fontSize: "13px" }}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Photo Warning Modal */}
+      {noPhotoWarning && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.85)", zIndex: 99999, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px", backdropFilter: "blur(4px)"
+        }}>
+          <div className="card" style={{ maxWidth: "380px", width: "100%", textAlign: "center", border: "2px solid #ef4444", padding: "24px", borderRadius: "16px", background: "#18181b", boxShadow: "0 10px 40px rgba(0,0,0,0.7)" }}>
+            <div style={{ fontSize: "46px", marginBottom: "12px" }}>📷⚠️</div>
+            <h3 style={{ color: "#ef4444", fontSize: "17px", fontWeight: "bold", margin: "0 0 10px 0" }}>
+              لم يقم الطالب برفع صورة المشروع!
+            </h3>
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "12px", marginBottom: "14px", textAlign: "right" }}>
+              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{noPhotoWarning.student.full_name}</div>
+              <div style={{ color: "#38bdf8", fontSize: "12px", marginTop: "4px" }}>
+                كود: {noPhotoWarning.student.student_code} • سكشن: {noPhotoWarning.student.section}
+              </div>
+            </div>
+            <p style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "20px", lineHeight: "1.6" }}>
+              لم يتم العثور على أي صورة مسجلة أو مرفوعة لهذا المشروع من قِبل الطالب حتى الآن. هل ترغب في المتابعة ورصد الدرجة يدوياً؟
+            </p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={() => {
+                  const data = noPhotoWarning;
+                  setNoPhotoWarning(null);
+                  if (data.mode === 'CAMERA') {
+                    setActiveScannedStudent(data.studentWithData);
+                  } else {
+                    setTargetStudent({ ...data.student, attCount: data.attCount, evalRecord: data.ex });
+                    setManualScore(data.ex && data.ex.score && data.ex.score > 0 ? data.ex.score.toString() : "");
+                    setTimeout(() => document.getElementById("manualGradeInput")?.focus(), 100);
+                  }
+                }}
+                style={{ flex: 1, padding: "12px", background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "#fff", border: "none", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}
+              >
+                تقييم على أي حال ⚠️
+              </button>
+              <button
+                onClick={() => {
+                  setNoPhotoWarning(null);
+                  setTargetStudent(null);
+                  setActiveScannedStudent(null);
+                  setSearchInput("");
+                }}
+                style={{ flex: 1, padding: "12px", background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}
+              >
+                إلغاء ✕
+              </button>
             </div>
           </div>
         </div>

@@ -394,7 +394,7 @@ export default function HomePage() {
 
       {/* الزر الرئيسي الكبير في أسفل الصفحة: الانتقال إلى نظام فنية */}
       <footer style={{ marginTop: "20px", marginBottom: "15px" }}>
-        <Link href="/system" style={{ textDecoration: "none" }}>
+        <Link href="/system?mode=register" style={{ textDecoration: "none" }}>
           <div 
             className="animate-glow"
             style={{ 

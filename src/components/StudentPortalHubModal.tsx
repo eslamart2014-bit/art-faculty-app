@@ -1293,6 +1293,209 @@ export default function StudentPortalHubModal({
           </div>
         )}
 
+        {/* ========================================== */}
+        {/* TAB 5: STUDENT COMPLAINTS (صندوق الشكاوى الطلابية) */}
+        {/* ========================================== */}
+        {activeTab === "complaints" && (
+          <div className="animate-fade-in">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <h3 style={{ fontSize: "16px", color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📬</span> صندوق شكاوى ومقترحات الطلاب
+                </h3>
+                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
+                  استعراض الشكاوى والمقترحات المرفوعة من بوابة الطلاب والرد عليها رسمياً
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => setComplaintFilter("all")}
+                  className="btn-compact"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: complaintFilter === "all" ? "#ec4899" : "#1e293b",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: "12px",
+                    cursor: "pointer"
+                  }}
+                >
+                  الكل ({complaintsList.length})
+                </button>
+                <button
+                  onClick={() => setComplaintFilter("new")}
+                  className="btn-compact"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: complaintFilter === "new" ? "#f59e0b" : "#1e293b",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: "12px",
+                    cursor: "pointer"
+                  }}
+                >
+                  جديدة ⏳ ({complaintsList.filter(c => c.status !== "تم الرد").length})
+                </button>
+                <button
+                  onClick={() => setComplaintFilter("replied")}
+                  className="btn-compact"
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: complaintFilter === "replied" ? "#10b981" : "#1e293b",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: "12px",
+                    cursor: "pointer"
+                  }}
+                >
+                  تم الرد ✅ ({complaintsList.filter(c => c.status === "تم الرد").length})
+                </button>
+              </div>
+            </div>
+
+            {replySuccessMsg && (
+              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginBottom: "14px", fontSize: "13px" }}>
+                ✓ {replySuccessMsg}
+              </div>
+            )}
+
+            {loadingComplaints ? (
+              <div style={{ textAlign: "center", padding: "40px", color: "#ec4899" }}>
+                <div style={{ width: "32px", height: "32px", border: "3px solid #ec4899", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
+                <div>جاري جلب الشكاوى الطلابية...</div>
+              </div>
+            ) : complaintsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "50px 20px", color: "#94a3b8", background: "#141b29", borderRadius: "16px", border: "1px dashed #2a374f" }}>
+                <div style={{ fontSize: "40px", marginBottom: "10px" }}>📭</div>
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>لا توجد أي شكاوى أو مقترحات طلابية مسجلة حالياً</div>
+                <div style={{ fontSize: "12px", marginTop: "4px" }}>عندما يقوم أي طالب بإرسال شكوى من بوابته ستظهر هنا مباشرة.</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {complaintsList
+                  .filter(c => {
+                    if (complaintFilter === "new") return c.status !== "تم الرد";
+                    if (complaintFilter === "replied") return c.status === "تم الرد";
+                    return true;
+                  })
+                  .map(c => {
+                    const isReplied = c.status === "تم الرد" || !!c.admin_reply;
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          background: "#141b29",
+                          border: isReplied ? "1px solid #1e293b" : "1px solid rgba(245, 158, 11, 0.4)",
+                          borderRadius: "14px",
+                          padding: "16px",
+                          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
+                        }}
+                      >
+                        {/* Complaint Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
+                                {c.student_name}
+                              </span>
+                              <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                                كود: {c.student_code}
+                              </span>
+                              <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                                الفرقة: {c.academic_year || "عام"}
+                              </span>
+                            </div>
+                            <div style={{ color: "#f59e0b", fontSize: "11px", marginTop: "4px" }}>
+                              موجهة إلى: <b>{c.target_entity}</b> • {c.created_at ? new Date(c.created_at).toLocaleString("ar-EG") : ""}
+                            </div>
+                          </div>
+
+                          <span style={{
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            background: isReplied ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                            color: isReplied ? "#34d399" : "#fbbf24",
+                            border: isReplied ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(245, 158, 11, 0.3)"
+                          }}>
+                            {isReplied ? "✅ تم الرد" : "⏳ جديدة"}
+                          </span>
+                        </div>
+
+                        {/* Complaint Body */}
+                        <div style={{ background: "#0d131f", padding: "12px 14px", borderRadius: "10px", border: "1px solid #1e293b", color: "#e2e8f0", fontSize: "13px", lineHeight: "1.7", marginBottom: "12px", whiteSpace: "pre-wrap" }}>
+                          {c.content}
+                        </div>
+
+                        {/* Existing Reply if already answered */}
+                        {isReplied && c.admin_reply && (
+                          <div style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "12px 14px", borderRadius: "10px", marginBottom: "12px" }}>
+                            <div style={{ color: "#34d399", fontWeight: "bold", fontSize: "12px", marginBottom: "4px" }}>
+                              💬 الرد الرسمي الموجه للطالب ({c.replied_by || "الإدارة"}):
+                            </div>
+                            <div style={{ color: "#fff", fontSize: "13px", lineHeight: "1.6" }}>
+                              {c.admin_reply}
+                            </div>
+                            {c.replied_at && (
+                              <div style={{ color: "#64748b", fontSize: "10px", marginTop: "6px" }}>
+                                تاريخ الرد: {new Date(c.replied_at).toLocaleString("ar-EG")}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Reply Form */}
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            type="text"
+                            placeholder={isReplied ? "تعديل الرد أو إرسال رد إضافي..." : "اكتب رد الإدارة الرسمي للطالب هنا..."}
+                            value={replyTextMap[c.id] || ""}
+                            onChange={(e) => setReplyTextMap(prev => ({ ...prev, [c.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSendReply(c.id);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: "10px 14px",
+                              background: "#0d131f",
+                              border: "1px solid #2a374f",
+                              borderRadius: "8px",
+                              color: "#fff",
+                              fontSize: "13px"
+                            }}
+                          />
+                          <button
+                            onClick={() => handleSendReply(c.id)}
+                            disabled={sendingReplyId === c.id || !replyTextMap[c.id]?.trim()}
+                            className="btn-compact"
+                            style={{
+                              padding: "10px 16px",
+                              background: "linear-gradient(135deg, #10b981, #059669)",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: "8px",
+                              fontWeight: "bold",
+                              fontSize: "12px",
+                              cursor: (sendingReplyId === c.id || !replyTextMap[c.id]?.trim()) ? "not-allowed" : "pointer",
+                              opacity: (sendingReplyId === c.id || !replyTextMap[c.id]?.trim()) ? 0.6 : 1
+                            }}
+                          >
+                            {sendingReplyId === c.id ? "جاري الإرسال..." : "إرسال الرد 💬"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
     </div>
   );

@@ -190,6 +190,16 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     });
 
     await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
+    
+    // تفريغ وحذف كافة صور وتسليمات المقرر من سحابة التخزين تلقائياً
+    try {
+      await fetch('/api/courses/delete-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_id: courseToDelete.id })
+      });
+    } catch (e) {}
+
     setCourseToDelete(null);
   };
 

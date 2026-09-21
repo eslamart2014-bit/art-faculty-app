@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, generatePinCode } from '@/lib/codeHelper';
+import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // 2. البحث عن الحساب المسجل في student_accounts أو telegram_browser_id
+      // 2. البحث عن الحساب المسجل
       let account: any = null;
       try {
         const { data } = await supabaseAdmin
@@ -50,54 +50,45 @@ export async function POST(request: Request) {
         return NextResponse.json({
           registered: false,
           student,
-          message: 'الطالب غير مسجل في بوابة فنية بعد! يجب عليه التسجيل أولاً وتصوير بطاقة الهوية.',
+          message: 'الطالب لم يقم بإنشاء حساب في البوابة بعد! يجب عليه فتح التطبيق والتسجيل أولاً.',
         });
       }
 
-      // إذا كان مسجلاً ولكن لم يُولد له PIN بعد
-      let pin = account.pin_code;
-      if (!pin) {
-        pin = generatePinCode();
-        account.pin_code = pin;
-        try {
-          await supabaseAdmin
-            .from('student_accounts')
-            .update({ pin_code: pin })
-            .eq('id', account.id);
-        } catch (e) {
-          localStore.upsertAccount(account);
-        }
-      }
-
-      // التحقق من تاريخ الاستخراج السابق
-      let warning = '';
-      if (account.is_pin_used) {
-        warning = `تنبيه: هذا الطالب تم استخراج رقمه السري مسبقاً واستخدامه بالفعل بتاريخ ${new Date(account.pin_issued_at || account.last_login_at || Date.now()).toLocaleDateString('ar-EG')} بواسطة (${account.pin_issued_by || 'المنسق المعتمد'}).`;
-      } else if (account.pin_issued_by) {
-        warning = `تنبيه: تم إصدار الرقم السري مسبقاً لهذا الطالب بتاريخ ${new Date(account.pin_issued_at).toLocaleDateString('ar-EG')} بواسطة (${account.pin_issued_by}) ولم يقم الطالب بإدخاله بعد.`;
-      }
+      const isActivated = account.status === 'active' || account.is_pin_used;
+      const activatedBy = account.activated_by || account.pin_issued_by || null;
+      const activatedAt = account.activated_at || account.pin_issued_at || account.last_login_at || null;
 
       return NextResponse.json({
         registered: true,
         student,
         account: {
           ...account,
-          pin_code: pin,
+          status: isActivated ? 'active' : 'pending',
+          activated_by: activatedBy,
+          activated_at: activatedAt,
         },
-        warning,
+        isActivated,
       });
     }
 
-    if (action === 'issue_pin') {
-      // تحديث حالة إصدار الرقم السري بواسطة هذا المنسق
+    // 2. تفعيل حساب الطالب بواسطة المنسق
+    if (action === 'activate_student') {
+      const nowIso = new Date().toISOString();
+      const coordName = coordinator_name || 'منسق النظام';
+
+      // تحديث student_accounts
       let updatedAccount: any = null;
       try {
         const res = await supabaseAdmin
           .from('student_accounts')
           .update({
+            status: 'active',
+            is_pin_used: true,
             id_card_verified: true,
-            pin_issued_by: coordinator_name || 'منسق النظام',
-            pin_issued_at: new Date().toISOString(),
+            activated_by: coordName,
+            activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
           })
           .eq('student_code', cleanCode)
           .select('*')
@@ -105,21 +96,24 @@ export async function POST(request: Request) {
         updatedAccount = res.data;
       } catch (e) {}
 
-      // تحديث حالة إصدار الرقم السري في students.telegram_browser_id لضمان البقاء والاستدامة السحابية
+      // تحديث students.telegram_browser_id
       try {
         const { data: st } = await supabaseAdmin
           .from('students')
           .select('id, telegram_browser_id')
           .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
           .maybeSingle();
+
         if (st) {
           let curr: any = {};
           try { curr = JSON.parse(st.telegram_browser_id || '{}'); } catch(e){}
           const merged = {
             ...curr,
+            status: 'active',
+            is_pin_used: true,
             id_card_verified: true,
-            pin_issued_by: coordinator_name || 'منسق النظام',
-            pin_issued_at: new Date().toISOString()
+            activated_by: coordName,
+            activated_at: nowIso,
           };
           await supabaseAdmin
             .from('students')
@@ -129,30 +123,130 @@ export async function POST(request: Request) {
         }
       } catch (e) {}
 
-      if (!updatedAccount) {
-        const localAcc = localStore.getAccount(cleanCode);
-        if (localAcc) {
-          localAcc.id_card_verified = true;
-          localAcc.pin_issued_by = coordinator_name || 'منسق النظام';
-          localAcc.pin_issued_at = new Date().toISOString();
-          localStore.upsertAccount(localAcc);
-          updatedAccount = localAcc;
-        }
+      // تحديث التخزين المحلي
+      const localAcc = localStore.getAccount(cleanCode);
+      if (localAcc) {
+        localAcc.status = 'active';
+        localAcc.is_pin_used = true;
+        localAcc.activated_by = coordName;
+        localAcc.activated_at = nowIso;
+        localStore.upsertAccount(localAcc);
       }
 
-      // تسجيل العملية في الأوديت لوج
+      // تسجيل العملية في Audit Log
       try {
         await supabaseAdmin.from('portal_audit_logs').insert({
           student_code: cleanCode,
-          action: 'pin_issued_by_coordinator',
-          details: { coordinator: coordinator_name, issuedAt: new Date().toISOString() },
+          action: 'account_activated_by_coordinator',
+          details: { coordinator: coordName, activatedAt: nowIso },
         });
       } catch (e) {}
 
       return NextResponse.json({
         success: true,
-        message: 'تم اعتماد بطاقة الهوية وتسجيل صرف الرقم السري بنجاح.',
+        message: 'تم اعتماد وتفعيل حساب الطالب بنجاح! يمكن للطالب الآن استخدام المنظومة فوراً.',
         account: updatedAccount,
+      });
+    }
+
+    // 3. رفض البيانات وحذف التسجيل (بيانات خاطئة)
+    if (action === 'reject_incorrect_data') {
+      const coordName = coordinator_name || 'منسق النظام';
+
+      // حذف صورة البطاقة من Storage إن وُجدت
+      try {
+        const { data: sa } = await supabaseAdmin
+          .from('student_accounts')
+          .select('id_card_url')
+          .eq('student_code', cleanCode)
+          .maybeSingle();
+
+        if (sa?.id_card_url && sa.id_card_url.includes('/artworks/')) {
+          const p = sa.id_card_url.split('/artworks/')[1]?.split('?')[0];
+          if (p) await supabaseAdmin.storage.from('artworks').remove([decodeURIComponent(p)]);
+        }
+      } catch (e) {}
+
+      // حذف من student_accounts
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .delete()
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // تصفير telegram_browser_id في جدول students
+      try {
+        await supabaseAdmin
+          .from('students')
+          .update({ telegram_browser_id: null })
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // حذف من التخزين المحلي
+      try {
+        localStore.deleteAccount(cleanCode);
+        localStore.deleteAccount(student_code);
+      } catch (e) {}
+
+      // تسجيل في Audit Log
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: 'registration_rejected_by_coordinator',
+          details: { coordinator: coordName, reason: 'بيانات غير مطابقة للبطاقة الشخصية', rejectedAt: new Date().toISOString() },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم رفض البيانات وحذف التسجيل وتصفير الحساب ليعود الطالب للتسجيل لأول مرة.',
+      });
+    }
+
+    // 4. إظهار بيانات التسجيل وإنهاء جلسات الأجهزة الأخرى لمنع التحايل
+    if (action === 'reset_other_sessions') {
+      const coordName = coordinator_name || 'منسق النظام';
+
+      // مسح الأجهزة وتصفير الجلسات في student_accounts
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({ devices: [] })
+          .eq('student_code', cleanCode);
+      } catch (e) {}
+
+      // مسح الأجهزة في students.telegram_browser_id
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st && st.telegram_browser_id) {
+          let curr: any = {};
+          try { curr = JSON.parse(st.telegram_browser_id); } catch(e){}
+          curr.devices = [];
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(curr) })
+            .eq('id', st.id);
+        }
+      } catch (e) {}
+
+      // تسجيل العملية في Audit Log
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: 'sessions_terminated_by_coordinator',
+          details: { coordinator: coordName, timestamp: new Date().toISOString() },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم إنهاء وحذف جلسة الطالب من أي جهاز آخر بنجاح لحمايته من التحايل.',
       });
     }
 

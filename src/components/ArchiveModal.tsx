@@ -104,6 +104,14 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
     const archive = archives.find(a => a.id === itemToDelete);
     if (archive && archive.item_type === "course") {
       const courseId = archive.original_data.course_id;
+      // مسح كافة وسائط وصور المقرر من سحابة التخزين
+      try {
+        await fetch('/api/courses/delete-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ course_id: courseId })
+        });
+      } catch (e) {}
       await supabase.from("courses").delete().eq("id", courseId);
     }
     

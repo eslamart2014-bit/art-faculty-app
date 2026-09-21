@@ -35,7 +35,7 @@ import { compressImageToWebP } from "@/lib/imageCompressor";
 
 export default function SystemPage() {
   // Navigation & Auth State
-  const [authMode, setAuthMode] = useState<"register" | "login">("login");
+  const [authMode, setAuthMode] = useState<"register" | "login">("register");
   const [currentStudent, setCurrentStudent] = useState<any>(null);
   const [accountStatus, setAccountStatus] = useState<"pending" | "active" | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +44,14 @@ export default function SystemPage() {
 
   // Coordinators list
   const [coordinators, setCoordinators] = useState<any[]>([]);
+
+  // PWA & Android Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showPwaPrompt, setShowPwaPrompt] = useState(false);
+  const [pwaHintVisible, setPwaHintVisible] = useState(false);
+
+  // Student registration lookup status (already active / pending / new)
+  const [lookupStatus, setLookupStatus] = useState<{ isAlreadyActive?: boolean; isPending?: boolean; message?: string } | null>(null);
 
   // Impersonation mode (Admin browsing as student)
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -194,10 +202,88 @@ export default function SystemPage() {
 
     fetchCoordinators();
 
+    // Check PWA mode or query param
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("mode") === "login") setAuthMode("login");
+      if (p.get("mode") === "register") setAuthMode("register");
+    }
+
     return () => {
       stopCamera();
     };
   }, []);
+
+  // PWA Install Prompt Listener for Android & Mobile
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone;
+    if (isStandalone) return;
+
+    const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    const dismissed = sessionStorage.getItem("pwa_install_dismissed");
+
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      if (!dismissed) {
+        setShowPwaPrompt(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+
+    const timer = setTimeout(() => {
+      if (isMobile && !dismissed && !isStandalone) {
+        setShowPwaPrompt(true);
+      }
+    }, 1200);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  // VIEW 1 Auto-Polling:
+  // Automatically detects when coordinator activates the account and switches to Dashboard!
+  useEffect(() => {
+    if (!currentStudent || accountStatus !== "pending") return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}`);
+        const data = await res.json();
+        if (!isMounted) return;
+
+        if (data.isAlreadyActive) {
+          const activeSession = {
+            ...currentStudent,
+            status: "active",
+            is_pin_used: true
+          };
+          localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+          setCurrentStudent(activeSession);
+          setAccountStatus("active");
+          setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
+          loadDashboard(currentStudent.student_code);
+        } else if (data.isNew) {
+          localStorage.removeItem("fania_student_session");
+          setCurrentStudent(null);
+          setAccountStatus(null);
+          setAuthMode("register");
+          setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
+        }
+      } catch (e) {}
+    }, 3500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentStudent, accountStatus]);
 
   const fetchCoordinators = async (studentCode?: string) => {
     try {
@@ -213,6 +299,7 @@ export default function SystemPage() {
   useEffect(() => {
     if (authMode !== "register" || !regCode.trim()) {
       setMatchedStudent(null);
+      setLookupStatus(null);
       setLookupMessage(null);
       return;
     }
@@ -231,9 +318,15 @@ export default function SystemPage() {
         if (res.ok && data.student) {
           setMatchedStudent(data.student);
           setRegName(data.student.full_name);
+          setLookupStatus({
+            isAlreadyActive: !!data.isAlreadyActive,
+            isPending: !!data.isPending,
+            message: data.message || undefined
+          });
           setLookupMessage(null);
         } else {
           setMatchedStudent(null);
+          setLookupStatus(null);
           setLookupMessage(data.message || "الكود غير مسجل في كشوف الكلية الرسمية.");
         }
       } catch (e) {
@@ -744,8 +837,16 @@ export default function SystemPage() {
   // Handle Registration Submit
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regCode || !regMobile) {
-      setErrorMsg("يرجى إدخال الكود ورقم الموبايل");
+    if (!regCode.trim()) {
+      setErrorMsg("يرجى إدخال كود الطالب الجامعي");
+      return;
+    }
+    if (!regMobile.trim()) {
+      setErrorMsg("يرجى إدخال رقم الموبايل للتواصل");
+      return;
+    }
+    if (!idCardPhoto) {
+      setErrorMsg("يرجى تصوير أو إرفاق صورة بطاقة الرقم القومي أو كارنيه الكلية (إجباري لإتمام التسجيل)");
       return;
     }
 
@@ -777,10 +878,11 @@ export default function SystemPage() {
         }
       } else {
         setSuccessMsg(data.message);
-        setCurrentStudent(data.student);
+        const pendingSession = { ...data.student, status: "pending" };
+        setCurrentStudent(pendingSession);
         setAccountStatus("pending");
         fetchCoordinators(data.student.student_code);
-        localStorage.setItem("fania_student_session", JSON.stringify(data.student));
+        localStorage.setItem("fania_student_session", JSON.stringify(pendingSession));
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "حدث خطأ في الاتصال");
@@ -2489,26 +2591,8 @@ export default function SystemPage() {
           </p>
         </header>
 
-        {/* مفتاح التبديل بين تسجيل الدخول والتسجيل الجديد */}
+        {/* مفتاح التبديل بين تسجيل جديد وتسجيل الدخول (تسجيل طالب جديد أولاً) */}
         <div style={{ display: "flex", background: "#141b29", padding: "4px", borderRadius: "12px", border: "1px solid #2a374f", marginBottom: "18px" }}>
-          <button
-            type="button"
-            onClick={() => { setAuthMode("login"); setErrorMsg(""); }}
-            className="btn-compact"
-            style={{
-              flex: 1,
-              padding: "10px",
-              borderRadius: "8px",
-              background: authMode === "login" ? "#2563eb" : "transparent",
-              color: authMode === "login" ? "#fff" : "#94a3b8",
-              fontWeight: "bold",
-              fontSize: "13px",
-              cursor: "pointer",
-              border: "none"
-            }}
-          >
-            تسجيل الدخول (بالـ PIN) 🔐
-          </button>
           <button
             type="button"
             onClick={() => { setAuthMode("register"); setErrorMsg(""); }}
@@ -2526,6 +2610,24 @@ export default function SystemPage() {
             }}
           >
             تسجيل طالب جديد 📝
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMode("login"); setErrorMsg(""); }}
+            className="btn-compact"
+            style={{
+              flex: 1,
+              padding: "10px",
+              borderRadius: "8px",
+              background: authMode === "login" ? "#2563eb" : "transparent",
+              color: authMode === "login" ? "#fff" : "#94a3b8",
+              fontWeight: "bold",
+              fontSize: "13px",
+              cursor: "pointer",
+              border: "none"
+            }}
+          >
+            تسجيل الدخول (بالـ PIN) 🔐
           </button>
         </div>
 
@@ -2605,6 +2707,40 @@ export default function SystemPage() {
                   ✓ {matchedStudent.full_name} • {matchedStudent.academic_year} (سكشن {matchedStudent.section || 'عام'})
                 </div>
               )}
+              {lookupStatus?.isAlreadyActive && (
+                <div style={{ background: "rgba(234, 179, 8, 0.15)", border: "1px solid #eab308", color: "#fef08a", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⚠️ هذا الطالب مسجل ومفعل بالفعل على المنظومة!</div>
+                  <div style={{ fontSize: "11px", color: "#fef9c3", marginBottom: "8px" }}>لا داعي لإعادة التسجيل، يمكنك تسجيل الدخول مباشرة برقمك السري.</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setErrorMsg("");
+                    }}
+                    style={{ background: "#eab308", color: "#000", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
+                  >
+                    الانتقال لتسجيل الدخول مباشرة 🔐
+                  </button>
+                </div>
+              )}
+              {lookupStatus?.isPending && (
+                <div style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid #38bdf8", color: "#bae6fd", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⏳ حسابك مسجل وبانتظار تفعيل المنسق</div>
+                  <div style={{ fontSize: "11px", color: "#e0f2fe", marginBottom: "8px" }}>تم رفع بياناتك المسبقة وهي بانتظار اعتماد المنسق.</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (matchedStudent) {
+                        setCurrentStudent(matchedStudent);
+                        setAccountStatus("pending");
+                      }
+                    }}
+                    style={{ background: "#38bdf8", color: "#000", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
+                  >
+                    عرض شاشة التفعيل والمنسقين 🔍
+                  </button>
+                </div>
+              )}
               {lookupMessage && (
                 <div style={{ color: "#f87171", fontSize: "11px", marginTop: "4px" }}>{lookupMessage}</div>
               )}
@@ -2639,7 +2775,7 @@ export default function SystemPage() {
             {/* تصوير بطاقة الهوية القومية */}
             <div style={{ marginBottom: "18px" }}>
               <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                صورة بطاقة الرقم القومي (لتأكيد الهوية):
+                صورة بطاقة الرقم القومي أو كارنيه الكلية (إجباري لتأكيد الهوية): *
               </label>
               {idCardPhoto ? (
                 <div style={{ position: "relative", height: "130px", borderRadius: "10px", overflow: "hidden", border: "2px solid #10b981", background: "#000" }}>
@@ -2677,7 +2813,7 @@ export default function SystemPage() {
 
             <button
               type="submit"
-              disabled={loading || !regCode || !regMobile}
+              disabled={loading || !regCode || !regMobile || !idCardPhoto}
               style={{
                 width: "100%",
                 padding: "12px",
@@ -2731,6 +2867,124 @@ export default function SystemPage() {
               }}
               style={{ width: "60px", height: "60px", borderRadius: "50%", background: "#fff", border: "4px solid #38bdf8", cursor: "pointer", margin: "0 auto" }}
             />
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تثبيت تطبيق فنية لطلاب الأندرويد والهواتف الذكية */}
+      {showPwaPrompt && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          background: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(6px)",
+          zIndex: 999999,
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "center",
+          padding: "16px",
+          direction: "rtl"
+        }}>
+          <div className="animate-fade-in" style={{
+            width: "100%",
+            maxWidth: "420px",
+            background: "linear-gradient(180deg, #182235, #0d131f)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            borderRadius: "20px",
+            padding: "24px 20px",
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
+            textAlign: "center"
+          }}>
+            <div style={{
+              width: "64px",
+              height: "64px",
+              borderRadius: "18px",
+              overflow: "hidden",
+              margin: "0 auto 14px",
+              boxShadow: "0 8px 25px rgba(37, 99, 235, 0.5)",
+              border: "2px solid #38bdf8"
+            }}>
+              <img src="/icon-192.png" alt="فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+
+            <h3 style={{ fontSize: "20px", fontWeight: "900", color: "#fff", margin: "0 0 6px" }}>
+              قم بتثبيت تطبيق فنية 📱
+            </h3>
+            <div style={{ color: "#38bdf8", fontSize: "13px", fontWeight: "bold", marginBottom: "16px" }}>
+              لمتابعة حضورك وتقييماتك بشكل دائم
+            </div>
+
+            <div style={{ background: "rgba(255, 255, 255, 0.04)", padding: "12px 14px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "18px", textAlign: "right", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.9" }}>
+              <div>⚡ <b>وصول فوري:</b> بنقرة واحدة من شاشتك الرئيسية دون الحاجة للرابط.</div>
+              <div>🔔 <b>إشعارات حية:</b> متابعة فورية لدرجات التقييم والغياب.</div>
+              <div>📷 <b>كاميرا ذكية:</b> رفع ومزامنة الأعمال الفنية ثلاثية وثنائية الأبعاد.</div>
+            </div>
+
+            {pwaHintVisible && (
+              <div style={{ background: "rgba(245, 158, 11, 0.15)", border: "1px solid #f59e0b", color: "#fbbf24", padding: "10px", borderRadius: "10px", fontSize: "12px", marginBottom: "14px" }}>
+                💡 اضغط على قائمة المتصفح (الثلاث نقاط ⋮ أعلى الشاشة) ثم اختر <b>"تثبيت التطبيق"</b> أو <b>"إضافة إلى الشاشة الرئيسية"</b>.
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const choice = await deferredPrompt.userChoice;
+                    if (choice.outcome === "accepted") {
+                      setShowPwaPrompt(false);
+                      sessionStorage.setItem("pwa_install_dismissed", "1");
+                    }
+                    setDeferredPrompt(null);
+                  } else {
+                    setPwaHintVisible(true);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "13px",
+                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 15px rgba(37, 99, 235, 0.4)"
+                }}
+              >
+                <span>تثبيت التطبيق الآن 📱</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPwaPrompt(false);
+                  sessionStorage.setItem("pwa_install_dismissed", "1");
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  background: "transparent",
+                  color: "#94a3b8",
+                  border: "1px solid #334155",
+                  borderRadius: "12px",
+                  fontSize: "13px",
+                  cursor: "pointer"
+                }}
+              >
+                المتابعة عبر المتصفح 🌐
+              </button>
+            </div>
           </div>
         </div>
       )}

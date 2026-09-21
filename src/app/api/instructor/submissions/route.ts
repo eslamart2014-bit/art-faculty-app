@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const courseId = searchParams.get('course_id');
   const projectName = searchParams.get('project_name');
   const searchQuery = (searchParams.get('q') || '').trim();
+  const includeGraduates = searchParams.get('include_graduates') === 'true';
 
   try {
     // 1. استرجاع قائمة الأساتذة والمعيدين (إذا لم يُحدد معيد أو لطلب القائمة)
@@ -61,6 +62,10 @@ export async function GET(request: Request) {
       let stQuery = supabaseAdmin
         .from('students')
         .select('id, full_name, student_code, academic_year, section');
+
+      if (!includeGraduates) {
+        stQuery = stQuery.eq('is_active', true);
+      }
 
       // حصر البحث في الفرق الدراسية المسندة للمعيد ما لم يكن مديراً
       if (!isAdmin && myAcademicYears.length > 0) {
@@ -202,6 +207,18 @@ export async function GET(request: Request) {
           });
         }
       } catch (e) {}
+    }
+
+    // عزل صور وأعمال الخريجين واستبعادهم من العرض ما لم يتم طلبهم صراحة
+    if (!includeGraduates && submissions.length > 0) {
+      const studentCodes = Array.from(new Set(submissions.map(s => s.student_code)));
+      const { data: activeStudents } = await supabaseAdmin
+        .from('students')
+        .select('student_code')
+        .in('student_code', studentCodes)
+        .eq('is_active', true);
+      const activeCodeSet = new Set((activeStudents || []).map(s => s.student_code));
+      submissions = submissions.filter(s => activeCodeSet.has(s.student_code));
     }
 
     return NextResponse.json({

@@ -17,9 +17,23 @@ export async function POST(request: Request) {
       device_info,
     } = body;
 
-    if (!student_code || !mobile) {
+    if (!student_code || !student_code.trim()) {
       return NextResponse.json(
-        { error: 'يرجى إدخال كود الطالب ورقم الموبايل بشكل صحيح' },
+        { error: 'يرجى إدخال كود الطالب الجامعي' },
+        { status: 400 }
+      );
+    }
+
+    if (!mobile || !mobile.trim()) {
+      return NextResponse.json(
+        { error: 'يرجى إدخال رقم الموبايل للتواصل' },
+        { status: 400 }
+      );
+    }
+
+    if (!id_card_image || (!id_card_image.startsWith('data:image') && !id_card_image.startsWith('http'))) {
+      return NextResponse.json(
+        { error: 'صورة بطاقة الرقم القومي أو كارنيه الكلية إجبارية لإتمام التسجيل' },
         { status: 400 }
       );
     }
@@ -76,7 +90,10 @@ export async function POST(request: Request) {
     if (id_card_image && id_card_image.startsWith('data:image')) {
       const uploadRes = await uploadImageToStorage(
         id_card_image,
-        `بطاقة هوية الطالب: ${studentRecord.full_name} (${studentRecord.student_code})`
+        `بطاقة هوية الطالب: ${studentRecord.full_name} (${studentRecord.student_code})`,
+        undefined,
+        undefined,
+        `id_cards/${studentRecord.student_code}_${Date.now()}.webp`
       );
       if (uploadRes.success) {
         idCardUrl = uploadRes.url;
@@ -159,7 +176,7 @@ export async function POST(request: Request) {
         academic_year: studentRecord.academic_year,
         section: studentRecord.section || 'عام',
       },
-      message: 'تم تسجيل بياناتك المبدئية بنجاح، يرجى التوجه لأحد منسقي النظام للحصول على الرقم السري.',
+      message: 'تم تسجيل بياناتك المبدئية بنجاح! يرجى مراجعة منسق المنظومة لتفعيل حسابك.',
     });
   } catch (err: any) {
     console.error('Registration server error:', err);

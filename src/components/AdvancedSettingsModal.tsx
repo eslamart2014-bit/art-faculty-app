@@ -252,6 +252,33 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
     setLoading(false);
   };
 
+  const handleClearTelegramDb = async () => {
+    if (!confirm("⚠️ تحذير: هل أنت متأكد من تفريغ كافة بيانات وسجلات التليجرام بالكامل من قاعدة البيانات؟\nسيتم حذف جميع المعرفات والربط القديم نهائياً.")) return;
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+      const res = await fetch('/api/admin/telegram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'clear_telegram_db' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("✅ " + data.message);
+      } else {
+        alert("خطأ: " + (data.error || "فشل التفريغ"));
+      }
+    } catch (e: any) {
+      alert("حدث خطأ في الاتصال: " + e?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleScanner = () => {
     setIsScanning(!isScanning);
   };
@@ -968,6 +995,28 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                   style={{ background: "#7B1FA2", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
                 >
                   ⚙️ لوحة الإدارة
+                </button>
+              </div>
+            )}
+
+            {/* Clear Telegram Database Card */}
+            {user?.role === "مدير" && (
+              <div style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px dashed rgba(239, 68, 68, 0.4)", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ background: "rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                    🧹
+                  </div>
+                  <div>
+                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>تفريغ قاعدة بيانات التليجرام بالكامل</div>
+                    <div style={{ color: "#f87171", fontSize: "12px" }}>مسح وتصفير كافة معرفات التليجرام وسجلات البوت القديمة من الجداول.</div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleClearTelegramDb}
+                  disabled={loading}
+                  style={{ background: "#ef4444", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer" }}
+                >
+                  {loading ? "جاري التفريغ..." : "تفريغ الآن 🗑️"}
                 </button>
               </div>
             )}
