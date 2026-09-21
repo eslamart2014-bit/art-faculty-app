@@ -412,7 +412,7 @@ export default function SystemPage() {
           if (found) {
             const sub = found.submission || (c.submissions || []).find((s: any) => (s.project_name || '').trim() === (found.title || '').trim());
             const ev = found.evaluation;
-            const isGraded = (ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score))) || (found.score !== null && found.score !== undefined && !isNaN(Number(found.score)) && found.status === 'evaluated');
+            const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (found.score !== null && found.score !== undefined && !isNaN(Number(found.score)) && Number(found.score) > 0 && found.status === 'evaluated'));
             const score = isGraded ? (ev?.score ?? found.score) : null;
             const isSubmitted = isGraded || found.status === 'submitted' || found.status === 'evaluated' || !!sub || !!(ev?.photo_url);
 
@@ -421,7 +421,7 @@ export default function SystemPage() {
               courseId: c.courseId,
               courseName: c.courseName,
               academicYear: c.academicYear,
-              instructorTitle: c.instructorTitle || "أستاذ / معيد المقرر",
+              instructorTitle: c.instructorTitle || "أستاذ المقرر",
               instructorName: c.instructorName,
               submission: sub,
               evaluation: ev,
@@ -748,6 +748,8 @@ export default function SystemPage() {
               ...prev,
               status: "submitted",
               isSubmitted: true,
+              isGraded: false,
+              score: null,
               submission: newSubObj
             };
           }
@@ -1178,7 +1180,7 @@ export default function SystemPage() {
       (course.assignedProjects || []).forEach((proj: any) => {
         const sub = proj.submission || (course.submissions || []).find((s: any) => (s.project_name || '').trim() === (proj.title || '').trim());
         const ev = proj.evaluation;
-        const isGraded = (ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score))) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && proj.status === 'evaluated');
+        const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
         const score = isGraded ? (ev?.score ?? proj.score) : null;
         const isSubmitted = isGraded || proj.status === 'submitted' || proj.status === 'evaluated' || !!sub || !!(ev?.photo_url);
 
@@ -1187,7 +1189,7 @@ export default function SystemPage() {
           courseId: course.courseId,
           courseName: course.courseName,
           academicYear: course.academicYear,
-          instructorTitle: course.instructorTitle || "أستاذ / معيد المقرر",
+          instructorTitle: course.instructorTitle || "أستاذ المقرر",
           instructorName: course.instructorName,
           submission: sub,
           evaluation: ev,
@@ -1521,7 +1523,7 @@ export default function SystemPage() {
                             </span>
                           </div>
 
-                          {/* بيانات المقرر والمعيد/الأستاذ */}
+                          {/* بيانات المقرر وأستاذ المقرر */}
                           <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "12px" }}>
                             <div style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: "6px" }}>
                               <span style={{ color: "#38bdf8" }}>📚</span>
@@ -1529,7 +1531,7 @@ export default function SystemPage() {
                             </div>
                             <div style={{ color: "#94a3b8", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
                               <span>👨‍🏫</span>
-                              <span>{proj.instructorTitle}</span>
+                              <span>أستاذ المقرر: <b style={{ color: "#fff" }}>{proj.instructorTitle}</b></span>
                             </div>
                           </div>
 
@@ -1674,7 +1676,7 @@ export default function SystemPage() {
                     padding: "12px"
                   }}>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>أستاذ / معيد المقرر:</div>
+                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>أستاذ المقرر:</div>
                       <div style={{ color: "#fff", fontSize: "12px", fontWeight: "bold", marginTop: "2px" }}>
                         👨‍🏫 {selectedProjectForView.instructorTitle}
                       </div>
@@ -1795,8 +1797,8 @@ export default function SystemPage() {
                         </div>
                       )}
 
-                      {/* مربع تقييم الدرجة */}
-                      {selectedProjectForView.isGraded && (
+                      {/* مربع تقييم الدرجة أو انتظار التقييم */}
+                      {selectedProjectForView.isGraded ? (
                         <div style={{
                           background: "linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15))",
                           border: "2px solid #10b981",
@@ -1821,6 +1823,25 @@ export default function SystemPage() {
                               ملاحظات الأستاذ: {selectedProjectForView.evaluation.notes}
                             </div>
                           )}
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: "rgba(56, 189, 248, 0.08)",
+                          border: "1px solid rgba(56, 189, 248, 0.3)",
+                          borderRadius: "14px",
+                          padding: "16px",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px"
+                        }}>
+                          <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                            <span>⏳</span>
+                            <span>قيد التقييم (بانتظار رصد الدرجة)</span>
+                          </div>
+                          <div style={{ color: "#94a3b8", fontSize: "12px", lineHeight: "1.5" }}>
+                            تم استلام وحفظ عملك الفني بنجاح بالسحابة، والعمل الآن بانتظار المراجعة والتقييم ورصد الدرجة من قِبل أستاذ المقرر.
+                          </div>
                         </div>
                       )}
 

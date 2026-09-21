@@ -292,7 +292,7 @@ export default function InstructorPage() {
           <div style="background: rgba(59, 130, 246, 0.15); border-radius: 8px; padding: 12px; margin: 12px 0;">
             <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 4px;">المقرر: ${courseObj?.name || ""}</div>
             <div style="font-size: 13px; color: #34d399; font-weight: bold;">المشروع: ${selectedProjectName}</div>
-            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">أستاذ / معيد المقرر: ${selectedInstructor?.full_name || ""}</div>
+            <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">أستاذ المقرر: ${selectedInstructor?.full_name || ""}</div>
           </div>
           <div style="font-size: 11px; color: #94a3b8; margin-top: 15px;">
             إجمالي الأعمال: ${submissions.length} عمل • تاريخ التصدير: ${new Date().toLocaleDateString("ar-EG")}

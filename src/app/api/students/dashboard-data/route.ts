@@ -16,24 +16,35 @@ function normalizeArabic(str: string = ''): string {
 }
 
 function formatInstructorTitle(profile: any): string {
-  if (!profile) return 'أستاذ / معيد المقرر';
+  if (!profile) return 'أستاذ المقرر';
   const name = (profile.full_name || '').trim();
   const degree = (profile.degree || '').trim();
   const role = (profile.role || '').trim();
 
-  let prefix = '';
-  if (name.startsWith('د.') || name.startsWith('د/') || name.startsWith('أ.د') || name.startsWith('م.') || name.startsWith('م/')) {
-    prefix = '';
-  } else if (degree.includes('دكتور') || degree.includes('أستاذ') || role.includes('مدرس') || role.includes('دكتور')) {
-    prefix = 'د. ';
-  } else if (role.includes('معيد') || degree.includes('معيد')) {
-    prefix = 'م. ';
-  } else if (role.includes('مساعد') || degree.includes('مساعد')) {
-    prefix = 'م.م. ';
+  // If already starts with title prefix
+  if (/^(د\/|د\.|أ\.د\/|أ\.د\.|م\/|م\.|م\.م\/|م\.م\.|أ\/)/.test(name)) {
+    return name;
   }
 
-  const degLabel = degree || (role.includes('معيد') ? 'معيد' : (role.includes('مدرس') ? 'مدرس' : 'مدرس المقرر'));
-  return `${prefix}${name} (${degLabel})`;
+  const d = degree.toLowerCase().trim();
+  const r = role.toLowerCase().trim();
+
+  let prefix = '';
+  if (d.includes('أستاذ دكتور') || d.includes('ا.د') || d.includes('أ.د')) {
+    prefix = 'أ.د/ ';
+  } else if (d.includes('دكتور') || d === 'د' || d === 'د.' || (r.includes('مدرس') && !r.includes('مساعد')) || r.includes('دكتور')) {
+    prefix = 'د/ ';
+  } else if (d.includes('مدرس مساعد') || d === 'م.م' || d === 'م.م.' || r.includes('مساعد')) {
+    prefix = 'م.م/ ';
+  } else if (d.includes('معيد') || d === 'م' || d === 'م.' || r.includes('معيد') || d.includes('مهندس')) {
+    prefix = 'م/ ';
+  } else if (d.includes('أستاذ') || d.includes('استاذ')) {
+    prefix = 'أ/ ';
+  } else {
+    prefix = 'أ/ ';
+  }
+
+  return `${prefix}${name}`.trim();
 }
 
 export async function GET(request: Request) {
@@ -276,8 +287,13 @@ export async function GET(request: Request) {
           const hasPhotoUrl = !!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null');
           const hasValidImage = hasSubImages || hasPhotoUrl;
 
-          const isGraded = ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0;
+          const isGraded = !!(ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0);
           const isSubmitted = isGraded || (hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated'));
+
+          const safeEval = ev ? {
+            ...ev,
+            score: isGraded ? Number(ev.score) : null
+          } : null;
 
           return {
             id: proj.id || pTitle,
@@ -286,7 +302,9 @@ export async function GET(request: Request) {
             cameraMode,
             requiredPhotos,
             submission: hasValidImage ? (sub || (ev?.photo_url ? { id: ev.id, images: [{ url: ev.photo_url }], project_name: pTitle, status: isGraded ? 'evaluated' : 'submitted' } : null)) : null,
-            evaluation: ev || null,
+            evaluation: safeEval,
+            score: isGraded ? Number(ev.score) : null,
+            isGraded,
             status: isGraded ? 'evaluated' : (isSubmitted ? 'submitted' : 'pending'),
           };
         });

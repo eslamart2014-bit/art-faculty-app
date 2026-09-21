@@ -148,11 +148,22 @@ export async function POST(request: Request) {
         .eq('id', course_id)
         .maybeSingle();
 
+      // فحص ما إذا كان هناك تقييم سابق من أستاذ المقرر للاحتفاظ بدرجته
+      const { data: existingEval } = await supabaseAdmin
+        .from('evaluations')
+        .select('score')
+        .eq('course_id', course_id)
+        .eq('student_id', studentRecord.id)
+        .eq('project_name', project_name)
+        .maybeSingle();
+
+      const existingScore = (existingEval && existingEval.score !== null && existingEval.score !== undefined) ? existingEval.score : null;
+
       await supabaseAdmin.from('evaluations').upsert({
         course_id,
         student_id: studentRecord.id,
         project_name,
-        score: 0,
+        score: existingScore,
         teacher_id: courseData?.teacher_id || null,
         photo_url: primaryPhotoUrl,
         ai_status: processedImages[0]?.dhash ? `hash:${processedImages[0].dhash}` : 'submitted_via_portal',

@@ -1,5 +1,5 @@
-// Service Worker v3.6.0 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.0';
+// Service Worker v3.6.1 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.1';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -11,7 +11,7 @@ const CORE_ASSETS = [
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3.6.0...');
+  console.log('[SW] Installing v3.6.1...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
