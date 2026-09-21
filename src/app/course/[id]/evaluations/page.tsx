@@ -840,19 +840,57 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // --- CANCEL / DELETE ARTWORK & RESET TELEGRAM ---
-  const cancelArtwork = async (evalId: string) => {
-    if (!confirm("هل أنت متأكد من إلغاء وحذف عمل هذا الطالب؟ سيتمكن الطالب من فتح الكاميرا وإعادة تصوير لوحته مجدداً.")) return;
-    
-    await supabase.from("evaluations").update({ photo_url: null, ai_status: null, score: 0 }).eq("id", evalId);
-    alert("✅ تم إلغاء العمل وحذفه بنجاح. يمكن للطالب الآن إعادة الرفع.");
-    if (targetStudent) {
-      setTargetStudent({ ...targetStudent, evalRecord: null });
+  // --- CANCEL / DELETE ARTWORK & RESET FOR RETAKE ---
+  const cancelArtwork = async (evalId?: string, studentToCancel?: any) => {
+    const student = studentToCancel || targetStudent || activeScannedStudent?.student;
+    if (!student || !selectedProject) {
+      alert("تعذر تحديد بيانات الطالب أو المشروع لإلغاء العمل.");
+      return;
     }
-    if (activeScannedStudent) {
-      setActiveScannedStudent({ ...activeScannedStudent, evalRecord: null });
+
+    if (!confirm(`هل أنت متأكد من إلغاء وحذف عمل الطالب (${student.full_name})؟\nسيتم حذف الصورة وتصفير الدرجة نهائياً، وسيتمكن الطالب من فتح الكاميرا في بوابته وإعادة تصوير لوحته مجدداً.`)) return;
+
+    try {
+      // 1. استدعاء API إعادة التصوير وحذف التسليم من السحابة وقواعد البيانات
+      const res = await fetch("/api/instructor/allow-retake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instructor_id: course?.teacher_id,
+          student_code: student.student_code,
+          course_id: course.id,
+          project_name: selectedProject.name
+        })
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "فشل إلغاء العمل");
+      }
+
+      // 2. تحديث جدول evaluations محلياً وتصفير الدرجة لـ null
+      if (evalId) {
+        await supabase.from("evaluations").update({ photo_url: null, ai_status: null, score: null }).eq("id", evalId);
+      } else if (student.id) {
+        await supabase.from("evaluations").update({ photo_url: null, ai_status: null, score: null })
+          .eq("student_id", student.id)
+          .eq("course_id", course.id)
+          .eq("project_name", selectedProject.name);
+      }
+
+      alert("✅ تم إلغاء العمل وحذفه بالكامل بنجاح!\nيمكن للطالب الآن فتح الكاميرا في بوابته وإعادة تصوير العمل.");
+
+      setManualScore("");
+      if (targetStudent && targetStudent.id === student.id) {
+        setTargetStudent({ ...targetStudent, evalRecord: null });
+      }
+      if (activeScannedStudent && activeScannedStudent.student.id === student.id) {
+        setActiveScannedStudent({ ...activeScannedStudent, evalRecord: null, score: null });
+      }
+      fetchStats(course);
+    } catch (e: any) {
+      alert("خطأ أثناء إلغاء العمل: " + e.message);
     }
-    fetchStats(course);
   };
 
   const resetTelegramLink = async (studentId: string, studentName: string) => {
@@ -1056,7 +1094,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                     <div>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "4px" }}>
                         <span style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
-                          ✅ تم رفع العمل عبر البوت
+                          ✅ تم رفع العمل على نظام فنية
                         </span>
                         <span style={{ color: "#888", fontSize: "11px" }}>
                           ⏱️ {formatRelativeTimeArabic(targetStudent.evalRecord.created_at)}
@@ -1075,10 +1113,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
                       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", gap: "8px" }}>
                         <button 
-                          onClick={() => cancelArtwork(targetStudent.evalRecord.id)}
+                          onClick={() => cancelArtwork(targetStudent.evalRecord?.id, targetStudent)}
                           style={{ width: "auto", margin: 0, background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", flex: 1 }}
                         >
-                          🗑️ إلغاء واعتماد إعادة الرفع
+                          🗑️ إلغاء واعتماد إعادة التصوير
                         </button>
                         
                         <button 
@@ -1291,18 +1329,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div style={{ color: "#4CAF50", fontSize: "12px", fontWeight: "bold" }}>
-                          ✅ تم رفع العمل عبر البوت
+                          ✅ تم رفع العمل على نظام فنية
                         </div>
                         <div style={{ color: "#888", fontSize: "10px", marginTop: "2px" }}>
                           ⏱️ {formatRelativeTimeArabic(activeScannedStudent.evalRecord.created_at)}
                         </div>
                       </div>
-                      <button 
-                        onClick={() => openZoomImage(activeScannedStudent.evalRecord.photo_url)}
-                        style={{ width: "auto", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
-                      >
-                        🖼️ معاينة وتكبير
-                      </button>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <button 
+                          onClick={() => cancelArtwork(activeScannedStudent.evalRecord?.id, activeScannedStudent.student)}
+                          style={{ width: "auto", margin: 0, background: "rgba(244, 67, 54, 0.15)", color: "#f44336", border: "1px solid #f44336", padding: "5px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          🗑️ إعادة تصوير
+                        </button>
+                        <button 
+                          onClick={() => openZoomImage(activeScannedStudent.evalRecord.photo_url)}
+                          style={{ width: "auto", margin: 0, background: "#2196F3", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer" }}
+                        >
+                          🖼️ معاينة وتكبير
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div style={{ color: "#aaa", fontSize: "11px", textAlign: "center" }}>
