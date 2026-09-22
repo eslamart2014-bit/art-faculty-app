@@ -26,7 +26,6 @@ import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
 import { compressImageToWebP } from "@/lib/imageCompressor";
 import StudentLockerTab from "@/components/lockers/StudentLockerTab";
-import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 export default function SystemPage() {
   // Navigation & Auth State
@@ -77,24 +76,6 @@ export default function SystemPage() {
 
   // 1. Initial Load: Check cached session & fetch coordinators
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("fania_last_portal", "/system");
-        localStorage.setItem("fania_app_mode", "student");
-        let mLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
-        if (mLink) {
-          mLink.href = "/manifest-student.json";
-        } else {
-          mLink = document.createElement("link");
-          mLink.rel = "manifest";
-          mLink.href = "/manifest-student.json";
-          document.head.appendChild(mLink);
-        }
-      } catch (e) {
-        console.error("Manifest/localStorage update error:", e);
-      }
-    }
-
     fetchCoordinators();
 
     const cachedStudent = localStorage.getItem("fania_student_session");
@@ -598,8 +579,6 @@ export default function SystemPage() {
         <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px" }}>
           بوابة طلاب فنية • نظام التربية الفنية الجديد
         </div>
-
-        <PwaInstallPrompt />
       </div>
     );
   }
@@ -1064,7 +1043,6 @@ export default function SystemPage() {
           </div>
         )}
 
-        <PwaInstallPrompt />
       </div>
     );
   }
@@ -1078,18 +1056,9 @@ export default function SystemPage() {
       <div>
         {/* زر العودة للصفحة الرئيسية */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-          <Link 
-            href="/?mode=faculty" 
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("fania_last_portal");
-                localStorage.setItem("fania_app_mode", "faculty");
-              }
-            }}
-            style={{ color: "#94a3b8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px" }}
-          >
+          <Link href="/" style={{ color: "#94a3b8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px" }}>
             <ChevronLeft size={16} />
-            <span>العودة لبوابة الأساتذة</span>
+            <span>العودة لبوابة فنية</span>
           </Link>
           <span style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold" }}>نظام فنية التفاعلي</span>
         </div>
@@ -1334,7 +1303,6 @@ export default function SystemPage() {
         نظام فنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن
       </div>
 
-      <PwaInstallPrompt />
     </div>
   );
 }

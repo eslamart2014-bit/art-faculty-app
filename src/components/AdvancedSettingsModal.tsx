@@ -401,6 +401,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
           { id: "search", label: "البحث الشامل 🔍", color: "#38bdf8" },
           { id: "roster", label: "كشوف الطلاب 📋", color: "#00BCD4" },
           { id: "portal", label: "بوابة الطلاب والأمان 🎓", color: "#f59e0b" },
+          { id: "lockers", label: "بوابة الدواليب 🗄️", color: "#6366f1" },
           { id: "shares", label: "طلبات المشاركة 🤝", color: "#10b981" },
           { id: "maintenance", label: "وضع الصيانة 🚧", color: "#ef4444" },
         ].map(t => {
@@ -1022,6 +1023,11 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
               </div>
             )}
           </div>
+        )}
+
+        {/* Lockers Tab */}
+        {activeTab === "lockers" && (
+          <LockerAdminTab />
         )}
 
         </div>
