@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import QRScanner from "@/components/QRScanner";
 
-import { Html5QrcodeScanner } from "html5-qrcode";
 import { extractStudentCode } from "@/lib/scannerHelper";
 import LockerAdminTab from "./lockers/LockerAdminTab";
 
@@ -281,6 +280,9 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
   };
 
   const toggleScanner = () => {
+    if (isScanning && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(0);
+    }
     setIsScanning(!isScanning);
   };
 
@@ -525,10 +527,19 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
               </div>
 
               {isScanning && (
-                <div style={{ marginBottom: "20px" }}>
-                  <div style={{ background: "black", borderRadius: "10px", overflow: "hidden", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <QRScanner onScan={(result) => { if(result) { performGlobalSearch(extractStudentCode(result)); setIsScanning(false); } }} />
-                  </div>
+                <div style={{ marginBottom: "20px", borderRadius: "14px", overflow: "hidden" }}>
+                  <QRScanner 
+                    onScan={(result) => { 
+                      const clean = extractStudentCode(result) || result.trim();
+                      if(clean) { 
+                        performGlobalSearch(clean); 
+                        setIsScanning(false); 
+                      } 
+                    }} 
+                    onClose={() => setIsScanning(false)}
+                    height="280px"
+                    title="ماسح بطاقة الطالب"
+                  />
                 </div>
               )}
 

@@ -48,8 +48,12 @@ function ScannerContent() {
   return (
     <div style={{ background: "#111", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
       <h2 style={{ color: "#fff", marginBottom: "20px" }}>قم بمسح كود الطالب</h2>
-      <div style={{ width: "90%", maxWidth: "400px", borderRadius: "20px", overflow: "hidden", border: "4px solid #4CAF50" }}>
-        <QRScanner onScan={handleScan} />
+      <div style={{ width: "92%", maxWidth: "380px", borderRadius: "20px", overflow: "hidden" }}>
+        <QRScanner 
+          onScan={handleScan} 
+          title="مسح بطاقة الطالب"
+          height="320px"
+        />
       </div>
       <p style={{ color: "#aaa", marginTop: "20px", fontSize: "14px", textAlign: "center", padding: "0 20px" }}>
         {crs && proj ? `إضافة عمل لمشروع: ${proj}` : 'البحث العام عن طالب'}

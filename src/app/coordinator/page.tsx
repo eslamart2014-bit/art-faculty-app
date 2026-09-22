@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatStudentCode } from "@/lib/codeHelper";
-import { Html5Qrcode } from "html5-qrcode";
+import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
 
 export default function CoordinatorPortalPage() {
@@ -28,7 +28,14 @@ export default function CoordinatorPortalPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [activatingAnim, setActivatingAnim] = useState(false);
   const [showActiveDetails, setShowActiveDetails] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(0);
+      }
+    };
+  }, []);
 
   // التحقق من صلاحية المستخدم كمنسق
   useEffect(() => {
@@ -186,43 +193,11 @@ export default function CoordinatorPortalPage() {
   // تشغيل ماسح الـ QR بكاميرا الهاتف
   const startScanner = () => {
     setIsScanning(true);
-    setTimeout(() => {
-      try {
-        const scanner = new Html5Qrcode("qr-reader-container", {
-          useBarCodeDetectorIfSupported: true,
-          verbose: false
-        });
-        scannerRef.current = scanner;
-        scanner.start(
-          { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-          (decodedText) => {
-            const extracted = extractStudentCode(decodedText);
-            if (extracted) {
-              setSearchCode(extracted);
-              stopScanner();
-              handleLookup(extracted);
-            }
-          },
-          () => {}
-        ).catch(err => {
-          console.warn(err);
-          alert("تعذر فتح الكاميرا للمسح، يرجى التأكد من منح الإذن.");
-          setIsScanning(false);
-        });
-      } catch (e) {
-        console.error(e);
-        setIsScanning(false);
-      }
-    }, 150);
   };
 
   const stopScanner = () => {
-    if (scannerRef.current) {
-      try {
-        scannerRef.current.stop().then(() => scannerRef.current?.clear()).catch(() => {});
-      } catch (e) {}
-      scannerRef.current = null;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(0);
     }
     setIsScanning(false);
   };
@@ -304,17 +279,21 @@ export default function CoordinatorPortalPage() {
 
         {/* حاوية الكاميرا لمسح QR */}
         {isScanning && (
-          <div style={{ position: "relative", marginBottom: "16px", borderRadius: "14px", overflow: "hidden", border: "2px solid #10b981", background: "#000" }}>
-            <div id="qr-reader-container" style={{ width: "100%" }}></div>
-            <div style={{ padding: "8px", background: "rgba(0,0,0,0.8)", textAlign: "center", color: "#10b981", fontSize: "12px", fontWeight: "bold" }}>
-              وجه الكاميرا نحو كود بطاقة الطالب لمسحه فوراً...
-            </div>
-            <button 
-              onClick={stopScanner}
-              style={{ position: "absolute", top: "8px", left: "8px", background: "rgba(239,68,68,0.8)", border: "none", color: "#fff", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
-            >
-              إغلاق الكاميرا ✕
-            </button>
+          <div style={{ marginBottom: "16px", borderRadius: "14px", overflow: "hidden" }}>
+            <QRScanner 
+              onScan={(decodedText) => {
+                const extracted = extractStudentCode(decodedText) || decodedText.trim();
+                if (extracted) {
+                  setSearchCode(extracted);
+                  stopScanner();
+                  handleLookup(extracted);
+                }
+              }}
+              onClose={stopScanner}
+              height="260px"
+              compact={true}
+              title="ماسح بطاقة الطالب"
+            />
           </div>
         )}
 

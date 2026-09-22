@@ -77,6 +77,15 @@ export default function InstructorPage() {
       }
     } catch (e) {}
 
+    return () => {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(0);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+
     import("@/lib/supabase").then(({ supabase }) => {
       supabase.auth.getUser().then(({ data: { user } }) => {
         if (user) {
@@ -947,23 +956,22 @@ export default function InstructorPage() {
             </div>
 
             {isCameraOpen && (
-              <div style={{ marginTop: "14px", background: "#000", borderRadius: "14px", overflow: "hidden", border: "2px solid #2563eb", padding: "10px", textAlign: "center" }}>
-                <div style={{ color: "#38bdf8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
-                  وجه الكاميرا نحو باركود QR الخاص بالطالب للبحث التلقائي الفوري
-                </div>
-                <div style={{ width: "100%", maxWidth: "320px", height: "260px", margin: "0 auto", borderRadius: "10px", overflow: "hidden" }}>
-                  <QRScanner
-                    onScan={(decoded) => {
-                      const code = extractStudentCode(decoded);
-                      if (code) {
-                        setSearchQuery(code);
-                        setIsCameraOpen(false);
-                        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(100);
-                        executeStudentSearch(code);
-                      }
-                    }}
-                  />
-                </div>
+              <div style={{ marginTop: "14px", borderRadius: "14px", overflow: "hidden" }}>
+                <QRScanner
+                  onScan={(decoded) => {
+                    const code = extractStudentCode(decoded) || decoded.trim();
+                    if (code) {
+                      setSearchQuery(code);
+                      setIsCameraOpen(false);
+                      if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(80);
+                      executeStudentSearch(code);
+                    }
+                  }}
+                  onClose={() => setIsCameraOpen(false)}
+                  title="ماسح بطاقة الطالب"
+                  height="260px"
+                  compact={true}
+                />
               </div>
             )}
             <div style={{ color: "#64748b", fontSize: "11px", marginTop: "8px" }}>
