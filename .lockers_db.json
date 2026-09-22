@@ -1,0 +1,1656 @@
+{
+  "lockers": [
+    {
+      "id": "L_A1",
+      "locker_code": "A1",
+      "letter": "A",
+      "number": 1,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null,
+      "is_admin_reserved": false,
+      "notes": "",
+      "updated_at": "2026-09-22T02:56:01.609Z"
+    },
+    {
+      "id": "L_A2",
+      "locker_code": "A2",
+      "letter": "A",
+      "number": 2,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A3",
+      "locker_code": "A3",
+      "letter": "A",
+      "number": 3,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A4",
+      "locker_code": "A4",
+      "letter": "A",
+      "number": 4,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A5",
+      "locker_code": "A5",
+      "letter": "A",
+      "number": 5,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A6",
+      "locker_code": "A6",
+      "letter": "A",
+      "number": 6,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A7",
+      "locker_code": "A7",
+      "letter": "A",
+      "number": 7,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A8",
+      "locker_code": "A8",
+      "letter": "A",
+      "number": 8,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A9",
+      "locker_code": "A9",
+      "letter": "A",
+      "number": 9,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A10",
+      "locker_code": "A10",
+      "letter": "A",
+      "number": 10,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A11",
+      "locker_code": "A11",
+      "letter": "A",
+      "number": 11,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A12",
+      "locker_code": "A12",
+      "letter": "A",
+      "number": 12,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A13",
+      "locker_code": "A13",
+      "letter": "A",
+      "number": 13,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A14",
+      "locker_code": "A14",
+      "letter": "A",
+      "number": 14,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A15",
+      "locker_code": "A15",
+      "letter": "A",
+      "number": 15,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A16",
+      "locker_code": "A16",
+      "letter": "A",
+      "number": 16,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A17",
+      "locker_code": "A17",
+      "letter": "A",
+      "number": 17,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A18",
+      "locker_code": "A18",
+      "letter": "A",
+      "number": 18,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A19",
+      "locker_code": "A19",
+      "letter": "A",
+      "number": 19,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A20",
+      "locker_code": "A20",
+      "letter": "A",
+      "number": 20,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A21",
+      "locker_code": "A21",
+      "letter": "A",
+      "number": 21,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A22",
+      "locker_code": "A22",
+      "letter": "A",
+      "number": 22,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A23",
+      "locker_code": "A23",
+      "letter": "A",
+      "number": 23,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A24",
+      "locker_code": "A24",
+      "letter": "A",
+      "number": 24,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A25",
+      "locker_code": "A25",
+      "letter": "A",
+      "number": 25,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A26",
+      "locker_code": "A26",
+      "letter": "A",
+      "number": 26,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A27",
+      "locker_code": "A27",
+      "letter": "A",
+      "number": 27,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A28",
+      "locker_code": "A28",
+      "letter": "A",
+      "number": 28,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A29",
+      "locker_code": "A29",
+      "letter": "A",
+      "number": 29,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A30",
+      "locker_code": "A30",
+      "letter": "A",
+      "number": 30,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A31",
+      "locker_code": "A31",
+      "letter": "A",
+      "number": 31,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A32",
+      "locker_code": "A32",
+      "letter": "A",
+      "number": 32,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A33",
+      "locker_code": "A33",
+      "letter": "A",
+      "number": 33,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A34",
+      "locker_code": "A34",
+      "letter": "A",
+      "number": 34,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A35",
+      "locker_code": "A35",
+      "letter": "A",
+      "number": 35,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A36",
+      "locker_code": "A36",
+      "letter": "A",
+      "number": 36,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A37",
+      "locker_code": "A37",
+      "letter": "A",
+      "number": 37,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A38",
+      "locker_code": "A38",
+      "letter": "A",
+      "number": 38,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A39",
+      "locker_code": "A39",
+      "letter": "A",
+      "number": 39,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_A40",
+      "locker_code": "A40",
+      "letter": "A",
+      "number": 40,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B1",
+      "locker_code": "B1",
+      "letter": "B",
+      "number": 1,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B2",
+      "locker_code": "B2",
+      "letter": "B",
+      "number": 2,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B3",
+      "locker_code": "B3",
+      "letter": "B",
+      "number": 3,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B4",
+      "locker_code": "B4",
+      "letter": "B",
+      "number": 4,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B5",
+      "locker_code": "B5",
+      "letter": "B",
+      "number": 5,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "confirmed",
+      "current_booking_id": "B_1790045761626_435",
+      "is_admin_reserved": false,
+      "updated_at": "2026-09-22T02:56:01.626Z"
+    },
+    {
+      "id": "L_B6",
+      "locker_code": "B6",
+      "letter": "B",
+      "number": 6,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B7",
+      "locker_code": "B7",
+      "letter": "B",
+      "number": 7,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B8",
+      "locker_code": "B8",
+      "letter": "B",
+      "number": 8,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B9",
+      "locker_code": "B9",
+      "letter": "B",
+      "number": 9,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B10",
+      "locker_code": "B10",
+      "letter": "B",
+      "number": 10,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B11",
+      "locker_code": "B11",
+      "letter": "B",
+      "number": 11,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B12",
+      "locker_code": "B12",
+      "letter": "B",
+      "number": 12,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B13",
+      "locker_code": "B13",
+      "letter": "B",
+      "number": 13,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B14",
+      "locker_code": "B14",
+      "letter": "B",
+      "number": 14,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B15",
+      "locker_code": "B15",
+      "letter": "B",
+      "number": 15,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B16",
+      "locker_code": "B16",
+      "letter": "B",
+      "number": 16,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B17",
+      "locker_code": "B17",
+      "letter": "B",
+      "number": 17,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B18",
+      "locker_code": "B18",
+      "letter": "B",
+      "number": 18,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B19",
+      "locker_code": "B19",
+      "letter": "B",
+      "number": 19,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B20",
+      "locker_code": "B20",
+      "letter": "B",
+      "number": 20,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B21",
+      "locker_code": "B21",
+      "letter": "B",
+      "number": 21,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B22",
+      "locker_code": "B22",
+      "letter": "B",
+      "number": 22,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B23",
+      "locker_code": "B23",
+      "letter": "B",
+      "number": 23,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B24",
+      "locker_code": "B24",
+      "letter": "B",
+      "number": 24,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B25",
+      "locker_code": "B25",
+      "letter": "B",
+      "number": 25,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B26",
+      "locker_code": "B26",
+      "letter": "B",
+      "number": 26,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B27",
+      "locker_code": "B27",
+      "letter": "B",
+      "number": 27,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B28",
+      "locker_code": "B28",
+      "letter": "B",
+      "number": 28,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B29",
+      "locker_code": "B29",
+      "letter": "B",
+      "number": 29,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B30",
+      "locker_code": "B30",
+      "letter": "B",
+      "number": 30,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B31",
+      "locker_code": "B31",
+      "letter": "B",
+      "number": 31,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B32",
+      "locker_code": "B32",
+      "letter": "B",
+      "number": 32,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B33",
+      "locker_code": "B33",
+      "letter": "B",
+      "number": 33,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B34",
+      "locker_code": "B34",
+      "letter": "B",
+      "number": 34,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B35",
+      "locker_code": "B35",
+      "letter": "B",
+      "number": 35,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B36",
+      "locker_code": "B36",
+      "letter": "B",
+      "number": 36,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B37",
+      "locker_code": "B37",
+      "letter": "B",
+      "number": 37,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B38",
+      "locker_code": "B38",
+      "letter": "B",
+      "number": 38,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B39",
+      "locker_code": "B39",
+      "letter": "B",
+      "number": 39,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_B40",
+      "locker_code": "B40",
+      "letter": "B",
+      "number": 40,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C1",
+      "locker_code": "C1",
+      "letter": "C",
+      "number": 1,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C2",
+      "locker_code": "C2",
+      "letter": "C",
+      "number": 2,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C3",
+      "locker_code": "C3",
+      "letter": "C",
+      "number": 3,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C4",
+      "locker_code": "C4",
+      "letter": "C",
+      "number": 4,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C5",
+      "locker_code": "C5",
+      "letter": "C",
+      "number": 5,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C6",
+      "locker_code": "C6",
+      "letter": "C",
+      "number": 6,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C7",
+      "locker_code": "C7",
+      "letter": "C",
+      "number": 7,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C8",
+      "locker_code": "C8",
+      "letter": "C",
+      "number": 8,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C9",
+      "locker_code": "C9",
+      "letter": "C",
+      "number": 9,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C10",
+      "locker_code": "C10",
+      "letter": "C",
+      "number": 10,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "confirmed",
+      "current_booking_id": "B_IMP_1790045770522_0",
+      "is_admin_reserved": false,
+      "updated_at": "2026-09-22T02:56:10.522Z"
+    },
+    {
+      "id": "L_C11",
+      "locker_code": "C11",
+      "letter": "C",
+      "number": 11,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C12",
+      "locker_code": "C12",
+      "letter": "C",
+      "number": 12,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C13",
+      "locker_code": "C13",
+      "letter": "C",
+      "number": 13,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C14",
+      "locker_code": "C14",
+      "letter": "C",
+      "number": 14,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C15",
+      "locker_code": "C15",
+      "letter": "C",
+      "number": 15,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C16",
+      "locker_code": "C16",
+      "letter": "C",
+      "number": 16,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C17",
+      "locker_code": "C17",
+      "letter": "C",
+      "number": 17,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C18",
+      "locker_code": "C18",
+      "letter": "C",
+      "number": 18,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C19",
+      "locker_code": "C19",
+      "letter": "C",
+      "number": 19,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C20",
+      "locker_code": "C20",
+      "letter": "C",
+      "number": 20,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C21",
+      "locker_code": "C21",
+      "letter": "C",
+      "number": 21,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C22",
+      "locker_code": "C22",
+      "letter": "C",
+      "number": 22,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C23",
+      "locker_code": "C23",
+      "letter": "C",
+      "number": 23,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C24",
+      "locker_code": "C24",
+      "letter": "C",
+      "number": 24,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C25",
+      "locker_code": "C25",
+      "letter": "C",
+      "number": 25,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C26",
+      "locker_code": "C26",
+      "letter": "C",
+      "number": 26,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C27",
+      "locker_code": "C27",
+      "letter": "C",
+      "number": 27,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C28",
+      "locker_code": "C28",
+      "letter": "C",
+      "number": 28,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C29",
+      "locker_code": "C29",
+      "letter": "C",
+      "number": 29,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C30",
+      "locker_code": "C30",
+      "letter": "C",
+      "number": 30,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C31",
+      "locker_code": "C31",
+      "letter": "C",
+      "number": 31,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C32",
+      "locker_code": "C32",
+      "letter": "C",
+      "number": 32,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C33",
+      "locker_code": "C33",
+      "letter": "C",
+      "number": 33,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C34",
+      "locker_code": "C34",
+      "letter": "C",
+      "number": 34,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C35",
+      "locker_code": "C35",
+      "letter": "C",
+      "number": 35,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C36",
+      "locker_code": "C36",
+      "letter": "C",
+      "number": 36,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C37",
+      "locker_code": "C37",
+      "letter": "C",
+      "number": 37,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C38",
+      "locker_code": "C38",
+      "letter": "C",
+      "number": 38,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C39",
+      "locker_code": "C39",
+      "letter": "C",
+      "number": 39,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_C40",
+      "locker_code": "C40",
+      "letter": "C",
+      "number": 40,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D1",
+      "locker_code": "D1",
+      "letter": "D",
+      "number": 1,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D2",
+      "locker_code": "D2",
+      "letter": "D",
+      "number": 2,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D3",
+      "locker_code": "D3",
+      "letter": "D",
+      "number": 3,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D4",
+      "locker_code": "D4",
+      "letter": "D",
+      "number": 4,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D5",
+      "locker_code": "D5",
+      "letter": "D",
+      "number": 5,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D6",
+      "locker_code": "D6",
+      "letter": "D",
+      "number": 6,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D7",
+      "locker_code": "D7",
+      "letter": "D",
+      "number": 7,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D8",
+      "locker_code": "D8",
+      "letter": "D",
+      "number": 8,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D9",
+      "locker_code": "D9",
+      "letter": "D",
+      "number": 9,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D10",
+      "locker_code": "D10",
+      "letter": "D",
+      "number": 10,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D11",
+      "locker_code": "D11",
+      "letter": "D",
+      "number": 11,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D12",
+      "locker_code": "D12",
+      "letter": "D",
+      "number": 12,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D13",
+      "locker_code": "D13",
+      "letter": "D",
+      "number": 13,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D14",
+      "locker_code": "D14",
+      "letter": "D",
+      "number": 14,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D15",
+      "locker_code": "D15",
+      "letter": "D",
+      "number": 15,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D16",
+      "locker_code": "D16",
+      "letter": "D",
+      "number": 16,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D17",
+      "locker_code": "D17",
+      "letter": "D",
+      "number": 17,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D18",
+      "locker_code": "D18",
+      "letter": "D",
+      "number": 18,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D19",
+      "locker_code": "D19",
+      "letter": "D",
+      "number": 19,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D20",
+      "locker_code": "D20",
+      "letter": "D",
+      "number": 20,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D21",
+      "locker_code": "D21",
+      "letter": "D",
+      "number": 21,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D22",
+      "locker_code": "D22",
+      "letter": "D",
+      "number": 22,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D23",
+      "locker_code": "D23",
+      "letter": "D",
+      "number": 23,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D24",
+      "locker_code": "D24",
+      "letter": "D",
+      "number": 24,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D25",
+      "locker_code": "D25",
+      "letter": "D",
+      "number": 25,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D26",
+      "locker_code": "D26",
+      "letter": "D",
+      "number": 26,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D27",
+      "locker_code": "D27",
+      "letter": "D",
+      "number": 27,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D28",
+      "locker_code": "D28",
+      "letter": "D",
+      "number": 28,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D29",
+      "locker_code": "D29",
+      "letter": "D",
+      "number": 29,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D30",
+      "locker_code": "D30",
+      "letter": "D",
+      "number": 30,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D31",
+      "locker_code": "D31",
+      "letter": "D",
+      "number": 31,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D32",
+      "locker_code": "D32",
+      "letter": "D",
+      "number": 32,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D33",
+      "locker_code": "D33",
+      "letter": "D",
+      "number": 33,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D34",
+      "locker_code": "D34",
+      "letter": "D",
+      "number": 34,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D35",
+      "locker_code": "D35",
+      "letter": "D",
+      "number": 35,
+      "capacity": 4,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D36",
+      "locker_code": "D36",
+      "letter": "D",
+      "number": 36,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D37",
+      "locker_code": "D37",
+      "letter": "D",
+      "number": 37,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D38",
+      "locker_code": "D38",
+      "letter": "D",
+      "number": 38,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D39",
+      "locker_code": "D39",
+      "letter": "D",
+      "number": 39,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    },
+    {
+      "id": "L_D40",
+      "locker_code": "D40",
+      "letter": "D",
+      "number": 40,
+      "capacity": 2,
+      "is_enabled": true,
+      "status": "empty",
+      "current_booking_id": null
+    }
+  ],
+  "bookings": [
+    {
+      "id": "B_1790045761626_435",
+      "locker_code": "B5",
+      "cohort": "الفرقة الثالثة",
+      "representative_phone": "01012345678",
+      "student_names": [
+        "أحمد علي محمد",
+        "حسام خالد حسن"
+      ],
+      "student_codes": [],
+      "status": "confirmed",
+      "created_at": "2026-09-22T02:56:01.626Z",
+      "confirmed_at": "2026-09-22T02:56:01.626Z",
+      "confirmed_by": "إدارة الكلية",
+      "responsible": "ADMIN_MANUAL",
+      "notes": "تسكين يدوي من لوحة الإدارة"
+    },
+    {
+      "id": "B_IMP_1790045770522_0",
+      "locker_code": "C10",
+      "cohort": "الفرقة الرابعة",
+      "representative_phone": "01099887766",
+      "student_names": [
+        "سارة أحمد كمال",
+        "مروة محمود سيد",
+        "منى إبراهيم علي",
+        "ندى حسن علي"
+      ],
+      "student_codes": [],
+      "status": "confirmed",
+      "created_at": "2026-09-22T02:56:10.522Z",
+      "confirmed_at": "2026-09-22T02:56:10.522Z",
+      "confirmed_by": "استيراد جوجل شيت",
+      "responsible": "SHEET_IMPORT",
+      "notes": "مستورد من كشوف التسكين المعتمدة"
+    }
+  ],
+  "waitlist": [],
+  "settings": {
+    "google_sheet_url": "https://script.google.com/macros/s/AKfycbwSM7et9hEz5T9Lff1VGYWhpJ3XBYitTQE82g6IiEunFU3R8LQi8gQOkU2P3gypX7fL/exec",
+    "supervisor_name": "م/ إسلام عبداللطيف",
+    "default_capacity": 4,
+    "auto_waitlist": true
+  }
+}

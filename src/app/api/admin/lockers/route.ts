@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { lockerStore } from '@/lib/lockerStore';
 
 export const dynamic = 'force-dynamic';
@@ -15,13 +15,15 @@ export async function GET(request: Request) {
       const stats = lockerStore.getStats();
       const waitlist = lockerStore.getWaitlist();
       const bookings = lockerStore.getBookings();
+      const ranges = lockerStore.getInventoryRanges();
 
       return NextResponse.json({
         success: true,
         lockers,
         stats,
         waitlist,
-        bookings
+        bookings,
+        ranges
       });
     }
 
@@ -151,6 +153,63 @@ export async function POST(request: Request) {
       if (!cohort) return NextResponse.json({ error: 'يرجى تحديد الفرقة الدراسية' }, { status: 400 });
       const { clearedCount } = lockerStore.clearCohort(cohort);
       return NextResponse.json({ success: true, message: `تم تفريغ عدد ${clearedCount} دواليب للفرقة ${cohort} بنجاح` });
+    }
+
+    // 8. تخصيص الدولاب للإدارة أو إلغاء التخصيص (الضغط المطول)
+    if (action === 'set_admin_reserved') {
+      const { lockerCode, reserved, notes } = body;
+      if (!lockerCode) return NextResponse.json({ error: 'يرجى تحديد رمز الدولاب' }, { status: 400 });
+      const res = lockerStore.setAdminReserved(lockerCode, reserved !== false, notes);
+      if (!res.success) return NextResponse.json({ error: res.message }, { status: 404 });
+      return NextResponse.json({
+        success: true,
+        is_admin_reserved: res.is_admin_reserved,
+        locker: res.locker,
+        message: res.message
+      });
+    }
+
+    // 9. تعديل نطاقات وأعداد دواليب الأقسام
+    if (action === 'update_ranges') {
+      const { ranges } = body;
+      if (!ranges || typeof ranges !== 'object') {
+        return NextResponse.json({ error: 'يرجى إرسال بيانات النطاقات بشكل صحيح' }, { status: 400 });
+      }
+      const res = lockerStore.updateInventoryRanges(ranges);
+      return NextResponse.json(res);
+    }
+
+    // 10. استيراد كشوفات التسكين بالجملة من جوجل شيت
+    if (action === 'import_data') {
+      const { rawData } = body;
+      if (!rawData || typeof rawData !== 'string') {
+        return NextResponse.json({ error: 'يرجى إدخال البيانات المنسوخة من الشيت' }, { status: 400 });
+      }
+      const res = lockerStore.importBookings(rawData);
+      return NextResponse.json({
+        ...res,
+        message: res.success
+          ? `تم استيراد وتسكين ${res.importedCount} حجزاً بنجاح وتحديث الدواليب!`
+          : (res.errors?.[0] || 'تعذر استيراد البيانات، تأكد من صحة التنسيق')
+      });
+    }
+
+    // 11. تسكين طلاب يدوياً في دولاب محدد
+    if (action === 'manual_assign') {
+      const { lockerCode, cohort, phone, studentNames, studentCodes, notes, status } = body;
+      if (!lockerCode || !studentNames || !Array.isArray(studentNames) || studentNames.filter(Boolean).length === 0) {
+        return NextResponse.json({ error: 'يرجى إدخال كود الدولاب واسم طالب واحد على الأقل' }, { status: 400 });
+      }
+      const res = lockerStore.manualAssignBooking({
+        lockerCode,
+        cohort: cohort || 'الفرقة الرابعة',
+        phone: phone || '',
+        studentNames: studentNames.filter(Boolean),
+        studentCodes: studentCodes || [],
+        notes,
+        status: status || 'confirmed'
+      });
+      return NextResponse.json(res);
     }
 
     return NextResponse.json({ error: 'إجراء غير مدعوم' }, { status: 400 });

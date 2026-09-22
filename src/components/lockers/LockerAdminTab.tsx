@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { 
@@ -20,7 +20,12 @@ import {
   Phone, 
   Sliders,
   Check,
-  X
+  X,
+  Plus,
+  FileSpreadsheet,
+  UploadCloud,
+  ShieldCheck,
+  Edit3
 } from "lucide-react";
 import { printLockerReceipt } from "@/lib/lockerReceipt";
 
@@ -40,6 +45,24 @@ export default function LockerAdminTab() {
   const [selectedLocker, setSelectedLocker] = useState<any | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
 
+  // نافذة تخصيص وإدارة الدولاب (الضغط المطول)
+  const [adminModalLocker, setAdminModalLocker] = useState<any | null>(null);
+
+  // نافذة التسكين اليدوي المباشر
+  const [manualAssignLocker, setManualAssignLocker] = useState<any | null>(null);
+  const [manualAssignCohort, setManualAssignCohort] = useState<string>("الفرقة الرابعة");
+  const [manualAssignPhone, setManualAssignPhone] = useState<string>("");
+  const [manualAssignNames, setManualAssignNames] = useState<string[]>(["", "", "", ""]);
+
+  // إعداد وضبط أعداد ونطاقات الدواليب
+  const [inventoryRanges, setInventoryRanges] = useState<{ [key: string]: number }>({ A: 40, B: 40, C: 40, D: 40 });
+  const [savingRanges, setSavingRanges] = useState<boolean>(false);
+
+  // استيراد بيانات التسكين من شيت جوجل
+  const [importText, setImportText] = useState<string>("");
+  const [importingData, setImportingData] = useState<boolean>(false);
+  const [importReport, setImportReport] = useState<any | null>(null);
+
   // Clear Cohort State
   const [cohortToClear, setCohortToClear] = useState<string>("الفرقة الرابعة");
 
@@ -48,9 +71,10 @@ export default function LockerAdminTab() {
   const [searchResults, setSearchResults] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Long press handling
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const isLongPress = useRef(false);
+  // معالجات الضغط المطول الدقيقة
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressActive = useRef(false);
+  const pressStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -68,6 +92,9 @@ export default function LockerAdminTab() {
         setWaitlist(json.waitlist || []);
         setBookings(json.bookings || []);
         setPendingList((json.bookings || []).filter((b: any) => b.status === "pending"));
+        if (json.ranges) {
+          setInventoryRanges(json.ranges);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -180,7 +207,7 @@ export default function LockerAdminTab() {
     }
   };
 
-  // تبديل إتاحة الدولاب (متاح / محجوب إدارياً) - للضغط المطول أو الزر
+  // تبديل إتاحة الدولاب (متاح / محجوب)
   const handleToggleEnabled = async (lockerCode: string) => {
     try {
       const res = await fetch('/api/admin/lockers', {
@@ -195,9 +222,142 @@ export default function LockerAdminTab() {
         if (selectedLocker && selectedLocker.locker_code === lockerCode) {
           setSelectedLocker({ ...selectedLocker, is_enabled: json.is_enabled });
         }
+        if (adminModalLocker && adminModalLocker.locker_code === lockerCode) {
+          setAdminModalLocker({ ...adminModalLocker, is_enabled: json.is_enabled });
+        }
       }
     } catch (e) {
       showToast("خطأ في تحديث حالة الدولاب");
+    }
+  };
+
+  // تخصيص الدولاب للإدارة أو إلغاء التخصيص (الميزة المطلوبة بالضغط المطول)
+  const handleSetAdminReserved = async (lockerCode: string, reserved: boolean) => {
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_admin_reserved', lockerCode, reserved })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        fetchData();
+        if (adminModalLocker && adminModalLocker.locker_code === lockerCode) {
+          setAdminModalLocker(json.locker || { ...adminModalLocker, is_admin_reserved: reserved, is_enabled: !reserved });
+        }
+        if (selectedLocker && selectedLocker.locker_code === lockerCode) {
+          setSelectedLocker(json.locker || { ...selectedLocker, is_admin_reserved: reserved, is_enabled: !reserved });
+        }
+      } else {
+        showToast(json.error || "فشل تحديث تخصيص الإدارة");
+      }
+    } catch (e) {
+      showToast("خطأ بالاتصال");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // حفظ نطاقات وأعداد الدواليب
+  const handleSaveRanges = async () => {
+    setSavingRanges(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_ranges', ranges: inventoryRanges })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        fetchData();
+      } else {
+        showToast(json.error || "فشل تحديث أعداد الدواليب");
+      }
+    } catch (e) {
+      showToast("خطأ بالاتصال");
+    } finally {
+      setSavingRanges(false);
+    }
+  };
+
+  // استيراد بيانات التسكين بالجملة من شيت جوجل
+  const handleImportData = async () => {
+    if (!importText.trim()) {
+      alert("يرجى لصق بيانات جدول التسجيلات من شيت جوجل أولاً.");
+      return;
+    }
+    setImportingData(true);
+    setImportReport(null);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_data', rawData: importText })
+      });
+      const json = await res.json();
+      setImportReport(json);
+      if (json.success) {
+        showToast(json.message);
+        setImportText("");
+        fetchData();
+      } else {
+        showToast(json.message || "تعذر الاستيراد، يرجى مراجعة التنسيق");
+      }
+    } catch (e) {
+      showToast("خطأ بالاتصال");
+    } finally {
+      setImportingData(false);
+    }
+  };
+
+  // فتح نافذة التسكين اليدوي لدولاب
+  const openManualAssign = (locker: any) => {
+    setManualAssignLocker(locker);
+    setManualAssignCohort("الفرقة الرابعة");
+    setManualAssignPhone("");
+    const cap = locker.capacity || 4;
+    setManualAssignNames(new Array(cap).fill(""));
+  };
+
+  // حفظ التسكين اليدوي
+  const handleManualAssignSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualAssignLocker) return;
+    const names = manualAssignNames.map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) {
+      alert("يرجى إدخال اسم طالب واحد على الأقل.");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'manual_assign',
+          lockerCode: manualAssignLocker.locker_code,
+          cohort: manualAssignCohort,
+          phone: manualAssignPhone,
+          studentNames: names
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        setManualAssignLocker(null);
+        if (adminModalLocker) setAdminModalLocker(null);
+        if (selectedLocker) setSelectedLocker(null);
+        fetchData();
+      } else {
+        showToast(json.error || "فشل التسكين");
+      }
+    } catch (e) {
+      showToast("خطأ بالاتصال");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -215,6 +375,9 @@ export default function LockerAdminTab() {
         fetchData();
         if (selectedLocker && selectedLocker.locker_code === lockerCode) {
           setSelectedLocker({ ...selectedLocker, capacity });
+        }
+        if (adminModalLocker && adminModalLocker.locker_code === lockerCode) {
+          setAdminModalLocker({ ...adminModalLocker, capacity });
         }
       }
     } catch (e) {
@@ -267,24 +430,39 @@ export default function LockerAdminTab() {
     }
   };
 
-  // معالجات الضغط المطول (Long Press) على الدولاب
-  const handleTouchStart = (code: string) => {
-    isLongPress.current = false;
-    longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      handleToggleEnabled(code);
-    }, 600);
+  // معالجات الضغط المطول (Long Press) الدقيقة
+  const startLongPress = (locker: any, clientX: number, clientY: number) => {
+    isLongPressActive.current = false;
+    pressStartPos.current = { x: clientX, y: clientY };
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+
+    pressTimer.current = setTimeout(() => {
+      isLongPressActive.current = true;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(50); } catch (e) {}
+      }
+      setAdminModalLocker(locker);
+    }, 450);
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
+  const cancelLongPress = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
     }
   };
 
-  const handleLockerClick = (locker: any) => {
-    if (isLongPress.current) {
-      isLongPress.current = false;
+  const handlePointerMove = (clientX: number, clientY: number) => {
+    const dx = Math.abs(clientX - pressStartPos.current.x);
+    const dy = Math.abs(clientY - pressStartPos.current.y);
+    if (dx > 10 || dy > 10) {
+      cancelLongPress();
+    }
+  };
+
+  const handleCardClick = (locker: any) => {
+    if (isLongPressActive.current) {
+      isLongPressActive.current = false;
       return;
     }
     setSelectedLocker(locker);
@@ -340,19 +518,19 @@ export default function LockerAdminTab() {
           <div style={{ fontSize: "24px", fontWeight: "900", color: "#10b981", marginTop: "4px" }}>{stats?.confirmed || 0}</div>
         </div>
 
-        <div style={{ background: "#18202f", border: "1px solid #f59e0b", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
-          <div style={{ fontSize: "12px", color: "#fcd34d" }}>بانتظار الاعتماد</div>
-          <div style={{ fontSize: "24px", fontWeight: "900", color: "#f59e0b", marginTop: "4px" }}>{stats?.pending || 0}</div>
-        </div>
-
         <div style={{ background: "#18202f", border: "1px solid #38bdf8", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
-          <div style={{ fontSize: "12px", color: "#7dd3fc" }}>دواليب شاغرة</div>
-          <div style={{ fontSize: "24px", fontWeight: "900", color: "#38bdf8", marginTop: "4px" }}>{stats?.empty || 0}</div>
+          <div style={{ fontSize: "12px", color: "#7dd3fc" }}>بانتظار الاعتماد</div>
+          <div style={{ fontSize: "24px", fontWeight: "900", color: "#38bdf8", marginTop: "4px" }}>{stats?.pending || 0}</div>
         </div>
 
-        <div style={{ background: "#18202f", border: "1px solid #64748b", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
-          <div style={{ fontSize: "12px", color: "#cbd5e1" }}>محجوب إدارياً</div>
-          <div style={{ fontSize: "24px", fontWeight: "900", color: "#94a3b8", marginTop: "4px" }}>{stats?.disabled || 0}</div>
+        <div style={{ background: "#18202f", border: "1px solid #f59e0b", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
+          <div style={{ fontSize: "12px", color: "#fcd34d" }}>مخصص للإدارة 🔒</div>
+          <div style={{ fontSize: "24px", fontWeight: "900", color: "#f59e0b", marginTop: "4px" }}>{stats?.adminReserved || 0}</div>
+        </div>
+
+        <div style={{ background: "#18202f", border: "1px solid #14b8a6", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
+          <div style={{ fontSize: "12px", color: "#5eead4" }}>دواليب شاغرة</div>
+          <div style={{ fontSize: "24px", fontWeight: "900", color: "#14b8a6", marginTop: "4px" }}>{stats?.empty || 0}</div>
         </div>
 
         <div style={{ background: "#18202f", border: "1px solid #818cf8", padding: "14px", borderRadius: "14px", textAlign: "center" }}>
@@ -436,8 +614,8 @@ export default function LockerAdminTab() {
             </div>
 
             <div style={{ fontSize: "12px", color: "#94a3b8", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#6366f1" }}></span>
-              <span>ميزة خاصة: <strong>الضغط المطول</strong> على أي دولاب يحجبه/يتيحه للطلاب فوراً</span>
+              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }}></span>
+              <span>ميزة خاصة: <strong>الضغط المطول</strong> (أو كليك يمين) يفتح نافذة تخصيص الدولاب للإدارة 🔒 وتعديل سعته فوراً</span>
             </div>
           </div>
 
@@ -447,20 +625,26 @@ export default function LockerAdminTab() {
           ) : (
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(105px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
               gap: "10px"
             }}>
               {lockers.map((locker) => {
+                const isAdminReserved = locker.is_admin_reserved || (!locker.is_enabled && !locker.current_booking_id && (locker.notes || '').includes('إدارة'));
                 const isConfirmed = locker.status === "confirmed";
                 const isPending = locker.status === "pending";
-                const isDisabled = !locker.is_enabled;
+                const isDisabled = !locker.is_enabled && !isAdminReserved;
 
                 let border = "#334155";
                 let bg = "#141b29";
                 let color = "#e2e8f0";
                 let statusLabel = `شاغر (${locker.capacity})`;
 
-                if (isDisabled) {
+                if (isAdminReserved) {
+                  border = "#f59e0b";
+                  bg = "rgba(245, 158, 11, 0.14)";
+                  color = "#fbbf24";
+                  statusLabel = "مخصص للإدارة";
+                } else if (isDisabled) {
                   border = "#475569";
                   bg = "#0f172a";
                   color = "#64748b";
@@ -471,20 +655,35 @@ export default function LockerAdminTab() {
                   color = "#34d399";
                   statusLabel = "معتمد";
                 } else if (isPending) {
-                  border = "#f59e0b";
-                  bg = "rgba(245, 158, 11, 0.12)";
-                  color = "#fbbf24";
+                  border = "#38bdf8";
+                  bg = "rgba(56, 189, 248, 0.12)";
+                  color = "#7dd3fc";
                   statusLabel = "معلق";
                 }
 
                 return (
                   <div
                     key={locker.locker_code}
-                    onClick={() => handleLockerClick(locker)}
-                    onMouseDown={() => handleTouchStart(locker.locker_code)}
-                    onMouseUp={handleTouchEnd}
-                    onTouchStart={() => handleTouchStart(locker.locker_code)}
-                    onTouchEnd={handleTouchEnd}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setAdminModalLocker(locker);
+                    }}
+                    onMouseDown={(e) => {
+                      if (e.button === 0) startLongPress(locker, e.clientX, e.clientY);
+                    }}
+                    onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
+                    onMouseUp={cancelLongPress}
+                    onTouchStart={(e) => {
+                      const t = e.touches[0];
+                      startLongPress(locker, t.clientX, t.clientY);
+                    }}
+                    onTouchMove={(e) => {
+                      const t = e.touches[0];
+                      handlePointerMove(t.clientX, t.clientY);
+                    }}
+                    onTouchEnd={cancelLongPress}
+                    onTouchCancel={cancelLongPress}
+                    onClick={() => handleCardClick(locker)}
                     style={{
                       background: bg,
                       border: `1.5px solid ${border}`,
@@ -494,20 +693,34 @@ export default function LockerAdminTab() {
                       cursor: "pointer",
                       userSelect: "none",
                       position: "relative",
-                      transition: "transform 0.1s ease, border-color 0.2s ease"
+                      transition: "transform 0.1s ease, border-color 0.2s ease",
+                      boxShadow: isAdminReserved ? "0 0 10px rgba(245, 158, 11, 0.2)" : "none"
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.04)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                    onMouseLeave={(e) => {
+                      cancelLongPress();
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
                   >
-                    {isDisabled && (
-                      <div style={{ position: "absolute", top: "5px", left: "5px" }}>
+                    {isAdminReserved ? (
+                      <div style={{ position: "absolute", top: "5px", left: "5px" }} title="مخصص للإدارة">
+                        <Lock size={13} color="#f59e0b" />
+                      </div>
+                    ) : isDisabled ? (
+                      <div style={{ position: "absolute", top: "5px", left: "5px" }} title="محجوب">
                         <Lock size={12} color="#94a3b8" />
                       </div>
-                    )}
+                    ) : null}
                     <div style={{ fontSize: "16px", fontWeight: "900", color }}>
                       {locker.locker_code}
                     </div>
-                    <div style={{ fontSize: "11px", marginTop: "4px", color: isDisabled ? "#64748b" : color, opacity: 0.85 }}>
+                    <div style={{
+                      fontSize: "11px",
+                      marginTop: "4px",
+                      color: isDisabled ? "#64748b" : color,
+                      opacity: 0.9,
+                      fontWeight: isAdminReserved ? "bold" : "normal"
+                    }}>
                       {statusLabel}
                     </div>
                   </div>
@@ -739,6 +952,144 @@ export default function LockerAdminTab() {
       {activeSubTab === "tools" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           
+          {/* أداة ضبط أعداد ونطاقات دواليب الأقسام */}
+          <div style={{ background: "#18202f", border: "1px solid #38bdf8", borderRadius: "16px", padding: "22px" }}>
+            <h4 style={{ color: "#38bdf8", margin: "0 0 8px 0", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Sliders size={18} />
+              <span>إعداد وضبط أعداد ونطاقات دواليب الأقسام (A, B, C, D)</span>
+            </h4>
+            <p style={{ color: "#94a3b8", fontSize: "13px", lineHeight: "1.6", margin: "0 0 16px 0" }}>
+              حدد العدد الفعلي للدواليب المتوفرة في كليتك لكل قسم. سيتم تحديث شبكة الدواليب فوراً دون التأثير على أي حجوزات أو تخصيصات قائمة.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+              {["A", "B", "C", "D"].map((letter) => (
+                <div key={letter} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "12px", textAlign: "center" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "6px" }}>
+                    قسم ({letter})
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "12px", color: "#94a3b8" }}>من 1 إلى</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={inventoryRanges[letter] || 40}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 1;
+                        setInventoryRanges({ ...inventoryRanges, [letter]: val });
+                      }}
+                      style={{
+                        width: "65px",
+                        background: "#1e293b",
+                        border: "1px solid #475569",
+                        color: "#fff",
+                        padding: "6px 8px",
+                        borderRadius: "8px",
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        fontSize: "15px",
+                        outline: "none"
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleSaveRanges}
+              disabled={savingRanges}
+              style={{
+                background: "#0284c7",
+                color: "#fff",
+                border: "none",
+                padding: "10px 24px",
+                borderRadius: "10px",
+                fontWeight: "bold",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <Check size={16} />
+              <span>{savingRanges ? "جاري الحفظ..." : "حفظ وتحديث شبكة الدواليب 💾"}</span>
+            </button>
+          </div>
+
+          {/* أداة الاستيراد السريع للحجوزات والتسكين من شيت جوجل */}
+          <div style={{ background: "#18202f", border: "1px solid #10b981", borderRadius: "16px", padding: "22px" }}>
+            <h4 style={{ color: "#10b981", margin: "0 0 8px 0", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <FileSpreadsheet size={18} />
+              <span>استيراد وتسكين الحجوزات من شيت جوجل / إكسيل فوراً 📥</span>
+            </h4>
+            <p style={{ color: "#94a3b8", fontSize: "13px", lineHeight: "1.6", margin: "0 0 12px 0" }}>
+              انسخ الصفوف من شيت جوجل (سواء من ورقة <strong>التسجيلات_المؤكدة</strong> أو أي كشف تسكين) والصقها في المربع أدناه. يتعرف النظام بذكاء فائق على: رمز الدولاب (A12)، الفرقة، رقم الهاتف، وأسماء الطلاب، ويقوم بتسكينهم فوراً واعتماد دواليبهم!
+            </p>
+
+            <textarea
+              rows={6}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder="الصق بيانات الجدول هنا مباشرة (نسخ ولصق من شيت جوجل)... مثال:&#10;A12	الفرقة الرابعة	01012345678	أحمد محمد علي	محمود حسن	عمر خالد"
+              style={{
+                width: "100%",
+                background: "#0f172a",
+                border: "1px solid #334155",
+                borderRadius: "10px",
+                color: "#f1f5f9",
+                padding: "12px",
+                fontSize: "13px",
+                fontFamily: "monospace",
+                direction: "ltr",
+                outline: "none",
+                resize: "vertical",
+                marginBottom: "12px"
+              }}
+            />
+
+            {importReport && (
+              <div style={{
+                background: importReport.success ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                border: `1px solid ${importReport.success ? "#10b981" : "#ef4444"}`,
+                borderRadius: "10px",
+                padding: "12px",
+                marginBottom: "14px",
+                fontSize: "13px",
+                color: importReport.success ? "#6ee7b7" : "#fca5a5"
+              }}>
+                <div style={{ fontWeight: "bold", marginBottom: "4px" }}>{importReport.message}</div>
+                {importReport.importedCount > 0 && (
+                  <div>تم تسكين عدد: <strong>{importReport.importedCount}</strong> دولاباً، وإضافة <strong>{importReport.updatedLockersCount}</strong> دواليب جديدة إلى المخزون.</div>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={handleImportData}
+              disabled={importingData}
+              style={{
+                background: "#059669",
+                color: "#fff",
+                border: "none",
+                padding: "10px 24px",
+                borderRadius: "10px",
+                fontWeight: "bold",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <UploadCloud size={16} />
+              <span>{importingData ? "جاري الاستيراد والتسكين..." : "بدء التسكين والاستيراد التلقائي 📥"}</span>
+            </button>
+          </div>
+
+          {/* أداة تفريغ دفعة كاملة */}
           <div style={{ background: "#18202f", border: "1px solid #ef4444", borderRadius: "16px", padding: "20px" }}>
             <h4 style={{ color: "#ef4444", margin: "0 0 8px 0", fontSize: "16px" }}>
               ⚠️ تفريغ دواليب دفعة كاملة (عند التخرج أو نهاية العام)
@@ -947,7 +1298,57 @@ export default function LockerAdminTab() {
               </div>
             ) : (
               <div style={{ background: "#0f172a", borderRadius: "12px", padding: "20px", textAlign: "center", color: "#94a3b8", marginBottom: "16px" }}>
-                هذا الدولاب شاغر حالياً وغير مسكن عليه أي طالب.
+                <p style={{ margin: "0 0 14px 0", color: selectedLocker.is_admin_reserved ? "#fbbf24" : "#94a3b8" }}>
+                  {selectedLocker.is_admin_reserved ? "🔒 هذا الدولاب مخصص للإدارة حالياً ومحجوب عن الطلاب." : "هذا الدولاب شاغر حالياً وغير مسكن عليه أي طالب."}
+                </p>
+                <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => {
+                      const lk = selectedLocker;
+                      setSelectedLocker(null);
+                      openManualAssign(lk);
+                    }}
+                    style={{
+                      background: "#0284c7",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <Plus size={15} />
+                    <span>تسكين طلاب يدوياً في هذا الدولاب</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      const code = selectedLocker.locker_code;
+                      const isRes = selectedLocker.is_admin_reserved;
+                      handleSetAdminReserved(code, !isRes);
+                    }}
+                    style={{
+                      background: selectedLocker.is_admin_reserved ? "#10b981" : "#d97706",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <Lock size={15} />
+                    <span>{selectedLocker.is_admin_reserved ? "إلغاء التخصيص وإتاحته للطلاب" : "تخصيص للإدارة 🔒"}</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -957,6 +1358,401 @@ export default function LockerAdminTab() {
             >
               إغلاق
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تخصيص وإدارة الدولاب (تفتح بالضغط المطول أو كليك يمين) */}
+      {adminModalLocker && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.82)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 10002,
+          padding: "16px"
+        }}>
+          <div style={{
+            background: "#18202f",
+            border: "1.5px solid #f59e0b",
+            borderRadius: "22px",
+            width: "100%",
+            maxWidth: "460px",
+            padding: "24px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.8)"
+          }}>
+            {/* الرأس */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{
+                  background: "rgba(245, 158, 11, 0.2)",
+                  border: "1px solid #f59e0b",
+                  color: "#fbbf24",
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "900",
+                  fontSize: "18px"
+                }}>
+                  {adminModalLocker.locker_code}
+                </div>
+                <div>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff" }}>
+                    إدارة وتخصيص الدولاب
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                    الحالة: {adminModalLocker.is_admin_reserved ? "مخصص للإدارة 🔒" : adminModalLocker.status === "confirmed" ? "معتمد 👥" : adminModalLocker.status === "pending" ? "معلق ⏳" : "شاغر 🟢"}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setAdminModalLocker(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* قائمة الخيارات السريعة */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+              
+              {/* 1. تخصيص للإدارة / إلغاء التخصيص */}
+              <button
+                onClick={() => handleSetAdminReserved(adminModalLocker.locker_code, !adminModalLocker.is_admin_reserved)}
+                disabled={actionLoading}
+                style={{
+                  background: adminModalLocker.is_admin_reserved ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                  border: `1.5px solid ${adminModalLocker.is_admin_reserved ? "#10b981" : "#f59e0b"}`,
+                  borderRadius: "14px",
+                  padding: "14px 16px",
+                  color: adminModalLocker.is_admin_reserved ? "#34d399" : "#fbbf24",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  textAlign: "right"
+                }}
+              >
+                <div style={{
+                  background: adminModalLocker.is_admin_reserved ? "#10b981" : "#f59e0b",
+                  color: "#000",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}>
+                  {adminModalLocker.is_admin_reserved ? <Unlock size={20} /> : <Lock size={20} />}
+                </div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    {adminModalLocker.is_admin_reserved ? "إلغاء تخصيص الإدارة وإتاحته للطلاب 🟢" : "تخصيص الدولاب للإدارة 🔒"}
+                  </div>
+                  <div style={{ fontSize: "12px", opacity: 0.85, marginTop: "2px" }}>
+                    {adminModalLocker.is_admin_reserved ? "إعادة فتح الدولاب ليصبح متاحاً للتسكين الطلابي" : "حجب الدولاب عن حجز الطلاب وتخصيصه للأساتذة والإدارة"}
+                  </div>
+                </div>
+              </button>
+
+              {/* 2. تعديل السعة */}
+              <div style={{
+                background: "#0f172a",
+                border: "1px solid #334155",
+                borderRadius: "14px",
+                padding: "12px 16px"
+              }}>
+                <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "8px" }}>
+                  تحديد سعة الدولاب:
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {[2, 4].map((cap) => (
+                    <button
+                      key={cap}
+                      onClick={() => handleUpdateCapacity(adminModalLocker.locker_code, cap)}
+                      style={{
+                        background: adminModalLocker.capacity === cap ? "#2563eb" : "#1e293b",
+                        border: adminModalLocker.capacity === cap ? "1px solid #38bdf8" : "1px solid #334155",
+                        color: "#fff",
+                        padding: "10px",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      <Users size={16} />
+                      <span>{cap === 2 ? "سعة شخصين (2)" : "سعة 4 طلاب"}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. تسكين طلاب يدوياً في هذا الدولاب */}
+              <button
+                onClick={() => {
+                  const lk = adminModalLocker;
+                  setAdminModalLocker(null);
+                  openManualAssign(lk);
+                }}
+                style={{
+                  background: "#0f172a",
+                  border: "1px solid #38bdf8",
+                  borderRadius: "14px",
+                  padding: "12px 16px",
+                  color: "#38bdf8",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  textAlign: "right"
+                }}
+              >
+                <div style={{
+                  background: "rgba(56, 189, 248, 0.2)",
+                  color: "#38bdf8",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0
+                }}>
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                    تسكين طلاب يدوياً في هذا الدولاب ✍️
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                    تسجيل واعتماد أسماء الطلاب مباشرة من هنا
+                  </div>
+                </div>
+              </button>
+
+              {/* 4. تفريغ وإخلاء الدولاب (إذا كان مسكناً) */}
+              {adminModalLocker.status !== "empty" && (
+                <button
+                  onClick={() => {
+                    const code = adminModalLocker.locker_code;
+                    setAdminModalLocker(null);
+                    handleVacateLocker(code);
+                  }}
+                  style={{
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid #ef4444",
+                    borderRadius: "14px",
+                    padding: "12px 16px",
+                    color: "#fca5a5",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    textAlign: "right"
+                  }}
+                >
+                  <div style={{
+                    background: "#dc2626",
+                    color: "#fff",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0
+                  }}>
+                    <Trash2 size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "bold" }}>
+                      إخلاء وتفريغ الدولاب فوراً 🗑️
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#fca5a5", opacity: 0.85, marginTop: "2px" }}>
+                      حذف التسكين الحالي وإعادة الدولاب شاغراً
+                    </div>
+                  </div>
+                </button>
+              )}
+
+            </div>
+
+            <button
+              onClick={() => setAdminModalLocker(null)}
+              style={{
+                width: "100%",
+                background: "#334155",
+                color: "#cbd5e1",
+                border: "none",
+                padding: "10px",
+                borderRadius: "10px",
+                fontSize: "14px",
+                cursor: "pointer"
+              }}
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة التسكين اليدوي المباشر */}
+      {manualAssignLocker && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 10003,
+          padding: "16px"
+        }}>
+          <div style={{
+            background: "#18202f",
+            border: "1.5px solid #0284c7",
+            borderRadius: "20px",
+            width: "100%",
+            maxWidth: "480px",
+            padding: "24px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.8)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontSize: "20px", fontWeight: "900", color: "#38bdf8" }}>
+                تسكين طلاب في دولاب ({manualAssignLocker.locker_code})
+              </div>
+              <button
+                onClick={() => setManualAssignLocker(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualAssignSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>الفرقة الدراسية:</label>
+                <select
+                  value={manualAssignCohort}
+                  onChange={(e) => setManualAssignCohort(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: "#0f172a",
+                    border: "1px solid #334155",
+                    borderRadius: "8px",
+                    padding: "10px",
+                    color: "#fff",
+                    outline: "none"
+                  }}
+                >
+                  <option value="الفرقة الرابعة">الفرقة الرابعة</option>
+                  <option value="الفرقة الثالثة">الفرقة الثالثة</option>
+                  <option value="الفرقة الثانية">الفرقة الثانية</option>
+                  <option value="الفرقة الأولى">الفرقة الأولى</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>رقم هاتف ممثل الدولاب:</label>
+                <input
+                  type="text"
+                  placeholder="01xxxxxxxxx"
+                  value={manualAssignPhone}
+                  onChange={(e) => setManualAssignPhone(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: "#0f172a",
+                    border: "1px solid #334155",
+                    borderRadius: "8px",
+                    padding: "10px",
+                    color: "#fff",
+                    outline: "none"
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>أسماء الطلاب المسكنين (سعة {manualAssignLocker.capacity || 4} طلاب):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {manualAssignNames.map((name, idx) => (
+                    <input
+                      key={idx}
+                      type="text"
+                      placeholder={`اسم الطالب (${idx + 1})`}
+                      value={name}
+                      onChange={(e) => {
+                        const updated = [...manualAssignNames];
+                        updated[idx] = e.target.value;
+                        setManualAssignNames(updated);
+                      }}
+                      style={{
+                        width: "100%",
+                        background: "#0f172a",
+                        border: "1px solid #334155",
+                        borderRadius: "8px",
+                        padding: "8px 12px",
+                        color: "#fff",
+                        outline: "none",
+                        fontSize: "13px"
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  style={{
+                    flex: 1,
+                    background: "#10b981",
+                    color: "#fff",
+                    border: "none",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    cursor: "pointer"
+                  }}
+                >
+                  تأكيد التسكين فوراً ✅
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManualAssignLocker(null)}
+                  style={{
+                    background: "#334155",
+                    color: "#cbd5e1",
+                    border: "none",
+                    padding: "12px 18px",
+                    borderRadius: "10px",
+                    cursor: "pointer"
+                  }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
