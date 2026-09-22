@@ -212,6 +212,41 @@ export async function POST(request: Request) {
       return NextResponse.json(res);
     }
 
+    // 12. معاينة تفاعلية لبيانات الشيت قبل التسكين
+    if (action === 'preview_data') {
+      const { rawData } = body;
+      if (!rawData || typeof rawData !== 'string') {
+        return NextResponse.json({ error: 'يرجى إرسال البيانات للمعاينة' }, { status: 400 });
+      }
+      const res = lockerStore.parseRawDataToPreview(rawData);
+      return NextResponse.json(res);
+    }
+
+    // 13. اعتماد وتسكين البيانات بعد المعاينة
+    if (action === 'commit_preview') {
+      const { rows, cleanBeforeSync } = body;
+      if (!rows || !Array.isArray(rows)) {
+        return NextResponse.json({ error: 'بيانات التسكين غير صالحة' }, { status: 400 });
+      }
+      const res = lockerStore.commitParsedBookings(rows, { cleanBeforeSync: cleanBeforeSync === true });
+      return NextResponse.json(res);
+    }
+
+    // 14. المزامنة المباشرة الذكية عبر رابط جوجل شيت
+    if (action === 'sync_sheet_url') {
+      const { sheetUrl, mode, customTab, cleanBeforeSync } = body;
+      if (!sheetUrl || typeof sheetUrl !== 'string') {
+        return NextResponse.json({ error: 'يرجى إدخال رابط أو معرف Google Sheets' }, { status: 400 });
+      }
+      const res = await lockerStore.syncFromGoogleSheetUrl({
+        sheetUrl,
+        mode: mode || 'full',
+        customTab,
+        cleanBeforeSync: cleanBeforeSync === true
+      });
+      return NextResponse.json(res);
+    }
+
     return NextResponse.json({ error: 'إجراء غير مدعوم' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطأ في معالجة طلب الدواليب' }, { status: 500 });
