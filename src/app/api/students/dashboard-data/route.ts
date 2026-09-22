@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
+import { lockerStore } from '@/lib/lockerStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -383,12 +384,25 @@ export async function GET(request: Request) {
       };
     });
 
+    // 9. جلب بيانات دولاب الطالب الذكي إن وجد
+    let studentLocker = null;
+    try {
+      await lockerStore.ensureLoaded();
+      studentLocker = lockerStore.getStudentLockerStatus({
+        code: student.student_code,
+        name: student.full_name
+      });
+    } catch (e) {
+      console.warn('Locker status error in dashboard:', e);
+    }
+
     return NextResponse.json({
       student: safeStudent,
       attendance: attendanceByCourse,
       projects: projectsByCourse,
       complaints: enrichedComplaints,
       warnings: attendanceByCourse.filter((c: any) => c.hasWarning),
+      locker: studentLocker,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',

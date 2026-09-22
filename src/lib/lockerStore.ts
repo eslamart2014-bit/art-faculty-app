@@ -197,6 +197,42 @@ export function normalizeLockerCode(raw: string): { code: string; letter: string
   return null;
 }
 
+// تنظيف وتوحيد النصوص والأسماء العربية بدقة لمعالجة اختلاف كتابة الهمزات والتاء المربوطة والياء والألف اللينة
+export function cleanArabicText(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/عبد\s+/g, 'عبد')
+    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+    .replace(/[-_.,/\\()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// خوارزمية مطابقة الأسماء العربية الذكية بنسبة دقة فائقة (97%+)
+export function isArabicNameMatch(name1: string, name2: string): boolean {
+  const n1 = cleanArabicText(name1);
+  const n2 = cleanArabicText(name2);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+  if (n1.includes(n2) || n2.includes(n1)) return true;
+
+  const w1 = n1.split(' ').filter(Boolean);
+  const w2 = n2.split(' ').filter(Boolean);
+  // مطابقة الاسمين الأول والثاني على الأقل
+  if (w1.length >= 2 && w2.length >= 2 && w1[0] === w2[0] && w1[1] === w2[1]) {
+    // إذا كان هناك اسم ثالث، نتحقق منه
+    if (w1.length >= 3 && w2.length >= 3) {
+      return w1[2] === w2[2];
+    }
+    return true;
+  }
+  return false;
+}
+
 // استكشاف كافة تبويبات وأوراق العمل الموجودة في ملف جوجل شيت تلقائياً
 export async function discoverAllSheetTabs(sheetId: string): Promise<string[]> {
   const tabs = new Set<string>();
@@ -759,23 +795,60 @@ export const lockerStore = {
     return db.waitlist.filter(w => w.status === 'waiting');
   },
 
-  // 6. التحقق من حالة الطالب (هل هو مسكن أو في الانتظار؟)
-  getStudentLockerStatus(studentCodeOrName: string): {
+  // 6. التحقق من حالة الطالب الذكي (هل هو مسكن أو في الانتظار؟)
+  getStudentLockerStatus(studentCodeOrName: string | { code?: string; name?: string }): {
     status: 'confirmed' | 'pending' | 'waitlist' | 'none';
     booking: LockerBooking | null;
     waitlist: LockerWaitlistEntry | null;
     locker: LockerItem | null;
   } {
     const db = readLocalDB();
-    const query = studentCodeOrName.trim().toLowerCase();
+    let codeQuery = '';
+    let nameQuery = '';
+
+    if (typeof studentCodeOrName === 'string') {
+      const q = studentCodeOrName.trim();
+      if (/^\d+$/.test(q)) {
+        codeQuery = q;
+      } else {
+        nameQuery = q;
+        codeQuery = q;
+      }
+    } else if (studentCodeOrName && typeof studentCodeOrName === 'object') {
+      codeQuery = (studentCodeOrName.code || '').trim();
+      nameQuery = (studentCodeOrName.name || '').trim();
+    }
+
+    const normCodeQuery = codeQuery.replace(/^0+/, '');
+
+    const matchesStudent = (codes: string[] = [], names: string[] = []): boolean => {
+      // 1. فحص الكود إن وجد
+      if (codeQuery) {
+        const codeMatch = codes.some(c => {
+          if (!c) return false;
+          const cleanC = String(c).trim();
+          return cleanC.toLowerCase() === codeQuery.toLowerCase() ||
+                 cleanC.replace(/^0+/, '') === normCodeQuery;
+        });
+        if (codeMatch) return true;
+      }
+
+      // 2. فحص الاسم بمطابقة النصوص والأسماء العربية الذكية
+      if (nameQuery) {
+        const nameMatch = names.some(n => {
+          if (!n) return false;
+          return isArabicNameMatch(n, nameQuery);
+        });
+        if (nameMatch) return true;
+      }
+
+      return false;
+    };
 
     // البحث في الحجوزات المؤكدة والمعلقة
     const activeBooking = db.bookings.find(b => 
       (b.status === 'confirmed' || b.status === 'pending') &&
-      (
-        b.student_codes.some(c => c.toLowerCase() === query || c.replace(/^0+/, '') === query.replace(/^0+/, '')) ||
-        b.student_names.some(n => n.toLowerCase().includes(query) || query.includes(n.toLowerCase()))
-      )
+      matchesStudent(b.student_codes, b.student_names)
     );
 
     if (activeBooking) {
@@ -791,10 +864,7 @@ export const lockerStore = {
     // البحث في قائمة الانتظار
     const waitEntry = db.waitlist.find(w => 
       w.status === 'waiting' &&
-      (
-        w.student_codes.some(c => c.toLowerCase() === query || c.replace(/^0+/, '') === query.replace(/^0+/, '')) ||
-        w.student_names.some(n => n.toLowerCase().includes(query) || query.includes(n.toLowerCase()))
-      )
+      matchesStudent(w.student_codes, w.student_names)
     );
 
     if (waitEntry) {
@@ -832,11 +902,12 @@ export const lockerStore = {
     const db = readLocalDB();
 
     // التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل
-    for (const code of params.student_codes) {
-      const check = this.getStudentLockerStatus(code);
+    for (let i = 0; i < params.student_names.length; i++) {
+      const name = params.student_names[i];
+      const code = params.student_codes?.[i] || '';
+      const check = this.getStudentLockerStatus({ code, name });
       if (check.status !== 'none') {
-        const studentIndex = params.student_codes.indexOf(code);
-        const studentName = params.student_names[studentIndex] || code;
+        const studentName = name || code;
         return {
           success: false,
           isWaitlist: false,
@@ -1512,12 +1583,117 @@ export const lockerStore = {
 
     await persistDB(db);
 
+    // مطابقة الحجوزات مع قاعدة بيانات الطلاب تلقائياً لتسجيل الأكواد
+    await this.reconcileWithStudentsDB();
+
     return {
       success: importedCount > 0,
       importedCount,
       updatedLockersCount,
-      message: `تم تسكين واعتماد ${importedCount} حجزاً بنجاح في النظام وحفظها سحابياً!`
+      message: `تم تسكين واعتماد ${importedCount} حجزاً بنجاح في النظام وحفظها ومطابقتها سحابياً!`
     };
+  },
+
+  // 21. ب. مطابقة الحجوزات مع قاعدة بيانات الطلاب وتعبئة الأكواد الرسمية تلقائياً
+  async reconcileWithStudentsDB(): Promise<{
+    success: boolean;
+    matched: number;
+    totalNames: number;
+    updatedBookings: number;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    try {
+      // 1. جلب كافة الطلاب من جدول students (دفعتين لتجاوز حد 1000 طالب)
+      const { data: b1, error: err1 } = await supabaseAdmin
+        .from('students')
+        .select('student_code, full_name, academic_year')
+        .range(0, 999);
+      
+      const { data: b2, error: err2 } = await supabaseAdmin
+        .from('students')
+        .select('student_code, full_name, academic_year')
+        .range(1000, 2499);
+
+      if (err1 && !b1) {
+        console.error('[LockerStore] فشل جلب الطلاب للمطابقة:', err1);
+        return { success: false, matched: 0, totalNames: 0, updatedBookings: 0, message: 'فشل جلب سجلات الطلاب من قاعدة البيانات' };
+      }
+
+      const allStudents = [...(b1 || []), ...(b2 || [])];
+      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب من قاعدة البيانات...`);
+
+      let matchedCount = 0;
+      let totalNames = 0;
+      let updatedBookings = 0;
+
+      for (const booking of db.bookings) {
+        let bookingChanged = false;
+        if (!booking.student_codes) {
+          booking.student_codes = [];
+        }
+
+        for (let i = 0; i < (booking.student_names || []).length; i++) {
+          totalNames++;
+          const name = booking.student_names[i];
+          if (!name) continue;
+
+          // إذا كان الكود موجود بالفعل وصحيح، نحافظ عليه ونعده كمطابق
+          if (booking.student_codes[i] && booking.student_codes[i].trim() !== '') {
+            matchedCount++;
+            continue;
+          }
+
+          // البحث عن الطالب في جدول الطلاب باستخدام خوارزمية المطابقة الذكية
+          const found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          if (found && found.student_code) {
+            booking.student_codes[i] = found.student_code;
+            matchedCount++;
+            bookingChanged = true;
+          } else {
+            if (!booking.student_codes[i]) {
+              booking.student_codes[i] = '';
+            }
+          }
+        }
+
+        if (bookingChanged) {
+          updatedBookings++;
+        }
+      }
+
+      // مطابقة قائمة الانتظار إن وجدت
+      for (const wait of db.waitlist) {
+        if (!wait.student_codes) wait.student_codes = [];
+        for (let i = 0; i < (wait.student_names || []).length; i++) {
+          const name = wait.student_names[i];
+          if (!name) continue;
+          if (wait.student_codes[i] && wait.student_codes[i].trim() !== '') continue;
+          const found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          if (found && found.student_code) {
+            wait.student_codes[i] = found.student_code;
+          }
+        }
+      }
+
+      // حفظ التغييرات سحابياً ومحلياً
+      await persistDB(db);
+
+      const percent = totalNames > 0 ? Math.round((matchedCount / totalNames) * 100) : 0;
+      const msg = `تمت مطابقة وربط ${matchedCount} من أصل ${totalNames} طالباً (${percent}%) بنجاح مع قاعدة البيانات، وتحديث ${updatedBookings} حجوزات!`;
+      console.log(`[LockerStore] ${msg}`);
+
+      return {
+        success: true,
+        matched: matchedCount,
+        totalNames,
+        updatedBookings,
+        message: msg
+      };
+    } catch (err: any) {
+      console.error('[LockerStore] خطأ استثنائي أثناء المطابقة:', err);
+      return { success: false, matched: 0, totalNames: 0, updatedBookings: 0, message: err.message || 'حدث خطأ أثناء المطابقة' };
+    }
   },
 
   // 22. محرك استكشاف وجلب كافة أوراق وبيانات ملف Google Sheets

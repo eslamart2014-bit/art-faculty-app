@@ -265,6 +265,12 @@ export async function POST(request: Request) {
       return NextResponse.json(res);
     }
 
+    // 16. مطابقة وربط الأكواد مع قاعدة بيانات الطلاب
+    if (action === 'reconcile_students') {
+      const res = await lockerStore.reconcileWithStudentsDB();
+      return NextResponse.json(res);
+    }
+
     return NextResponse.json({ error: 'إجراء غير مدعوم' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطأ في معالجة طلب الدواليب' }, { status: 500 });

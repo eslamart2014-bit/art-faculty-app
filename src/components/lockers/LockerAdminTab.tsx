@@ -74,6 +74,7 @@ export default function LockerAdminTab() {
   const [cleanBeforeSync, setCleanBeforeSync] = useState<boolean>(false);
   const [syncLoading, setSyncLoading] = useState<boolean>(false);
   const [syncStatusResult, setSyncStatusResult] = useState<any | null>(null);
+  const [reconcilingStudents, setReconcilingStudents] = useState<boolean>(false);
 
   // حالات رفع الملفات والمعاينة التفاعلية
   const [dragOver, setDragOver] = useState<boolean>(false);
@@ -366,6 +367,31 @@ export default function LockerAdminTab() {
       showToast("خطأ في الاتصال بالخادم أثناء المزامنة");
     } finally {
       setSyncLoading(false);
+    }
+  };
+
+  // 1. أ. مطابقة وربط الأسماء مع قاعدة بيانات الطلاب وتعبئة الأكواد
+  const handleReconcileStudents = async () => {
+    setReconcilingStudents(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reconcile_students'
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        await fetchData();
+      } else {
+        showToast(json.message || "فشلت المطابقة مع قاعدة بيانات الطلاب");
+      }
+    } catch (e) {
+      showToast("خطأ في الاتصال أثناء مطابقة بيانات الطلاب");
+    } finally {
+      setReconcilingStudents(false);
     }
   };
 
@@ -1188,7 +1214,7 @@ export default function LockerAdminTab() {
 
                   <button
                     onClick={handleSyncFromUrl}
-                    disabled={syncLoading || previewLoading}
+                    disabled={syncLoading || previewLoading || reconcilingStudents}
                     style={{
                       background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                       color: "#fff",
@@ -1197,7 +1223,7 @@ export default function LockerAdminTab() {
                       borderRadius: "12px",
                       fontWeight: "900",
                       fontSize: "15px",
-                      cursor: (syncLoading || previewLoading) ? "not-allowed" : "pointer",
+                      cursor: (syncLoading || previewLoading || reconcilingStudents) ? "not-allowed" : "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1205,8 +1231,32 @@ export default function LockerAdminTab() {
                       boxShadow: "0 4px 20px rgba(16, 185, 129, 0.25)"
                     }}
                   >
-                    <RefreshCw size={18} />
+                    <RefreshCw size={18} className={syncLoading ? "animate-spin" : ""} />
                     <span>{syncLoading ? "جاري المزامنة الشاملة..." : "بدء المزامنة الفورية لكامل الشيت ⚡"}</span>
+                  </button>
+
+                  <button
+                    onClick={handleReconcileStudents}
+                    disabled={reconcilingStudents || syncLoading || previewLoading}
+                    style={{
+                      background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "14px 20px",
+                      borderRadius: "12px",
+                      fontWeight: "900",
+                      fontSize: "15px",
+                      cursor: (reconcilingStudents || syncLoading || previewLoading) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "10px",
+                      boxShadow: "0 4px 20px rgba(139, 92, 246, 0.25)"
+                    }}
+                    title="مطابقة أسماء الحجوزات مع قاعدة بيانات الطلاب وتعبئة الأكواد لظهور الدواليب بحساباتهم فورياً"
+                  >
+                    <Users size={18} className={reconcilingStudents ? "animate-spin" : ""} />
+                    <span>{reconcilingStudents ? "جاري مطابقة وربط الأكواد..." : "مطابقة الأكواد مع قاعدة بيانات الطلاب 🔄"}</span>
                   </button>
                 </div>
 

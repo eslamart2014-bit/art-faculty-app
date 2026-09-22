@@ -27,7 +27,8 @@ import {
   Sun,
   RotateCw,
   ShieldCheck,
-  Check
+  Check,
+  Archive
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
@@ -1361,10 +1362,56 @@ export default function SystemPage() {
               <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {currentStudent.full_name}
               </div>
-              <div style={{ color: "#38bdf8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ color: "#38bdf8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                 <span>كود: {formatStudentCode(currentStudent.student_code)}</span>
                 <span style={{ opacity: 0.4 }}>•</span>
                 <span style={{ color: "#94a3b8" }}>{currentStudent.academic_year}</span>
+                {dashboardData?.locker?.status === 'confirmed' && dashboardData?.locker?.booking && (
+                  <>
+                    <span style={{ opacity: 0.4 }}>•</span>
+                    <span 
+                      onClick={() => setActiveTab("lockers")}
+                      style={{ 
+                        color: "#34d399", 
+                        cursor: "pointer", 
+                        fontWeight: "bold",
+                        background: "rgba(16, 185, 129, 0.15)",
+                        padding: "1px 7px",
+                        borderRadius: "6px",
+                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                      title="عرض تفاصيل الدولاب"
+                    >
+                      🗄️ دولاب: {dashboardData.locker.booking.locker_code}
+                    </span>
+                  </>
+                )}
+                {dashboardData?.locker?.status === 'pending' && dashboardData?.locker?.booking && (
+                  <>
+                    <span style={{ opacity: 0.4 }}>•</span>
+                    <span 
+                      onClick={() => setActiveTab("lockers")}
+                      style={{ 
+                        color: "#f59e0b", 
+                        cursor: "pointer", 
+                        fontWeight: "bold",
+                        background: "rgba(245, 158, 11, 0.15)",
+                        padding: "1px 7px",
+                        borderRadius: "6px",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                      title="طلب الحجز قيد المراجعة والاعتماد"
+                    >
+                      ⏳ حجز دولاب: {dashboardData.locker.booking.locker_code}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1428,7 +1475,14 @@ export default function SystemPage() {
             { id: "evaluation", label: "المشاريع 🎨", color: "#10b981" },
             { id: "attendance", label: "الحضور 📅", color: "#38bdf8" },
             { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: dashboardData?.warnings?.length || 0 },
-            { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7" },
+            { 
+              id: "lockers", 
+              label: "الدواليب 🗄️", 
+              color: "#a855f7", 
+              badge: dashboardData?.locker?.status === 'confirmed' 
+                ? (dashboardData.locker.booking?.locker_code || "✓") 
+                : (dashboardData?.locker?.status === 'pending' ? "⏳" : undefined)
+            },
             { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b" }
           ].map(tab => {
             const isActive = activeTab === tab.id;
@@ -1492,6 +1546,45 @@ export default function SystemPage() {
             {/* 1.1 عندما لا يكون هناك مشروع مفتوح: عرض شبكة كروت المشاريع */}
             {!selectedProjectForView ? (
               <div>
+                {/* كارت ملخص الدولاب المسكن للطالب */}
+                {dashboardData?.locker?.status === 'confirmed' && dashboardData?.locker?.booking && (
+                  <div 
+                    onClick={() => setActiveTab("lockers")}
+                    style={{
+                      background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2))",
+                      border: "1px solid rgba(16, 185, 129, 0.35)",
+                      borderRadius: "12px",
+                      padding: "10px 14px",
+                      marginBottom: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      gap: "10px"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                      <div style={{ background: "rgba(16, 185, 129, 0.2)", padding: "7px", borderRadius: "8px" }}>
+                        <Archive size={18} color="#34d399" />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>دولابك المخصص:</span>
+                          <span style={{ color: "#34d399", background: "rgba(16, 185, 129, 0.2)", padding: "1px 8px", borderRadius: "6px" }}>
+                            {dashboardData.locker.booking.locker_code}
+                          </span>
+                        </div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          الزملاء: {(dashboardData.locker.booking.student_names || []).join('، ') || 'مسكن فردي'}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                      عرض التفاصيل ←
+                    </span>
+                  </div>
+                )}
+
                 {/* شريط الفلترة حسب المقرر إن وُجد أكثر من مقرر */}
                 {dashboardData?.projects?.length > 1 && (
                   <div 

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
   try {
     await lockerStore.ensureLoaded();
-    const result = lockerStore.getStudentLockerStatus(code || name);
+    const result = lockerStore.getStudentLockerStatus({ code, name });
     return NextResponse.json({
       success: true,
       data: result
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         if (excludeCodes.includes(student.student_code)) return false;
 
         // فحص هل الطالب مسكن في أي دولاب
-        const status = lockerStore.getStudentLockerStatus(student.student_code);
+        const status = lockerStore.getStudentLockerStatus({ code: student.student_code, name: student.full_name });
         return status.status === 'none';
       });
 
