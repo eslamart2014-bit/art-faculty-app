@@ -37,7 +37,6 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [phone, setPhone] = useState(student.mobile_number || "");
-  const [preferredLetter, setPreferredLetter] = useState("ALL");
   const [partners, setPartners] = useState<{ name: string; code: string }[]>([]);
   
   // Search Peer State
@@ -141,8 +140,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           cohort: student.academic_year,
           representative_phone: phone.trim(),
           student_names: allNames,
-          student_codes: allCodes,
-          preferred_letter: preferredLetter !== 'ALL' ? preferredLetter : undefined
+          student_codes: allCodes
         })
       });
 
@@ -836,32 +834,6 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   </div>
                 </div>
 
-                {/* اختيار الحرف المفضل (اختياري) */}
-                <div>
-                  <label style={{ display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "6px" }}>
-                    الحرف المفضل للدولاب (اختياري):
-                  </label>
-                  <select
-                    value={preferredLetter}
-                    onChange={(e) => setPreferredLetter(e.target.value)}
-                    style={{
-                      width: "100%",
-                      background: "#0f172a",
-                      border: "1px solid #334155",
-                      borderRadius: "10px",
-                      padding: "10px",
-                      color: "#fff",
-                      fontSize: "14px",
-                      outline: "none"
-                    }}
-                  >
-                    <option value="ALL">تسكين تلقائي (أي دولاب متاح فوراً)</option>
-                    <option value="A">دواليب قسم A</option>
-                    <option value="B">دواليب قسم B</option>
-                    <option value="C">دواليب قسم C</option>
-                    <option value="D">دواليب قسم D</option>
-                  </select>
-                </div>
 
                 {/* زر الإرسال */}
                 <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>

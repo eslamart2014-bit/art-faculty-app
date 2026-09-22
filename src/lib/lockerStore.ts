@@ -233,6 +233,30 @@ export function isArabicNameMatch(name1: string, name2: string): boolean {
   return false;
 }
 
+// توحيد ومطابقة أسماء الفرق الدراسية بمختلف صيغها (مع كلمة "الفرقة" أو بدونها)
+export function normalizeCohortName(c: string = ''): string {
+  const norm = String(c || '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\s\-_]/g, '')
+    .toLowerCase();
+
+  if (norm.includes('اول') || norm.includes('1')) return '1';
+  if (norm.includes('ثان') || norm.includes('تان') || norm.includes('2')) return '2';
+  if (norm.includes('ثالث') || norm.includes('تالت') || norm.includes('3')) return '3';
+  if (norm.includes('رابع') || norm.includes('4')) return '4';
+  return norm;
+}
+
+export function isCohortMatch(c1: string = '', c2: string = ''): boolean {
+  if (!c1 || !c2) return false;
+  const k1 = normalizeCohortName(c1);
+  const k2 = normalizeCohortName(c2);
+  if (k1 === k2) return true;
+  return c1.trim() === c2.trim();
+}
+
 // استكشاف كافة تبويبات وأوراق العمل الموجودة في ملف جوجل شيت تلقائياً
 export async function discoverAllSheetTabs(sheetId: string): Promise<string[]> {
   const tabs = new Set<string>();
@@ -916,22 +940,18 @@ export const lockerStore = {
       }
     }
 
-    // البحث عن دولاب شاغر ومتاح (مفعل)
+    // البحث عن جميع الدواليب الشاغرة المتاحة واختيار دولاب عشوائي
+    const emptyLockers = db.lockers.filter(l => 
+      l.status === 'empty' && 
+      l.is_enabled === true && 
+      !l.is_admin_reserved
+    );
+
     let availableLocker: LockerItem | undefined;
-
-    // إذا طلب حرفاً مفضلاً
-    if (params.preferred_letter) {
-      availableLocker = db.lockers.find(l => 
-        l.letter.toUpperCase() === params.preferred_letter?.toUpperCase() &&
-        l.status === 'empty' &&
-        l.is_enabled === true &&
-        !l.is_admin_reserved
-      );
-    }
-
-    // إذا لم يجد أو لم يحدد حرفاً، خذ أول دولاب شاغر متاح
-    if (!availableLocker) {
-      availableLocker = db.lockers.find(l => l.status === 'empty' && l.is_enabled === true && !l.is_admin_reserved);
+    if (emptyLockers.length > 0) {
+      // تخصيص عشوائي تماماً من الدواليب المتاحة
+      const randomIndex = Math.floor(Math.random() * emptyLockers.length);
+      availableLocker = emptyLockers[randomIndex];
     }
 
     // إذا لم تتوفر دواليب شاغرة -> تحويل تلقائي لقائمة الانتظار!
@@ -1120,21 +1140,40 @@ export const lockerStore = {
 
   // 14. تفريغ دفعة بالكامل (مثلاً الفرقة الرابعة بعد التخرج)
   async clearCohort(cohort: string): Promise<{ clearedCount: number }> {
+    await this.ensureLoaded(true);
     const db = readLocalDB();
     let count = 0;
+    const clearedLockerCodes = new Set<string>();
 
     for (const booking of db.bookings) {
-      if ((booking.status === 'confirmed' || booking.status === 'pending') && booking.cohort === cohort) {
+      if ((booking.status === 'confirmed' || booking.status === 'pending') && isCohortMatch(booking.cohort, cohort)) {
         booking.status = 'rejected';
         booking.notes = `تم تفريغ الدفعة بالكامل (${cohort})`;
+        clearedLockerCodes.add(booking.locker_code.toUpperCase());
+        count++;
+      }
+    }
 
-        const locker = db.lockers.find(l => l.locker_code === booking.locker_code);
-        if (locker) {
+    // إخلاء جميع الدواليب المرتبطة بالحجوزات المفرغة
+    for (const locker of db.lockers) {
+      if (clearedLockerCodes.has(locker.locker_code.toUpperCase())) {
+        locker.status = 'empty';
+        locker.current_booking_id = null;
+        locker.updated_at = new Date().toISOString();
+      } else if (locker.current_booking_id) {
+        const b = db.bookings.find(x => x.id === locker.current_booking_id);
+        if (b && isCohortMatch(b.cohort, cohort)) {
           locker.status = 'empty';
           locker.current_booking_id = null;
           locker.updated_at = new Date().toISOString();
         }
-        count++;
+      }
+    }
+
+    // إلغاء أي طلبات في قائمة الانتظار تخص هذه الفرقة
+    for (const wait of db.waitlist) {
+      if (wait.status === 'waiting' && isCohortMatch(wait.cohort, cohort)) {
+        wait.status = 'cancelled';
       }
     }
 
@@ -1295,6 +1334,7 @@ export const lockerStore = {
     notes?: string;
     status?: 'confirmed' | 'pending';
   }): Promise<{ success: boolean; message: string; booking?: LockerBooking; locker?: LockerItem }> {
+    await this.ensureLoaded(true);
     const db = readLocalDB();
     const code = params.lockerCode.trim().toUpperCase();
     let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
@@ -1331,13 +1371,42 @@ export const lockerStore = {
     const bookingId = `B_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const validNames = (params.studentNames || []).map(n => String(n || '').trim()).filter(Boolean);
 
+    const finalCodes: string[] = [...(params.studentCodes || [])];
+    while (finalCodes.length < validNames.length) {
+      finalCodes.push('');
+    }
+
+    // مطابقة وتعبئة أكواد الطلاب تلقائياً إن كانت غير مكتملة
+    try {
+      for (let i = 0; i < validNames.length; i++) {
+        if (!finalCodes[i] || !finalCodes[i].trim()) {
+          const sName = validNames[i];
+          const firstWord = sName.split(' ')[0];
+          const { data: stRows } = await supabaseAdmin
+            .from('students')
+            .select('student_code, full_name')
+            .ilike('full_name', `%${firstWord}%`)
+            .limit(25);
+
+          if (stRows && stRows.length > 0) {
+            const matched = stRows.find((s: any) => isArabicNameMatch(s.full_name, sName));
+            if (matched) {
+              finalCodes[i] = matched.student_code;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[LockerStore] Auto-resolve student codes error:', e);
+    }
+
     const newBooking: LockerBooking = {
       id: bookingId,
       locker_code: code,
       cohort: params.cohort || 'الفرقة الرابعة',
       representative_phone: params.phone || '',
       student_names: validNames,
-      student_codes: params.studentCodes || [],
+      student_codes: finalCodes,
       status: bookingStatus,
       created_at: new Date().toISOString(),
       confirmed_at: bookingStatus === 'confirmed' ? new Date().toISOString() : undefined,

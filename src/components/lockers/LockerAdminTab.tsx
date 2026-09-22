@@ -49,6 +49,10 @@ export default function LockerAdminTab() {
   const [manualAssignCohort, setManualAssignCohort] = useState<string>("الفرقة الرابعة");
   const [manualAssignPhone, setManualAssignPhone] = useState<string>("");
   const [manualAssignNames, setManualAssignNames] = useState<string[]>(["", "", "", ""]);
+  const [manualAssignCodes, setManualAssignCodes] = useState<string[]>(["", "", "", ""]);
+  const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
+  const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
+  const [isSearchingStudents, setIsSearchingStudents] = useState<boolean>(false);
 
   // إعداد وضبط أعداد ونطاقات الدواليب
   const [inventoryRanges, setInventoryRanges] = useState<{ [key: string]: number }>({ A: 40, B: 40, C: 40, D: 40 });
@@ -309,9 +313,59 @@ export default function LockerAdminTab() {
     setManualAssignPhone("");
     const cap = locker.capacity || 4;
     setManualAssignNames(new Array(cap).fill(""));
+    setManualAssignCodes(new Array(cap).fill(""));
+    setActiveSearchIdx(null);
+    setStudentSuggestions([]);
   };
 
-  // حفظ التسكين اليدوي
+  // البحث الذكي أثناء كتابة اسم الطالب في التسكين اليدوي
+  const handleStudentSearchInput = async (idx: number, query: string) => {
+    const updatedNames = [...manualAssignNames];
+    updatedNames[idx] = query;
+    setManualAssignNames(updatedNames);
+
+    const updatedCodes = [...manualAssignCodes];
+    updatedCodes[idx] = "";
+    setManualAssignCodes(updatedCodes);
+
+    if (!query || query.trim().length < 2) {
+      setStudentSuggestions([]);
+      setActiveSearchIdx(null);
+      return;
+    }
+
+    setActiveSearchIdx(idx);
+    setIsSearchingStudents(true);
+    try {
+      const res = await fetch(`/api/students/search?q=${encodeURIComponent(query.trim())}&level=${encodeURIComponent(manualAssignCohort)}`);
+      const json = await res.json();
+      if (json.students && json.students.length > 0) {
+        setStudentSuggestions(json.students);
+      } else {
+        setStudentSuggestions([]);
+      }
+    } catch {
+      setStudentSuggestions([]);
+    } finally {
+      setIsSearchingStudents(false);
+    }
+  };
+
+  // اختيار طالب من قائمة البحث الذكي
+  const handleSelectStudent = (idx: number, student: any) => {
+    const updatedNames = [...manualAssignNames];
+    updatedNames[idx] = student.full_name;
+    setManualAssignNames(updatedNames);
+
+    const updatedCodes = [...manualAssignCodes];
+    updatedCodes[idx] = student.student_code;
+    setManualAssignCodes(updatedCodes);
+
+    setActiveSearchIdx(null);
+    setStudentSuggestions([]);
+  };
+
+  // حفظ التسكين اليدوي مع ربط الأكواد وحفظها سحابياً
   const handleManualAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualAssignLocker) return;
@@ -330,7 +384,8 @@ export default function LockerAdminTab() {
           lockerCode: manualAssignLocker.locker_code,
           cohort: manualAssignCohort,
           phone: manualAssignPhone,
-          studentNames: names
+          studentNames: names,
+          studentCodes: manualAssignCodes.slice(0, names.length)
         })
       });
       const json = await res.json();
@@ -1649,30 +1704,106 @@ export default function LockerAdminTab() {
               </div>
 
               <div>
-                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>أسماء الطلاب المسكنين (سعة {manualAssignLocker.capacity || 4} طلاب):</label>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+                  أسماء الطلاب المسكنين (سعة {manualAssignLocker.capacity || 4} طلاب) - بالبحث الذكي:
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {manualAssignNames.map((name, idx) => (
-                    <input
-                      key={idx}
-                      type="text"
-                      placeholder={`اسم الطالب (${idx + 1})`}
-                      value={name}
-                      onChange={(e) => {
-                        const updated = [...manualAssignNames];
-                        updated[idx] = e.target.value;
-                        setManualAssignNames(updated);
-                      }}
-                      style={{
-                        width: "100%",
-                        background: "#0f172a",
-                        border: "1px solid #334155",
-                        borderRadius: "8px",
-                        padding: "8px 12px",
-                        color: "#fff",
-                        outline: "none",
-                        fontSize: "13px"
-                      }}
-                    />
+                    <div key={idx} style={{ position: "relative" }}>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input
+                          type="text"
+                          placeholder={`اسم الطالب (${idx + 1}) - اكتب للبحث بالاسم أو الكود...`}
+                          value={name}
+                          onChange={(e) => handleStudentSearchInput(idx, e.target.value)}
+                          onFocus={() => {
+                            if (name && name.length >= 2) {
+                              handleStudentSearchInput(idx, name);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            background: "#0f172a",
+                            border: manualAssignCodes[idx] ? "1.5px solid #10b981" : "1px solid #334155",
+                            borderRadius: "8px",
+                            padding: "9px 12px",
+                            color: "#fff",
+                            outline: "none",
+                            fontSize: "13px"
+                          }}
+                        />
+                        {manualAssignCodes[idx] && (
+                          <span 
+                            style={{
+                              background: "rgba(16, 185, 129, 0.2)",
+                              color: "#34d399",
+                              border: "1px solid rgba(16, 185, 129, 0.4)",
+                              borderRadius: "6px",
+                              padding: "5px 8px",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              whiteSpace: "nowrap"
+                            }}
+                            title="تم ربط كود الطالب بنجاح وسيظهر الدولاب في حسابه فورياً"
+                          >
+                            ✓ #{manualAssignCodes[idx]}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* القائمة الذكية المنسدلة للبحث */}
+                      {activeSearchIdx === idx && (
+                        <div style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          zIndex: 10010,
+                          background: "#1e293b",
+                          border: "1px solid #38bdf8",
+                          borderRadius: "10px",
+                          marginTop: "4px",
+                          maxHeight: "180px",
+                          overflowY: "auto",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.7)"
+                        }}>
+                          {isSearchingStudents ? (
+                            <div style={{ padding: "10px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              جاري البحث في قاعدة بيانات الطلاب...
+                            </div>
+                          ) : studentSuggestions.length > 0 ? (
+                            studentSuggestions.map((st: any) => (
+                              <div
+                                key={st.id || st.student_code}
+                                onClick={() => handleSelectStudent(idx, st)}
+                                style={{
+                                  padding: "9px 14px",
+                                  cursor: "pointer",
+                                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#334155")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <div>
+                                  <div style={{ color: "#fff", fontSize: "13px", fontWeight: "bold" }}>{st.full_name}</div>
+                                  <div style={{ color: "#94a3b8", fontSize: "11px" }}>{st.academic_year || manualAssignCohort} {st.section ? `• ${st.section}` : ''}</div>
+                                </div>
+                                <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold", background: "rgba(56, 189, 248, 0.15)", padding: "2px 7px", borderRadius: "4px" }}>
+                                  #{st.student_code}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ padding: "10px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              لا توجد نتائج مطابقة، يمكنك ترك الاسم كما كتبته
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
