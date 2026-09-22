@@ -477,22 +477,24 @@ export default function StudentPortalHubModal({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "16px 20px",
+          padding: "12px 18px",
           background: "#141b29",
-          borderBottom: "1px solid #2a374f"
+          borderBottom: "1px solid #2a374f",
+          minHeight: "56px"
         }}
       >
         <div>
-          <h2 style={{ margin: 0, color: "#38bdf8", fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <h3 style={{ margin: 0, color: "#38bdf8", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
             <span>🎓</span> بوابة الطلاب وجناح الأمان الأكاديمي
-          </h2>
-          <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
+          </h3>
+          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
             جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
         <button
           onClick={onClose}
-          style={{ background: "none", border: "none", color: "#aaa", fontSize: "26px", cursor: "pointer" }}
+          className="modal-close-btn"
+          title="إغلاق"
         >
           ✕
         </button>

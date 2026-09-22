@@ -369,16 +369,30 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
       background: "rgba(0,0,0,0.85)", zIndex: 1000,
       display: "flex", flexDirection: "column", direction: "rtl"
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#1e1e1e", borderBottom: "1px solid #333" }}>
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        padding: "12px 18px", 
+        background: "#181f2c", 
+        borderBottom: "1px solid #2a374f",
+        minHeight: "56px"
+      }}>
         <div>
-          <h2 style={{ margin: 0, color: "#fff", display: "flex", alignItems: "center", gap: "10px" }}>
+          <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
             <span>🧩</span> الإعدادات المتقدمة
-          </h2>
+          </h3>
           <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
             جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
+        <button 
+          onClick={onClose} 
+          className="modal-close-btn"
+          title="إغلاق"
+        >
+          ✕
+        </button>
       </div>
 
       <div 
@@ -388,9 +402,9 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
           flexWrap: "nowrap", 
           overflowX: "auto", 
           whiteSpace: "nowrap", 
-          gap: "8px", 
-          padding: "12px 16px", 
-          background: "#161c28", 
+          gap: "6px", 
+          padding: "10px 14px", 
+          background: "#121824", 
           borderBottom: "1px solid #2a374f",
           scrollbarWidth: "none",
           WebkitOverflowScrolling: "touch"

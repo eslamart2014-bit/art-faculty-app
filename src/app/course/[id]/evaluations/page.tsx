@@ -1106,6 +1106,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 <div style={{ position: "relative", marginBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "8px" }}>
                   <button 
                     onClick={() => { setTargetStudent(null); setSearchInput(""); }} 
+                    className="btn-compact modal-close-btn"
                     title="إغلاق بطاقة الطالب"
                     style={{ 
                       position: "absolute", 
@@ -1366,6 +1367,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 <div style={{ position: "relative", marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "6px" }}>
                   <button 
                     onClick={handleCancelActiveStudent} 
+                    className="btn-compact modal-close-btn"
                     title="إلغاء الطالب الحالي"
                     style={{ 
                       position: "absolute", 

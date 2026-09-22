@@ -128,7 +128,8 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 300, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(2px)" }}>
-      <div className="card" style={{ width: "90%", maxWidth: "380px", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+      <div className="card" style={{ width: "90%", maxWidth: "380px", maxHeight: "85vh", display: "flex", flexDirection: "column", position: "relative" }}>
+        <button onClick={onClose} className="modal-close-btn" style={{ position: "absolute", top: "12px", left: "12px" }} title="إغلاق">✕</button>
         <h3 style={{ marginTop: 0, textAlign: "center", color: "var(--primary)" }}>إضافة مقرر جديد</h3>
         
         <div style={{ flexGrow: 1, overflowY: "auto", paddingRight: "5px" }}>

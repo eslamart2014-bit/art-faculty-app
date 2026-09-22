@@ -286,9 +286,10 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
           <div className="card" style={{ width: "90%", maxWidth: "500px", display: "flex", flexDirection: "column", maxHeight: "90vh", padding: 0, overflow: "hidden" }}>
             
             {/* Header Tabs */}
-            <div style={{ display: "flex", background: "#1e1e1e", borderBottom: "1px solid #333" }}>
-              <button onClick={() => setActiveTab("sync")} style={{ flex: 1, padding: "15px", background: activeTab === "sync" ? "#333" : "transparent", color: activeTab === "sync" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "sync" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}>مزامنة ذكية 🤖</button>
-              <button onClick={() => setActiveTab("export")} style={{ flex: 1, padding: "15px", background: activeTab === "export" ? "#333" : "transparent", color: activeTab === "export" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "export" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer" }}>تصدير الكشوف 📥</button>
+            <div style={{ display: "flex", alignItems: "center", background: "#1e1e1e", borderBottom: "1px solid #333", padding: "0 10px 0 0" }}>
+              <button onClick={() => setActiveTab("sync")} style={{ flex: 1, padding: "14px", background: activeTab === "sync" ? "#333" : "transparent", color: activeTab === "sync" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "sync" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>مزامنة ذكية 🤖</button>
+              <button onClick={() => setActiveTab("export")} style={{ flex: 1, padding: "14px", background: activeTab === "export" ? "#333" : "transparent", color: activeTab === "export" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "export" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>تصدير الكشوف 📥</button>
+              <button onClick={onClose} className="modal-close-btn" style={{ margin: "0 8px" }} title="إغلاق">✕</button>
             </div>
 
             <div style={{ overflowY: "auto", padding: "20px", flexGrow: 1 }}>

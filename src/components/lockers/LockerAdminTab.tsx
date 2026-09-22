@@ -2085,9 +2085,10 @@ export default function LockerAdminTab() {
               </div>
               <button
                 onClick={() => setSelectedLocker(null)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                className="modal-close-btn"
+                title="إغلاق"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2320,9 +2321,10 @@ export default function LockerAdminTab() {
               </div>
               <button
                 onClick={() => setAdminModalLocker(null)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                className="modal-close-btn"
+                title="إغلاق"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -2546,9 +2548,10 @@ export default function LockerAdminTab() {
               </div>
               <button
                 onClick={() => setManualAssignLocker(null)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                className="modal-close-btn"
+                title="إغلاق"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 

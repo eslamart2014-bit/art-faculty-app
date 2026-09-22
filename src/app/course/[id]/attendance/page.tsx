@@ -1249,7 +1249,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           <div style={{ padding: "15px", background: "#1e1e1e", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", direction: "rtl" }}>
             <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📸 ماسح الحضور الذكي</h3>
             
-            <button onClick={closeCameraScanner} style={{ background: "none", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}>✕</button>
+            <button onClick={closeCameraScanner} className="modal-close-btn" title="إغلاق">✕</button>
           </div>
           
           <div style={{ background: "black", position: "relative", height: "300px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
@@ -1350,7 +1350,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           <div style={{ background: "#1e1e1e", borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "20px", direction: "rtl", animation: "slideUp 0.3s" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "15px", marginBottom: "20px" }}>
               <h3 style={{ margin: 0, color: "#fff" }}>⚙️ إعدادات المقرر</h3>
-              <button onClick={() => setShowSettingsModal(false)} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
+              <button onClick={() => setShowSettingsModal(false)} className="modal-close-btn" title="إغلاق">✕</button>
             </div>
             
             <div style={{ marginBottom: "20px" }}>
@@ -1431,7 +1431,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                 <h3 style={{ margin: 0, color: "#fff" }}>اختر أسبوع التحضير</h3>
                 <span style={{ fontSize: "12px", color: "#888" }}>اضغط مطولاً على أي أسبوع لتغيير اسمه (مثال: أسبوع الرسم بالرصاص)</span>
               </div>
-              <button onClick={() => setShowWeeksModal(false)} style={{ background: "none", border: "none", color: "#aaa", fontSize: "24px", cursor: "pointer" }}>✕</button>
+              <button onClick={() => setShowWeeksModal(false)} className="modal-close-btn" title="إغلاق">✕</button>
             </div>
             
             <div style={{ overflowY: "auto", flexGrow: 1, paddingRight: "5px" }}>

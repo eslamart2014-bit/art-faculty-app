@@ -60,10 +60,14 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
         direction: "rtl", border: "1px solid #333", position: "relative",
         boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
       }} onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} style={{
-          position: "absolute", top: "15px", left: "15px",
-          background: "none", border: "none", color: "#aaa", fontSize: "20px", cursor: "pointer"
-        }}>✕</button>
+        <button 
+          onClick={onClose} 
+          className="modal-close-btn"
+          style={{ position: "absolute", top: "15px", left: "15px" }}
+          title="إغلاق"
+        >
+          ✕
+        </button>
         
         <div style={{ textAlign: "center", marginBottom: "25px" }}>
           <div style={{ 

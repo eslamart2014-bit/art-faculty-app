@@ -58,10 +58,14 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userE
         background: "#1e1e1e", padding: "25px", borderRadius: "15px", width: "90%", maxWidth: "350px",
         direction: "rtl", border: "1px solid #444", position: "relative"
       }} onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} style={{
-          position: "absolute", top: "15px", left: "15px",
-          background: "none", border: "none", color: "#aaa", fontSize: "20px", cursor: "pointer"
-        }}>✕</button>
+        <button 
+          onClick={onClose} 
+          className="modal-close-btn"
+          style={{ position: "absolute", top: "15px", left: "15px" }}
+          title="إغلاق"
+        >
+          ✕
+        </button>
         
         <div style={{ textAlign: "center", marginBottom: "20px" }}>
           <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔒</div>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { 
@@ -614,9 +614,10 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
               </div>
               <button 
                 onClick={() => setShowModal(false)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+                className="modal-close-btn"
+                title="إغلاق"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 

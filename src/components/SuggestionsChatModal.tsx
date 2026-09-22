@@ -140,16 +140,16 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
       }} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div style={{ padding: "15px", background: "#121212", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "12px 18px", background: "#121212", borderBottom: "1px solid #333", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {isAdmin && selectedUserId && (
-              <button onClick={() => setSelectedUserId(null)} style={{ background: "none", border: "none", color: "#4CAF50", fontSize: "20px", cursor: "pointer", padding: "0 10px" }}>🡲</button>
+              <button onClick={() => setSelectedUserId(null)} className="btn-compact" style={{ background: "none", border: "none", color: "#4CAF50", fontSize: "16px", cursor: "pointer", padding: "0 8px" }}>🡲</button>
             )}
-            <h2 style={{ margin: 0, color: "#fff", fontSize: "18px" }}>
+            <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", fontWeight: "bold" }}>
               {isAdmin && !selectedUserId ? "💡 صندوق الاقتراحات" : "💡 اقتراحات التطوير (تواصل مع المطور)"}
-            </h2>
+            </h3>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "20px", cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} className="modal-close-btn" title="إغلاق">✕</button>
         </div>
 
         {/* Content */}

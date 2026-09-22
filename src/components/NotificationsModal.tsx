@@ -50,9 +50,9 @@ export default function NotificationsModal({ isOpen, onClose, user }: { isOpen: 
           <h2 style={{ margin: 0, color: "#fff", display: "flex", alignItems: "center", gap: "10px" }}>
             <span>🔔</span> الإشعارات
           </h2>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={clearAll} style={{ background: "transparent", border: "1px solid #f44336", color: "#f44336", borderRadius: "5px", padding: "5px 10px", cursor: "pointer", fontSize: "12px" }}>مسح الكل</button>
-            <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: "20px", cursor: "pointer" }}>✕</button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button onClick={clearAll} className="btn-compact" style={{ background: "transparent", border: "1px solid #f44336", color: "#f44336", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "12px" }}>مسح الكل</button>
+            <button onClick={onClose} className="modal-close-btn" title="إغلاق">✕</button>
           </div>
         </div>
 
