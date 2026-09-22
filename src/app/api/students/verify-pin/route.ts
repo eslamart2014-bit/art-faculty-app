@@ -21,7 +21,6 @@ export async function POST(request: Request) {
 
     // جلب الحساب
     let account: any = null;
-    let studentRecord: any = null;
     try {
       const { data } = await supabaseAdmin
         .from('student_accounts')
@@ -30,22 +29,6 @@ export async function POST(request: Request) {
         .maybeSingle();
       account = data;
     } catch (e) {}
-
-    if (!account) {
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-        if (st) {
-          studentRecord = st;
-          if (st.telegram_browser_id) {
-            account = JSON.parse(st.telegram_browser_id);
-          }
-        }
-      } catch (e) {}
-    }
 
     if (!account) {
       account = localStore.getAccount(cleanCode);
@@ -114,20 +97,6 @@ export async function POST(request: Request) {
       localStore.upsertAccount(account);
       updatedAccount = account;
     }
-
-    // حفظ التفعيل بشكل مستدام في students.telegram_browser_id
-    try {
-      const mergedPayload = {
-        ...account,
-        is_pin_used: true,
-        status: 'active',
-        last_login_at: new Date().toISOString()
-      };
-      await supabaseAdmin
-        .from('students')
-        .update({ telegram_browser_id: JSON.stringify(mergedPayload) })
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-    } catch (e) {}
 
     // تسجيل في الأوديت لوج
     try {

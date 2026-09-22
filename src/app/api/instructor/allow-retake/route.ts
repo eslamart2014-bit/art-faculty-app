@@ -27,9 +27,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'المقرر غير موجود' }, { status: 404 });
     }
 
-    const effectiveInstructorId = instructor_id || course.teacher_id;
-    const isOwner = course.teacher_id === effectiveInstructorId;
-    const isShared = Array.isArray(course.shared_with) && course.shared_with.includes(effectiveInstructorId);
+    const isOwner = course.teacher_id === instructor_id;
+    const isShared = Array.isArray(course.shared_with) && course.shared_with.includes(instructor_id);
 
     if (!isOwner && !isShared) {
       return NextResponse.json(
@@ -38,70 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. فحص واستخراج أي صور مرتبطة بالتسليم لحذفها من سحابة التخزين artworks
-    try {
-      const filesToRemove: string[] = [];
-
-      const { data: subToDelete } = await supabaseAdmin
-        .from('student_submissions')
-        .select('images')
-        .eq('student_code', student_code)
-        .eq('course_id', course_id)
-        .eq('project_name', project_name)
-        .maybeSingle();
-
-      if (subToDelete?.images) {
-        const imgs = Array.isArray(subToDelete.images) ? subToDelete.images : [];
-        imgs.forEach((img: any) => {
-          const url = typeof img === 'string' ? img : (img?.url || '');
-          if (url && url.includes('/artworks/')) {
-            const path = url.split('/artworks/')[1]?.split('?')[0];
-            if (path) filesToRemove.push(decodeURIComponent(path));
-          }
-        });
-      }
-
-      const { data: stData } = await supabaseAdmin
-        .from('students')
-        .select('id')
-        .eq('student_code', student_code)
-        .maybeSingle();
-
-      if (stData?.id) {
-        const { data: evalToDelete } = await supabaseAdmin
-          .from('evaluations')
-          .select('photo_url')
-          .eq('student_id', stData.id)
-          .eq('course_id', course_id)
-          .eq('project_name', project_name)
-          .maybeSingle();
-
-        if (evalToDelete?.photo_url && evalToDelete.photo_url.includes('/artworks/')) {
-          const path = evalToDelete.photo_url.split('/artworks/')[1]?.split('?')[0];
-          if (path) filesToRemove.push(decodeURIComponent(path));
-        }
-
-        // 3. تصفير أو حذف صورة العمل الفني والدرجة لـ null في جدول evaluations
-        await supabaseAdmin
-          .from('evaluations')
-          .update({ photo_url: null, ai_status: null, score: null })
-          .eq('student_id', stData.id)
-          .eq('course_id', course_id)
-          .eq('project_name', project_name);
-      }
-
-      if (filesToRemove.length > 0) {
-        try {
-          await supabaseAdmin.storage.from('artworks').remove(filesToRemove);
-        } catch (storageErr) {
-          console.warn('Storage remove error:', storageErr);
-        }
-      }
-    } catch (cleanupErr) {
-      console.warn('Media cleanup error:', cleanupErr);
-    }
-
-    // 4. حذف التسليم القديم نهائياً من جدول student_submissions
+    // 2. فك القفل في جدول student_submissions (حذف التسليم القديم لإتاحة إعادة التصوير للطالب)
     try {
       await supabaseAdmin
         .from('student_submissions')
@@ -116,15 +52,35 @@ export async function POST(request: Request) {
     // حذف من المخزن المحلي كـ Fallback
     localStore.deleteSubmission(student_code, course_id, project_name);
 
-    // 5. توثيق حركة السماح في سجل الأوديت (Audit Log)
+    // 3. تصفير أو حذف صورة العمل الفني من جدول evaluations إذا كانت مسجلة بالنظام القديم
+    try {
+      const { data: stData } = await supabaseAdmin
+        .from('students')
+        .select('id')
+        .eq('student_code', student_code)
+        .maybeSingle();
+
+      if (stData?.id) {
+        await supabaseAdmin
+          .from('evaluations')
+          .update({ photo_url: null, ai_status: null })
+          .eq('student_id', stData.id)
+          .eq('course_id', course_id)
+          .eq('project_name', project_name);
+      }
+    } catch (e) {
+      console.warn('Update evaluations error:', e);
+    }
+
+    // 4. توثيق حركة السماح في سجل الأوديت (Audit Log)
     try {
       const { data: instProfile } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
-        .eq('id', effectiveInstructorId)
+        .eq('id', instructor_id)
         .maybeSingle();
 
-      const instName = instProfile?.full_name || 'أستاذ المقرر';
+      const instName = instProfile?.full_name || 'عضو هيئة تدريس';
 
       localStore.addAuditLog({
         action: 'ALLOW_RETAKE_ARTWORK',
@@ -142,7 +98,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `تم فك القفل وحذف العمل القديم بنجاح! يمكن للطالب (${student_code}) الآن فتح الكاميرا في بوابته وإعادة تصوير مشروع (${project_name}).`,
+      message: `تم فك القفل بنجاح! يمكن للطالب (${student_code}) الآن فتح الكاميرا في بوابته وإعادة تصوير مشروع (${project_name}).`,
     });
   } catch (err: any) {
     console.error('Allow retake error:', err);

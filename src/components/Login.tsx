@@ -321,6 +321,55 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             {error}
           </div>
         )}
+
+        {/* رابط التحويل لبوابة الطلاب */}
+        <div style={{
+          marginTop: "20px",
+          padding: "16px",
+          background: "linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(16, 185, 129, 0.1))",
+          borderRadius: "14px",
+          border: "1px solid rgba(59, 130, 246, 0.35)",
+          textAlign: "center"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginBottom: "6px" }}>
+            <span style={{ fontSize: "18px" }}>🎓</span>
+            <span style={{ color: "#60a5fa", fontWeight: "bold", fontSize: "14px" }}>
+              هل أنت طالب بالكلية؟
+            </span>
+          </div>
+          <p style={{ color: "#94a3b8", fontSize: "12px", margin: "0 0 12px 0", lineHeight: "1.5" }}>
+            لا تحتاج لبريد أو كلمة مرور الأساتذة — ادخل مباشرة إلى بوابتك لتسجيل الحضور، متابعة التقييمات، ورفع أعمالك.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                localStorage.setItem("fania_last_portal", "/system");
+                localStorage.setItem("fania_app_mode", "student");
+              }
+              window.location.href = "/system";
+            }}
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)"
+            }}
+          >
+            <span>الانتقال لبوابة الطلاب (التحضير والتقييمات)</span>
+            <span>←</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,8 @@
-import { supabaseAdmin } from './supabase';
+/**
+ * محرك تخزين الوسائط السحابي الصامت (Silent Telegram Media Storage Engine)
+ * يرفع الصور في الخلفية إلى تيليجرام ليوفر سعة تخزين غير محدودة ومجانية 100%
+ * مع دعم بديل فوري في حال عدم توفر التوكن.
+ */
 
 export interface UploadResult {
   success: boolean;
@@ -12,8 +16,7 @@ export async function uploadImageToStorage(
   base64Data: string,
   caption = 'بوابة فنية - صورة عمل فني',
   botToken?: string,
-  chatId?: string,
-  storagePath?: string
+  chatId?: string
 ): Promise<UploadResult> {
   const token = botToken || process.env.TELEGRAM_BOT_TOKEN;
   const targetChatId = chatId || process.env.TELEGRAM_MEDIA_CHAT_ID;
@@ -21,6 +24,7 @@ export async function uploadImageToStorage(
   // 1. إذا توفر توكن التيليجرام والشات آي دي: رفع إلى تيليجرام صامت
   if (token && targetChatId) {
     try {
+      // تحويل base64 إلى Buffer
       const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(cleanBase64, 'base64');
 
@@ -37,54 +41,36 @@ export async function uploadImageToStorage(
 
       const data = await res.json();
       if (data.ok && data.result?.photo?.length > 0) {
+        // نأخذ أعلى جودة للصورة (آخر عنصر في المصفوفة)
         const highestPhoto = data.result.photo[data.result.photo.length - 1];
         const fileId = highestPhoto.file_id;
 
-        return {
-          success: true,
-          url: `/api/media/${fileId}`,
-          fileId: fileId,
-          source: 'telegram',
-        };
+        // الحصول على مسار الملف المباشر
+        const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+        const fileData = await fileRes.json();
+
+        if (fileData.ok && fileData.result?.file_path) {
+          const directUrl = `https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`;
+          // استخدام رابط وسيط داخلي لحماية التوكن من الظهور في كود المتصفح
+          const safeProxyUrl = `/api/media/${fileId}`;
+          return {
+            success: true,
+            url: safeProxyUrl,
+            fileId: fileId,
+            source: 'telegram',
+          };
+        }
       }
     } catch (e: any) {
-      console.warn('Telegram upload failed, falling back to Supabase...', e?.message);
+      console.warn('Telegram upload failed, falling back...', e?.message);
     }
   }
 
-  // 2. الرفع إلى سحابة Supabase Storage في مجلد artworks
-  try {
-    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(cleanBase64, 'base64');
-    const fileName = storagePath || `submissions/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webp`;
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('artworks')
-      .upload(fileName, buffer, {
-        contentType: 'image/webp',
-        upsert: true,
-      });
-
-    if (!uploadError) {
-      const { data: publicUrlData } = supabaseAdmin.storage.from('artworks').getPublicUrl(fileName);
-      if (publicUrlData?.publicUrl) {
-        return {
-          success: true,
-          url: publicUrlData.publicUrl,
-          source: 'supabase',
-        };
-      }
-    } else {
-      console.warn('Supabase artworks storage error:', uploadError);
-    }
-  } catch (err: any) {
-    console.warn('Supabase storage exception:', err?.message);
-  }
-
-  // 3. بديل آمن: تخزين مضغوط عالي الكفاءة Base64 Data URL
+  // 2. بديل آمن: تخزين مضغوط عالي الكفاءة
+  // الصور مضغوطة بالفعل لـ ~50KB عبر WebP فيمكن تخزينها بأمان
   return {
     success: true,
-    url: base64Data,
+    url: base64Data, // DataURL خفيف جداً (~50KB)
     source: 'base64',
   };
 }

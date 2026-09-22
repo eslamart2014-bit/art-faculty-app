@@ -8,8 +8,4 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Admin client for secure server-side API routes (bypasses RLS)
-// Safely created ONLY in server runtime when service key is provided; otherwise fall back to standard client
-export const supabaseAdmin = (typeof window === 'undefined' && supabaseServiceKey)
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : supabase;
-
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);

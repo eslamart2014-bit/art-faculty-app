@@ -1,17 +1,19 @@
-// Service Worker v3.6.5 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.5';
+// Service Worker v3.6.6 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.6';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
 const CORE_ASSETS = [
   '/',
+  '/system',
   '/manifest.json',
+  '/manifest-student.json',
   '/icon-192.png'
 ];
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3.6.5...');
+  console.log('[SW] Installing v3.6.6...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {

@@ -1,0 +1,22 @@
+{
+  "name": "نظام فنية — بوابة الطلاب",
+  "short_name": "فنية طلاب",
+  "description": "بوابة طلاب قسم التربية الفنية — متابعة الحضور والتقييمات ورفع الأعمال",
+  "start_url": "/system",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

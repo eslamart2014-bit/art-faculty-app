@@ -4,6 +4,7 @@ import QRScanner from "@/components/QRScanner";
 
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { extractStudentCode } from "@/lib/scannerHelper";
+import LockerAdminTab from "./lockers/LockerAdminTab";
 
 interface AdvancedSettingsModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
     window.history.pushState({ modal: true }, "");
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares" | "roster" | "portal">("study");
+  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares" | "roster" | "portal" | "lockers">("study");
   const [portalStats, setPortalStats] = useState({ totalStudents: 0, registeredAccounts: 0, submissionsCount: 0 });
   const [copiedPortalLink, setCopiedPortalLink] = useState(false);
   

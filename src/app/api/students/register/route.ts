@@ -17,23 +17,9 @@ export async function POST(request: Request) {
       device_info,
     } = body;
 
-    if (!student_code || !student_code.trim()) {
+    if (!student_code || !mobile) {
       return NextResponse.json(
-        { error: 'يرجى إدخال كود الطالب الجامعي' },
-        { status: 400 }
-      );
-    }
-
-    if (!mobile || !mobile.trim()) {
-      return NextResponse.json(
-        { error: 'يرجى إدخال رقم الموبايل للتواصل' },
-        { status: 400 }
-      );
-    }
-
-    if (!id_card_image || (!id_card_image.startsWith('data:image') && !id_card_image.startsWith('http'))) {
-      return NextResponse.json(
-        { error: 'صورة بطاقة الرقم القومي أو كارنيه الكلية إجبارية لإتمام التسجيل' },
+        { error: 'يرجى إدخال كود الطالب ورقم الموبايل بشكل صحيح' },
         { status: 400 }
       );
     }
@@ -54,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. التحقق من الحساب في جدول student_accounts أو telegram_browser_id
+    // 2. التحقق من الحساب في جدول student_accounts
     let existingAccount: any = null;
     try {
       const { data } = await supabaseAdmin
@@ -64,12 +50,6 @@ export async function POST(request: Request) {
         .maybeSingle();
       existingAccount = data;
     } catch (e) {}
-
-    if (!existingAccount && (studentRecord as any).telegram_browser_id) {
-      try {
-        existingAccount = JSON.parse((studentRecord as any).telegram_browser_id);
-      } catch (e) {}
-    }
 
     if (!existingAccount) {
       existingAccount = localStore.getAccount(studentRecord.student_code);
@@ -90,10 +70,7 @@ export async function POST(request: Request) {
     if (id_card_image && id_card_image.startsWith('data:image')) {
       const uploadRes = await uploadImageToStorage(
         id_card_image,
-        `بطاقة هوية الطالب: ${studentRecord.full_name} (${studentRecord.student_code})`,
-        undefined,
-        undefined,
-        `id_cards/${studentRecord.student_code}_${Date.now()}.webp`
+        `بطاقة هوية الطالب: ${studentRecord.full_name} (${studentRecord.student_code})`
       );
       if (uploadRes.success) {
         idCardUrl = uploadRes.url;
@@ -145,16 +122,6 @@ export async function POST(request: Request) {
       localStore.upsertAccount(payload);
     }
 
-    // حفظ فوري ومستدام في جدول students كحاوية JSON آمنة ومزامنة عبر السحاب
-    try {
-      await supabaseAdmin
-        .from('students')
-        .update({ telegram_browser_id: JSON.stringify(payload) })
-        .eq('id', studentRecord.id);
-    } catch (e) {
-      console.error('Error updating students.telegram_browser_id:', e);
-    }
-
     // 6. تسجيل النشاط الأمني
     try {
       await supabaseAdmin.from('portal_audit_logs').insert({
@@ -176,7 +143,7 @@ export async function POST(request: Request) {
         academic_year: studentRecord.academic_year,
         section: studentRecord.section || 'عام',
       },
-      message: 'تم تسجيل بياناتك المبدئية بنجاح! يرجى مراجعة منسق المنظومة لتفعيل حسابك.',
+      message: 'تم تسجيل بياناتك المبدئية بنجاح، يرجى التوجه لأحد منسقي النظام للحصول على الرقم السري.',
     });
   } catch (err: any) {
     console.error('Registration server error:', err);

@@ -47,6 +47,24 @@ export default function Home() {
     }
     return true;
   });
+  const [isRedirectingToStudent, setIsRedirectingToStudent] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('faculty') === '1' || urlParams.get('mode') === 'faculty') {
+        localStorage.removeItem('fania_last_portal');
+        localStorage.setItem('fania_app_mode', 'faculty');
+        return false;
+      }
+      const isFaculty = !!localStorage.getItem('cached_profile');
+      const hasStudentSession = !!localStorage.getItem('fania_student_session');
+      const lastPortal = localStorage.getItem('fania_last_portal');
+      const appMode = localStorage.getItem('fania_app_mode');
+      if (!isFaculty && (hasStudentSession || lastPortal === '/system' || appMode === 'student')) {
+        return true;
+      }
+    }
+    return false;
+  });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeAdminModal, setActiveAdminModal] = useState<"users" | "roster" | null>(null);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
@@ -58,6 +76,26 @@ export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isFacultyMode = urlParams.get('faculty') === '1' || urlParams.get('mode') === 'faculty';
+      if (isFacultyMode) {
+        localStorage.removeItem('fania_last_portal');
+        localStorage.setItem('fania_app_mode', 'faculty');
+      } else {
+        const isFaculty = !!localStorage.getItem('cached_profile');
+        const hasStudentSession = !!localStorage.getItem('fania_student_session');
+        const lastPortal = localStorage.getItem('fania_last_portal');
+        const appMode = localStorage.getItem('fania_app_mode');
+
+        if (!isFaculty && (hasStudentSession || lastPortal === '/system' || appMode === 'student')) {
+          setIsRedirectingToStudent(true);
+          window.location.replace('/system');
+          return;
+        }
+      }
+    }
+
     // 0ms instant cached profile load for offline/instant launch
     if (typeof window !== 'undefined') {
       try {
@@ -169,6 +207,26 @@ export default function Home() {
 
     return authUser;
   };
+
+  if (isRedirectingToStudent) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        background: "#0a0e17",
+        color: "#38bdf8",
+        fontFamily: "system-ui, sans-serif",
+        direction: "rtl"
+      }}>
+        <div style={{ width: "42px", height: "42px", border: "3px solid #1e293b", borderTopColor: "#38bdf8", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
+        <div style={{ fontSize: "16px", fontWeight: "bold", color: "#f1f5f9" }}>جاري فتح بوابة الطلاب...</div>
+        <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>نظام فنية الموحد</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

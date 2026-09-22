@@ -1,64 +1,67 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { 
-  ShieldCheck, 
+  Scan, 
   Search, 
-  Camera, 
+  UserCheck, 
+  ShieldAlert, 
   CheckCircle2, 
-  AlertTriangle, 
-  RotateCcw,
-  ChevronLeft,
-  XCircle,
-  ShieldAlert,
-  UserCheck
+  Copy, 
+  Camera, 
+  ChevronLeft, 
+  Clock, 
+  AlertTriangle,
+  FileText,
+  Smartphone
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { formatStudentCode } from "@/lib/codeHelper";
 import { Html5Qrcode } from "html5-qrcode";
-import { extractStudentCode } from "@/lib/scannerHelper";
+import { extractStudentCode, formatStudentCode } from "@/lib/codeHelper";
 
-export default function CoordinatorPortalPage() {
-  const [user, setUser] = useState<any>(null);
-  const [coordinatorName, setCoordinatorName] = useState<string>("");
+export default function CoordinatorPage() {
+  const [coordinatorName, setCoordinatorName] = useState("");
+  const [coordinatorsList, setCoordinatorsList] = useState<any[]>([]);
+  
   const [searchCode, setSearchCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const [searchResult, setSearchResult] = useState<any>(null);
+
+  // ماسح الكاميرا
   const [isScanning, setIsScanning] = useState(false);
-  const [activatingAnim, setActivatingAnim] = useState(false);
-  const [showActiveDetails, setShowActiveDetails] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  // التحقق من صلاحية المستخدم كمنسق
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+    // جلب قائمة المنسقين
+    fetch("/api/coordinators")
+      .then(r => r.json())
+      .then(d => {
+        if (d.coordinators) {
+          setCoordinatorsList(d.coordinators);
+          if (d.coordinators.length > 0) {
+            setCoordinatorName(d.coordinators[0].name);
+          }
+        }
+      })
+      .catch(console.error);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id, full_name, role, can_verify_students")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (profile) {
-        setUser(profile);
-        setCoordinatorName(profile.full_name || "منسق النظام");
-      }
-    };
-
-    checkAuth();
+    const savedCoord = localStorage.getItem("fania_coordinator_name");
+    if (savedCoord) setCoordinatorName(savedCoord);
   }, []);
 
-  // البحث عن الطالب بكوده
-  const handleLookup = async (codeToLookup?: string) => {
-    const code = (codeToLookup || searchCode).trim();
-    if (!code) return;
+  const handleCoordinatorChange = (name: string) => {
+    setCoordinatorName(name);
+    localStorage.setItem("fania_coordinator_name", name);
+  };
+
+  const handleLookup = async (codeToSearch?: string) => {
+    const target = codeToSearch || searchCode;
+    if (!target.trim()) return;
 
     setLoading(true);
+    setErrorMsg("");
     setSearchResult(null);
-    setShowActiveDetails(false);
 
     try {
       const res = await fetch("/api/coordinator/action", {
@@ -66,95 +69,25 @@ export default function CoordinatorPortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "lookup",
-          student_code: code,
-          coordinator_name: coordinatorName || "منسق النظام",
+          student_code: target.trim(),
         })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "تعذر البحث عن الطالب");
+        setErrorMsg(data.error || "لم يتم العثور على الطالب");
       } else {
         setSearchResult(data);
       }
     } catch (e: any) {
-      alert("خطأ في الاتصال: " + e.message);
+      setErrorMsg("خطأ في الاتصال بالسيرفر");
     } finally {
       setLoading(false);
     }
   };
 
-  // 1. تفعيل حساب الطالب (مع أنيميشن تزايد وسرعة العودة لطالب آخر)
-  const handleActivateStudent = async () => {
-    if (!searchResult?.student?.student_code) return;
-
-    setActivatingAnim(true);
-    try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "activate_student",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        // بعد ثانية واحدة من الأنيميشن، العودة لطالب آخر لسرعة الطابور
-        setTimeout(() => {
-          setActivatingAnim(false);
-          setSearchResult(null);
-          setSearchCode("");
-          // إذا كانت الكاميرا متاحة يعود لتشغيلها أو التركيز على البحث
-          const inputEl = document.getElementById("coordSearchInput");
-          if (inputEl) inputEl.focus();
-        }, 1000);
-      } else {
-        setActivatingAnim(false);
-        alert(data.error || "تعذر تفعيل الحساب");
-      }
-    } catch (e: any) {
-      setActivatingAnim(false);
-      alert("خطأ: " + e.message);
-    }
-  };
-
-  // 2. رفض البيانات (بيانات خاطئة)
-  const handleRejectData = async () => {
-    if (!searchResult?.student?.student_code) return;
-    if (!confirm("هل أنت متأكد من رفض بيانات هذا الطالب وحذف تسجيله؟\nسيتعين على الطالب التسجيل مجدداً من الصفر بهاتفه.")) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "reject_incorrect_data",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        alert("✅ تم رفض البيانات وتصفير حساب الطالب للبدء من جديد.");
-        setSearchResult(null);
-        setSearchCode("");
-      } else {
-        alert(data.error || "تعذر الرفض");
-      }
-    } catch (e: any) {
-      alert("خطأ: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 3. إظهار بيانات التسجيل وإنهاء جلسات الأجهزة الأخرى لمنع التحايل
-  const handleShowRegistrationData = async () => {
+  // تأكيد صرف الرقم السري للطالب
+  const handleConfirmIssue = async () => {
     if (!searchResult?.student?.student_code) return;
 
     setLoading(true);
@@ -163,7 +96,7 @@ export default function CoordinatorPortalPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "reset_other_sessions",
+          action: "issue_pin",
           student_code: searchResult.student.student_code,
           coordinator_name: coordinatorName || "منسق النظام",
         })
@@ -171,10 +104,10 @@ export default function CoordinatorPortalPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setShowActiveDetails(true);
-        alert("🔒 " + (data.message || "تم إنهاء جلسات الطالب من الأجهزة الأخرى بنجاح."));
+        alert("تم اعتماد بطاقة الطالب وتأكيد تسليم الرقم السري بنجاح!");
+        handleLookup(searchResult.student.student_code);
       } else {
-        alert(data.error || "تعذر العملية");
+        alert(data.error || "تعذر التسجيل");
       }
     } catch (e: any) {
       alert("خطأ: " + e.message);
@@ -188,14 +121,11 @@ export default function CoordinatorPortalPage() {
     setIsScanning(true);
     setTimeout(() => {
       try {
-        const scanner = new Html5Qrcode("qr-reader-container", {
-          useBarCodeDetectorIfSupported: true,
-          verbose: false
-        });
+        const scanner = new Html5Qrcode("qr-reader-container");
         scannerRef.current = scanner;
         scanner.start(
           { facingMode: "environment" },
-          { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+          { fps: 15, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
             const extracted = extractStudentCode(decodedText);
             if (extracted) {
@@ -207,14 +137,14 @@ export default function CoordinatorPortalPage() {
           () => {}
         ).catch(err => {
           console.warn(err);
-          alert("تعذر فتح الكاميرا للمسح، يرجى التأكد من منح الإذن.");
+          alert("تعذر فتح الكاميرا للمسح");
           setIsScanning(false);
         });
       } catch (e) {
         console.error(e);
         setIsScanning(false);
       }
-    }, 150);
+    }, 200);
   };
 
   const stopScanner = () => {
@@ -241,90 +171,82 @@ export default function CoordinatorPortalPage() {
 
       <div className="glass-card" style={{ padding: "20px", marginBottom: "18px" }}>
         
-        {/* المنسق الحالي المسؤول عن الصرف */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #1e293b" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={22} />
-          </div>
-          <div>
-            <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق الحالي المسؤول عن التفعيل:</div>
-            <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{coordinatorName || "منسق معتمد"}</div>
-          </div>
+        {/* اختيار اسم المنسق القائم بالعملية */}
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+            المنسق الحالي المسؤول عن الصرف:
+          </label>
+          <select 
+            value={coordinatorName} 
+            onChange={(e) => handleCoordinatorChange(e.target.value)}
+            style={{ fontWeight: "bold", color: "#38bdf8" }}
+          >
+            {coordinatorsList.map(c => (
+              <option key={c.id} value={c.name} style={{ background: "#141b29", color: "#fff" }}>
+                {c.name} ({c.title || "منسق"})
+              </option>
+            ))}
+          </select>
         </div>
 
-        <h1 style={{ fontSize: "18px", fontWeight: "bold", color: "#fff", marginBottom: "6px" }}>
-          اعتماد هوية الطالب وتفعيل حسابه
-        </h1>
-        <p style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "16px", lineHeight: "1.5" }}>
-          قم بمسح كود الطالب بالـ QR أو كتابة الكود للتحقق من هويته وبطاقته وتفعيل حسابه فورياً.
-        </p>
-
-        {/* حقل البحث والكاميرا */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-          <div style={{ position: "relative", flex: 1 }}>
+        {/* خانة إدخال الكود + زر الكاميرا */}
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+            البحث بكود الطالب أو مسح بطاقة الـ QR:
+          </label>
+          <div style={{ display: "flex", gap: "8px" }}>
             <input 
-              id="coordSearchInput"
               type="text"
-              placeholder="أدخل كود الطالب (مثل: 0001)..."
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleLookup(); }}
-              style={{ width: "100%", padding: "12px", paddingRight: "36px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
+              placeholder="اكتب كود الطالب (0001)..."
+              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+              style={{ flex: 1, fontWeight: "bold" }}
             />
-            <Search size={16} style={{ position: "absolute", right: "12px", top: "15px", color: "#64748b" }} />
+            <button 
+              onClick={() => handleLookup()}
+              disabled={loading}
+              className="btn-primary"
+              style={{ width: "50px", padding: "0" }}
+              title="بحث"
+            >
+              <Search size={18} />
+            </button>
+            <button 
+              onClick={startScanner}
+              className="btn-primary"
+              style={{ width: "50px", padding: "0", background: "linear-gradient(135deg, #10b981, #059669)" }}
+              title="مسح بالكاميرا"
+            >
+              <Camera size={18} />
+            </button>
           </div>
-
-          <button 
-            onClick={() => handleLookup()}
-            disabled={loading}
-            className="btn-primary"
-            style={{ padding: "0 18px", fontSize: "13px" }}
-          >
-            {loading ? "بحث..." : "فحص"}
-          </button>
-
-          <button 
-            onClick={isScanning ? stopScanner : startScanner}
-            style={{ 
-              background: isScanning ? "#ef4444" : "#1e293b", 
-              border: "1px solid #334155", 
-              color: "#fff", 
-              borderRadius: "10px", 
-              padding: "0 14px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}
-            title="مسح QR بالكاميرا"
-          >
-            <Camera size={18} />
-          </button>
         </div>
 
-        {/* حاوية الكاميرا لمسح QR */}
-        {isScanning && (
-          <div style={{ position: "relative", marginBottom: "16px", borderRadius: "14px", overflow: "hidden", border: "2px solid #10b981", background: "#000" }}>
-            <div id="qr-reader-container" style={{ width: "100%" }}></div>
-            <div style={{ padding: "8px", background: "rgba(0,0,0,0.8)", textAlign: "center", color: "#10b981", fontSize: "12px", fontWeight: "bold" }}>
-              وجه الكاميرا نحو كود بطاقة الطالب لمسحه فوراً...
-            </div>
-            <button 
-              onClick={stopScanner}
-              style={{ position: "absolute", top: "8px", left: "8px", background: "rgba(239,68,68,0.8)", border: "none", color: "#fff", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
-            >
-              إغلاق الكاميرا ✕
-            </button>
+        {errorMsg && (
+          <div style={{ color: "#f87171", fontSize: "13px", padding: "10px", borderRadius: "8px", background: "rgba(239, 68, 68, 0.1)", textAlign: "center" }}>
+            {errorMsg}
           </div>
         )}
 
       </div>
 
-      {/* نتيجة الفحص */}
+      {/* نافذة ماسح الـ QR */}
+      {isScanning && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.9)", display: "flex", flexDirection: "column", justifyContent: "center", padding: "20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <span style={{ color: "#fff", fontWeight: "bold" }}>امسح كود QR الطالب بالكاميرا</span>
+            <button onClick={stopScanner} style={{ background: "#333", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer" }}>✕</button>
+          </div>
+          <div id="qr-reader-container" style={{ width: "100%", borderRadius: "14px", overflow: "hidden", border: "2px solid #10b981" }} />
+        </div>
+      )}
+
+      {/* نتائج فحص الطالب */}
       {searchResult && (
         <div className="glass-card animate-fade-in" style={{ padding: "20px" }}>
           
-          {/* 1. حالة غير مسجل في البوابة */}
+          {/* 1. حالة غير مسجل */}
           {!searchResult.registered ? (
             <div style={{ textAlign: "center", padding: "10px 0" }}>
               <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(239, 68, 68, 0.15)", color: "#ef4444", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
@@ -339,7 +261,7 @@ export default function CoordinatorPortalPage() {
               </div>
             </div>
           ) : (
-            /* 2. حالة مسجل وبانتظار التفعيل أو مفعل مسبقاً */
+            /* 2. حالة مسجل ولديه بطاقة ورقم سري */
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", borderBottom: "1px solid #1e293b", paddingBottom: "12px" }}>
                 <div>
@@ -361,154 +283,79 @@ export default function CoordinatorPortalPage() {
                   padding: "4px 10px", 
                   borderRadius: "12px", 
                   fontWeight: "bold",
-                  background: searchResult.isActivated ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                  color: searchResult.isActivated ? "#34d399" : "#fbbf24"
+                  background: searchResult.account?.is_pin_used ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
+                  color: searchResult.account?.is_pin_used ? "#34d399" : "#fbbf24"
                 }}>
-                  {searchResult.isActivated ? "✅ مفعل مسبقاً" : "⏳ بانتظار الاعتماد"}
+                  {searchResult.account?.is_pin_used ? "مفعل ومستخدم" : "قيد التفعيل"}
                 </span>
               </div>
 
-              {/* إذا كان الحساب مفعلاً مسبقاً */}
-              {searchResult.isActivated ? (
-                <div style={{ marginBottom: "16px" }}>
-                  <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", borderRadius: "10px", padding: "12px 14px", marginBottom: "14px", color: "#34d399", fontSize: "13px", lineHeight: "1.7" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: "4px" }}>
-                      <CheckCircle2 size={16} />
-                      <span>بيانات الاعتماد السابقة:</span>
-                    </div>
-                    <div>👤 <b>تم التفعيل بواسطة:</b> {searchResult.account?.activated_by || "منسق معتمد"}</div>
-                    <div>🕒 <b>التاريخ والوقت بالتحديد:</b> {searchResult.account?.activated_at ? new Date(searchResult.account.activated_at).toLocaleString("ar-EG") : "غير مسجل"}</div>
+              {/* التحذير الذكي في حال الاستخراج المسبق */}
+              {searchResult.warning && (
+                <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "10px", padding: "12px", color: "#fca5a5", fontSize: "13px", lineHeight: "1.6", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", marginBottom: "4px" }}>
+                    <ShieldAlert size={16} />
+                    <span>تنبيه أمني هام للمنسق:</span>
                   </div>
-
-                  <div style={{ background: "rgba(245, 158, 11, 0.1)", border: "1px dashed #f59e0b", borderRadius: "10px", padding: "12px", marginBottom: "14px", color: "#fbbf24", fontSize: "12px", lineHeight: "1.6" }}>
-                    ⚠️ إذا حضر الطالب مدعياً رغبته في مراجعة البيانات أو استرجاع حسابه، يمكنك الضغط بالأسفل لإظهار بياناته مع <b>حذف أي جلسات نشطة له من أي هواتف أخرى لمنع التحايل</b>.
-                  </div>
-
-                  {!showActiveDetails ? (
-                    <button
-                      onClick={handleShowRegistrationData}
-                      disabled={loading}
-                      className="btn-compact"
-                      style={{ width: "100%", padding: "12px", background: "#1e293b", border: "1px solid #38bdf8", color: "#38bdf8", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}
-                    >
-                      إظهار بيانات التسجيل للطالب 🔄 (وإلغاء جلسات الأجهزة الأخرى)
-                    </button>
-                  ) : (
-                    /* استعراض صورة بطاقة الهوية التي رفعها الطالب */
-                    <div style={{ marginBottom: "16px" }}>
-                      <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                        صورة بطاقة الهوية المرفوعة:
-                      </label>
-                      {searchResult.account?.id_card_url ? (
-                        <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid #38bdf8", maxHeight: "200px" }}>
-                          <img 
-                            src={searchResult.account.id_card_url} 
-                            alt="بطاقة الطالب" 
-                            style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} 
-                          />
-                        </div>
-                      ) : (
-                        <div style={{ padding: "14px", borderRadius: "10px", background: "#0d131f", color: "#64748b", textAlign: "center", fontSize: "12px" }}>
-                          لم تسجل صورة بطاقة لهذا الحساب
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* حالة الحساب بانتظار الاعتماد (Pending) */
-                <div>
-                  {/* استعراض صورة بطاقة الهوية التي رفعها الطالب */}
-                  <div style={{ marginBottom: "16px" }}>
-                    <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                      صورة بطاقة الهوية المرفوعة بواسطة الطالب (للمطابقة الشخصية العينية):
-                    </label>
-                    {searchResult.account?.id_card_url ? (
-                      <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid #38bdf8", maxHeight: "220px" }}>
-                        <img 
-                          src={searchResult.account.id_card_url} 
-                          alt="بطاقة الطالب" 
-                          style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} 
-                        />
-                      </div>
-                    ) : (
-                      <div style={{ padding: "14px", borderRadius: "10px", background: "#0d131f", color: "#64748b", textAlign: "center", fontSize: "12px" }}>
-                        لم يتم تسجيل صورة بطاقة لهذا الحساب بعد
-                      </div>
-                    )}
-                  </div>
-
-                  {/* أزرار الإجراء السريع: تفعيل / بيانات خاطئة */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    <button 
-                      onClick={handleActivateStudent}
-                      disabled={activatingAnim || loading}
-                      style={{
-                        background: activatingAnim ? "linear-gradient(135deg, #059669, #047857)" : "linear-gradient(135deg, #10b981, #059669)",
-                        color: "#fff",
-                        border: activatingAnim ? "2px solid #34d399" : "none",
-                        borderRadius: "12px",
-                        padding: "16px",
-                        fontSize: activatingAnim ? "17px" : "15px",
-                        fontWeight: "bold",
-                        cursor: activatingAnim ? "default" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "8px",
-                        boxShadow: activatingAnim ? "0 0 25px rgba(16, 185, 129, 0.8)" : "0 4px 15px rgba(16, 185, 129, 0.3)",
-                        transform: activatingAnim ? "scale(1.04)" : "scale(1)",
-                        transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)"
-                      }}
-                    >
-                      <CheckCircle2 size={activatingAnim ? 22 : 18} className={activatingAnim ? "animate-bounce" : ""} />
-                      <span>{activatingAnim ? "✓ تم تفعيل الحساب بنجاح! جاري الانتقال..." : "تفعيل حساب الطالب ✅"}</span>
-                    </button>
-
-                    <button 
-                      onClick={handleRejectData}
-                      disabled={activatingAnim || loading}
-                      style={{
-                        background: "rgba(239, 68, 68, 0.1)",
-                        color: "#f87171",
-                        border: "1px solid rgba(239, 68, 68, 0.3)",
-                        borderRadius: "10px",
-                        padding: "12px",
-                        fontSize: "13px",
-                        fontWeight: "bold",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px"
-                      }}
-                    >
-                      <XCircle size={16} />
-                      <span>بيانات خاطئة / رفض التسجيل ❌</span>
-                    </button>
-                  </div>
+                  {searchResult.warning}
                 </div>
               )}
 
-              <div style={{ marginTop: "12px", textAlign: "center" }}>
+              {/* استعراض صورة بطاقة الهوية التي رفعها الطالب */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+                  صورة بطاقة الهوية المرفوعة بواسطة الطالب (للمطابقة الشخصية):
+                </label>
+                {searchResult.account?.id_card_url ? (
+                  <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid #38bdf8", maxHeight: "200px" }}>
+                    <img 
+                      src={searchResult.account.id_card_url} 
+                      alt="بطاقة الطالب" 
+                      style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} 
+                    />
+                  </div>
+                ) : (
+                  <div style={{ padding: "14px", borderRadius: "10px", background: "#0d131f", color: "#64748b", textAlign: "center", fontSize: "12px" }}>
+                    لم يتم تسجيل صورة بطاقة لهذا الحساب بعد
+                  </div>
+                )}
+              </div>
+
+              {/* عرض الرقم السري المكون من 8 خانات */}
+              <div style={{ background: "#0a0e17", border: "2px dashed #f59e0b", borderRadius: "14px", padding: "16px", textAlign: "center", marginBottom: "16px" }}>
+                <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "4px" }}>الرقم السري المخصص للطالب (8 خانات):</div>
+                <div style={{ color: "#f59e0b", fontSize: "28px", fontWeight: "900", fontFamily: "monospace", letterSpacing: "4px", margin: "8px 0" }}>
+                  {searchResult.account?.pin_code}
+                </div>
                 <button 
-                  onClick={() => { setSearchResult(null); setSearchCode(""); }}
-                  style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "12px", textDecoration: "underline" }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(searchResult.account?.pin_code || "");
+                    alert("تم نسخ الرقم السري إلى الحافظة!");
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: "6px 14px", fontSize: "12px" }}
                 >
-                  فحص طالب آخر
+                  <Copy size={14} />
+                  <span>نسخ الرقم السري</span>
                 </button>
               </div>
+
+              {/* زر اعتماد وصرف الرقم السري */}
+              <button 
+                onClick={handleConfirmIssue}
+                disabled={loading}
+                className="btn-primary"
+                style={{ background: "linear-gradient(135deg, #10b981, #059669)", fontSize: "15px" }}
+              >
+                <CheckCircle2 size={18} />
+                <span>اعتماد الهوية وتأكيد تسليم الـ PIN للطالب</span>
+              </button>
 
             </div>
           )}
 
         </div>
       )}
-
-      {/* ذيل وتوقيع الصفحة */}
-      <footer style={{ textAlign: "center", marginTop: "30px", color: "#64748b", fontSize: "11px" }}>
-        جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
-      </footer>
 
     </div>
   );

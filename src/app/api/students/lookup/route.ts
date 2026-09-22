@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     // 1. البحث في كشوف الكلية الأصلية
     const { data: student, error } = await supabaseAdmin
       .from('students')
-      .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
+      .select('id, full_name, student_code, academic_year, section')
       .or(`student_code.eq.${rawCode},student_code.eq.${cleanCode}`)
       .maybeSingle();
 
@@ -35,14 +35,6 @@ export async function GET(request: Request) {
       }, { status: 404 });
     }
 
-    const safeStudent = {
-      id: student.id,
-      full_name: student.full_name,
-      student_code: student.student_code,
-      academic_year: student.academic_year,
-      section: student.section,
-    };
-
     // 2. التحقق من حالة حساب الطالب (مفعل، معلق، أو جديد)
     let existingAccount: any = null;
     try {
@@ -54,12 +46,6 @@ export async function GET(request: Request) {
       existingAccount = acc;
     } catch (e) {}
 
-    if (!existingAccount && student.telegram_browser_id) {
-      try {
-        existingAccount = JSON.parse(student.telegram_browser_id);
-      } catch (e) {}
-    }
-
     if (!existingAccount) {
       existingAccount = localStore.getAccount(student.student_code);
     }
@@ -67,7 +53,7 @@ export async function GET(request: Request) {
     if (existingAccount && existingAccount.status === 'active' && existingAccount.is_pin_used) {
       return NextResponse.json({
         success: true,
-        student: safeStudent,
+        student,
         isAlreadyActive: true,
         message: 'هذا الحساب مسجل ومفعل بالفعل بالرقم السري. يمكنك التوجه لتسجيل الدخول مباشرة.',
       });
@@ -76,7 +62,7 @@ export async function GET(request: Request) {
     if (existingAccount && existingAccount.status === 'pending') {
       return NextResponse.json({
         success: true,
-        student: safeStudent,
+        student,
         isPending: true,
         message: 'بياناتك مسجلة بالفعل ولكنها بانتظار إدخال الرقم السري من المنسق لتفعيل الحساب.',
       });
@@ -84,7 +70,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      student: safeStudent,
+      student,
       isNew: true,
     });
   } catch (err: any) {
