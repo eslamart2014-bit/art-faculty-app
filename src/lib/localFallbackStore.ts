@@ -64,6 +64,14 @@ export const localStore = {
     return this.upsertAccount(account);
   },
 
+  deleteAccount(code: string) {
+    const db = readDB();
+    db.student_accounts = db.student_accounts.filter(
+      (a) => a.student_code !== code && a.student_code !== code.padStart(4, '0')
+    );
+    writeDB(db);
+  },
+
   getSubmissions(code: string) {
     const db = readDB();
     return db.student_submissions.filter((s) => s.student_code === code);
