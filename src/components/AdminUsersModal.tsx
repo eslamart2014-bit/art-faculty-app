@@ -164,7 +164,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   const handleToggleVerifyPermission = async (user: any) => {
     if (!isAdmin) return;
     const actionText = user.can_verify_students ? 'سحب' : 'منح';
-    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (تأكيد هوية الطالب) لهذا المستخدم؟\nالاسم: ${user.full_name}`)) return;
+    if (!confirm(`هل أنت متأكد من ${actionText} صلاحية (اعتماد هوية الطلاب وتفعيل الحسابات) لهذا المستخدم؟\nالاسم: ${user.full_name}`)) return;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -181,7 +181,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
       const data = await res.json();
       if (data.success) {
-        alert(`تم ${actionText} صلاحية تأكيد هوية الطالب بنجاح.`);
+        alert(`تم ${actionText} صلاحية اعتماد هوية الطلاب وتفعيل الحسابات بنجاح.`);
         fetchData();
       } else {
         alert("خطأ: " + (data.error || "فشلت العملية"));
@@ -423,11 +423,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                               </button>
                             )}
 
-                            {isPrimaryAdmin && (
-                              <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(33, 150, 243, 0.2)" : "#333", color: u.can_verify_students ? "#64B5F6" : "#aaa", border: `1px solid ${u.can_verify_students ? "#2196F3" : "#555"}`, padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
-                                {u.can_verify_students ? "✅ سحب صلاحية تأكيد هوية الطالب" : "🪪 منح صلاحية تأكيد هوية الطالب"}
-                              </button>
-                            )}
+                              {isPrimaryAdmin && (
+                                <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(33, 150, 243, 0.2)" : "#333", color: u.can_verify_students ? "#64B5F6" : "#aaa", border: `1px solid ${u.can_verify_students ? "#2196F3" : "#555"}`, padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
+                                  {u.can_verify_students ? "✅ سحب صلاحية اعتماد الهوية والتفعيل" : "🪪 منح صلاحية اعتماد هوية الطلاب وتفعيل الحسابات"}
+                                </button>
+                              )}
                           </>
                         )}
                       </div>

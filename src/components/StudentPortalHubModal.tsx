@@ -354,9 +354,14 @@ export default function StudentPortalHubModal({
       case "student_registered":
         return "إنشاء الحساب لأول مرة وتصوير بطاقة الهوية الجامعية";
       case "pin_verified_and_activated":
-        return "إدخال وتأكيد الرقم السري (PIN) وتفعيل الحساب بنجاح";
+      case "account_activated_by_coordinator":
+        return `اعتماد وتفعيل حساب الطالب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
+      case "registration_rejected_by_coordinator":
+        return `رفض بيانات التسجيل وتصفير الحساب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
+      case "sessions_terminated_by_coordinator":
+        return `إنهاء جلسات الأجهزة الأخرى لمنع التحايل بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
       case "pin_issued_by_coordinator":
-        return `اعتماد الهوية وتسليم الرقم السري (PIN) بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
+        return `اعتماد الهوية وتفعيل الحساب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
       case "allow_retake":
         return `فك قفل المشروع وإتاحة إعادة التصوير بواسطة (${details?.instructor || "المعيد"})`;
       case "account_wiped_by_admin":
@@ -722,19 +727,19 @@ export default function StudentPortalHubModal({
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ background: "rgba(245, 158, 11, 0.2)", color: "#f59e0b", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
+                    <div style={{ background: "rgba(56, 189, 248, 0.2)", color: "#38bdf8", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
                       🪪
                     </div>
                     <div>
-                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>إدارة تأكيد هوية الطلاب والرقم السري (PIN)</div>
-                      <div style={{ color: "#888", fontSize: "12px" }}>مطابقة بطاقات الرقم القومي ومنح الأرقام السرية لتفعيل حسابات الطلاب.</div>
+                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>إدارة اعتماد هوية الطلاب وتفعيل الحسابات</div>
+                      <div style={{ color: "#888", fontSize: "12px" }}>مطابقة بطاقات الرقم القومي وتفعيل حسابات الطلاب الرسمية فورياً.</div>
                     </div>
                   </div>
 
                   <button
                     onClick={() => { onClose(); onOpenIdentityModal(); }}
                     style={{
-                      background: "#f59e0b",
+                      background: "#38bdf8",
                       color: "#000",
                       border: "none",
                       padding: "10px 18px",
@@ -747,7 +752,7 @@ export default function StudentPortalHubModal({
                       gap: "6px"
                     }}
                   >
-                    🔐 فتح نافذة الاعتماد
+                    🪪 فتح نافذة اعتماد الهوية والتفعيل
                   </button>
                 </div>
               </div>
@@ -1196,7 +1201,7 @@ export default function StudentPortalHubModal({
                 {searchedStudent.parsedAccount ? (
                   <div style={{ background: "#0d131f", padding: "12px 14px", borderRadius: "10px", marginBottom: "14px", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.9" }}>
                     <div>📱 <b>رقم الموبايل المسجل:</b> {searchedStudent.parsedAccount.mobile || "غير مسجل"}</div>
-                    <div>🔐 <b>حالة الرقم السري (PIN):</b> {searchedStudent.parsedAccount.is_pin_used ? "تم تفعيله واستخدامه" : "بانتظار التفعيل"} {searchedStudent.parsedAccount.pin_code ? `(الكود: ${searchedStudent.parsedAccount.pin_code})` : ""}</div>
+                    <div>🔐 <b>حالة تفعيل الحساب:</b> {searchedStudent.parsedAccount.status === "active" || searchedStudent.parsedAccount.is_pin_used ? "مفعل ومعتمد رسمياً ✅" : "بانتظار اعتماد المنسق ⏳"}</div>
                     <div>🕒 <b>آخر نشاط للدخول:</b> {searchedStudent.parsedAccount.last_login_at ? new Date(searchedStudent.parsedAccount.last_login_at).toLocaleString("ar-EG") : "غير مسجل"}</div>
                     <div>📱 <b>الأجهزة المرتبطة:</b> {searchedStudent.parsedAccount.devices?.length || 1} جهاز</div>
                     {searchedStudent.parsedAccount.devices && searchedStudent.parsedAccount.devices.length > 0 && (

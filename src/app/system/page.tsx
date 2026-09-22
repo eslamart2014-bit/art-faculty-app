@@ -951,7 +951,7 @@ export default function SystemPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regCode || !enteredPin) {
-      setErrorMsg("يرجى إدخال كود الطالب والرقم السري (PIN)");
+      setErrorMsg("يرجى إدخال كود الطالب والرقم السري أو رقم الموبايل المسجل");
       return;
     }
 
@@ -1087,7 +1087,8 @@ export default function SystemPage() {
   };
 
   // ==========================================
-  // VIEW 1: شاشة انتظار الرقم السري (Pending PIN)
+  // ==========================================
+  // VIEW 1: شاشة انتظار اعتماد المنسق (Pending Approval)
   // ==========================================
   if (currentStudent && accountStatus === "pending") {
     return (
@@ -1131,18 +1132,18 @@ export default function SystemPage() {
           </button>
         </div>
 
-        {/* الرسالة الإرشادية لإدخال الـ PIN */}
-        <div className="glass-card animate-fade-in" style={{ padding: "12px 14px", textAlign: "center", marginBottom: "12px" }}>
-          <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(245, 158, 11, 0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", marginBottom: "10px" }}>
-            <ShieldAlert size={32} />
+        {/* كارت انتظار اعتماد الهوية */}
+        <div className="glass-card animate-fade-in" style={{ padding: "20px 16px", textAlign: "center", marginBottom: "16px" }}>
+          <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "rgba(245, 158, 11, 0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#f59e0b", marginBottom: "12px", boxShadow: "0 0 20px rgba(245, 158, 11, 0.2)" }}>
+            <ShieldCheck size={36} />
           </div>
 
           <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#ffffff", marginBottom: "8px", lineHeight: "1.3" }}>
-            الحساب مسجل وبانتظار التفعيل 🔐
+            الحساب مسجل وبانتظار اعتماد المنسق ⏳
           </h2>
 
-          <p style={{ color: "#cbd5e1", fontSize: "12px", lineHeight: "1.6", marginBottom: "12px" }}>
-            أهلاً بك يا <b>{currentStudent.full_name}</b>. تم تسجيل بياناتك بنجاح. يرجى التوجه إلى أحد المنسقين المحددين لك لاستلام <b>الرقم السري (PIN)</b> لتفعيل حسابك:
+          <p style={{ color: "#cbd5e1", fontSize: "13px", lineHeight: "1.7", marginBottom: "16px" }}>
+            أهلاً بك يا <b>{currentStudent.full_name}</b>. تم استلام بيانات تسجيلك وصورة بطاقتك بنجاح. لتفعيل حسابك، يرجى التوجه إلى منسق النظام لمطابقة الهوية وتفعيل الحساب:
           </p>
 
           {errorMsg && (
@@ -1157,64 +1158,102 @@ export default function SystemPage() {
             </div>
           )}
 
-          {/* إدخال الـ PIN للتفعيل الفوري */}
-          <div style={{ background: "#0d131f", padding: "12px", borderRadius: "12px", border: "1px solid #1e293b", marginBottom: "14px" }}>
-            <label style={{ display: "block", color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>
-              هل استلمت الرقم السري (PIN) من المنسق؟
-            </label>
-            <input 
-              type="text"
-              maxLength={8}
-              placeholder="أدخل الـ PIN المكون من 8 خانات..."
-              value={enteredPin}
-              onChange={(e) => setEnteredPin(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px", textAlign: "center", fontSize: "16px",
-                fontFamily: "monospace",
-                letterSpacing: "4px",
-                fontWeight: "bold",
-                background: "#141b29",
-                border: "1px solid #2a374f",
-                borderRadius: "8px",
-                color: "#fbbf24",
-                marginBottom: "12px"
-              }}
-            />
-            <button
-              onClick={handleVerifyPinSubmit}
-              disabled={loading || enteredPin.length < 4}
-              style={{
-                width: "100%",
-                padding: "10px", background: "linear-gradient(135deg, #10b981, #059669)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "bold",
-                fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer"
-              }}
-            >
-              {loading ? "جاري التحقق والتفعيل..." : "تأكيد وتفعيل الحساب فورياً ✅"}
-            </button>
-          </div>
-
-          {/* قائمة المنسقين */}
-          {coordinators.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+          {/* قائمة المنسقين بالأسماء فقط بدون أي وصف أو صفة إضافية */}
+          {coordinators.length > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", flexWrap: "wrap", marginBottom: "18px" }}>
               {coordinators.slice(0, 2).map((c, idx) => (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ background: "#1e293b", padding: "6px 12px", borderRadius: "8px", display: "inline-flex", flexDirection: "column", alignItems: "center", border: "1px solid #334155" }}>
-                    <span style={{ color: "#fff", fontWeight: "bold", fontSize: "12px" }}>{c.full_name}</span>
-                    <span style={{ color: "#38bdf8", fontSize: "10px" }}>{c.role || "منسق"}</span>
+                <div key={c.id || idx} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{
+                    background: "rgba(56, 189, 248, 0.12)",
+                    border: "1px solid #38bdf8",
+                    padding: "10px 18px",
+                    borderRadius: "12px",
+                    color: "#38bdf8",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    boxShadow: "0 2px 10px rgba(56, 189, 248, 0.15)"
+                  }}>
+                    👤 {c.full_name}
                   </div>
                   {idx < Math.min(coordinators.length, 2) - 1 && (
-                    <span style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>أو</span>
+                    <span style={{ color: "#94a3b8", fontSize: "13px", fontWeight: "bold" }}>أو</span>
                   )}
                 </div>
               ))}
             </div>
+          ) : (
+            <div style={{ background: "rgba(56, 189, 248, 0.1)", border: "1px dashed #38bdf8", padding: "10px 16px", borderRadius: "10px", color: "#38bdf8", fontWeight: "bold", fontSize: "13px", display: "inline-block", marginBottom: "18px" }}>
+              👤 منسق النظام المعتمد
+            </div>
           )}
+
+          {/* مؤشر الفحص التلقائي الحي */}
+          <div style={{
+            background: "rgba(16, 185, 129, 0.08)",
+            border: "1px solid rgba(16, 185, 129, 0.25)",
+            borderRadius: "12px",
+            padding: "14px",
+            marginBottom: "16px",
+            textAlign: "center"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", color: "#34d399", fontSize: "13px", fontWeight: "bold", marginBottom: "6px" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", display: "inline-block" }}></span>
+              <span>جاري التحقق من التفعيل تلقائياً...</span>
+            </div>
+            <p style={{ color: "#94a3b8", fontSize: "12px", margin: 0, lineHeight: "1.6" }}>
+              بمجرد أن يقوم المنسق بمطابقة بياناتك واعتماد حسابك، سيتم فتح لوحة تحكمك ومقرراتك فوراً دون الحاجة لكتابة أي كود أو رقم سري.
+            </p>
+          </div>
+
+          {/* زر الفحص والتحديث اليدوي الفوري */}
+          <button
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}&_t=${Date.now()}`);
+                const data = await res.json();
+                if (data.isAlreadyActive) {
+                  const activeSession = { ...currentStudent, status: "active", is_pin_used: true };
+                  localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                  setCurrentStudent(activeSession);
+                  setAccountStatus("active");
+                  setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
+                  loadDashboard(currentStudent.student_code);
+                } else if (data.isNew) {
+                  localStorage.removeItem("fania_student_session");
+                  setCurrentStudent(null);
+                  setAccountStatus(null);
+                  setAuthMode("register");
+                  setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
+                } else {
+                  alert("الحساب ما زال بانتظار اعتماد المنسق. يرجى التوجه للمنسق الموضح أعلاه لتأكيد هويتك وتفعيل الحساب.");
+                }
+              } catch(e) {
+                alert("تعذر التحقق من حالة الاتصال حالياً.");
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "12px",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              color: "#cbd5e1",
+              borderRadius: "10px",
+              fontWeight: "bold",
+              fontSize: "13px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px"
+            }}
+          >
+            <RotateCw size={15} className={loading ? "animate-spin" : ""} />
+            <span>تحديث حالة الاعتماد الآن 🔄</span>
+          </button>
         </div>
 
         <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px", marginBottom: "10px" }}>
@@ -3150,7 +3189,7 @@ export default function SystemPage() {
               border: "none"
             }}
           >
-            تسجيل الدخول (بالـ PIN) 🔐
+            تسجيل الدخول 🔐
           </button>
         </div>
 
@@ -3178,15 +3217,14 @@ export default function SystemPage() {
 
             <div style={{ marginBottom: "18px" }}>
               <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                الرقم السري (PIN):
+                الرقم السري أو رقم الموبايل المسجل:
               </label>
               <input
-                type="password"
-                maxLength={8}
-                placeholder="••••••••"
+                type="text"
+                placeholder="أدخل الرمز السري أو رقم الموبايل..."
                 value={enteredPin}
                 onChange={(e) => setEnteredPin(e.target.value)}
-                style={{ width: "100%", padding: "12px", textAlign: "center", letterSpacing: "4px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fbbf24", fontSize: "16px", fontWeight: "bold" }}
+                style={{ width: "100%", padding: "12px", textAlign: "center", direction: "ltr", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fbbf24", fontSize: "15px", fontWeight: "bold" }}
               />
             </div>
 
@@ -3233,7 +3271,7 @@ export default function SystemPage() {
               {lookupStatus?.isAlreadyActive && (
                 <div style={{ background: "rgba(234, 179, 8, 0.15)", border: "1px solid #eab308", color: "#fef08a", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
                   <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⚠️ هذا الطالب مسجل ومفعل بالفعل على المنظومة!</div>
-                  <div style={{ fontSize: "11px", color: "#fef9c3", marginBottom: "8px" }}>لا داعي لإعادة التسجيل، يمكنك تسجيل الدخول مباشرة برقمك السري.</div>
+                  <div style={{ fontSize: "11px", color: "#fef9c3", marginBottom: "8px" }}>لا داعي لإعادة التسجيل، يمكنك الانتقال لتسجيل الدخول مباشرة.</div>
                   <button
                     type="button"
                     onClick={() => {
@@ -3248,8 +3286,8 @@ export default function SystemPage() {
               )}
               {lookupStatus?.isPending && (
                 <div style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid #38bdf8", color: "#bae6fd", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⏳ حسابك مسجل وبانتظار تفعيل المنسق</div>
-                  <div style={{ fontSize: "11px", color: "#e0f2fe", marginBottom: "8px" }}>تم رفع بياناتك المسبقة وهي بانتظار اعتماد المنسق.</div>
+                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⏳ حسابك مسجل وبانتظار اعتماد المنسق</div>
+                  <div style={{ fontSize: "11px", color: "#e0f2fe", marginBottom: "8px" }}>تم استلام بياناتك وبطاقتك وهي بانتظار اعتماد المنسق.</div>
                   <button
                     type="button"
                     onClick={() => {
@@ -3260,7 +3298,7 @@ export default function SystemPage() {
                     }}
                     style={{ background: "#38bdf8", color: "#000", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
                   >
-                    عرض شاشة التفعيل والمنسقين 🔍
+                    عرض شاشة الاعتماد والمنسقين 🔍
                   </button>
                 </div>
               )}

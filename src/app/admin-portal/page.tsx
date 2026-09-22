@@ -267,12 +267,12 @@ export default function AdminPortalPage() {
                       <div style={{ color: "#f59e0b", fontFamily: "monospace", fontWeight: "bold", fontSize: "16px" }}>{studentData.account?.pin_code}</div>
                     </div>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق الذي صرف الباسورد:</div>
-                      <div style={{ color: "#34d399", fontWeight: "bold" }}>{studentData.account?.pin_issued_by || "لم يتم الصرف"}</div>
+                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق المعتمد للحساب:</div>
+                      <div style={{ color: "#34d399", fontWeight: "bold" }}>{studentData.account?.activated_by || studentData.account?.pin_issued_by || "لم يتم الاعتماد بعد"}</div>
                     </div>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>تاريخ الصرف:</div>
-                      <div style={{ color: "#cbd5e1" }}>{studentData.account?.pin_issued_at ? new Date(studentData.account.pin_issued_at).toLocaleDateString("ar-EG") : "غير محدد"}</div>
+                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>تاريخ الاعتماد والتفعيل:</div>
+                      <div style={{ color: "#cbd5e1" }}>{studentData.account?.activated_at || studentData.account?.pin_issued_at ? new Date(studentData.account.activated_at || studentData.account.pin_issued_at).toLocaleString("ar-EG") : "غير محدد"}</div>
                     </div>
                   </div>
 

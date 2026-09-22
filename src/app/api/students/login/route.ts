@@ -80,11 +80,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // التحقق من مطابقة الرقم السري
-    if (account.pin_code !== cleanPin) {
+    // التحقق من مطابقة الرقم السري أو رقم الموبايل المسجل للطالب
+    const normalizedMobile = (account.mobile || '').replace(/[\s\-\+]/g, '');
+    const normalizedEntered = cleanPin.replace(/[\s\-\+]/g, '');
+    const isPinMatch = account.pin_code && account.pin_code === cleanPin;
+    const isMobileMatch = Boolean(normalizedMobile && normalizedMobile.length >= 8 && (normalizedEntered === normalizedMobile || normalizedEntered.endsWith(normalizedMobile) || normalizedMobile.endsWith(normalizedEntered)));
+
+    if (!isPinMatch && !isMobileMatch) {
       const failed = (account.failed_attempts || 0) + 1;
       let lockUpdate: any = { failed_attempts: failed };
-      let warnMessage = `الرقم السري غير صحيح! (المحاولة ${failed} من 5)`;
+      let warnMessage = `الرمز السري أو رقم الموبايل غير مطابق! (المحاولة ${failed} من 5)`;
 
       if (failed >= 5) {
         lockUpdate.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
