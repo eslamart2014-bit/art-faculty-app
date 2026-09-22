@@ -75,6 +75,8 @@ export interface PreviewDataResult {
   uniqueLockers: number;
   conflictCount: number;
   errors: string[];
+  scannedTabs?: string[];
+  discoveredTabs?: string[];
 }
 
 export interface SheetSyncResult {
@@ -86,6 +88,8 @@ export interface SheetSyncResult {
   ranges?: { [key: string]: number };
   message: string;
   errors?: string[];
+  scannedTabs?: string[];
+  discoveredTabs?: string[];
 }
 
 interface LocalLockersDB {
@@ -151,15 +155,186 @@ export function extractSpreadsheetId(input: string): string | null {
   return null;
 }
 
-// تحليل البيانات الخام إلى حجوزات معيارية
-export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirmed' | 'pending' = 'confirmed'): Array<{
+// استخراج معرف الورقة (gid) من الرابط إذا وجد
+export function extractGid(input: string): string | null {
+  if (!input) return null;
+  const match = input.match(/[?&#]gid=([0-9]+)/);
+  return match ? match[1] : null;
+}
+
+// توحيد وتنسيق كود الدولاب ودعم الحروف العربية والبادئات والترتيب العكسي
+export function normalizeLockerCode(raw: string): { code: string; letter: string; number: number } | null {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  s = s.replace(/^(دولاب|Locker|رقم|كود|دولاب رقم|كود الدولاب)\s*[:#-]?\s*/i, '').trim();
+
+  // النمط 1: الحرف ثم الرقم (مثال: A12, أ-12, A 12, B_5)
+  const prefixMatch = s.match(/^([A-Da-dأإآابجدهـ])\s*[-_./]?\s*(\d+)$/i);
+  if (prefixMatch) {
+    let char = prefixMatch[1].toUpperCase();
+    if (/[أإآا]/.test(char)) char = 'A';
+    else if (char === 'ب') char = 'B';
+    else if (char === 'ج') char = 'C';
+    else if (char === 'د') char = 'D';
+    else if (char === 'ه' || char === 'هـ') char = 'E';
+    const number = parseInt(prefixMatch[2], 10);
+    return { code: `${char}${number}`, letter: char, number };
+  }
+
+  // النمط 2: الرقم ثم الحرف (مثال: 15A, 15-ج, 15 ج)
+  const suffixMatch = s.match(/^(\d+)\s*[-_./]?\s*([A-Da-dأإآابجدهـ])$/i);
+  if (suffixMatch) {
+    let char = suffixMatch[2].toUpperCase();
+    if (/[أإآا]/.test(char)) char = 'A';
+    else if (char === 'ب') char = 'B';
+    else if (char === 'ج') char = 'C';
+    else if (char === 'د') char = 'D';
+    else if (char === 'ه' || char === 'هـ') char = 'E';
+    const number = parseInt(suffixMatch[1], 10);
+    return { code: `${char}${number}`, letter: char, number };
+  }
+
+  return null;
+}
+
+// استكشاف كافة تبويبات وأوراق العمل الموجودة في ملف جوجل شيت تلقائياً
+export async function discoverAllSheetTabs(sheetId: string): Promise<string[]> {
+  const tabs = new Set<string>();
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (res.ok) {
+      const html = await res.text();
+      
+      // النمط 1: فحص أسماء التبويبات الظاهرة في شريط أوراق العمل
+      const regex1 = /class="[^"]*docs-sheet-tab-caption[^"]*">([^<]+)<\/div>/g;
+      let m: RegExpExecArray | null;
+      while ((m = regex1.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name) tabs.add(name);
+      }
+
+      // النمط 2: فحص مصفوفات البيانات العامة [gid, null, "SheetName"]
+      const regex2 = /\[\d+,\d+,"([^"]+)",\d+\]/g;
+      while ((m = regex2.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name && !name.startsWith('http') && name.length < 60) {
+          tabs.add(name);
+        }
+      }
+
+      // النمط 3: كائنات JSON المضمنة باسم الورقة
+      const regex3 = /"name"\s*:\s*"([^"\\]+)"/g;
+      while ((m = regex3.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name && !name.startsWith('http') && !name.startsWith('user') && name.length < 60 && !name.includes('googleapis') && !name.includes('{')) {
+          tabs.add(name);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[LockerStore] فشل الاستكشاف التلقائي لأسماء الأوراق:', err.message);
+  }
+
+  return Array.from(tabs);
+}
+
+// دمج الحجوزات المتعددة لنفس الدولاب لمنع حذف الطلاب
+export function mergeBookings(rawBookings: Array<{
   locker_code: string;
   letter: string;
   number: number;
   cohort: string;
   phone: string;
   student_names: string[];
+  student_codes?: string[];
   status: 'confirmed' | 'pending';
+  notes?: string;
+}>): Array<{
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  student_codes?: string[];
+  status: 'confirmed' | 'pending';
+  notes?: string;
+}> {
+  const map = new Map<string, any>();
+
+  for (const b of rawBookings) {
+    const norm = normalizeLockerCode(b.locker_code);
+    const code = norm ? norm.code : (b.locker_code || '').toUpperCase().trim();
+    if (!code) continue;
+
+    const letter = norm ? norm.letter : b.letter;
+    const number = norm ? norm.number : b.number;
+
+    if (!map.has(code)) {
+      map.set(code, {
+        locker_code: code,
+        letter,
+        number,
+        cohort: b.cohort || 'الفرقة الرابعة',
+        phone: b.phone || '',
+        student_names: [...(b.student_names || [])].map(n => String(n || '').trim()).filter(Boolean),
+        student_codes: [...(b.student_codes || [])].map(c => String(c || '').trim()).filter(Boolean),
+        status: b.status || 'confirmed',
+        notes: b.notes || ''
+      });
+    } else {
+      const existing = map.get(code)!;
+      // دمج أسماء الطلاب دون تكرار
+      for (const name of (b.student_names || [])) {
+        const trimmed = String(name || '').trim();
+        if (trimmed && !existing.student_names.includes(trimmed)) {
+          existing.student_names.push(trimmed);
+        }
+      }
+      // دمج أكواد الطلاب
+      for (const c of (b.student_codes || [])) {
+        const trimmed = String(c || '').trim();
+        if (trimmed && !existing.student_codes.includes(trimmed)) {
+          existing.student_codes.push(trimmed);
+        }
+      }
+      // إذا كان أي سطر مؤكداً، تصبح حالة الحجز مؤكدة
+      if (b.status === 'confirmed') existing.status = 'confirmed';
+      if (!existing.phone && b.phone) existing.phone = b.phone;
+      if ((!existing.cohort || existing.cohort === 'الفرقة الرابعة') && b.cohort) existing.cohort = b.cohort;
+      if (b.notes && (!existing.notes || existing.notes.length < b.notes.length)) existing.notes = b.notes;
+    }
+  }
+
+  const result: any[] = [];
+  for (const [, item] of map) {
+    item.student_names = item.student_names.slice(0, 4);
+    result.push(item);
+  }
+  return result;
+}
+
+// تحليل البيانات الخام إلى حجوزات معيارية
+export function parseRawDataToBookings(
+  rawData: string,
+  defaultStatus: 'confirmed' | 'pending' = 'confirmed',
+  tabLetterHint?: string
+): Array<{
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  student_codes?: string[];
+  status: 'confirmed' | 'pending';
+  notes?: string;
 }> {
   if (!rawData || !rawData.trim()) return [];
   const table = parseCSV(rawData);
@@ -168,13 +343,15 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
   const firstRow = table[0].map(c => (c || '').trim());
   const isDataRow = firstRow.some(cell => 
     /^[A-Da-d]\s*\d+$/.test(cell) || 
-    /^(01[0125]\d{8}|\+?201[0125]\d{8})$/.test(cell.replace(/\s+/g, ''))
+    /^(01[0125]\d{8}|\+?201[0125]\d{8})$/.test(cell.replace(/\s+/g, '')) ||
+    normalizeLockerCode(cell) !== null
   );
 
   const hasHeader = !isDataRow && firstRow.some(c => {
     const lower = c.toLowerCase();
     return lower === 'id' || lower === 'الدولاب' || lower === 'رمز الدولاب' || lower === 'كود الدولاب' || lower === 'locker' ||
-           lower === 'الحرف' || lower === 'الرقم' || lower === 'ممثل الهاتف' || lower === 'اسم1' || lower === 'اسم' || lower === 'name';
+           lower === 'الحرف' || lower === 'الرقم' || lower === 'ممثل الهاتف' || lower === 'اسم1' || lower === 'اسم' || lower === 'name' ||
+           lower.includes('طالب') || lower.includes('دولاب') || lower.includes('كود');
   });
 
   const headerIndices = {
@@ -184,6 +361,7 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
     cohort: -1,
     phone: -1,
     status: -1,
+    notes: -1,
     nameCols: [] as number[]
   };
 
@@ -192,11 +370,11 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
     startIndex = 1;
     table[0].forEach((col, idx) => {
       const lower = col.trim().toLowerCase();
-      if (lower === 'الدولاب' || lower === 'رمز الدولاب' || lower === 'كود الدولاب' || lower === 'locker' || lower === 'code') {
+      if (lower === 'الدولاب' || lower === 'رمز الدولاب' || lower === 'كود الدولاب' || lower === 'locker' || lower === 'code' || lower.includes('رقم الدولاب')) {
         headerIndices.lockerCode = idx;
-      } else if (lower === 'الحرف' || lower === 'letter') {
+      } else if (lower === 'الحرف' || lower === 'letter' || lower === 'السكشن') {
         headerIndices.letter = idx;
-      } else if (lower === 'الرقم' || lower === 'number') {
+      } else if (lower === 'الرقم' || lower === 'number' || lower === 'رقم') {
         headerIndices.number = idx;
       } else if (lower.includes('فرقة') || lower === 'cohort') {
         headerIndices.cohort = idx;
@@ -204,6 +382,8 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
         headerIndices.phone = idx;
       } else if (lower.includes('حالة') || lower === 'status') {
         headerIndices.status = idx;
+      } else if (lower.includes('ملاحظ') || lower.includes('إدارة') || lower.includes('note')) {
+        headerIndices.notes = idx;
       } else if (lower.includes('اسم') || lower.includes('طالب') || lower.includes('name')) {
         headerIndices.nameCols.push(idx);
       }
@@ -217,7 +397,9 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
     cohort: string;
     phone: string;
     student_names: string[];
+    student_codes?: string[];
     status: 'confirmed' | 'pending';
+    notes?: string;
   }> = [];
 
   for (let i = startIndex; i < table.length; i++) {
@@ -229,14 +411,32 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
     let number = 0;
     let cohort = '';
     let phone = '';
+    let rowNotes = '';
     let status: 'confirmed' | 'pending' = defaultStatus;
     const names: string[] = [];
 
     if (hasHeader && (headerIndices.lockerCode !== -1 || (headerIndices.letter !== -1 && headerIndices.number !== -1))) {
       if (headerIndices.lockerCode !== -1 && row[headerIndices.lockerCode]) {
-        lockerCode = row[headerIndices.lockerCode].toUpperCase().replace(/\s+/g, '');
+        const rawCode = row[headerIndices.lockerCode];
+        const norm = normalizeLockerCode(rawCode);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
+        } else {
+          lockerCode = rawCode.toUpperCase().replace(/\s+/g, '');
+        }
       } else if (headerIndices.letter !== -1 && headerIndices.number !== -1) {
-        lockerCode = `${row[headerIndices.letter].toUpperCase()}${row[headerIndices.number]}`.replace(/\s+/g, '');
+        const lRaw = row[headerIndices.letter] || '';
+        const nRaw = row[headerIndices.number] || '';
+        const norm = normalizeLockerCode(`${lRaw}${nRaw}`);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
+        } else {
+          lockerCode = `${lRaw.toUpperCase()}${nRaw}`.replace(/\s+/g, '');
+        }
       }
 
       if (headerIndices.cohort !== -1 && row[headerIndices.cohort]) {
@@ -245,6 +445,9 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
       if (headerIndices.phone !== -1 && row[headerIndices.phone]) {
         phone = row[headerIndices.phone].replace(/\s+/g, '');
       }
+      if (headerIndices.notes !== -1 && row[headerIndices.notes]) {
+        rowNotes = row[headerIndices.notes].trim();
+      }
       if (headerIndices.status !== -1 && row[headerIndices.status]) {
         const st = row[headerIndices.status];
         if (st.includes('مؤكد') || st.includes('تأكيد')) status = 'confirmed';
@@ -252,28 +455,49 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
       }
       headerIndices.nameCols.forEach(idx => {
         const val = (row[idx] || '').trim();
-        if (val && val.length > 2) names.push(val);
+        if (val && val.length > 2 && !val.includes('إدارة') && !val.includes('حجز إداري')) {
+          names.push(val);
+        }
       });
     }
 
     if (!lockerCode) {
       for (const p of row) {
-        const m = p.match(/^([A-Da-d])\s*(\d+)$/);
-        if (m) {
-          letter = m[1].toUpperCase();
-          number = parseInt(m[2], 10);
-          lockerCode = `${letter}${number}`;
+        const norm = normalizeLockerCode(p);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
           break;
         }
       }
       if (!lockerCode) {
-        const lIndex = row.findIndex(p => /^[A-Da-d]$/.test(p));
+        const lIndex = row.findIndex(p => /^[A-Da-dأإآابجدهـ]$/.test(p.trim()));
         if (lIndex >= 0) {
-          letter = row[lIndex].toUpperCase();
-          const nIndex = row.findIndex((p, idx) => idx !== lIndex && /^\d+$/.test(p) && parseInt(p, 10) < 500);
+          const lNorm = normalizeLockerCode(`${row[lIndex]}1`);
+          letter = lNorm ? lNorm.letter : row[lIndex].toUpperCase();
+          const nIndex = row.findIndex((p, idx) => idx !== lIndex && /^\d+$/.test(p.trim()) && parseInt(p, 10) < 500);
           if (nIndex >= 0) {
-            number = parseInt(row[nIndex], 10);
+            number = parseInt(row[nIndex].trim(), 10);
             lockerCode = `${letter}${number}`;
+          }
+        }
+      }
+
+      // إذا لم يتوفر رمز الدولاب ولكن تم تمرير تلميح الحرف (مثل أوراق A, B, C, D)
+      if (!lockerCode && tabLetterHint) {
+        const normHint = normalizeLockerCode(`${tabLetterHint}1`);
+        const hintLetter = normHint ? normHint.letter : tabLetterHint.toUpperCase();
+        for (const p of row) {
+          const trimmedP = p.trim();
+          if (/^\d+$/.test(trimmedP)) {
+            const num = parseInt(trimmedP, 10);
+            if (num > 0 && num <= 500) {
+              number = num;
+              letter = hintLetter;
+              lockerCode = `${letter}${number}`;
+              break;
+            }
           }
         }
       }
@@ -282,10 +506,10 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
     if (!lockerCode) continue;
 
     if (!letter || !number) {
-      const match = lockerCode.match(/^([A-Za-z])(\d+)$/);
-      if (match) {
-        letter = match[1].toUpperCase();
-        number = parseInt(match[2], 10);
+      const norm = normalizeLockerCode(lockerCode);
+      if (norm) {
+        letter = norm.letter;
+        number = norm.number;
       }
     }
 
@@ -299,16 +523,26 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
       cohort = cohortPart || 'الفرقة الرابعة';
     }
 
+    // فحص الملاحظات إذا لم يتم استخراجها من الترويسة
+    if (!rowNotes) {
+      for (const p of row) {
+        if (p.includes('إدارة') || p.includes('محجوز للإدارة') || p.includes('تخصيص')) {
+          rowNotes = 'مخصص للإدارة';
+          break;
+        }
+      }
+    }
+
     if (names.length === 0) {
       for (const p of row) {
         if (!p || p === lockerCode || p === phone || p === cohort || p === letter || String(number) === p) continue;
-        if (/^(R\d+|\d{10,}|\d{4}-\d{2}-\d{2}|http|تم التأكيد|قيد التسجيل)/.test(p)) continue;
-        if (/[\u0600-\u06FF]{3,}/.test(p) && !p.includes('فرقة') && !p.includes('تأكيد') && !p.includes('تسجيل')) {
+        if (/^(R\d+|\d{10,}|\d{4}-\d{2}-\d{2}|http|تم التأكيد|قيد التسجيل|سعة|مخصص للإدارة)/.test(p)) continue;
+        if (/[\u0600-\u06FF]{3,}/.test(p) && !p.includes('فرقة') && !p.includes('تأكيد') && !p.includes('تسجيل') && !p.includes('إدارة')) {
           const splitNames = p.split(/[\n|\-–,،]/).map(n => n.trim()).filter(n => n.length > 2);
           if (splitNames.length > 1) {
             splitNames.forEach(n => names.push(n));
           } else {
-            names.push(p);
+            names.push(p.trim());
           }
         }
       }
@@ -321,7 +555,8 @@ export function parseRawDataToBookings(rawData: string, defaultStatus: 'confirme
       cohort,
       phone,
       student_names: names.slice(0, 4),
-      status
+      status,
+      notes: rowNotes || undefined
     });
   }
 
@@ -993,12 +1228,14 @@ export const lockerStore = {
       };
     }
 
+    // دمج الصفوف المتعددة لنفس الدولاب لضمان عدم إسقاط الطلاب
+    const merged = mergeBookings(parsed);
     const db = readLocalDB();
     const rows: ParsedPreviewRow[] = [];
     const lockerSet = new Set<string>();
 
-    for (let i = 0; i < parsed.length; i++) {
-      const b = parsed[i];
+    for (let i = 0; i < merged.length; i++) {
+      const b = merged[i];
       lockerSet.add(b.locker_code);
       const existingLocker = db.lockers.find(l => l.locker_code.toUpperCase() === b.locker_code.toUpperCase());
 
@@ -1059,6 +1296,8 @@ export const lockerStore = {
       return { success: false, importedCount: 0, updatedLockersCount: 0, message: 'لا توجد بيانات لاعتمادها' };
     }
 
+    // دمج الصفوف المتكررة لنفس الدولاب لمنع مسح أي طالب مسجل بسطر منفصل
+    const mergedRows = mergeBookings(rows);
     const db = readLocalDB();
     const clean = options?.cleanBeforeSync === true;
     let importedCount = 0;
@@ -1075,16 +1314,16 @@ export const lockerStore = {
       });
     }
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const code = (r.locker_code || '').trim().toUpperCase();
+    for (let i = 0; i < mergedRows.length; i++) {
+      const r = mergedRows[i];
+      const norm = normalizeLockerCode(r.locker_code);
+      const code = norm ? norm.code : (r.locker_code || '').trim().toUpperCase();
       if (!code) continue;
 
       let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
       if (!locker) {
-        const match = code.match(/^([A-Za-z])(\d+)$/);
-        const letter = match ? match[1].toUpperCase() : code.charAt(0).toUpperCase();
-        const number = match ? parseInt(match[2], 10) : 1;
+        const letter = norm ? norm.letter : code.charAt(0).toUpperCase();
+        const number = norm ? norm.number : (parseInt(code.slice(1), 10) || 1);
         locker = {
           id: `L_${code}`,
           locker_code: code,
@@ -1126,7 +1365,7 @@ export const lockerStore = {
         confirmed_at: bookingStatus === 'confirmed' ? new Date().toISOString() : undefined,
         confirmed_by: bookingStatus === 'confirmed' ? 'استيراد جوجل شيت' : undefined,
         responsible: 'SHEET_SYNC',
-        notes: 'مستورد عبر أداة مزامنة شيت جوجل'
+        notes: r.notes || 'مستورد عبر أداة مزامنة شيت جوجل'
       };
 
       locker.status = bookingStatus;
@@ -1160,34 +1399,84 @@ export const lockerStore = {
     };
   },
 
-  // 22. المزامنة المباشرة الذكية مع رابط أو معرف Google Sheets
-  async syncFromGoogleSheetUrl(params: {
+  // 22. محرك استكشاف وجلب كافة أوراق وبيانات ملف Google Sheets
+  async harvestGoogleSheet(params: {
     sheetUrl: string;
     mode?: 'full' | 'confirmed_only' | 'custom';
     customTab?: string;
-    cleanBeforeSync?: boolean;
-  }): Promise<SheetSyncResult> {
-    const { sheetUrl, mode = 'full', customTab, cleanBeforeSync } = params;
+  }): Promise<{
+    success: boolean;
+    sheetId: string;
+    discoveredTabs: string[];
+    scannedTabs: string[];
+    mergedBookings: any[];
+    detectedRanges: { [key: string]: number };
+    adminReservedCodes: string[];
+    capacityUpdates: { [code: string]: number };
+    authRequired?: boolean;
+    error?: string;
+  }> {
+    const { sheetUrl, mode = 'full', customTab } = params;
     const sheetId = extractSpreadsheetId(sheetUrl);
 
     if (!sheetId) {
       return {
         success: false,
-        importedConfirmed: 0,
-        importedPending: 0,
-        adminReservedCount: 0,
-        totalLockers: 0,
-        message: 'رابط جوجل شيت غير صالح. يرجى لصق الرابط كاملاً من المتصفح أو إدخال معرف الشيت (ID).'
+        sheetId: '',
+        discoveredTabs: [],
+        scannedTabs: [],
+        mergedBookings: [],
+        detectedRanges: {},
+        adminReservedCodes: [],
+        capacityUpdates: {},
+        error: 'رابط جوجل شيت غير صالح. يرجى لصق الرابط كاملاً من المتصفح أو إدخال معرف الشيت (ID).'
       };
     }
 
+    const urlGid = extractGid(sheetUrl);
+
+    // دالة مساعدة لجلب محتوى أي ورقة باسمها عبر GViz
     const fetchGVizCSV = async (tabName: string): Promise<string | null> => {
       try {
         const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
         const res = await fetch(url, { redirect: 'follow' });
         if (!res.ok) return null;
         const text = await res.text();
-        if (text.includes('accounts.google.com') || text.includes('<html') || text.includes('<!DOCTYPE')) {
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
+          throw new Error('AUTH_REQUIRED');
+        }
+        return text;
+      } catch (e: any) {
+        if (e.message === 'AUTH_REQUIRED') throw e;
+        return null;
+      }
+    };
+
+    // دالة مساعدة لجلب محتوى الورقة عبر gid مباشرة
+    const fetchGidCSV = async (gid: string): Promise<string | null> => {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${encodeURIComponent(gid)}`;
+        const res = await fetch(url, { redirect: 'follow' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
+          throw new Error('AUTH_REQUIRED');
+        }
+        return text;
+      } catch (e: any) {
+        if (e.message === 'AUTH_REQUIRED') throw e;
+        return null;
+      }
+    };
+
+    // دالة مساعدة لتنزيل الكشف الافتراضي العام
+    const fetchExportCSV = async (): Promise<string | null> => {
+      try {
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+        const res = await fetch(exportUrl, { redirect: 'follow' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
           throw new Error('AUTH_REQUIRED');
         }
         return text;
@@ -1198,178 +1487,363 @@ export const lockerStore = {
     };
 
     try {
-      const db = readLocalDB();
-      let adminReservedCount = 0;
+      // 1. استكشاف كافة التبويبات الحقيقية الموجودة في المستند تلقائياً
+      const discoveredTabs = await discoverAllSheetTabs(sheetId);
+
+      // التبويبات الشائعة المرشحة
+      const standardCandidates = [
+        'A', 'B', 'C', 'D',
+        'أ', 'ب', 'ج', 'د',
+        'التسجيلات_المؤكدة', 'التسجيلات المؤكدة',
+        'التسجيلات_المؤقتة', 'التسجيلات المؤقتة',
+        'المؤكدة', 'المؤقتة', 'الحجوزات', 'الحجوزات المؤكدة', 'كشف الدواليب', 'الدواليب',
+        'الفرقة الرابعة', 'الفرقة الثالثة', 'الفرقة الثانية', 'الفرقة الأولى',
+        'فرقة رابعة', 'فرقة ثالثة', 'فرقة ثانية', 'فرقة أولى',
+        'بيانات الطلاب', 'تسكين الدواليب', 'تسكين',
+        'Sheet1', 'Sheet2', 'Sheet3', 'Sheet4', 'ورقة1', 'ورقة2', 'ورقة3', 'ورقة4'
+      ];
+
+      let tabsToScan: string[] = [];
+      if (mode === 'custom' && customTab) {
+        tabsToScan = [customTab.trim()];
+      } else if (mode === 'confirmed_only') {
+        const confirmedDiscovered = discoveredTabs.filter(t => t.includes('مؤكد') || t.includes('تأكيد'));
+        if (confirmedDiscovered.length > 0) {
+          tabsToScan = confirmedDiscovered;
+        } else {
+          tabsToScan = ['التسجيلات المؤكدة', 'التسجيلات_المؤكدة', 'المؤكدة', 'الحجوزات المؤكدة'];
+        }
+      } else {
+        // نمط المسح الشامل الكامل
+        if (discoveredTabs.length > 0) {
+          // نبدأ بالتبويبات المكتشفة فعلياً من هيكل المستند
+          tabsToScan = [...discoveredTabs];
+          // نضيف التبويبات القياسية التي لم تكتشف بعد
+          for (const cand of standardCandidates) {
+            if (!tabsToScan.includes(cand)) tabsToScan.push(cand);
+          }
+        } else {
+          tabsToScan = standardCandidates;
+        }
+      }
+
+      const scannedTabs: string[] = [];
+      const rawBookings: any[] = [];
       const detectedRanges: { [key: string]: number } = {};
+      const adminReservedCodes: string[] = [];
+      const capacityUpdates: { [code: string]: number } = {};
+      const seenContentSignatures = new Set<string>();
 
-      if (mode === 'full') {
-        // 1. قراءة أوراق الأحرف A, B, C, D لتحديد أعداد المخزون والتخصيص الإداري
-        const letters = ['A', 'B', 'C', 'D'];
-        for (const letter of letters) {
-          const letterCSV = await fetchGVizCSV(letter);
-          if (letterCSV) {
-            const table = parseCSV(letterCSV);
-            let maxNum = 0;
-            for (const row of table) {
-              const num = parseInt(row[0], 10);
-              if (!isNaN(num) && num > 0) {
-                if (num > maxNum) maxNum = num;
-                const note = (row[1] || '').trim();
-                const code = `${letter}${num}`;
+      // 2. إذا وجد معرف ورقة محدد في الرابط (?gid=...) نفحصه أولاً
+      if (urlGid) {
+        const gidCSV = await fetchGidCSV(urlGid);
+        if (gidCSV && gidCSV.trim().length > 10) {
+          const sig = `${gidCSV.length}_${gidCSV.slice(0, 80)}`;
+          seenContentSignatures.add(sig);
+          scannedTabs.push(`الورقة المحددة في الرابط (gid: ${urlGid})`);
 
-                let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
-                if (!locker) {
-                  locker = {
-                    id: `L_${code}`,
-                    locker_code: code,
-                    letter,
-                    number: num,
-                    capacity: 4,
-                    is_enabled: true,
-                    is_admin_reserved: false,
-                    status: 'empty',
-                    current_booking_id: null
-                  };
-                  db.lockers.push(locker);
-                }
+          const parsedGid = parseRawDataToBookings(gidCSV, 'confirmed');
+          rawBookings.push(...parsedGid);
 
-                if (note.includes('إدارة')) {
-                  locker.is_admin_reserved = true;
-                  locker.is_enabled = false;
-                  locker.notes = 'مخصص للإدارة (مستورد من شيت ' + letter + ')';
-                  adminReservedCount++;
-                }
-                if (note.includes('شخصين') || note.includes('2')) {
-                  locker.capacity = 2;
-                } else if (note.includes('4')) {
-                  locker.capacity = 4;
-                }
+          // فحص الملاحظات والنطاقات في ورقة الـ gid
+          const table = parseCSV(gidCSV);
+          for (const row of table) {
+            const rowText = row.join(' ');
+            const codeNorm = normalizeLockerCode(row[0]);
+            if (codeNorm) {
+              if (codeNorm.number > (detectedRanges[codeNorm.letter] || 0)) {
+                detectedRanges[codeNorm.letter] = codeNorm.number;
               }
-            }
-            if (maxNum > 0) {
-              detectedRanges[letter] = maxNum;
+              if (rowText.includes('إدارة') || rowText.includes('مخصص للإدارة') || rowText.includes('حجز إداري')) {
+                if (!adminReservedCodes.includes(codeNorm.code)) adminReservedCodes.push(codeNorm.code);
+              }
             }
           }
         }
-        writeLocalDB(db);
+      }
 
-        // 2. قراءة ورقة التسجيلات_المؤكدة
-        const confirmedText = await fetchGVizCSV('التسجيلات_المؤكدة');
-        let confirmedBookings: any[] = [];
-        if (confirmedText) {
-          confirmedBookings = parseRawDataToBookings(confirmedText, 'confirmed');
+      // 3. مسح التبويبات المحددة واحداً تلو الآخر
+      for (const tabName of tabsToScan) {
+        const csvText = await fetchGVizCSV(tabName);
+        if (!csvText || csvText.trim().length < 5) continue;
+
+        // التحقق من أن المحتوى حقيقي وليس تكراراً للورقة الافتراضية
+        const sig = `${csvText.length}_${csvText.slice(0, 80)}`;
+        if (seenContentSignatures.has(sig) && !discoveredTabs.includes(tabName)) {
+          // هذا التبويب غير حقيقي وأرجع جوجل الورقة الافتراضية كبديل
+          continue;
         }
+        seenContentSignatures.add(sig);
+        scannedTabs.push(tabName);
 
-        // 3. قراءة ورقة التسجيلات_المؤقتة
-        const pendingText = await fetchGVizCSV('التسجيلات_المؤقتة');
-        let pendingBookings: any[] = [];
-        if (pendingText) {
-          pendingBookings = parseRawDataToBookings(pendingText, 'pending');
-        }
+        // تحديد تلميح السكشن (A, B, C, D)
+        const tabNorm = normalizeLockerCode(`${tabName}1`);
+        const letterHint = tabNorm ? tabNorm.letter : (['A', 'B', 'C', 'D'].includes(tabName.toUpperCase()) ? tabName.toUpperCase() : undefined);
 
-        // إذا لم يتم العثور على أوراق بأسمائها العربية، نحاول التنزيل العام الافتراضي
-        if (confirmedBookings.length === 0 && pendingBookings.length === 0) {
-          try {
-            const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-            const exportRes = await fetch(exportUrl, { redirect: 'follow' });
-            if (exportRes.ok) {
-              const exportText = await exportRes.text();
-              if (!exportText.includes('accounts.google.com') && !exportText.includes('<html')) {
-                confirmedBookings = parseRawDataToBookings(exportText, 'confirmed');
+        // تحديد الحالة الافتراضية للورقة
+        const defaultStatus: 'confirmed' | 'pending' = (tabName.includes('مؤقت') || tabName.includes('معلق') || tabName.includes('تسجيلات_مؤقتة')) ? 'pending' : 'confirmed';
+
+        // استخراج أعداد المخزون والتخصيص الإداري والسعة
+        const table = parseCSV(csvText);
+        for (const row of table) {
+          const rowText = row.join(' ');
+          let codeNorm = normalizeLockerCode(row[0]);
+          if (!codeNorm && letterHint && /^\d+$/.test(row[0]?.trim() || '')) {
+            codeNorm = normalizeLockerCode(`${letterHint}${row[0].trim()}`);
+          }
+
+          if (codeNorm) {
+            if (codeNorm.number > (detectedRanges[codeNorm.letter] || 0)) {
+              detectedRanges[codeNorm.letter] = codeNorm.number;
+            }
+            if (rowText.includes('إدارة') || rowText.includes('مخصص للإدارة') || rowText.includes('حجز إداري')) {
+              if (!adminReservedCodes.includes(codeNorm.code)) {
+                adminReservedCodes.push(codeNorm.code);
               }
             }
-          } catch (e) {}
+            if (rowText.includes('شخصين') || rowText.includes('سعة 2') || rowText.includes('2 طالب') || rowText.includes('طالبين')) {
+              capacityUpdates[codeNorm.code] = 2;
+            } else if (rowText.includes('أربعة') || rowText.includes('سعة 4') || rowText.includes('4 طلاب')) {
+              capacityUpdates[codeNorm.code] = 4;
+            }
+          }
         }
 
-        const allToCommit = [...confirmedBookings, ...pendingBookings];
-        const commitRes = this.commitParsedBookings(allToCommit, { cleanBeforeSync });
-
-        // حفظ رابط الشيت في الإعدادات
-        const currentDb = readLocalDB();
-        currentDb.settings.google_sheet_url = sheetUrl;
-        writeLocalDB(currentDb);
-
-        return {
-          success: true,
-          importedConfirmed: confirmedBookings.length,
-          importedPending: pendingBookings.length,
-          adminReservedCount,
-          totalLockers: currentDb.lockers.length,
-          ranges: detectedRanges,
-          message: `تمت المزامنة بنجاح! تم استيراد ${confirmedBookings.length} حجوزات معتمدة، و${pendingBookings.length} حجوزات معلقة، وتأكيد ${adminReservedCount} دواليب مخصصة للإدارة.`
-        };
-      } else if (mode === 'confirmed_only') {
-        let text = await fetchGVizCSV('التسجيلات_المؤكدة');
-        if (!text) {
-          const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-          const exportRes = await fetch(exportUrl, { redirect: 'follow' });
-          if (exportRes.ok) text = await exportRes.text();
-        }
-        if (!text) {
-          return {
-            success: false,
-            importedConfirmed: 0,
-            importedPending: 0,
-            adminReservedCount: 0,
-            totalLockers: 0,
-            message: 'تعذر العثور على ورقة التسجيلات_المؤكدة في هذا الشيت'
-          };
-        }
-        const bookings = parseRawDataToBookings(text, 'confirmed');
-        const commitRes = this.commitParsedBookings(bookings, { cleanBeforeSync });
-        return {
-          success: true,
-          importedConfirmed: bookings.length,
-          importedPending: 0,
-          adminReservedCount: 0,
-          totalLockers: readLocalDB().lockers.length,
-          message: `تم استيراد ${bookings.length} حجوزات معتمدة بنجاح!`
-        };
-      } else {
-        // mode === 'custom'
-        const tab = customTab || 'Sheet1';
-        const text = await fetchGVizCSV(tab);
-        if (!text) {
-          return {
-            success: false,
-            importedConfirmed: 0,
-            importedPending: 0,
-            adminReservedCount: 0,
-            totalLockers: 0,
-            message: `تعذر قراءة الورقة "${tab}" من ملف جوجل شيت`
-          };
-        }
-        const bookings = parseRawDataToBookings(text, 'confirmed');
-        const commitRes = this.commitParsedBookings(bookings, { cleanBeforeSync });
-        return {
-          success: true,
-          importedConfirmed: bookings.length,
-          importedPending: 0,
-          adminReservedCount: 0,
-          totalLockers: readLocalDB().lockers.length,
-          message: `تم استيراد ${bookings.length} حجوزات من الورقة "${tab}" بنجاح!`
-        };
+        // استخراج حجوزات الطلاب من هذه الورقة
+        const bookingsFromTab = parseRawDataToBookings(csvText, defaultStatus, letterHint);
+        rawBookings.push(...bookingsFromTab);
       }
+
+      // 4. إذا لم يتم استخراج أي حجوزات من التبويبات الفردية، نحاول التنزيل العام الافتراضي
+      if (rawBookings.length === 0) {
+        const exportText = await fetchExportCSV();
+        if (exportText && exportText.trim().length > 10) {
+          scannedTabs.push('الكشف الافتراضي العام (Default Export)');
+          const exportBookings = parseRawDataToBookings(exportText, 'confirmed');
+          rawBookings.push(...exportBookings);
+        }
+      }
+
+      // 5. دمج كافة الحجوزات المستخرجة عبر جميع الأوراق لدمج الطلاب المسكنين في نفس الدواليب
+      const mergedBookings = mergeBookings(rawBookings);
+
+      return {
+        success: true,
+        sheetId,
+        discoveredTabs,
+        scannedTabs,
+        mergedBookings,
+        detectedRanges,
+        adminReservedCodes,
+        capacityUpdates
+      };
     } catch (err: any) {
       if (err.message === 'AUTH_REQUIRED') {
         return {
           success: false,
-          importedConfirmed: 0,
-          importedPending: 0,
-          adminReservedCount: 0,
-          totalLockers: 0,
-          message: 'الشيت يتطلب تسجيل دخول Google أو غير متاح للعامة. يرجى ضبط صلاحية المشاركة على "أي مستخدم لديه الرابط يمكنه العرض" (Anyone with the link can view)، أو تنزيل الشيت كملف CSV ورفعه في تبويب "رفع ملف CSV".'
+          sheetId,
+          discoveredTabs: [],
+          scannedTabs: [],
+          mergedBookings: [],
+          detectedRanges: {},
+          adminReservedCodes: [],
+          capacityUpdates: {},
+          authRequired: true,
+          error: 'الشيت يتطلب تسجيل دخول Google أو غير متاح للعامة. يرجى ضبط مشاركة الشيت على "أي شخص لديه الرابط يمكنه العرض" (Anyone with the link can view)، أو تنزيل الشيت كملف CSV ورفعه في تبويب "رفع ملف CSV".'
         };
       }
+      return {
+        success: false,
+        sheetId,
+        discoveredTabs: [],
+        scannedTabs: [],
+        mergedBookings: [],
+        detectedRanges: {},
+        adminReservedCodes: [],
+        capacityUpdates: {},
+        error: 'خطأ أثناء الاتصال بجوجل شيت: ' + (err.message || 'خطأ غير معروف')
+      };
+    }
+  },
+
+  // 23. معاينة تفاعلية لكامل بيانات رابط شيت جوجل قبل التسكين الفعلي
+  async previewGoogleSheetUrl(params: {
+    sheetUrl: string;
+    mode?: 'full' | 'confirmed_only' | 'custom';
+    customTab?: string;
+  }): Promise<PreviewDataResult> {
+    const harvest = await this.harvestGoogleSheet(params);
+
+    if (!harvest.success) {
+      return {
+        success: false,
+        rows: [],
+        total: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        uniqueLockers: 0,
+        conflictCount: 0,
+        discoveredTabs: harvest.discoveredTabs,
+        scannedTabs: harvest.scannedTabs,
+        errors: [harvest.error || 'تعذر استخراج بيانات الشيت']
+      };
+    }
+
+    const db = readLocalDB();
+    const rows: ParsedPreviewRow[] = [];
+    const lockerSet = new Set<string>();
+
+    for (let i = 0; i < harvest.mergedBookings.length; i++) {
+      const b = harvest.mergedBookings[i];
+      lockerSet.add(b.locker_code);
+      const existingLocker = db.lockers.find(l => l.locker_code.toUpperCase() === b.locker_code.toUpperCase());
+
+      let conflictWarning: string | undefined = undefined;
+      let existingStudents: string[] | undefined = undefined;
+
+      if (existingLocker) {
+        if (existingLocker.is_admin_reserved || harvest.adminReservedCodes.includes(b.locker_code)) {
+          conflictWarning = 'الدولاب مخصص للإدارة حالياً';
+        } else if (existingLocker.status === 'confirmed' && existingLocker.current_booking_id) {
+          const exBk = db.bookings.find(bk => bk.id === existingLocker.current_booking_id);
+          if (exBk && exBk.student_names && exBk.student_names.length > 0) {
+            existingStudents = exBk.student_names;
+            const hasOverlap = b.student_names.some((n: string) => exBk.student_names.includes(n));
+            if (!hasOverlap) {
+              conflictWarning = `مسكن بالفعل لـ: ${exBk.student_names.slice(0, 2).join('، ')}`;
+            }
+          }
+        }
+      }
+
+      rows.push({
+        id: `prev_url_${Date.now()}_${i}`,
+        locker_code: b.locker_code,
+        letter: b.letter,
+        number: b.number,
+        cohort: b.cohort,
+        phone: b.phone,
+        student_names: b.student_names,
+        status: b.status,
+        is_existing: !!existingLocker,
+        current_status: existingLocker ? existingLocker.status : 'new',
+        current_students: existingStudents,
+        conflict_warning: conflictWarning
+      });
+    }
+
+    return {
+      success: true,
+      rows,
+      total: rows.length,
+      confirmedCount: rows.filter(r => r.status === 'confirmed').length,
+      pendingCount: rows.filter(r => r.status === 'pending').length,
+      uniqueLockers: lockerSet.size,
+      conflictCount: rows.filter(r => !!r.conflict_warning).length,
+      discoveredTabs: harvest.discoveredTabs,
+      scannedTabs: harvest.scannedTabs,
+      errors: rows.length === 0 ? ['تم مسح الأوراق بنجاح لكن لم يتم العثور على أسطر تسكين صالحة'] : []
+    };
+  },
+
+  // 24. المزامنة المباشرة الشاملة والذكية مع رابط Google Sheets
+  async syncFromGoogleSheetUrl(params: {
+    sheetUrl: string;
+    mode?: 'full' | 'confirmed_only' | 'custom';
+    customTab?: string;
+    cleanBeforeSync?: boolean;
+  }): Promise<SheetSyncResult> {
+    const { sheetUrl, cleanBeforeSync } = params;
+    const harvest = await this.harvestGoogleSheet(params);
+
+    if (!harvest.success) {
       return {
         success: false,
         importedConfirmed: 0,
         importedPending: 0,
         adminReservedCount: 0,
         totalLockers: 0,
-        message: 'خطأ أثناء الاتصال بجوجل شيت: ' + (err.message || 'خطأ غير معروف')
+        discoveredTabs: harvest.discoveredTabs,
+        scannedTabs: harvest.scannedTabs,
+        message: harvest.error || 'فشلت المزامنة مع خوادم جوجل'
       };
     }
+
+    const db = readLocalDB();
+
+    // 1. تحديث أعداد المخزون من النطاقات المكتشفة في الأوراق
+    for (const [letter, maxNum] of Object.entries(harvest.detectedRanges)) {
+      if (maxNum > 0) {
+        for (let i = 1; i <= maxNum; i++) {
+          const code = `${letter.toUpperCase()}${i}`;
+          let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
+          if (!locker) {
+            locker = {
+              id: `L_${code}`,
+              locker_code: code,
+              letter: letter.toUpperCase(),
+              number: i,
+              capacity: 4,
+              is_enabled: true,
+              is_admin_reserved: false,
+              status: 'empty',
+              current_booking_id: null,
+              updated_at: new Date().toISOString()
+            };
+            db.lockers.push(locker);
+          }
+        }
+      }
+    }
+
+    // 2. تطبيق التخصيص الإداري المكتشف
+    let adminReservedCount = 0;
+    for (const code of harvest.adminReservedCodes) {
+      let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code.toUpperCase());
+      if (locker) {
+        locker.is_admin_reserved = true;
+        locker.is_enabled = false;
+        locker.notes = 'مخصص للإدارة (مستورد من شيت جوجل)';
+        adminReservedCount++;
+      }
+    }
+
+    // 3. تطبيق تحديثات السعة المكتشفة (شخصين أو 4)
+    for (const [code, cap] of Object.entries(harvest.capacityUpdates)) {
+      let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code.toUpperCase());
+      if (locker) {
+        locker.capacity = cap;
+      }
+    }
+
+    writeLocalDB(db);
+
+    // 4. اعتماد وتسكين كافة الحجوزات المدمجة
+    const commitRes = this.commitParsedBookings(harvest.mergedBookings, { cleanBeforeSync });
+
+    // 5. حفظ رابط الشيت في الإعدادات
+    const currentDb = readLocalDB();
+    currentDb.settings.google_sheet_url = sheetUrl;
+    writeLocalDB(currentDb);
+
+    const confirmedCount = harvest.mergedBookings.filter(b => b.status === 'confirmed').length;
+    const pendingCount = harvest.mergedBookings.filter(b => b.status === 'pending').length;
+
+    const scannedSummary = harvest.scannedTabs.length > 0
+      ? `تم مسح ${harvest.scannedTabs.length} أوراق عمل: [${harvest.scannedTabs.join(', ')}].`
+      : '';
+
+    return {
+      success: true,
+      importedConfirmed: confirmedCount,
+      importedPending: pendingCount,
+      adminReservedCount,
+      totalLockers: currentDb.lockers.length,
+      ranges: harvest.detectedRanges,
+      scannedTabs: harvest.scannedTabs,
+      discoveredTabs: harvest.discoveredTabs,
+      message: `تمت المزامنة الشاملة بنجاح! ${scannedSummary} تم استيراد وتسكين ${harvest.mergedBookings.length} حجوزات (${confirmedCount} مؤكد، ${pendingCount} معلق) وتأكيد ${adminReservedCount} دواليب مخصصة للإدارة.`
+    };
   },
 
   // 23. استيراد فوري سريع (للتوافق مع الواجهات السابقة)

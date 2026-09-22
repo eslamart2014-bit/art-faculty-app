@@ -95,6 +95,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = body.action;
+    console.log('[Lockers POST]:', action, JSON.stringify(body).slice(0, 300));
 
     // 1. تأكيد حجز
     if (action === 'confirm') {
@@ -232,7 +233,21 @@ export async function POST(request: Request) {
       return NextResponse.json(res);
     }
 
-    // 14. المزامنة المباشرة الذكية عبر رابط جوجل شيت
+    // 14. معاينة تفاعلية لكامل بيانات رابط جوجل شيت
+    if (action === 'preview_sheet_url') {
+      const { sheetUrl, mode, customTab } = body;
+      if (!sheetUrl || typeof sheetUrl !== 'string') {
+        return NextResponse.json({ error: 'يرجى إدخال رابط أو معرف Google Sheets' }, { status: 400 });
+      }
+      const res = await lockerStore.previewGoogleSheetUrl({
+        sheetUrl,
+        mode: mode || 'full',
+        customTab
+      });
+      return NextResponse.json(res);
+    }
+
+    // 15. المزامنة المباشرة الذكية عبر رابط جوجل شيت
     if (action === 'sync_sheet_url') {
       const { sheetUrl, mode, customTab, cleanBeforeSync } = body;
       if (!sheetUrl || typeof sheetUrl !== 'string') {

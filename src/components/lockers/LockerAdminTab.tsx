@@ -367,6 +367,39 @@ export default function LockerAdminTab() {
     }
   };
 
+  // 1. ب. معاينة تفاعلية لكامل بيانات الرابط قبل الاعتماد
+  const handlePreviewUrl = async () => {
+    if (!sheetUrlInput || !sheetUrlInput.trim()) {
+      showToast("يرجى إدخال رابط أو معرّف Google Sheet أولاً");
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'preview_sheet_url',
+          sheetUrl: sheetUrlInput.trim(),
+          mode: syncStrategy,
+          customTab: customSheetTab
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setPreviewData(json);
+        const tabsScanned = json.scannedTabs && json.scannedTabs.length > 0 ? ` من ${json.scannedTabs.length} أوراق` : '';
+        showToast(`تم استخراج ${json.total} صفوف بنجاح${tabsScanned}، راجع جدول المعاينة أدناه`);
+      } else {
+        showToast(json.errors?.[0] || "تعذر قراءة بيانات الشيت");
+      }
+    } catch (e) {
+      showToast("خطأ في الاتصال بالخادم أثناء المعاينة");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   // 2. تحليل ومعاينة البيانات تفاعلياً قبل الاعتماد
   const handlePreviewRawData = async (rawText: string) => {
     if (!rawText || !rawText.trim()) {
@@ -1125,29 +1158,54 @@ export default function LockerAdminTab() {
                   </label>
                 </div>
 
-                {/* زر بدء المزامنة */}
-                <button
-                  onClick={handleSyncFromUrl}
-                  disabled={syncLoading}
-                  style={{
-                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                    color: "#fff",
-                    border: "none",
-                    padding: "14px 28px",
-                    borderRadius: "12px",
-                    fontWeight: "900",
-                    fontSize: "15px",
-                    cursor: syncLoading ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "10px",
-                    boxShadow: "0 4px 20px rgba(16, 185, 129, 0.25)"
-                  }}
-                >
-                  <RefreshCw size={18} />
-                  <span>{syncLoading ? "جاري المزامنة مع خوادم جوجل..." : "بدء المزامنة الفورية من شيت جوجل ⚡"}</span>
-                </button>
+                {/* أزرار المعاينة والمزامنة المباشرة */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+                  <button
+                    onClick={handlePreviewUrl}
+                    disabled={previewLoading || syncLoading}
+                    style={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "14px 20px",
+                      borderRadius: "12px",
+                      fontWeight: "900",
+                      fontSize: "15px",
+                      cursor: (previewLoading || syncLoading) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "10px",
+                      boxShadow: "0 4px 20px rgba(99, 102, 241, 0.25)"
+                    }}
+                  >
+                    <Eye size={18} />
+                    <span>{previewLoading ? "جاري فحص وقراءة الأوراق..." : "معاينة وتحليل كامل بيانات الرابط 👁️"}</span>
+                  </button>
+
+                  <button
+                    onClick={handleSyncFromUrl}
+                    disabled={syncLoading || previewLoading}
+                    style={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "14px 20px",
+                      borderRadius: "12px",
+                      fontWeight: "900",
+                      fontSize: "15px",
+                      cursor: (syncLoading || previewLoading) ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "10px",
+                      boxShadow: "0 4px 20px rgba(16, 185, 129, 0.25)"
+                    }}
+                  >
+                    <RefreshCw size={18} />
+                    <span>{syncLoading ? "جاري المزامنة الشاملة..." : "بدء المزامنة الفورية لكامل الشيت ⚡"}</span>
+                  </button>
+                </div>
 
                 {/* تقرير المزامنة المباشرة */}
                 {syncStatusResult && (
@@ -1164,19 +1222,32 @@ export default function LockerAdminTab() {
                     </div>
                     <p style={{ margin: "0 0 10px 0", lineHeight: "1.6" }}>{syncStatusResult.message}</p>
                     {syncStatusResult.success && (
-                      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", fontSize: "13px" }}>
-                        <span style={{ background: "#064e3b", padding: "4px 10px", borderRadius: "6px", color: "#a7f3d0" }}>
-                          حجوزات مؤكدة: <strong>{syncStatusResult.importedConfirmed}</strong>
-                        </span>
-                        <span style={{ background: "#1e3a8a", padding: "4px 10px", borderRadius: "6px", color: "#bfdbfe" }}>
-                          حجوزات معلقة: <strong>{syncStatusResult.importedPending}</strong>
-                        </span>
-                        <span style={{ background: "#78350f", padding: "4px 10px", borderRadius: "6px", color: "#fde68a" }}>
-                          مخصص للإدارة: <strong>{syncStatusResult.adminReservedCount}</strong>
-                        </span>
-                        <span style={{ background: "#312e81", padding: "4px 10px", borderRadius: "6px", color: "#c7d2fe" }}>
-                          إجمالي الدواليب: <strong>{syncStatusResult.totalLockers}</strong>
-                        </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", fontSize: "13px" }}>
+                          <span style={{ background: "#064e3b", padding: "4px 10px", borderRadius: "6px", color: "#a7f3d0" }}>
+                            حجوزات مؤكدة: <strong>{syncStatusResult.importedConfirmed}</strong>
+                          </span>
+                          <span style={{ background: "#1e3a8a", padding: "4px 10px", borderRadius: "6px", color: "#bfdbfe" }}>
+                            حجوزات معلقة: <strong>{syncStatusResult.importedPending}</strong>
+                          </span>
+                          <span style={{ background: "#78350f", padding: "4px 10px", borderRadius: "6px", color: "#fde68a" }}>
+                            مخصص للإدارة: <strong>{syncStatusResult.adminReservedCount}</strong>
+                          </span>
+                          <span style={{ background: "#312e81", padding: "4px 10px", borderRadius: "6px", color: "#c7d2fe" }}>
+                            إجمالي الدواليب: <strong>{syncStatusResult.totalLockers}</strong>
+                          </span>
+                        </div>
+
+                        {syncStatusResult.scannedTabs && syncStatusResult.scannedTabs.length > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "12px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "8px" }}>
+                            <span style={{ color: "#94a3b8" }}>الأوراق التي تم سحبها:</span>
+                            {syncStatusResult.scannedTabs.map((tab: string, ti: number) => (
+                              <span key={ti} style={{ background: "#1e293b", border: "1px solid #475569", padding: "2px 8px", borderRadius: "6px", color: "#e2e8f0" }}>
+                                📄 {tab}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1348,6 +1419,30 @@ export default function LockerAdminTab() {
                   )}
                 </div>
               </div>
+
+              {/* شريط الأوراق التي تم فحصها وسحبها */}
+              {previewData.scannedTabs && previewData.scannedTabs.length > 0 && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                  fontSize: "12px",
+                  background: "#0f172a",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #334155"
+                }}>
+                  <span style={{ color: "#38bdf8", fontWeight: "bold" }}>
+                    📁 الأوراق التي تم مسحها بنجاح ({previewData.scannedTabs.length}):
+                  </span>
+                  {previewData.scannedTabs.map((tab: string, ti: number) => (
+                    <span key={ti} style={{ background: "#1e293b", border: "1px solid #475569", padding: "2px 8px", borderRadius: "6px", color: "#f8fafc" }}>
+                      📄 {tab}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* خيار الاستبدال النظيف للمعاينات */}
               <div style={{
