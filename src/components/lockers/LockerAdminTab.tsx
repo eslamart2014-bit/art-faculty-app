@@ -321,7 +321,8 @@ export default function LockerAdminTab() {
       if (json.success) {
         showToast(json.message);
         setImportText("");
-        fetchData();
+        await fetchData();
+        setActiveSubTab("grid");
       } else {
         showToast(json.message || "تعذر الاستيراد، يرجى مراجعة التنسيق");
       }
@@ -356,7 +357,8 @@ export default function LockerAdminTab() {
       setSyncStatusResult(json);
       if (json.success) {
         showToast(json.message);
-        fetchData();
+        await fetchData();
+        setActiveSubTab("grid");
       } else {
         showToast(json.message || "فشلت المزامنة");
       }
@@ -463,11 +465,12 @@ export default function LockerAdminTab() {
       });
       const json = await res.json();
       if (json.success) {
-        showToast(json.message);
+        showToast(json.message || `تم بنجاح تسكين ${json.importedCount || previewData.total} حجزاً وحفظها في السحابة!`);
         setPreviewData(null);
         setImportText("");
         setUploadedFileName(null);
-        fetchData();
+        await fetchData();
+        setActiveSubTab("grid");
       } else {
         showToast(json.message || "فشل اعتماد التسكين");
       }
@@ -1399,7 +1402,7 @@ export default function LockerAdminTab() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{ background: "#1e293b", border: "1px solid #475569", padding: "6px 12px", borderRadius: "20px", fontSize: "12px", color: "#fff", fontWeight: "bold" }}>
                     إجمالي: {previewData.total}
                   </span>
@@ -1417,6 +1420,27 @@ export default function LockerAdminTab() {
                       تنبيهات: {previewData.conflictCount}
                     </span>
                   )}
+                  <button
+                    onClick={handleCommitPreview}
+                    disabled={commitLoading}
+                    style={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "8px 20px",
+                      borderRadius: "12px",
+                      fontWeight: "900",
+                      fontSize: "13px",
+                      cursor: commitLoading ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      boxShadow: "0 4px 15px rgba(16, 185, 129, 0.3)"
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>{commitLoading ? "جاري التسكين..." : `تأكيد وتسكين الكل (${previewData.total}) 🚀`}</span>
+                  </button>
                 </div>
               </div>
 

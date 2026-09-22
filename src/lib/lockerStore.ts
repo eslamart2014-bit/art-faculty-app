@@ -589,7 +589,11 @@ function generateInitialLockers(): LockerItem[] {
   return lockers;
 }
 
-function readLocalDB(): LocalLockersDB {
+let memoryDB: LocalLockersDB | null = null;
+let lastCloudFetchTime = 0;
+const CACHE_TTL_MS = 10000; // 10 seconds memory cache
+
+function readLocalFileDB(): LocalLockersDB {
   try {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, 'utf-8');
@@ -599,7 +603,7 @@ function readLocalDB(): LocalLockersDB {
       }
     }
   } catch (e) {
-    console.error('Error reading lockers db file:', e);
+    console.error('[LockerStore] Error reading lockers db file:', e);
   }
 
   const initial: LocalLockersDB = {
@@ -614,19 +618,111 @@ function readLocalDB(): LocalLockersDB {
     }
   };
 
-  writeLocalDB(initial);
+  writeLocalFileDB(initial);
   return initial;
 }
 
-function writeLocalDB(data: LocalLockersDB) {
+function writeLocalFileDB(data: LocalLockersDB) {
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
   } catch (e) {
-    console.error('Error writing lockers db file:', e);
+    // Vercel serverless / readonly environment handling
+    console.warn('[LockerStore] Local write skipped (read-only environment):', (e as any)?.message);
   }
 }
 
+async function loadFromCloud(force: boolean = false): Promise<LocalLockersDB> {
+  if (!force && memoryDB && (Date.now() - lastCloudFetchTime < CACHE_TTL_MS)) {
+    return memoryDB;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('system_settings')
+      .select('telegram_config')
+      .eq('id', 1)
+      .single();
+
+    if (!error && data?.telegram_config?.lockers_data?.lockers?.length) {
+      memoryDB = data.telegram_config.lockers_data;
+      lastCloudFetchTime = Date.now();
+      writeLocalFileDB(memoryDB!);
+      return memoryDB!;
+    }
+  } catch (err: any) {
+    console.warn('[LockerStore] Cloud fetch warning:', err?.message || err);
+  }
+
+  if (!memoryDB) {
+    memoryDB = readLocalFileDB();
+    lastCloudFetchTime = Date.now();
+    // Proactively persist initial data to cloud
+    persistDB(memoryDB).catch(() => {});
+  }
+  return memoryDB;
+}
+
+async function persistDB(data: LocalLockersDB): Promise<void> {
+  memoryDB = data;
+  lastCloudFetchTime = Date.now();
+  writeLocalFileDB(data);
+
+  try {
+    const { data: current } = await supabaseAdmin
+      .from('system_settings')
+      .select('telegram_config')
+      .eq('id', 1)
+      .single();
+
+    const updatedConfig = {
+      ...(current?.telegram_config || {}),
+      lockers_data: data
+    };
+
+    const { error: updErr } = await supabaseAdmin
+      .from('system_settings')
+      .update({ telegram_config: updatedConfig })
+      .eq('id', 1);
+
+    if (updErr) {
+      console.error('[LockerStore] Supabase cloud save error:', updErr.message);
+    } else {
+      console.log(`[LockerStore] Cloud persistence OK: ${data.lockers.length} lockers, ${data.bookings.length} bookings saved.`);
+    }
+  } catch (cloudErr: any) {
+    console.error('[LockerStore] Supabase cloud persist error:', cloudErr?.message || cloudErr);
+  }
+}
+
+function readLocalDB(): LocalLockersDB {
+  if (memoryDB) return memoryDB;
+  memoryDB = readLocalFileDB();
+  return memoryDB;
+}
+
+function writeLocalDB(data: LocalLockersDB) {
+  memoryDB = data;
+  lastCloudFetchTime = Date.now();
+  writeLocalFileDB(data);
+  persistDB(data).catch(e => console.error('[LockerStore] Background persist error:', e));
+}
+
 export const lockerStore = {
+  // التأكد من جلب أحدث نسخة سحابية من Supabase
+  async ensureLoaded(force: boolean = false): Promise<LocalLockersDB> {
+    return await loadFromCloud(force);
+  },
+
+  // جلب كائن قاعدة البيانات الحالي
+  getDB(): LocalLockersDB {
+    return readLocalDB();
+  },
+
+  // حفظ كائن قاعدة البيانات يدوياً في السحابة
+  async saveDB(data?: LocalLockersDB): Promise<void> {
+    await persistDB(data || readLocalDB());
+  },
+
   // 1. جلب كافة الدواليب أو حسب الحرف
   getLockers(letter?: string): LockerItem[] {
     const db = readLocalDB();
@@ -719,20 +815,20 @@ export const lockerStore = {
   },
 
   // 7. حجز دولاب جديد للطلاب
-  bookLocker(params: {
+  async bookLocker(params: {
     cohort: string;
     representative_phone: string;
     student_names: string[];
     student_codes: string[];
     preferred_letter?: string;
-  }): {
+  }): Promise<{
     success: boolean;
     isWaitlist: boolean;
     booking?: LockerBooking;
     waitlist?: LockerWaitlistEntry;
     locker?: LockerItem;
     message: string;
-  } {
+  }> {
     const db = readLocalDB();
 
     // التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل
@@ -781,7 +877,7 @@ export const lockerStore = {
       };
 
       db.waitlist.push(waitEntry);
-      writeLocalDB(db);
+      await persistDB(db);
 
       return {
         success: true,
@@ -811,7 +907,7 @@ export const lockerStore = {
     availableLocker.updated_at = new Date().toISOString();
 
     db.bookings.push(newBooking);
-    writeLocalDB(db);
+    await persistDB(db);
 
     return {
       success: true,
@@ -823,7 +919,7 @@ export const lockerStore = {
   },
 
   // 8. تأكيد واعتماد حجز (من قبل المشرف)
-  confirmBooking(bookingId: string, confirmedBy: string = 'م/ إسلام عبداللطيف'): boolean {
+  async confirmBooking(bookingId: string, confirmedBy: string = 'م/ إسلام عبداللطيف'): Promise<boolean> {
     const db = readLocalDB();
     const booking = db.bookings.find(b => b.id === bookingId);
     if (!booking) return false;
@@ -838,12 +934,12 @@ export const lockerStore = {
       locker.updated_at = new Date().toISOString();
     }
 
-    writeLocalDB(db);
+    await persistDB(db);
     return true;
   },
 
   // 9. رفض أو إلغاء حجز
-  rejectBooking(bookingId: string, reason?: string): boolean {
+  async rejectBooking(bookingId: string, reason?: string): Promise<boolean> {
     const db = readLocalDB();
     const booking = db.bookings.find(b => b.id === bookingId);
     if (!booking) return false;
@@ -861,12 +957,12 @@ export const lockerStore = {
       this.checkAndFulfillWaitlist(locker.locker_code, db);
     }
 
-    writeLocalDB(db);
+    await persistDB(db);
     return true;
   },
 
   // 10. إخلاء دولاب بالكامل (Admin Vacate)
-  vacateLocker(lockerCode: string): boolean {
+  async vacateLocker(lockerCode: string): Promise<boolean> {
     const db = readLocalDB();
     const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
     if (!locker) return false;
@@ -886,12 +982,12 @@ export const lockerStore = {
     // فحص قائمة الانتظار
     this.checkAndFulfillWaitlist(locker.locker_code, db);
 
-    writeLocalDB(db);
+    await persistDB(db);
     return true;
   },
 
   // 11. إقصاء طالب محدد من الدولاب دون إخلاء باقي زملائه
-  removeStudentFromLocker(bookingId: string, studentCodeOrName: string): { success: boolean; message: string; remaining: number } {
+  async removeStudentFromLocker(bookingId: string, studentCodeOrName: string): Promise<{ success: boolean; message: string; remaining: number }> {
     const db = readLocalDB();
     const booking = db.bookings.find(b => b.id === bookingId);
     if (!booking) return { success: false, message: 'الحجز غير موجود', remaining: 0 };
@@ -919,40 +1015,40 @@ export const lockerStore = {
         locker.status = 'empty';
         locker.current_booking_id = null;
       }
-      writeLocalDB(db);
+      await persistDB(db);
       return { success: true, message: 'تم إقصاء الطالب، وتم تفريغ الدولاب لعدم وجود طلاب آخرين', remaining: 0 };
     }
 
-    writeLocalDB(db);
+    await persistDB(db);
     return { success: true, message: 'تم إقصاء الطالب بنجاح وبقاء زملائه', remaining: booking.student_names.length };
   },
 
   // 12. تبديل حالة الدولاب (تفعيل / تعطيل بالحجز) - للضغط المطول
-  toggleLockerEnabled(lockerCode: string): boolean {
+  async toggleLockerEnabled(lockerCode: string): Promise<boolean> {
     const db = readLocalDB();
     const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
     if (!locker) return false;
 
     locker.is_enabled = !locker.is_enabled;
     locker.updated_at = new Date().toISOString();
-    writeLocalDB(db);
+    await persistDB(db);
     return locker.is_enabled;
   },
 
   // 13. تعديل سعة الدولاب (2 أو 4 أو مخصص)
-  updateLockerCapacity(lockerCode: string, capacity: number): boolean {
+  async updateLockerCapacity(lockerCode: string, capacity: number): Promise<boolean> {
     const db = readLocalDB();
     const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
     if (!locker) return false;
 
     locker.capacity = Math.max(1, capacity);
     locker.updated_at = new Date().toISOString();
-    writeLocalDB(db);
+    await persistDB(db);
     return true;
   },
 
   // 14. تفريغ دفعة بالكامل (مثلاً الفرقة الرابعة بعد التخرج)
-  clearCohort(cohort: string): { clearedCount: number } {
+  async clearCohort(cohort: string): Promise<{ clearedCount: number }> {
     const db = readLocalDB();
     let count = 0;
 
@@ -971,7 +1067,7 @@ export const lockerStore = {
       }
     }
 
-    writeLocalDB(db);
+    await persistDB(db);
     return { clearedCount: count };
   },
 
@@ -1007,7 +1103,7 @@ export const lockerStore = {
   },
 
   // 16. تخصيص الدولاب للإدارة أو إلغاء التخصيص
-  setAdminReserved(lockerCode: string, reserved: boolean, notes?: string): { success: boolean; is_admin_reserved: boolean; locker?: LockerItem; message: string } {
+  async setAdminReserved(lockerCode: string, reserved: boolean, notes?: string): Promise<{ success: boolean; is_admin_reserved: boolean; locker?: LockerItem; message: string }> {
     const db = readLocalDB();
     const code = lockerCode.trim().toUpperCase();
     const locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
@@ -1034,7 +1130,7 @@ export const lockerStore = {
     }
 
     locker.updated_at = new Date().toISOString();
-    writeLocalDB(db);
+    await persistDB(db);
     return {
       success: true,
       is_admin_reserved: reserved,
@@ -1059,7 +1155,7 @@ export const lockerStore = {
   },
 
   // 18. تحديث وضبط أعداد ونطاقات دواليب الأقسام
-  updateInventoryRanges(ranges: { [letter: string]: number }): { success: boolean; total: number; ranges: { [letter: string]: number }; message: string } {
+  async updateInventoryRanges(ranges: { [letter: string]: number }): Promise<{ success: boolean; total: number; ranges: { [letter: string]: number }; message: string }> {
     const db = readLocalDB();
     const letters = ['A', 'B', 'C', 'D'];
 
@@ -1108,18 +1204,18 @@ export const lockerStore = {
       return a.number - b.number;
     });
 
-    writeLocalDB(db);
+    await persistDB(db);
     const newRanges = this.getInventoryRanges();
     return {
       success: true,
       total: db.lockers.length,
       ranges: newRanges,
-      message: `تم تحديث شبكة الدواليب بنجاح. إجمالي الدواليب: ${db.lockers.length}`
+      message: `تم تحديث شبكة الدواليب بنجاح وحفظها سحابياً. إجمالي الدواليب: ${db.lockers.length}`
     };
   },
 
   // 19. تسكين طلاب يدوياً في دولاب
-  manualAssignBooking(params: {
+  async manualAssignBooking(params: {
     lockerCode: string;
     cohort: string;
     phone: string;
@@ -1127,7 +1223,7 @@ export const lockerStore = {
     studentCodes?: string[];
     notes?: string;
     status?: 'confirmed' | 'pending';
-  }): { success: boolean; message: string; booking?: LockerBooking; locker?: LockerItem } {
+  }): Promise<{ success: boolean; message: string; booking?: LockerBooking; locker?: LockerItem }> {
     const db = readLocalDB();
     const code = params.lockerCode.trim().toUpperCase();
     let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
@@ -1189,11 +1285,11 @@ export const lockerStore = {
     locker.updated_at = new Date().toISOString();
 
     db.bookings.push(newBooking);
-    writeLocalDB(db);
+    await persistDB(db);
 
     return {
       success: true,
-      message: `تم تسكين الدولاب ${code} بنجاح (${bookingStatus === 'confirmed' ? 'معتمد' : 'معلق'})`,
+      message: `تم تسكين الدولاب ${code} بنجاح (${bookingStatus === 'confirmed' ? 'معتمد' : 'معلق'}) وحفظه سحابياً`,
       booking: newBooking,
       locker
     };
@@ -1286,12 +1382,12 @@ export const lockerStore = {
   },
 
   // 21. اعتماد وتسكين البيانات بعد المعاينة أو من ملف
-  commitParsedBookings(rows: any[], options?: { cleanBeforeSync?: boolean }): {
+  async commitParsedBookings(rows: any[], options?: { cleanBeforeSync?: boolean }): Promise<{
     success: boolean;
     importedCount: number;
     updatedLockersCount: number;
     message: string;
-  } {
+  }> {
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return { success: false, importedCount: 0, updatedLockersCount: 0, message: 'لا توجد بيانات لاعتمادها' };
     }
@@ -1340,6 +1436,32 @@ export const lockerStore = {
         updatedLockersCount++;
       }
 
+      // فحص هل السطر مخصص للإدارة
+      const isReserved = (r.notes && (r.notes.includes('إدارة') || r.notes.includes('حجز إداري') || r.notes.includes('مخصص للإدارة'))) ||
+                         (r.student_names && r.student_names.some((n: string) => n.includes('إدارة') || n.includes('حجز إداري')));
+
+      if (isReserved) {
+        locker.is_admin_reserved = true;
+        locker.is_enabled = false;
+        locker.status = 'empty';
+        locker.notes = 'مخصص للإدارة (مستورد من الشيت)';
+        locker.current_booking_id = null;
+        locker.updated_at = new Date().toISOString();
+        continue;
+      }
+
+      // تنقية أسماء الطلاب الصالحة
+      const validNames = (r.student_names || []).map((n: any) => String(n || '').trim()).filter((n: string) => n.length > 1 && !n.includes('إدارة'));
+
+      // إذا لم يكن هناك أي أسماء للطلاب، لا ننشئ حجوزات وهمية فارغة
+      if (validNames.length === 0) {
+        if (clean) {
+          locker.status = 'empty';
+          locker.current_booking_id = null;
+        }
+        continue;
+      }
+
       // في حالة عدم التنظيف المسبق، نتأكد من إخلاء الحجز السابق لهذا الدولاب
       if (!clean && locker.current_booking_id) {
         const prevB = db.bookings.find(b => b.id === locker!.current_booking_id);
@@ -1351,7 +1473,6 @@ export const lockerStore = {
 
       const bookingStatus: 'confirmed' | 'pending' = r.status === 'pending' ? 'pending' : 'confirmed';
       const bookingId = `B_IMP_${Date.now()}_${i}`;
-      const validNames = (r.student_names || []).map((n: any) => String(n || '').trim()).filter(Boolean);
 
       const booking: LockerBooking = {
         id: bookingId,
@@ -1389,13 +1510,13 @@ export const lockerStore = {
       return a.number - b.number;
     });
 
-    writeLocalDB(db);
+    await persistDB(db);
 
     return {
       success: importedCount > 0,
       importedCount,
       updatedLockersCount,
-      message: `تم تسكين واعتماد ${importedCount} حجزاً بنجاح في النظام!`
+      message: `تم تسكين واعتماد ${importedCount} حجزاً بنجاح في النظام وحفظها سحابياً!`
     };
   },
 
@@ -1818,13 +1939,13 @@ export const lockerStore = {
 
     writeLocalDB(db);
 
-    // 4. اعتماد وتسكين كافة الحجوزات المدمجة
-    const commitRes = this.commitParsedBookings(harvest.mergedBookings, { cleanBeforeSync });
+    // 4. اعتماد وتسكين كافة الحجوزات المدمجة وحفظها سحابياً
+    const commitRes = await this.commitParsedBookings(harvest.mergedBookings, { cleanBeforeSync });
 
-    // 5. حفظ رابط الشيت في الإعدادات
+    // 5. حفظ رابط الشيت في الإعدادات سحابياً
     const currentDb = readLocalDB();
     currentDb.settings.google_sheet_url = sheetUrl;
-    writeLocalDB(currentDb);
+    await persistDB(currentDb);
 
     const confirmedCount = harvest.mergedBookings.filter(b => b.status === 'confirmed').length;
     const pendingCount = harvest.mergedBookings.filter(b => b.status === 'pending').length;
@@ -1842,12 +1963,12 @@ export const lockerStore = {
       ranges: harvest.detectedRanges,
       scannedTabs: harvest.scannedTabs,
       discoveredTabs: harvest.discoveredTabs,
-      message: `تمت المزامنة الشاملة بنجاح! ${scannedSummary} تم استيراد وتسكين ${harvest.mergedBookings.length} حجوزات (${confirmedCount} مؤكد، ${pendingCount} معلق) وتأكيد ${adminReservedCount} دواليب مخصصة للإدارة.`
+      message: `تمت المزامنة الشاملة بنجاح وحفظها سحابياً! ${scannedSummary} تم استيراد وتسكين ${harvest.mergedBookings.length} حجوزات (${confirmedCount} مؤكد، ${pendingCount} معلق) وتأكيد ${adminReservedCount} دواليب مخصصة للإدارة.`
     };
   },
 
   // 23. استيراد فوري سريع (للتوافق مع الواجهات السابقة)
-  importBookings(rawData: string): { success: boolean; importedCount: number; updatedLockersCount: number; errors: string[] } {
+  async importBookings(rawData: string): Promise<{ success: boolean; importedCount: number; updatedLockersCount: number; errors: string[] }> {
     if (!rawData || !rawData.trim()) {
       return { success: false, importedCount: 0, updatedLockersCount: 0, errors: ['لا توجد بيانات صالحة للاستيراد'] };
     }
@@ -1855,7 +1976,7 @@ export const lockerStore = {
     if (parsed.length === 0) {
       return { success: false, importedCount: 0, updatedLockersCount: 0, errors: ['تعذر استخراج بيانات الدواليب والطلاب'] };
     }
-    const res = this.commitParsedBookings(parsed, { cleanBeforeSync: false });
+    const res = await this.commitParsedBookings(parsed, { cleanBeforeSync: false });
     return {
       success: res.success,
       importedCount: res.importedCount,

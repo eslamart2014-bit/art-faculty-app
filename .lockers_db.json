@@ -7,11 +7,11 @@
       "number": 1,
       "capacity": 2,
       "is_enabled": true,
-      "status": "empty",
-      "current_booking_id": null,
+      "status": "confirmed",
+      "current_booking_id": "B_IMP_1790049390897_0",
       "is_admin_reserved": false,
       "notes": "",
-      "updated_at": "2026-09-22T02:56:01.609Z"
+      "updated_at": "2026-09-22T03:56:30.897Z"
     },
     {
       "id": "L_A2",
@@ -418,10 +418,12 @@
       "locker_code": "B2",
       "letter": "B",
       "number": 2,
-      "capacity": 4,
+      "capacity": 2,
       "is_enabled": true,
-      "status": "empty",
-      "current_booking_id": null
+      "status": "confirmed",
+      "current_booking_id": "B_IMP_1790049390897_1",
+      "is_admin_reserved": false,
+      "updated_at": "2026-09-22T03:56:30.897Z"
     },
     {
       "id": "L_B3",
@@ -1644,6 +1646,39 @@
       "confirmed_by": "استيراد جوجل شيت",
       "responsible": "SHEET_IMPORT",
       "notes": "مستورد من كشوف التسكين المعتمدة"
+    },
+    {
+      "id": "B_IMP_1790049390897_0",
+      "locker_code": "A1",
+      "cohort": "الفرقة الرابعة",
+      "representative_phone": "01012345678",
+      "student_names": [
+        "طالب تجريبي أول",
+        "طالب تجريبي ثان"
+      ],
+      "student_codes": [],
+      "status": "confirmed",
+      "created_at": "2026-09-22T03:56:30.897Z",
+      "confirmed_at": "2026-09-22T03:56:30.897Z",
+      "confirmed_by": "استيراد جوجل شيت",
+      "responsible": "SHEET_SYNC",
+      "notes": "مستورد عبر أداة مزامنة شيت جوجل"
+    },
+    {
+      "id": "B_IMP_1790049390897_1",
+      "locker_code": "B2",
+      "cohort": "الفرقة الثالثة",
+      "representative_phone": "01122334455",
+      "student_names": [
+        "طالبة تجريبية ثالثة"
+      ],
+      "student_codes": [],
+      "status": "confirmed",
+      "created_at": "2026-09-22T03:56:30.897Z",
+      "confirmed_at": "2026-09-22T03:56:30.897Z",
+      "confirmed_by": "استيراد جوجل شيت",
+      "responsible": "SHEET_SYNC",
+      "notes": "مستورد عبر أداة مزامنة شيت جوجل"
     }
   ],
   "waitlist": [],

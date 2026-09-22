@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { lockerStore } from '@/lib/lockerStore';
 
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    await lockerStore.ensureLoaded();
     const result = lockerStore.getStudentLockerStatus(code || name);
     return NextResponse.json({
       success: true,
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
 // 2. POST: البحث الذكي عن زملاء الدفعة أو تقديم طلب الحجز
 export async function POST(request: Request) {
   try {
+    await lockerStore.ensureLoaded();
     const body = await request.json();
     const action = body.action || 'book';
 
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
 
-      const result = lockerStore.bookLocker({
+      const result = await lockerStore.bookLocker({
         cohort,
         representative_phone,
         student_names,
