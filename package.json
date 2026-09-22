@@ -1,6 +1,6 @@
 {
   "name": "art-edu-app",
-  "version": "3.6.10",
+  "version": "3.6.11",
   "private": true,
   "scripts": {
     "dev": "next dev",

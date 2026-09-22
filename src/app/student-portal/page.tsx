@@ -34,10 +34,10 @@ export default function HomePage() {
   const [downloading, setDownloading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // البحث التلقائي المؤخر (Debounced) أو عند تغيير الفرقة
+  // البحث التلقائي المؤخر (Debounced) - فقط عند إدخال حرفين على الأقل
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (query.trim().length >= 1 || (level && level !== "الكل")) {
+      if (query.trim().length >= 2) {
         searchStudents();
       } else {
         setStudents([]);
@@ -106,9 +106,8 @@ export default function HomePage() {
       ctx.fillStyle = "#93c5fd";
       ctx.font = "bold 32px Cairo, sans-serif";
       ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 100);
-
+      ctx.font = "bold 26px 'Cairo', sans-serif";
       ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 26px Cairo, sans-serif";
       ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 145);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
@@ -212,38 +211,15 @@ export default function HomePage() {
       {/* الرأس والترويسة */}
       <div>
         <header style={{ textAlign: "center", paddingTop: "15px", marginBottom: "20px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "60px", height: "60px", borderRadius: "18px", background: "linear-gradient(135deg, #2563eb, #06b6d4)", marginBottom: "12px", boxShadow: "0 8px 25px rgba(37, 99, 235, 0.4)" }}>
-            <GraduationCap size={34} color="#fff" />
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px", borderRadius: "18px", overflow: "hidden", marginBottom: "12px", boxShadow: "0 8px 25px rgba(37, 99, 235, 0.4)" }}>
+            <img src="/icon-192.png" alt="بوابة فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", letterSpacing: "-0.5px", marginBottom: "4px" }}>
             بوابة فنية
           </h1>
           <p style={{ color: "#94a3b8", fontSize: "13px" }}>
-            المنظومة الرقمية الذكية لطلاب كلية التربية النوعية - قسم التربية الفنية
+            المنظومة الرقمية الذكية لطلاب جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </p>
-
-          <div style={{ marginTop: "10px", display: "flex", justifyContent: "center", gap: "8px" }}>
-            <Link 
-              href="/instructor"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "rgba(16, 185, 129, 0.12)",
-                border: "1px solid rgba(16, 185, 129, 0.35)",
-                color: "#34d399",
-                padding: "6px 14px",
-                borderRadius: "20px",
-                fontSize: "12px",
-                fontWeight: "bold",
-                textDecoration: "none",
-                transition: "0.2s"
-              }}
-            >
-              <span>👨‍🏫</span>
-              <span>بوابة المدرسين والمعيدين</span>
-            </Link>
-          </div>
         </header>
 
         {/* عرض البطاقة المستخرجة إن وُجدت */}
@@ -251,7 +227,8 @@ export default function HomePage() {
           <div className="animate-fade-in" style={{ marginBottom: "24px" }}>
             <div className="student-id-card" ref={cardRef} style={{ padding: "26px 20px", textAlign: "center" }}>
               
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "4px" }}>
+                <span style={{ fontSize: "11px", color: "#c7d2fe", fontWeight: "bold" }}>جامعة قنا</span>
                 <span style={{ fontSize: "11px", color: "#93c5fd", fontWeight: "bold" }}>كلية التربية النوعية</span>
                 <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>قسم التربية الفنية</span>
               </div>
@@ -287,24 +264,25 @@ export default function HomePage() {
               </div>
 
               {/* أزرار العمليات على البطاقة */}
-              <div style={{ display: "flex", gap: "10px" }}>
+              <div>
                 <button 
                   onClick={downloadCardAsImage}
                   disabled={downloading}
                   className="btn-primary"
-                  style={{ background: "linear-gradient(135deg, #10b981, #059669)", flex: 2 }}
+                  style={{ background: "linear-gradient(135deg, #10b981, #059669)", width: "100%", padding: "14px", fontSize: "14px" }}
                 >
                   <Download size={18} />
                   <span>{downloading ? "جاري تجهيز الصورة..." : "تحميل البطاقة كصورة (PNG)"}</span>
                 </button>
 
-                <button 
-                  onClick={() => setSelectedStudent(null)}
-                  className="btn-secondary"
-                  style={{ flex: 1 }}
-                >
-                  بحث آخر
-                </button>
+                <div style={{ textAlign: "center", marginTop: "12px" }}>
+                  <button 
+                    onClick={() => setSelectedStudent(null)}
+                    style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "13px", textDecoration: "underline" }}
+                  >
+                    استخراج بطاقة لطالب آخر
+                  </button>
+                </div>
               </div>
 
               <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px", marginTop: "16px", color: "#64748b", fontSize: "10px" }}>
@@ -416,14 +394,14 @@ export default function HomePage() {
 
       {/* الزر الرئيسي الكبير في أسفل الصفحة: الانتقال إلى نظام فنية */}
       <footer style={{ marginTop: "20px", marginBottom: "15px" }}>
-        <Link href="/system" style={{ textDecoration: "none" }}>
+        <Link href="/system?mode=register" style={{ textDecoration: "none" }}>
           <div 
             className="animate-glow"
             style={{ 
               background: "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)", 
               border: "2px solid #60a5fa",
               borderRadius: "16px", 
-              padding: "18px 20px", 
+              padding: "16px 20px", 
               display: "flex", 
               alignItems: "center", 
               justifyContent: "space-between",
@@ -435,11 +413,11 @@ export default function HomePage() {
             onMouseUp={(e) => e.currentTarget.style.transform = "scale(1)"}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Sparkles size={26} color="#fff" />
+              <div style={{ width: "46px", height: "46px", borderRadius: "12px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", flexShrink: 0 }}>
+                <img src="/icon-192.png" alt="فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: "#ffffff", fontWeight: "900", fontSize: "17px", letterSpacing: "-0.2px" }}>
+                <div style={{ color: "#ffffff", fontWeight: "900", fontSize: "16px", letterSpacing: "-0.2px" }}>
                   الانتقال إلى نظام "فنية"
                 </div>
                 <div style={{ color: "#bfdbfe", fontSize: "12px" }}>
@@ -453,17 +431,6 @@ export default function HomePage() {
             </div>
           </div>
         </Link>
-
-        {/* روابط سريعة للمنسقين والأدمن */}
-        <div style={{ display: "flex", justifyContent: "center", gap: "18px", marginTop: "14px", fontSize: "11px", color: "#64748b" }}>
-          <Link href="/coordinator" style={{ color: "#64748b", textDecoration: "none" }}>
-            مكتب المنسقين (صرف الـ PIN)
-          </Link>
-          <span>•</span>
-          <Link href="/admin-portal" style={{ color: "#64748b", textDecoration: "none" }}>
-            بوابة الطلاب المتقدمة (الإدارة)
-          </Link>
-        </div>
       </footer>
 
     </main>

@@ -19,14 +19,44 @@ export async function POST(request: Request) {
     const cleanCode = formatStudentCode(student_code);
     const cleanPin = pin_code.trim();
 
-    // جلب الحساب
-    const { data: account, error: accErr } = await supabaseAdmin
-      .from('student_accounts')
-      .select('*')
-      .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-      .maybeSingle();
+    // جلب الحساب من student_accounts أو telegram_browser_id
+    let account: any = null;
+    let studentId: string | null = null;
+    try {
+      const { data } = await supabaseAdmin
+        .from('student_accounts')
+        .select('*')
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .maybeSingle();
+      account = data;
+    } catch (e) {}
 
-    if (accErr || !account) {
+    if (!account) {
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+        if (st) {
+          studentId = st.id;
+          if (st.telegram_browser_id) {
+            account = JSON.parse(st.telegram_browser_id);
+            account.student_id = st.id;
+            account.full_name = st.full_name;
+            account.student_code = st.student_code;
+            account.academic_year = st.academic_year;
+            account.section = st.section;
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!account) {
+      account = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
+    }
+
+    if (!account) {
       return NextResponse.json(
         { error: 'لم يتم العثور على حساب مسجل بهذا الكود. يرجى الضغط على "تسجيل جديد" أولاً.' },
         { status: 404 }
@@ -108,13 +138,29 @@ export async function POST(request: Request) {
       });
     }
 
-    await supabaseAdmin
-      .from('student_accounts')
-      .update({
+    if (account.id) {
+      await supabaseAdmin
+        .from('student_accounts')
+        .update({
+          devices: updatedDevices,
+          last_login_at: new Date().toISOString(),
+        })
+        .eq('id', account.id);
+    }
+
+    // تحديث دائم في students.telegram_browser_id
+    try {
+      const mergedPayload = {
+        ...account,
+        ...resetSecurity,
         devices: updatedDevices,
-        last_login_at: new Date().toISOString(),
-      })
-      .eq('id', account.id);
+        last_login_at: new Date().toISOString()
+      };
+      await supabaseAdmin
+        .from('students')
+        .update({ telegram_browser_id: JSON.stringify(mergedPayload) })
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+    } catch (e) {}
 
     // تسجيل الدخول في الأوديت لوج
     try {
