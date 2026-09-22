@@ -18,6 +18,24 @@ const getWeekRangeFromKey = (key: string) => {
   return { start, end };
 };
 
+const getTodayLocalDateStr = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const getEffectiveSaveDate = (weekKey: string) => {
+  const todayStr = getTodayLocalDateStr();
+  const { start, end } = getWeekRangeFromKey(weekKey);
+  const startStr = getTodayLocalDateStr(start);
+  const endStr = getTodayLocalDateStr(end);
+  if (todayStr >= startStr && todayStr <= endStr) {
+    return todayStr;
+  }
+  return weekKey;
+};
+
 export default function AttendancePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -334,13 +352,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         setTotalWeeksCount(countWeeks);
 
         const { start: wStart, end: wEnd } = getWeekRangeFromKey(selectedWeekKey);
+        const wStartStr = getTodayLocalDateStr(wStart);
+        const wEndStr = getTodayLocalDateStr(wEnd);
 
         const { data: attData } = await supabase
           .from("attendance")
           .select("*")
           .eq("course_id", resolvedParams.id)
-          .gte("date", wStart.toISOString())
-          .lte("date", wEnd.toISOString());
+          .gte("date", wStartStr)
+          .lte("date", wEndStr);
         
         const loadedAtt = attData || [];
         setAttendance(loadedAtt);
@@ -400,7 +420,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   const handleSaveAttendance = async () => {
     setSaving(true);
     try {
-      const saveDate = selectedWeekKey;
+      const saveDate = getEffectiveSaveDate(selectedWeekKey);
       const displayIds = getDisplayStudents().map(s => s.id);
       const toDeleteIds = displayIds.filter(id => 
         !selectedStudentIds.has(id) && 
@@ -581,7 +601,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   const saveBatchCameraAttendance = async () => {
     if (scannedStudents.length === 0) return;
-    const saveDate = selectedWeekKey;
+    const saveDate = getTodayLocalDateStr();
     
     // 1. Instant Optimistic UI (0ms!)
     const newAtt = [...attendance];
@@ -1088,7 +1108,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                     const inserts = [{
                       course_id: course.id,
                       student_id: longPressStudent.id,
-                      date: selectedWeekKey,
+                      date: getEffectiveSaveDate(selectedWeekKey),
                       status: "غياب بعذر",
                       note: excuse,
                       teacher_id: course.teacher_id

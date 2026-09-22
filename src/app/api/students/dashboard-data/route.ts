@@ -240,7 +240,8 @@ export async function GET(request: Request) {
         records: sortedRecords.map((r: any) => {
           let dateStr = r.date;
           try {
-            dateStr = new Date(r.date).toLocaleDateString('ar-EG', {
+            const dateObj = r.date.includes('T') ? new Date(r.date) : new Date(r.date + 'T12:00:00');
+            dateStr = dateObj.toLocaleDateString('ar-EG', {
               weekday: 'long',
               year: 'numeric',
               month: 'short',

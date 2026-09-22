@@ -2316,14 +2316,77 @@ export default function SystemPage() {
                         </span>
                       </div>
 
-                      <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "#94a3b8", marginBottom: "12px", flexWrap: "wrap" }}>
-                        <span>حاضر: <b style={{ color: "#34d399" }}>{c.attended}</b></span>
-                        <span>•</span>
-                        <span>غائب: <b style={{ color: "#f87171" }}>{c.absent}</b></span>
-                        <span>•</span>
-                        <span>عذر: <b style={{ color: "#fbbf24" }}>{c.excused || 0}</b></span>
-                        <span>•</span>
-                        <span>إجمالي المحاضرات: {c.total || c.totalLectures || (c.records?.length || 0)}</span>
+                      {/* بطاقات إحصائيات الحضور والغياب البارزة والواضحة للطالب */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "14px" }}>
+                        {/* بطاقة الحضور الكبيرة والواضحة */}
+                        <div style={{
+                          background: "rgba(16, 185, 129, 0.15)",
+                          border: "1.5px solid rgba(16, 185, 129, 0.45)",
+                          borderRadius: "12px",
+                          padding: "10px 6px",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          boxShadow: "0 4px 14px rgba(16, 185, 129, 0.12)"
+                        }}>
+                          <span style={{ fontSize: "15px", fontWeight: "900", color: "#34d399", marginBottom: "2px", letterSpacing: "0.3px" }}>
+                            حضور ✅
+                          </span>
+                          <span style={{ fontSize: "28px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
+                            {c.attended}
+                          </span>
+                          <span style={{ fontSize: "11px", color: "#a7f3d0", marginTop: "2px" }}>
+                            محاضرة
+                          </span>
+                        </div>
+
+                        {/* بطاقة الغياب */}
+                        <div style={{
+                          background: "rgba(239, 68, 68, 0.1)",
+                          border: "1px solid rgba(239, 68, 68, 0.3)",
+                          borderRadius: "12px",
+                          padding: "10px 6px",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}>
+                          <span style={{ fontSize: "13px", fontWeight: "bold", color: "#f87171", marginBottom: "2px" }}>
+                            غياب ❌
+                          </span>
+                          <span style={{ fontSize: "24px", fontWeight: "bold", color: "#ffffff", lineHeight: "1.1" }}>
+                            {c.absent}
+                          </span>
+                          <span style={{ fontSize: "11px", color: "#fca5a5", marginTop: "2px" }}>
+                            {c.excused > 0 ? `(${c.excused} عذر)` : "محاضرة"}
+                          </span>
+                        </div>
+
+                        {/* بطاقة نسبة الحضور والإجمالي */}
+                        <div style={{
+                          background: "rgba(56, 189, 248, 0.1)",
+                          border: "1px solid rgba(56, 189, 248, 0.3)",
+                          borderRadius: "12px",
+                          padding: "10px 6px",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}>
+                          <span style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "2px" }}>
+                            النسبة 📊
+                          </span>
+                          <span style={{ fontSize: "24px", fontWeight: "bold", color: "#ffffff", lineHeight: "1.1" }}>
+                            {c.rate}%
+                          </span>
+                          <span style={{ fontSize: "11px", color: "#93c5fd", marginTop: "2px" }}>
+                            من {c.total || c.totalLectures || (c.records?.length || 0)} محاضرة
+                          </span>
+                        </div>
                       </div>
 
                       {/* زر فتح/إغلاق التواريخ التفصيلية */}
@@ -2372,15 +2435,17 @@ export default function SystemPage() {
                                     fontSize: "12px"
                                   }}
                                 >
-                                  <span style={{ color: "#e2e8f0" }}>
+                                  <span style={{ color: "#ffffff", fontWeight: "bold", fontSize: "13px" }}>
                                     📅 {rec.formattedDate || rec.date}
                                   </span>
                                   <span style={{
-                                    fontWeight: "bold",
-                                    padding: "2px 8px",
-                                    borderRadius: "6px",
-                                    background: isPresent ? "rgba(16, 185, 129, 0.2)" : isExcused ? "rgba(245, 158, 11, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                                    color: isPresent ? "#34d399" : isExcused ? "#fbbf24" : "#f87171"
+                                    fontWeight: "900",
+                                    fontSize: "13px",
+                                    padding: "3px 10px",
+                                    borderRadius: "8px",
+                                    background: isPresent ? "rgba(16, 185, 129, 0.25)" : isExcused ? "rgba(245, 158, 11, 0.25)" : "rgba(239, 68, 68, 0.25)",
+                                    color: isPresent ? "#34d399" : isExcused ? "#fbbf24" : "#f87171",
+                                    border: isPresent ? "1px solid #10b981" : isExcused ? "1px solid #f59e0b" : "1px solid #ef4444"
                                   }}>
                                     {isPresent ? "حاضر ✅" : isExcused ? "عذر 📝" : "غائب ❌"}
                                   </span>
