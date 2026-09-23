@@ -171,6 +171,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const longPressTriggered = useRef(false);
   const [scannerStatus, setScannerStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [scannerStatusText, setScannerStatusText] = useState<string>("");
+  const [cameraScoreInput, setCameraScoreInput] = useState<string>("");
+  const [savingActiveStudent, setSavingActiveStudent] = useState(false);
   const isProcessingScanRef = useRef(false);
 
   useEffect(() => {
@@ -290,6 +292,11 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         projectStats: stats
       });
     } catch (e) {}
+  };
+
+  const getTodayLocalDateStr = (d = new Date()) => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
 
   const getSuggestedDeadline = () => {
@@ -702,6 +709,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             });
           } else {
             setActiveScannedStudent(studentWithData);
+            setCameraScoreInput(studentWithData.score !== null ? studentWithData.score.toString() : "");
+            setTimeout(() => document.getElementById("cameraGradeInput")?.focus(), 150);
           }
         }, 500);
       } else {
@@ -729,14 +738,103 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const handleQuickGradeSelect = (score: number) => {
     if (!activeScannedStudent) return;
     vibrateSuccess();
-    const updatedStudent = { ...activeScannedStudent, score };
-    setScannedStudents(prev => [updatedStudent, ...prev]);
-    setActiveScannedStudent(null);
-    isProcessingScanRef.current = false;
+    setCameraScoreInput(score.toString());
+  };
+
+  const handleSaveCameraScannedStudent = async () => {
+    if (!activeScannedStudent || !selectedProject) return;
+    if (cameraScoreInput === "" || isNaN(Number(cameraScoreInput))) {
+      vibrateError();
+      alert("يرجى كتابة أو اختيار درجة صحيحة.");
+      return;
+    }
+
+    const scoreNum = Number(cameraScoreInput);
+    if (scoreNum < 0 || scoreNum > selectedProject.max_score) {
+      vibrateError();
+      alert(`الدرجة المسموحة يجب أن تكون بين 0 و ${selectedProject.max_score}`);
+      return;
+    }
+
+    setSavingActiveStudent(true);
+    try {
+      const student = activeScannedStudent.student;
+      
+      // 1. Save evaluation to DB
+      await supabase.from("evaluations").upsert({
+        course_id: course.id,
+        student_id: student.id,
+        project_name: selectedProject.name,
+        score: scoreNum,
+        teacher_id: course.teacher_id,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'course_id,student_id,project_name' });
+
+      // 2. Mark attendance if checked
+      if (markAttendanceWithEval) {
+        const today = getTodayLocalDateStr();
+        const { data: existingAtt } = await supabase.from("attendance")
+          .select("id, status")
+          .eq("course_id", course.id)
+          .eq("student_id", student.id)
+          .eq("date", today)
+          .maybeSingle();
+
+        if (existingAtt) {
+          if (existingAtt.status !== "حاضر") {
+            await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existingAtt.id);
+          }
+        } else {
+          await supabase.from("attendance").insert({
+            course_id: course.id,
+            student_id: student.id,
+            date: today,
+            status: "حاضر",
+            teacher_id: course.teacher_id
+          });
+        }
+      }
+
+      // 3. Send Telegram Notification
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        fetch('/api/bot/notify_eval', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          },
+          body: JSON.stringify({
+            studentId: student.id,
+            projectName: selectedProject.name,
+            score: scoreNum,
+            projectShowScore: selectedProject.show_score
+          })
+        }).catch(() => {});
+      });
+
+      vibrateSuccess();
+      
+      // Update session history list
+      const updatedItem = { ...activeScannedStudent, score: scoreNum };
+      setScannedStudents(prev => [updatedItem, ...prev.filter(s => s.student?.id !== student.id)]);
+      
+      // Reset active student and resume scanner
+      setActiveScannedStudent(null);
+      setCameraScoreInput("");
+      isProcessingScanRef.current = false;
+      fetchStats(course);
+    } catch (err: any) {
+      console.error(err);
+      vibrateError();
+      alert("حدث خطأ أثناء حفظ التقييم: " + (err.message || err));
+    } finally {
+      setSavingActiveStudent(false);
+    }
   };
 
   const handleCancelActiveStudent = () => {
     setActiveScannedStudent(null);
+    setCameraScoreInput("");
     isProcessingScanRef.current = false;
   };
 
@@ -1455,41 +1553,113 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                   )}
                 </div>
 
-                {/* 0 TO MAX_SCORE QUICK GRADE GRID */}
-                <div style={{ marginBottom: "4px" }}>
-                  <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>اضغط لتحديد الدرجة (0 إلى {selectedProject.max_score}):</label>
+                {/* QUICK GRADE GRID & MANUAL INPUT */}
+                <div style={{ marginBottom: "6px" }}>
+                  <label style={{ display: "block", color: "#aaa", fontSize: "11px", marginBottom: "4px" }}>
+                    اختر الدرجة السريعة (0 إلى {selectedProject.max_score}):
+                  </label>
                   <div style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(42px, 1fr))",
                     gap: "6px",
-                    maxHeight: "150px",
+                    maxHeight: "130px",
                     overflowY: "auto",
-                    padding: "2px"
+                    padding: "2px",
+                    marginBottom: "10px"
                   }}>
-                    {getQuickGrades(selectedProject.max_score).map(score => (
-                      <button
-                        key={score}
-                        onClick={() => handleQuickGradeSelect(score)}
+                    {getQuickGrades(selectedProject.max_score).map(score => {
+                      const isSelected = cameraScoreInput === score.toString() || (cameraScoreInput === "" && activeScannedStudent.score === score);
+                      return (
+                        <button
+                          key={score}
+                          type="button"
+                          onClick={() => handleQuickGradeSelect(score)}
+                          style={{
+                            width: "100%",
+                            margin: 0,
+                            padding: 0,
+                            height: "38px",
+                            background: isSelected ? "#4CAF50" : "#222",
+                            color: isSelected ? "#000" : "#fff",
+                            border: isSelected ? "2px solid #fff" : "1px solid #4CAF50",
+                            borderRadius: "8px",
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.15s ease"
+                          }}
+                        >
+                          {score}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* MANUAL GRADE INPUT & SAVE BUTTON */}
+                  <div style={{ background: "#1a1a1a", border: "1px solid #333", borderRadius: "10px", padding: "10px" }}>
+                    <label style={{ display: "block", color: "#4CAF50", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+                      ✏️ كتابة الدرجة يدوياً وحفظ التقييم:
+                    </label>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                      <input
+                        id="cameraGradeInput"
+                        type="number"
+                        min="0"
+                        max={selectedProject.max_score}
+                        step="any"
+                        value={cameraScoreInput}
+                        onChange={(e) => setCameraScoreInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSaveCameraScannedStudent();
+                          }
+                        }}
+                        placeholder={`0 - ${selectedProject.max_score}`}
                         style={{
-                          width: "100%",
-                          margin: 0,
-                          padding: 0,
-                          height: "38px",
-                          background: activeScannedStudent.score === score ? "#4CAF50" : "#222",
-                          color: activeScannedStudent.score === score ? "#000" : "#fff",
-                          border: activeScannedStudent.score === score ? "2px solid #fff" : "1px solid #4CAF50",
+                          flex: "1",
+                          padding: "10px 12px",
+                          background: "#0d0d0d",
+                          border: "1.5px solid #4CAF50",
                           borderRadius: "8px",
-                          fontSize: "14px",
+                          color: "#fff",
+                          fontSize: "17px",
                           fontWeight: "bold",
-                          cursor: "pointer",
+                          textAlign: "center",
+                          outline: "none"
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveCameraScannedStudent}
+                        disabled={savingActiveStudent || cameraScoreInput === ""}
+                        style={{
+                          width: "auto",
+                          margin: 0,
+                          padding: "10px 16px",
+                          background: (savingActiveStudent || cameraScoreInput === "")
+                            ? "#444" 
+                            : "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)",
+                          color: (savingActiveStudent || cameraScoreInput === "") ? "#888" : "#fff",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                          fontWeight: "bold",
+                          cursor: (savingActiveStudent || cameraScoreInput === "") ? "not-allowed" : "pointer",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center"
+                          justifyContent: "center",
+                          gap: "6px",
+                          boxShadow: (savingActiveStudent || cameraScoreInput === "") ? "none" : "0 2px 10px rgba(76, 175, 80, 0.4)",
+                          whiteSpace: "nowrap"
                         }}
                       >
-                        {score}
+                        {savingActiveStudent ? "جاري الحفظ..." : "💾 حفظ التقييم ومتابعة المسح ↵"}
                       </button>
-                    ))}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -286,42 +286,95 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
     setIsScanning(!isScanning);
   };
 
+  const normalizeArabic = (str: string = '') => {
+    return str
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي')
+      .replace(/[\u064B-\u065F]/g, '') // remove tashkeel
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  };
+
   const performGlobalSearch = async (query: string) => {
-    if (!query.trim()) return;
+    const raw = query ? query.trim() : '';
+    if (!raw) return;
     setSearchLoading(true);
     setStudentsList(null);
     setSelectedStudentResult(null);
 
-    let q = query.trim();
-    if (/^\d+$/.test(q) && q.length < 4) {
-      q = q.padStart(4, '0');
-    }
+    try {
+      const cleanNumeric = raw.replace(/^0+/, '') || '0';
+      const padded4 = cleanNumeric.padStart(4, '0');
+      const isNum = /^\d+$/.test(raw);
 
-    let { data: students } = await supabase
-      .from('students')
-      .select('*')
-      .eq('student_code', q)
-      .eq('is_active', true);
+      let foundStudents: any[] = [];
 
-    if (!students || students.length === 0) {
-      const { data: studentsByName } = await supabase
-        .from('students')
-        .select('*')
-        .ilike('full_name', `%${q}%`)
-        .eq('is_active', true);
-      students = studentsByName;
-    }
+      if (isNum) {
+        // Query by numeric codes (exact, unpadded, padded)
+        const { data: byCode } = await supabase
+          .from('students')
+          .select('*')
+          .or(`student_code.eq.${raw},student_code.eq.${cleanNumeric},student_code.eq.${padded4}`);
+        
+        if (byCode && byCode.length > 0) {
+          foundStudents = byCode;
+        }
+      }
 
-    if (!students || students.length === 0) {
-      alert("لم يتم العثور على طالب نشط بهذا الكود أو الاسم.");
-      setSearchLoading(false);
-      return;
-    }
+      // If not found by direct code or if query is textual:
+      if (foundStudents.length === 0) {
+        // Fetch all active students for smart Arabic normalization matching
+        const { data: allStudents } = await supabase
+          .from('students')
+          .select('*')
+          .order('student_code', { ascending: true });
 
-    if (students.length === 1) {
-      await fetchStudentDetails(students[0]);
-    } else {
-      setStudentsList(students);
+        if (allStudents && allStudents.length > 0) {
+          const normQ = normalizeArabic(raw);
+          // 1. Try matching normalized name or code
+          foundStudents = allStudents.filter(s => {
+            const normName = normalizeArabic(s.full_name || '');
+            const sc = (s.student_code || '').trim();
+            const scClean = sc.replace(/^0+/, '');
+            return normName.includes(normQ) || sc === raw || scClean === cleanNumeric || sc === padded4;
+          });
+
+          // 2. If still not found, try multi-word matching
+          if (foundStudents.length === 0 && normQ.length >= 2) {
+            const words = normQ.split(' ').filter(w => w.length > 1);
+            if (words.length > 0) {
+              foundStudents = allStudents.filter(s => {
+                const normName = normalizeArabic(s.full_name || '');
+                return words.every(w => normName.includes(w));
+              });
+            }
+          }
+        }
+      }
+
+      if (!foundStudents || foundStudents.length === 0) {
+        alert("لم يتم العثور على أي طالب يطابق البحث: " + raw);
+        setSearchLoading(false);
+        return;
+      }
+
+      // Prioritize active students first
+      foundStudents.sort((a, b) => {
+        if (a.is_active === b.is_active) return 0;
+        return a.is_active ? -1 : 1;
+      });
+
+      if (foundStudents.length === 1) {
+        await fetchStudentDetails(foundStudents[0]);
+      } else {
+        setStudentsList(foundStudents);
+      }
+    } catch (err: any) {
+      console.error("Global search error:", err);
+      alert("حدث خطأ أثناء البحث: " + (err.message || err));
+    } finally {
       setSearchLoading(false);
     }
   };
@@ -329,38 +382,107 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
   const fetchStudentDetails = async (student: any) => {
     setSearchLoading(true);
     setStudentsList(null);
-    
-    const { data: courses } = await supabase.from('courses').select('id, name');
-    const coursesMap = new Map((courses || []).map(c => [c.id, c.name]));
 
-    const { data: attendance } = await supabase.from('attendance').select('course_id, status').eq('student_id', student.id);
-    const { data: evaluations } = await supabase.from('evaluations').select('course_id, project_name, score').eq('student_id', student.id);
+    try {
+      // 1. Fetch courses
+      const { data: allCourses } = await supabase.from('courses').select('id, name, academic_year, term, teacher_id');
+      const coursesMap = new Map((allCourses || []).map(c => [c.id, c]));
 
-    const courseStats = new Map<string, any>();
+      // 2. Fetch attendance & evaluations & portal account
+      const [attRes, evalRes, accRes] = await Promise.all([
+        supabase.from('attendance').select('course_id, status, date').eq('student_id', student.id),
+        supabase.from('evaluations').select('course_id, project_name, score, created_at').eq('student_id', student.id),
+        supabase.from('student_accounts').select('*').eq('student_code', student.student_code).maybeSingle()
+      ]);
 
-    (attendance || []).forEach(att => {
-      const courseId = att.course_id;
-      if (!courseStats.has(courseId)) {
-        courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
-      }
-      if (att.status === 'غائب') {
-        courseStats.get(courseId).totalAbsences += 1;
-      }
-    });
+      const attendance = attRes.data || [];
+      const evaluations = evalRes.data || [];
+      const studentAccount = accRes.data || null;
 
-    (evaluations || []).forEach(ev => {
-      const courseId = ev.course_id;
-      if (!courseStats.has(courseId)) {
-        courseStats.set(courseId, { courseName: coursesMap.get(courseId) || 'مقرر محذوف', totalAbsences: 0, evaluations: [] });
-      }
-      courseStats.get(courseId).evaluations.push({ project_name: ev.project_name, score: ev.score });
-    });
+      // 3. Fetch locker info if available
+      let lockerInfo: string | null = null;
+      try {
+        const { data: lockerData } = await supabase
+          .from('lockers')
+          .select('locker_code, cohort')
+          .eq('student_code', student.student_code)
+          .maybeSingle();
+        if (lockerData) {
+          lockerInfo = `دولاب رقم: ${lockerData.locker_code}`;
+        }
+      } catch (e) {}
 
-    setSelectedStudentResult({
-      student,
-      courses: Array.from(courseStats.values())
-    });
-    setSearchLoading(false);
+      const courseStats = new Map<string, any>();
+
+      // First, include all courses for the student's academic year
+      (allCourses || []).forEach(c => {
+        if (c.academic_year === student.academic_year) {
+          courseStats.set(c.id, {
+            courseId: c.id,
+            courseName: c.name,
+            term: c.term || '',
+            totalAttended: 0,
+            totalAbsences: 0,
+            evaluations: []
+          });
+        }
+      });
+
+      // Map attendance
+      attendance.forEach(att => {
+        const cId = att.course_id;
+        if (!courseStats.has(cId)) {
+          const c = coursesMap.get(cId);
+          courseStats.set(cId, {
+            courseId: cId,
+            courseName: c ? c.name : 'مقرر دراسي',
+            term: c?.term || '',
+            totalAttended: 0,
+            totalAbsences: 0,
+            evaluations: []
+          });
+        }
+        const item = courseStats.get(cId);
+        if (att.status === 'حاضر') {
+          item.totalAttended += 1;
+        } else if (att.status === 'غائب') {
+          item.totalAbsences += 1;
+        }
+      });
+
+      // Map evaluations
+      evaluations.forEach(ev => {
+        const cId = ev.course_id;
+        if (!courseStats.has(cId)) {
+          const c = coursesMap.get(cId);
+          courseStats.set(cId, {
+            courseId: cId,
+            courseName: c ? c.name : 'مقرر دراسي',
+            term: c?.term || '',
+            totalAttended: 0,
+            totalAbsences: 0,
+            evaluations: []
+          });
+        }
+        courseStats.get(cId).evaluations.push({
+          project_name: ev.project_name,
+          score: ev.score,
+          created_at: ev.created_at
+        });
+      });
+
+      setSelectedStudentResult({
+        student,
+        account: studentAccount,
+        lockerInfo,
+        courses: Array.from(courseStats.values())
+      });
+    } catch (err: any) {
+      console.error("fetchStudentDetails error:", err);
+      alert("حدث خطأ أثناء جلب تفاصيل الطالب: " + (err.message || err));
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -532,6 +654,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                     onScan={(result) => { 
                       const clean = extractStudentCode(result) || result.trim();
                       if(clean) { 
+                        setSearchQuery(clean);
                         performGlobalSearch(clean); 
                         setIsScanning(false); 
                       } 
@@ -581,52 +704,129 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                         🔙 عودة لنتائج البحث
                       </button>
                     </div>
-                    <div style={{ background: "#333", padding: "20px", borderRadius: "8px", marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <h2 style={{ margin: "0 0 5px 0", color: "#fff" }}>{searchResult.student.full_name}</h2>
-                        <div style={{ color: "#aaa" }}>
-                          الكود: <strong style={{ color: "#fff" }}>{searchResult.student.student_code}</strong> | 
-                          الفرقة: <strong style={{ color: "#fff" }}>{searchResult.student.academic_year}</strong> |
-                          السكشن: <strong style={{ color: "#fff" }}>{searchResult.student.section}</strong>
+                    <div style={{ background: "#1c2433", border: "1px solid #2e3e5b", padding: "18px", borderRadius: "12px", marginBottom: "20px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <h2 style={{ margin: "0", color: "#fff", fontSize: "20px", fontWeight: "bold" }}>{searchResult.student.full_name}</h2>
+                            <span style={{
+                              background: searchResult.student.is_active ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)",
+                              color: searchResult.student.is_active ? "#4CAF50" : "#f44336",
+                              border: `1px solid ${searchResult.student.is_active ? '#4CAF50' : '#f44336'}`,
+                              padding: "2px 8px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: "bold"
+                            }}>
+                              {searchResult.student.is_active ? "🟢 طالب نشط" : "🔴 غير نشط / مؤرشف"}
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px", color: "#cbd5e1", fontSize: "13px" }}>
+                            <span>كود: <strong style={{ color: "#38bdf8" }}>{searchResult.student.student_code}</strong></span>
+                            <span>|</span>
+                            <span>الفرقة: <strong style={{ color: "#fff" }}>{searchResult.student.academic_year}</strong></span>
+                            <span>|</span>
+                            <span>السكشن: <strong style={{ color: "#fff" }}>{searchResult.student.section || 'عام'}</strong></span>
+                            {(searchResult.account?.mobile || searchResult.student?.phone) && (
+                              <>
+                                <span>|</span>
+                                <span>هاتف: <strong style={{ color: "#fbbf24" }}>{searchResult.account?.mobile || searchResult.student?.phone}</strong></span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Badges: Locker & Portal */}
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {searchResult.lockerInfo && (
+                            <div style={{ background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid #38bdf8", padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold" }}>
+                              🚪 {searchResult.lockerInfo}
+                            </div>
+                          )}
+                          <div style={{
+                            background: searchResult.account ? (searchResult.account.id_card_verified ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)") : "rgba(100, 116, 139, 0.15)",
+                            color: searchResult.account ? (searchResult.account.id_card_verified ? "#34d399" : "#fbbf24") : "#94a3b8",
+                            border: `1px solid ${searchResult.account ? (searchResult.account.id_card_verified ? '#34d399' : '#fbbf24') : '#64748b'}`,
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: "bold"
+                          }}>
+                            {searchResult.account 
+                              ? (searchResult.account.id_card_verified ? "📱 مسجل بالبوابة وموثق" : "📱 مسجل بالبوابة (قيد الاعتماد)")
+                              : "📱 غير مسجل بالبوابة"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Overall Summary Row */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", marginTop: "15px", paddingTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div style={{ background: "#111827", padding: "8px 12px", borderRadius: "8px", textAlign: "center" }}>
+                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>المقررات المقيدة</div>
+                          <div style={{ color: "#38bdf8", fontSize: "18px", fontWeight: "bold" }}>{searchResult.courses.length}</div>
+                        </div>
+                        <div style={{ background: "#111827", padding: "8px 12px", borderRadius: "8px", textAlign: "center" }}>
+                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>إجمالي الحضور</div>
+                          <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>
+                            {searchResult.courses.reduce((sum: number, c: any) => sum + (c.totalAttended || 0), 0)}
+                          </div>
+                        </div>
+                        <div style={{ background: "#111827", padding: "8px 12px", borderRadius: "8px", textAlign: "center" }}>
+                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>إجمالي الغياب</div>
+                          <div style={{ color: "#f44336", fontSize: "18px", fontWeight: "bold" }}>
+                            {searchResult.courses.reduce((sum: number, c: any) => sum + (c.totalAbsences || 0), 0)}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <h3 style={{ color: "#4CAF50", borderBottom: "1px solid #444", paddingBottom: "10px", marginBottom: "15px" }}>📊 سجل المقررات</h3>
+                    <h3 style={{ color: "#4CAF50", borderBottom: "1px solid #444", paddingBottom: "10px", marginBottom: "15px" }}>📊 سجل المقررات الدراسية</h3>
                     
                     {searchResult.courses.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: "30px", color: "#888", background: "#111", borderRadius: "8px" }}>لا توجد بيانات حضور أو تقييمات لهذا الطالب في أي مقرر.</div>
+                      <div style={{ textAlign: "center", padding: "30px", color: "#888", background: "#111", borderRadius: "8px" }}>لا توجد مقررات مسجلة لهذا الطالب حالياً.</div>
                     ) : (
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "15px" }}>
                         {searchResult.courses.map((c: any, idx: number) => (
-                          <div key={idx} style={{ background: "#111", padding: "15px", borderRadius: "8px", border: "1px solid #333" }}>
-                            <h4 style={{ color: "#2196F3", marginTop: 0, marginBottom: "15px", fontSize: "18px" }}>📘 {c.courseName}</h4>
-                            
-                            <div style={{ marginBottom: "15px", background: "#222", padding: "10px", borderRadius: "5px" }}>
-                              <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "5px" }}>إجمالي مرات الغياب</div>
-                              <div style={{ color: c.totalAbsences >= 3 ? "#f44336" : "#fff", fontSize: "24px", fontWeight: "bold" }}>
-                                {c.totalAbsences} <span style={{ fontSize: "14px", fontWeight: "normal" }}>مرة</span>
+                          <div key={idx} style={{ background: "#111", padding: "15px", borderRadius: "10px", border: "1px solid #333", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                                <h4 style={{ color: "#2196F3", margin: 0, fontSize: "16px", fontWeight: "bold" }}>📘 {c.courseName}</h4>
+                                {c.term && (
+                                  <span style={{ background: "#222", color: "#aaa", fontSize: "11px", padding: "2px 6px", borderRadius: "4px" }}>{c.term}</span>
+                                )}
                               </div>
-                            </div>
-
-                            <div style={{ background: "#222", padding: "10px", borderRadius: "5px" }}>
-                              <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "10px" }}>التقييمات والدرجات</div>
-                              {c.evaluations.length === 0 ? (
-                                <div style={{ color: "#666", fontSize: "13px" }}>لا توجد درجات مسجلة</div>
-                              ) : (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                  {c.evaluations.map((ev: any, evIdx: number) => (
-                                    <div key={evIdx} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #333", paddingBottom: "5px" }}>
-                                      <span style={{ color: "#ccc", fontSize: "14px" }}>{ev.project_name}</span>
-                                      <strong style={{ color: "#4CAF50" }}>{ev.score}</strong>
-                                    </div>
-                                  ))}
-                                  <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "5px", borderTop: "1px solid #555" }}>
-                                    <strong style={{ color: "#fff" }}>الإجمالي:</strong>
-                                    <strong style={{ color: "#ff9800" }}>{c.evaluations.reduce((acc: number, curr: any) => acc + Number(curr.score), 0)}</strong>
-                                  </div>
+                              
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                                <div style={{ background: "#1e1e1e", padding: "8px", borderRadius: "6px", textAlign: "center" }}>
+                                  <div style={{ color: "#888", fontSize: "11px" }}>مرات الحضور</div>
+                                  <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>{c.totalAttended || 0}</div>
                                 </div>
-                              )}
+                                <div style={{ background: "#1e1e1e", padding: "8px", borderRadius: "6px", textAlign: "center" }}>
+                                  <div style={{ color: "#888", fontSize: "11px" }}>مرات الغياب</div>
+                                  <div style={{ color: (c.totalAbsences || 0) >= 3 ? "#f44336" : "#ff9800", fontSize: "18px", fontWeight: "bold" }}>{c.totalAbsences || 0}</div>
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#1a1a1a", padding: "10px", borderRadius: "8px" }}>
+                                <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "8px", fontWeight: "bold" }}>التقييمات والدرجات:</div>
+                                {(!c.evaluations || c.evaluations.length === 0) ? (
+                                  <div style={{ color: "#666", fontSize: "12px", textAlign: "center", padding: "6px 0" }}>لا توجد درجات مسجلة</div>
+                                ) : (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {c.evaluations.map((ev: any, evIdx: number) => (
+                                      <div key={evIdx} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #2a2a2a", paddingBottom: "4px", fontSize: "13px" }}>
+                                        <span style={{ color: "#ccc" }}>{ev.project_name}</span>
+                                        <strong style={{ color: "#4CAF50" }}>{ev.score}</strong>
+                                      </div>
+                                    ))}
+                                    <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "6px", borderTop: "1px solid #444", fontSize: "13px" }}>
+                                      <strong style={{ color: "#fff" }}>الإجمالي:</strong>
+                                      <strong style={{ color: "#ff9800" }}>{c.evaluations.reduce((acc: number, curr: any) => acc + Number(curr.score || 0), 0)}</strong>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
