@@ -7,9 +7,18 @@ export function extractStudentCode(decodedText: string): string {
   if (!decodedText) return "";
 
   let code = decodedText.trim();
-  const match = decodedText.match(/كود الطالب:\s*([^\n]+)/);
+  const match = decodedText.match(/(?:كود الطالب|الكود|كود|Code):\s*([^\n\r]+)/i);
   if (match && match[1]) {
     code = match[1].trim();
+  } else {
+    const lines = decodedText.split(/[\r\n]+/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (/^\d{1,6}$/.test(trimmed)) {
+        code = trimmed;
+        break;
+      }
+    }
   }
 
   // تنسيق الكود إلى 4 خانات إذا كان أرقاماً قصيرة (0001)

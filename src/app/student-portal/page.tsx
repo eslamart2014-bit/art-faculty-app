@@ -62,9 +62,9 @@ export default function HomePage() {
     }
   };
 
-  // توليد نص الـ QR المتطابق 100% مع ماسح النظام الرئيسي
+  // توليد نص الـ QR (يحمل الكود والاسم فقط لكي يترجم النظام الفرقة والسكشن تلقائياً)
   const getQRValue = (st: any) => {
-    return `اسم الطالب: ${st.full_name}\nكود الطالب: ${st.student_code}\nالفرقة: ${st.academic_year}\nالسكشن: ${st.section || 'عام'}`;
+    return `كود الطالب: ${formatStudentCode(st.student_code)}\nاسم الطالب: ${st.full_name}`;
   };
 
   // تحميل البطاقة كصورة PNG عالية الدقة بضغطة زر
