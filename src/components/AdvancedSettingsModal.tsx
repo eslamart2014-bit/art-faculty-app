@@ -18,9 +18,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
     window.history.pushState({ modal: true }, "");
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares" | "roster" | "portal" | "lockers">("study");
-  const [portalStats, setPortalStats] = useState({ totalStudents: 0, registeredAccounts: 0, submissionsCount: 0 });
-  const [copiedPortalLink, setCopiedPortalLink] = useState(false);
+  const [activeTab, setActiveTab] = useState<"study" | "search" | "maintenance" | "shares" | "roster" | "lockers">("study");
   
   // Study Settings state
   const [term1Start, setTerm1Start] = useState("");
@@ -59,24 +57,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
       fetchShareRequests();
       fetchProfiles();
     }
-    if (isOpen && activeTab === "portal") {
-      fetchPortalStats();
-    }
   }, [isOpen, activeTab]);
-
-  const fetchPortalStats = async () => {
-    try {
-      const { count: totalSt } = await supabase.from("students").select("id", { count: "exact", head: true });
-      const { count: regAcc } = await supabase.from("students").select("id", { count: "exact", head: true }).not("telegram_browser_id", "is", null);
-      setPortalStats({
-        totalStudents: totalSt || 0,
-        registeredAccounts: regAcc || 0,
-        submissionsCount: 0
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const fetchShareRequests = async () => {
     setLoading(true);
@@ -538,7 +519,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
           { id: "study", label: "الدراسة والتواريخ 📅", color: "#38bdf8" },
           { id: "search", label: "البحث الشامل 🔍", color: "#38bdf8" },
           { id: "roster", label: "كشوف الطلاب 📋", color: "#00BCD4" },
-          { id: "portal", label: "بوابة الطلاب والأمان 🎓", color: "#f59e0b" },
           { id: "lockers", label: "بوابة الدواليب 🗄️", color: "#6366f1" },
           { id: "shares", label: "طلبات المشاركة 🤝", color: "#10b981" },
           { id: "maintenance", label: "وضع الصيانة 🚧", color: "#ef4444" },
@@ -624,27 +604,28 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                 ابحث برقم الطالب أو اسمه أو قم بمسح بطاقته للحصول على تقرير مفصل بجميع مقرراته وحضوره وتقييماته في مكان واحد.
               </p>
 
-              <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "16px", width: "100%", alignItems: "stretch", boxSizing: "border-box" }}>
                 <input 
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && performGlobalSearch(searchQuery)}
-                  placeholder="اكتب كود أو اسم الطالب ثم اضغط Enter..."
-                  style={{ flexGrow: 1, padding: "15px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px", fontSize: "16px" }}
+                  placeholder="كود أو اسم الطالب..."
+                  style={{ flex: 1, minWidth: 0, height: "44px", padding: "0 12px", background: "#111", border: "1px solid #444", color: "#fff", borderRadius: "8px", fontSize: "14px", boxSizing: "border-box" }}
                 />
                 <button 
                   onClick={() => performGlobalSearch(searchQuery)}
                   disabled={searchLoading}
-                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "0 25px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                  style={{ height: "44px", background: "#2196F3", color: "#fff", border: "none", padding: "0 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "13px", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" }}
                 >
                   {searchLoading ? "..." : "بحث 🔍"}
                 </button>
                 <button 
                   onClick={toggleScanner}
-                  style={{ background: isScanning ? "#f44336" : "#4CAF50", color: "#fff", border: "none", padding: "0 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", gap: "5px" }}
+                  style={{ height: "44px", background: isScanning ? "#f44336" : "#4CAF50", color: "#fff", border: "none", padding: "0 14px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", fontSize: "13px", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" }}
+                  title={isScanning ? "إغلاق الكاميرا" : "مسح QR بالكاميرا"}
                 >
-                  {isScanning ? "إغلاق ❌" : "كاميرا 📷"}
+                  {isScanning ? "إغلاق ❌" : "📷"}
                 </button>
               </div>
 
@@ -991,6 +972,28 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                   {loading ? "جاري التطبيق..." : isMaintenance ? "إيقاف وإنهاء وضع الصيانة ❌" : "تفعيل وضع الصيانة بالنطاق المحدد ✅"}
                 </button>
               </div>
+
+              {/* تفريغ قاعدة بيانات التليجرام بالكامل */}
+              {user?.role === "مدير" && (
+                <div style={{ marginTop: "24px", background: "rgba(239, 68, 68, 0.08)", border: "1px dashed rgba(239, 68, 68, 0.4)", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ background: "rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                      🧹
+                    </div>
+                    <div>
+                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>تفريغ قاعدة بيانات التليجرام بالكامل</div>
+                      <div style={{ color: "#f87171", fontSize: "12px" }}>مسح وتصفير كافة معرفات التليجرام وسجلات البوت القديمة من الجداول.</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleClearTelegramDb}
+                    disabled={loading}
+                    style={{ background: "#ef4444", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer" }}
+                  >
+                    {loading ? "جاري التفريغ..." : "تفريغ الآن 🗑️"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1079,174 +1082,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
             >
               <span>📂</span> فتح لوحة إدارة الكشوف الكاملة
             </button>
-          </div>
-        )}
-
-        {/* Portal Tab */}
-        {activeTab === "portal" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            
-            {/* جناج الأمان وكشف الاحتيال المتقدم */}
-            <div style={{
-              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.15))",
-              border: "1px solid rgba(239, 68, 68, 0.4)",
-              borderRadius: "14px",
-              padding: "16px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "12px"
-            }}>
-              <div style={{ flex: "1 1 300px" }}>
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>🚨</span> جناح الأمان الأكاديمي: كشف الغش والاحتيال وتطابق الأعمال
-                </div>
-                <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "4px", lineHeight: "1.6" }}>
-                  فحص أجهزة الموبايل المشتركة (كشف فتح أكثر من حساب على نفس الهاتف)، خوارزمية مطابقة اللوحات والمجسمات الفنية، وبحث وفرمتة الحسابات المشبوهة.
-                </div>
-              </div>
-
-              <button
-                onClick={() => {
-                  onClose();
-                  if (onOpenPortalHub) onOpenPortalHub();
-                }}
-                className="btn-compact"
-                style={{
-                  background: "linear-gradient(135deg, #ef4444, #b91c1c)",
-                  color: "#fff",
-                  padding: "10px 20px",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  border: "none",
-                  boxShadow: "0 4px 15px rgba(239, 68, 68, 0.3)"
-                }}
-              >
-                <span>🛡️</span> فتح لوحة كشف الاحتيال والتلاعب
-              </button>
-            </div>
-
-            {/* Quick Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px" }}>
-              <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "14px", borderRadius: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#90CAF9" }}>إجمالي الطلاب المقيدين</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
-                  {portalStats.totalStudents || "--"}
-                </div>
-              </div>
-              <div style={{ background: "#1a2a1a", border: "1px solid #2e4a2e", padding: "14px", borderRadius: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#81C784" }}>حسابات الطلاب المسجلة</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
-                  {portalStats.registeredAccounts || "0"}
-                </div>
-              </div>
-            </div>
-
-            {/* Public Student Portal */}
-            <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                <div style={{ background: "rgba(33, 150, 243, 0.2)", color: "#2196F3", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                  🎓
-                </div>
-                <div>
-                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>بوابة الطلاب العامة (بوابة فنية)</div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>الرابط المخصص للطلاب لاستخراج كارت الـ QR ومتابعة الحضور.</div>
-                </div>
-              </div>
-              <div style={{ background: "#151515", border: "1px dashed #444", padding: "10px 14px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "10px", flexWrap: "wrap" }}>
-                <span style={{ color: "#64B5F6", fontSize: "13px", direction: "ltr" }}>
-                  {typeof window !== "undefined" ? `${window.location.origin}/student-portal` : "/student-portal"}
-                </span>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button
-                    onClick={() => {
-                      if (navigator.clipboard) {
-                        navigator.clipboard.writeText(typeof window !== "undefined" ? `${window.location.origin}/student-portal` : "/student-portal");
-                        setCopiedPortalLink(true);
-                        setTimeout(() => setCopiedPortalLink(false), 2000);
-                      }
-                    }}
-                    style={{ background: copiedPortalLink ? "#4CAF50" : "#333", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
-                  >
-                    {copiedPortalLink ? "✓ تم النسخ" : "📋 نسخ"}
-                  </button>
-                  <button
-                    onClick={() => window.open("/student-portal", "_blank")}
-                    style={{ background: "#2196F3", color: "#fff", border: "none", padding: "7px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
-                  >
-                    🌐 فتح
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Instructor Gallery */}
-            <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ background: "rgba(76, 175, 80, 0.2)", color: "#4CAF50", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                  🖼️
-                </div>
-                <div>
-                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>معرض أعمال ومشاريع الطلاب</div>
-                  <div style={{ color: "#888", fontSize: "12px" }}>فحص الأعمال وتقييم مشاريع الطلاب للمدرسين والمعيدين.</div>
-                </div>
-              </div>
-              <button
-                onClick={() => { onClose(); window.open("/instructor", "_blank"); }}
-                style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
-              >
-                🎨 الانتقال للمعرض
-              </button>
-            </div>
-
-            {/* Admin Portal Control (Only Primary Admin) */}
-            {user?.role === "مدير" && (
-              <div style={{ background: "#222", border: "1px solid #333", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ background: "rgba(156, 39, 176, 0.2)", color: "#AB47BC", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                    🛡️
-                  </div>
-                  <div>
-                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>لوحة إدارة حسابات الطلاب المركزية</div>
-                    <div style={{ color: "#888", fontSize: "12px" }}>متابعة سجلات التدقيق، فك أجهزة الطلاب، وإلغاء الحسابات.</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { onClose(); if (onOpenPortalHub) onOpenPortalHub(); else window.open("/student-portal", "_blank"); }}
-                  style={{ background: "#7B1FA2", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
-                >
-                  ⚙️ لوحة الإدارة
-                </button>
-              </div>
-            )}
-
-            {/* Clear Telegram Database Card */}
-            {user?.role === "مدير" && (
-              <div style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px dashed rgba(239, 68, 68, 0.4)", borderRadius: "12px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ background: "rgba(239, 68, 68, 0.2)", color: "#ef4444", width: "36px", height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                    🧹
-                  </div>
-                  <div>
-                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>تفريغ قاعدة بيانات التليجرام بالكامل</div>
-                    <div style={{ color: "#f87171", fontSize: "12px" }}>مسح وتصفير كافة معرفات التليجرام وسجلات البوت القديمة من الجداول.</div>
-                  </div>
-                </div>
-                <button
-                  onClick={handleClearTelegramDb}
-                  disabled={loading}
-                  style={{ background: "#ef4444", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: loading ? "not-allowed" : "pointer" }}
-                >
-                  {loading ? "جاري التفريغ..." : "تفريغ الآن 🗑️"}
-                </button>
-              </div>
-            )}
           </div>
         )}
 

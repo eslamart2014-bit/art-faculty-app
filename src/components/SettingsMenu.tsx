@@ -116,8 +116,18 @@ export default function SettingsMenu({
         )}
 
         {user?.role === "مدير" && (
+          <div 
+            className="settings-item" 
+            onClick={() => { onClose(); onOpenStudentPortalHub?.(); }}
+            style={{ color: "#38bdf8", fontWeight: "bold" }}
+          >
+            <span style={{ marginLeft: "10px", fontSize: "18px" }}>🎓</span> بوابة الطلاب والتحكم الأكاديمي
+          </div>
+        )}
+
+        {user?.role === "مدير" && (
           <div className="settings-item" onClick={() => { onClose(); onOpenAdvancedSettings(); }}>
-            <span style={{ marginLeft: "10px" }}>🧩</span> إعدادات متقدمة (الكشوف، البوابة، التواريخ)
+            <span style={{ marginLeft: "10px" }}>🧩</span> إعدادات متقدمة (المقررات، الكشوف، التواريخ)
           </div>
         )}
 

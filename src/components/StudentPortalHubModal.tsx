@@ -25,9 +25,12 @@ import {
   Calendar,
   Clock,
   ChevronRight,
-  Filter
+  Filter,
+  Camera
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
+import QRScanner from "@/components/QRScanner";
+import { extractStudentCode } from "@/lib/scannerHelper";
 
 interface StudentPortalHubModalProps {
   isOpen: boolean;
@@ -109,6 +112,7 @@ export default function StudentPortalHubModal({
   const [zoomedIdCard, setZoomedIdCard] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [isScanningQr, setIsScanningQr] = useState(false);
 
   // Fraud Detection State
   const [fraudData, setFraudData] = useState<any>(null);
@@ -715,24 +719,65 @@ export default function StudentPortalHubModal({
                 البحث بكود الطالب لإدارة حسابه والتحكم في إعداداته:
               </label>
               
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", width: "100%", alignItems: "stretch", boxSizing: "border-box" }}>
                 <input
                   type="text"
-                  placeholder="أدخل كود الطالب (مثل: 0001)..."
+                  placeholder="كود الطالب (مثل: 0001)..."
                   value={searchAccountCode}
                   onChange={(e) => setSearchAccountCode(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleInspectAccount(); }}
-                  style={{ flex: 1, padding: "12px 14px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", fontWeight: "bold" }}
+                  style={{ flex: 1, minWidth: 0, height: "44px", padding: "0 12px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", fontWeight: "bold", boxSizing: "border-box" }}
                 />
                 <button
                   onClick={() => handleInspectAccount()}
                   disabled={searchingAccount}
-                  style={{ background: "#2563eb", color: "#fff", border: "none", padding: "0 22px", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: searchingAccount ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                  style={{ height: "44px", background: "#2563eb", color: "#fff", border: "none", padding: "0 16px", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: searchingAccount ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" }}
                 >
                   <Search size={16} />
                   <span>{searchingAccount ? "فحص..." : "فحص"}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsScanningQr(!isScanningQr)}
+                  style={{
+                    height: "44px",
+                    width: "44px",
+                    background: isScanningQr ? "#ef4444" : "#1e293b",
+                    border: "1px solid",
+                    borderColor: isScanningQr ? "#ef4444" : "#3b82f6",
+                    color: "#fff",
+                    borderRadius: "10px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    boxSizing: "border-box"
+                  }}
+                  title={isScanningQr ? "إغلاق الكاميرا" : "مسح QR بالكاميرا"}
+                >
+                  <Camera size={18} />
+                </button>
               </div>
+
+              {isScanningQr && (
+                <div style={{ marginTop: "12px", borderRadius: "12px", overflow: "hidden", border: "2px solid #3b82f6" }}>
+                  <QRScanner
+                    onScan={(decoded) => {
+                      const clean = extractStudentCode(decoded) || decoded.trim();
+                      if (clean) {
+                        setSearchAccountCode(clean);
+                        setIsScanningQr(false);
+                        handleInspectAccount(clean);
+                      }
+                    }}
+                    onClose={() => setIsScanningQr(false)}
+                    title="مسح كود الطالب بالكاميرا"
+                    height="240px"
+                    compact={true}
+                  />
+                </div>
+              )}
 
               {accountInspectError && (
                 <div style={{ marginTop: "10px", color: "#f87171", fontSize: "12px" }}>
@@ -787,42 +832,48 @@ export default function StudentPortalHubModal({
                 {/* التفاصيل الأساسية في شبكة نظيفة */}
                 {inspectedAccount.isRegistered && (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#0d131f", padding: "14px", borderRadius: "12px", marginBottom: "16px" }}>
-                      <div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>رقم الموبايل:</div>
-                        <div style={{ color: "#fff", fontWeight: "bold", direction: "ltr", textAlign: "right" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "#0d131f", padding: "14px", borderRadius: "12px", marginBottom: "16px", border: "1px solid #1e293b" }}>
+                      
+                      {/* السطر الأول: رقم الموبايل */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
+                        <span style={{ color: "#94a3b8", fontSize: "12px" }}>رقم الموبايل:</span>
+                        <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", direction: "ltr" }}>
                           {inspectedAccount.account?.mobile || "غير مدخل"}
-                        </div>
+                        </span>
                       </div>
 
-                      <div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>الرقم السري (PIN):</div>
+                      {/* السطر الثاني: الرقم السري */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
+                        <span style={{ color: "#94a3b8", fontSize: "12px" }}>الرقم السري (PIN):</span>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <span style={{ color: "#f59e0b", fontFamily: "monospace", fontWeight: "bold", fontSize: "16px" }}>
                             {showInspectedPin ? (inspectedAccount.account?.pin_code || "----") : "••••"}
                           </span>
                           <button
                             onClick={() => setShowInspectedPin(!showInspectedPin)}
-                            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer" }}
+                            style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "11px" }}
                             title={showInspectedPin ? "إخفاء" : "إظهار"}
                           >
-                            {showInspectedPin ? <EyeOff size={15} /> : <Eye size={15} />}
+                            {showInspectedPin ? <EyeOff size={14} /> : <Eye size={14} />}
+                            <span>{showInspectedPin ? "إخفاء" : "إظهار"}</span>
                           </button>
                         </div>
                       </div>
 
-                      <div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق المعتمد:</div>
-                        <div style={{ color: "#34d399", fontWeight: "bold" }}>
+                      {/* السطر الثالث: المنسق المعتمد */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
+                        <span style={{ color: "#94a3b8", fontSize: "12px" }}>المنسق المعتمد:</span>
+                        <span style={{ color: "#34d399", fontWeight: "bold", fontSize: "12px" }}>
                           {inspectedAccount.account?.activated_by || inspectedAccount.account?.pin_issued_by || "غير محدد"}
-                        </div>
+                        </span>
                       </div>
 
-                      <div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>تاريخ الاعتماد:</div>
-                        <div style={{ color: "#cbd5e1" }}>
+                      {/* السطر الرابع: تاريخ الاعتماد */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "#94a3b8", fontSize: "12px" }}>تاريخ الاعتماد:</span>
+                        <span style={{ color: "#cbd5e1", fontSize: "12px" }}>
                           {inspectedAccount.account?.activated_at ? new Date(inspectedAccount.account.activated_at).toLocaleString("ar-EG") : "غير مسجل"}
-                        </div>
+                        </span>
                       </div>
                     </div>
 
@@ -905,6 +956,20 @@ export default function StudentPortalHubModal({
                       >
                         <RotateCcw size={14} />
                         <span>إعادة توليد رقم PIN</span>
+                      </button>
+
+                      {/* زر تصفير أعمال الطالب لإعادة الرفع */}
+                      <button
+                        onClick={() => {
+                          if (confirm("هل أنت متأكد من رغبتك في حذف وتصفير جميع أعمال ومشاريع هذا الطالب لإتاحة إعادة التصوير والرفع له؟")) {
+                            handleExecuteAccountAction('reset_submissions');
+                          }
+                        }}
+                        disabled={actionLoading}
+                        style={{ background: "#1e293b", border: "1px solid #eab308", color: "#facc15", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                      >
+                        <RefreshCw size={14} />
+                        <span>تصفير الأعمال لإعادة الرفع</span>
                       </button>
 
                       {/* زر فرمتة وتصفير الحساب */}
