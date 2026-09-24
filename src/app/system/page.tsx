@@ -1464,13 +1464,16 @@ export default function SystemPage() {
             width: "100%"
           }}
         >
-          {[
-            { id: "evaluation", label: "المشاريع 🎨", color: "#10b981" },
-            { id: "attendance", label: "الحضور 📅", color: "#38bdf8" },
-            { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: dashboardData?.warnings?.length || 0 },
-            { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7" },
-            { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b" }
-          ].map(tab => {
+          {(() => {
+            const repliedComplaintsCount = (dashboardData?.complaints || []).filter((c: any) => c.status === 'تم الرد' || Boolean(c.officialReply)).length;
+            return [
+              { id: "evaluation", label: "المشاريع 🎨", color: "#10b981" },
+              { id: "attendance", label: "الحضور 📅", color: "#38bdf8" },
+              { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: dashboardData?.warnings?.length || 0 },
+              { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7" },
+              { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b", badge: repliedComplaintsCount }
+            ];
+          })().map(tab => {
             const isActive = activeTab === tab.id;
             return (
               <button

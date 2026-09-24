@@ -1218,7 +1218,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                   </div>
                 </div>
                 <button
-                  onClick={() => { onClose(); window.open("/admin-portal", "_blank"); }}
+                  onClick={() => { onClose(); if (onOpenPortalHub) onOpenPortalHub(); else window.open("/student-portal", "_blank"); }}
                   style={{ background: "#7B1FA2", color: "#fff", border: "none", padding: "9px 16px", borderRadius: "6px", fontSize: "13px", fontWeight: "bold", cursor: "pointer" }}
                 >
                   ⚙️ لوحة الإدارة

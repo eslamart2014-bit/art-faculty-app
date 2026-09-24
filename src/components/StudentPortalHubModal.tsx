@@ -14,8 +14,20 @@ import {
   ExternalLink,
   Users,
   Image as ImageIcon,
-  Sparkles
+  Sparkles,
+  Lock,
+  Unlock,
+  RotateCcw,
+  Eye,
+  EyeOff,
+  UserCheck,
+  Maximize2,
+  Calendar,
+  Clock,
+  ChevronRight,
+  Filter
 } from "lucide-react";
+import { formatStudentCode } from "@/lib/codeHelper";
 
 interface StudentPortalHubModalProps {
   isOpen: boolean;
@@ -65,7 +77,8 @@ export default function StudentPortalHubModal({
   user,
   onOpenIdentityModal
 }: StudentPortalHubModalProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "fraud" | "plagiarism" | "wipe" | "complaints">("overview");
+  // Tabs: overview, accounts, fraud, plagiarism
+  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "fraud" | "plagiarism">("overview");
 
   // General Portal Stats
   const [copiedLink, setCopiedLink] = useState(false);
@@ -77,6 +90,26 @@ export default function StudentPortalHubModal({
   });
   const [loadingStats, setLoadingStats] = useState(false);
 
+  // Coordinator Stats
+  const [coordStats, setCoordStats] = useState<{ totalActivated: number; coordinators: any[] }>({ totalActivated: 0, coordinators: [] });
+  const [loadingCoordStats, setLoadingCoordStats] = useState(false);
+
+  // Modal: Registered Accounts List (عند النقر على مربع الإحصائيات)
+  const [isAccountsModalOpen, setIsAccountsModalOpen] = useState(false);
+  const [registeredStudentsList, setRegisteredStudentsList] = useState<any[]>([]);
+  const [loadingRegisteredList, setLoadingRegisteredList] = useState(false);
+  const [accountListFilter, setAccountListFilter] = useState("");
+
+  // Tab: Account Management (إدارة وبحث الحسابات)
+  const [searchAccountCode, setSearchAccountCode] = useState("");
+  const [searchingAccount, setSearchingAccount] = useState(false);
+  const [inspectedAccount, setInspectedAccount] = useState<any>(null);
+  const [accountInspectError, setAccountInspectError] = useState("");
+  const [showInspectedPin, setShowInspectedPin] = useState(false);
+  const [zoomedIdCard, setZoomedIdCard] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+
   // Fraud Detection State
   const [fraudData, setFraudData] = useState<any>(null);
   const [loadingFraud, setLoadingFraud] = useState(false);
@@ -86,31 +119,14 @@ export default function StudentPortalHubModal({
   const [plagiarismData, setPlagiarismData] = useState<any>(null);
   const [loadingPlagiarism, setLoadingPlagiarism] = useState(false);
 
-  // Wipe Account State
-  const [searchStudentTerm, setSearchStudentTerm] = useState("");
-  const [searchingStudent, setSearchingStudent] = useState(false);
-  const [searchedStudent, setSearchedStudent] = useState<any>(null);
-  const [wipeReason, setWipeReason] = useState("");
-  const [wipingAccount, setWipingAccount] = useState(false);
-
-  // Complaints State
-  const [complaintsList, setComplaintsList] = useState<any[]>([]);
-  const [loadingComplaints, setLoadingComplaints] = useState(false);
-  const [replyTextMap, setReplyTextMap] = useState<Record<string, string>>({});
-  const [sendingReplyId, setSendingReplyId] = useState<string | null>(null);
-  const [complaintFilter, setComplaintFilter] = useState<"all" | "new" | "replied">("all");
-  const [replySuccessMsg, setReplySuccessMsg] = useState("");
-  const [wipeSuccessMsg, setWipeSuccessMsg] = useState("");
-  const [wipeErrorMsg, setWipeErrorMsg] = useState("");
-
   useEffect(() => {
     if (isOpen) {
       window.history.pushState({ modal: true }, "");
       fetchPortalStats();
+      fetchCoordinatorStats();
     }
   }, [isOpen]);
 
-  // Load fraud or plagiarism data on tab switch
   useEffect(() => {
     if (isOpen && activeTab === "fraud" && !fraudData && !loadingFraud) {
       fetchFraudData();
@@ -118,59 +134,7 @@ export default function StudentPortalHubModal({
     if (isOpen && activeTab === "plagiarism" && !plagiarismData && !loadingPlagiarism) {
       fetchPlagiarismData();
     }
-    if (isOpen && activeTab === "complaints") {
-      fetchComplaints();
-    }
   }, [isOpen, activeTab]);
-
-  const fetchComplaints = async () => {
-    setLoadingComplaints(true);
-    try {
-      const res = await fetch("/api/admin/portal/complaints");
-      const data = await res.json();
-      if (data && data.complaints) {
-        setComplaintsList(data.complaints);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingComplaints(false);
-    }
-  };
-
-  const handleSendReply = async (complaintId: string) => {
-    const text = replyTextMap[complaintId];
-    if (!text || !text.trim()) {
-      alert("يرجى كتابة نص الرد أولاً");
-      return;
-    }
-
-    setSendingReplyId(complaintId);
-    try {
-      const res = await fetch("/api/admin/portal/reply-complaint", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          complaint_id: complaintId,
-          reply_text: text.trim(),
-          admin_name: user?.full_name || "إدارة المنظومة"
-        })
-      });
-      const data = await res.json();
-      if (data && data.success) {
-        setReplySuccessMsg("تم إرسال الرد الرسمي للطالب بنجاح!");
-        setTimeout(() => setReplySuccessMsg(""), 3500);
-        setReplyTextMap(prev => ({ ...prev, [complaintId]: "" }));
-        fetchComplaints();
-      } else {
-        alert("فشل إرسال الرد: " + (data?.error || "خطأ غير معروف"));
-      }
-    } catch (e) {
-      alert("خطأ في الاتصال بالخادم");
-    } finally {
-      setSendingReplyId(null);
-    }
-  };
 
   const fetchPortalStats = async () => {
     setLoadingStats(true);
@@ -185,24 +149,142 @@ export default function StudentPortalHubModal({
           verifiedCards: data.verifiedCards,
           submissionsCount: data.submissionsCount
         });
-      } else {
-        // Fallback
-        const [stRes, accRes, subRes] = await Promise.all([
-          supabase.from("students").select("id", { count: "exact", head: true }),
-          supabase.from("student_accounts").select("id, id_card_verified", { count: "exact" }),
-          supabase.from("student_submissions").select("id", { count: "exact", head: true })
-        ]);
-        setStats({
-          totalStudents: stRes.count || 0,
-          registeredAccounts: (accRes as any)?.count || 0,
-          verifiedCards: ((accRes as any)?.data || []).filter((a: any) => a.id_card_verified).length || 0,
-          submissionsCount: (subRes as any)?.count || 0
-        });
       }
     } catch (e) {
       console.error("Error fetching portal stats:", e);
     } finally {
       setLoadingStats(false);
+    }
+  };
+
+  const fetchCoordinatorStats = async () => {
+    setLoadingCoordStats(true);
+    try {
+      const res = await fetch("/api/admin/portal/coordinator-stats");
+      const data = await res.json();
+      if (data && data.success) {
+        setCoordStats({
+          totalActivated: data.totalActivated || 0,
+          coordinators: data.coordinators || []
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching coordinator stats:", e);
+    } finally {
+      setLoadingCoordStats(false);
+    }
+  };
+
+  // جلب قائمة الحسابات المسجلة للنافذة التفاعلية
+  const openRegisteredAccountsModal = async () => {
+    setIsAccountsModalOpen(true);
+    setAccountListFilter("");
+    if (registeredStudentsList.length === 0) {
+      setLoadingRegisteredList(true);
+      try {
+        const res = await fetch("/api/admin/portal/registered-students");
+        const data = await res.json();
+        if (data && data.success) {
+          setRegisteredStudentsList(data.students || []);
+        }
+      } catch (e) {
+        console.error("Error fetching registered students list:", e);
+      } finally {
+        setLoadingRegisteredList(false);
+      }
+    }
+  };
+
+  // فحص حساب طالب محدد
+  const handleInspectAccount = async (codeToInspect?: string) => {
+    const code = (codeToInspect || searchAccountCode).trim();
+    if (!code) return;
+
+    setSearchingAccount(true);
+    setAccountInspectError("");
+    setInspectedAccount(null);
+    setShowInspectedPin(false);
+    setActionMessage("");
+
+    try {
+      const res = await fetch(`/api/admin/portal?action=inspect&code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setAccountInspectError(data.error || "تعذر العثور على الطالب");
+      } else {
+        setInspectedAccount(data);
+      }
+    } catch (e: any) {
+      setAccountInspectError("خطأ في الاتصال بالخادم");
+    } finally {
+      setSearchingAccount(false);
+    }
+  };
+
+  // تنفيذ العمليات الإدارية على الحساب (توليد PIN، تعليق، فورمات)
+  const handleExecuteAccountAction = async (actionType: string, extra?: any) => {
+    if (!inspectedAccount?.student?.student_code) return;
+    const cleanCode = inspectedAccount.student.student_code;
+
+    if (actionType === "wipe_account") {
+      const ok = confirm(`تحذير أمني هام:\nهل أنت متأكد تماماً من رغبتك في فرمتة وتصفير حساب الطالب (كود: ${cleanCode})؟\n\nسيتم فك ارتباط الجهاز ومسح الجلسة والسماح للطالب بالتسجيل مجدداً.`);
+      if (!ok) return;
+
+      setActionLoading(true);
+      try {
+        const res = await fetch("/api/admin/portal/wipe-account", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_code: cleanCode,
+            reason: "فرمتة الحساب عبر لوحة الإدارة المركزية"
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert("✓ تمت فرمتة الحساب وتصفيره بنجاح.");
+          handleInspectAccount(cleanCode);
+          fetchPortalStats();
+        } else {
+          alert(data.error || "فشلت العملية");
+        }
+      } catch (e: any) {
+        alert("خطأ: " + e.message);
+      } finally {
+        setActionLoading(false);
+      }
+      return;
+    }
+
+    if (actionType === "reset_submissions") {
+      const ok = confirm("تحذير: هل أنت متأكد من رغبتك في تصفير وحذف جميع أعمال ومشاريع هذا الطالب لإتاحة إعادة الرفع له؟");
+      if (!ok) return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await fetch("/api/admin/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: actionType,
+          student_code: cleanCode,
+          extra,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage(data.message || "تم تنفيذ الإجراء بنجاح");
+        setTimeout(() => setActionMessage(""), 4000);
+        handleInspectAccount(cleanCode);
+      } else {
+        alert(data.error || "فشلت العملية");
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -217,7 +299,6 @@ export default function StudentPortalHubModal({
         alert(data.error || "تعذر جلب بيانات كشف الاحتيال");
       }
     } catch (err: any) {
-      console.error(err);
       alert("خطأ في الاتصال بالخادم");
     } finally {
       setLoadingFraud(false);
@@ -235,201 +316,11 @@ export default function StudentPortalHubModal({
         alert(data.error || "تعذر إجراء فحص تطابق الأعمال");
       }
     } catch (err: any) {
-      console.error(err);
       alert("خطأ في الاتصال بالخادم");
     } finally {
       setLoadingPlagiarism(false);
     }
   };
-
-  const handleSearchStudentToWipe = async (e?: React.FormEvent, codeOverride?: string) => {
-    if (e) e.preventDefault();
-    const term = (codeOverride || searchStudentTerm).trim();
-    if (!term) return;
-
-    setSearchingStudent(true);
-    setSearchedStudent(null);
-    setWipeSuccessMsg("");
-    setWipeErrorMsg("");
-
-    try {
-      // جلب بيانات الطالب والفحص الأمني وسجل النشاط
-      const res = await fetch(`/api/admin/portal?code=${encodeURIComponent(term)}`);
-      const portalData = await res.json();
-
-      if (res.ok && portalData.student) {
-        setSearchedStudent({
-          ...portalData.student,
-          isRegistered: portalData.isRegistered,
-          parsedAccount: portalData.account,
-          auditLogs: portalData.auditLogs || [],
-          deviceSecurity: portalData.deviceSecurity || null,
-          submissions: portalData.submissions || []
-        });
-      } else {
-        // Fallback البحث المباشر
-        const { data, error } = await supabase
-          .from("students")
-          .select("id, full_name, student_code, academic_year, section, telegram_browser_id")
-          .or(`student_code.eq.${term},full_name.ilike.%${term}%`)
-          .limit(1)
-          .maybeSingle();
-
-        if (error || !data) {
-          setWipeErrorMsg("لم يتم العثور على طالب بهذا الكود أو الاسم.");
-        } else {
-          let parsedAcc: any = null;
-          try {
-            if (data.telegram_browser_id) parsedAcc = JSON.parse(data.telegram_browser_id);
-          } catch (err) {}
-          setSearchedStudent({
-            ...data,
-            parsedAccount: parsedAcc,
-            auditLogs: []
-          });
-        }
-      }
-    } catch (err: any) {
-      setWipeErrorMsg(err.message || "حدث خطأ أثناء البحث");
-    } finally {
-      setSearchingStudent(false);
-    }
-  };
-
-  const handleResetArtworks = async (studentCode: string) => {
-    if (!confirm(`هل أنت متأكد تماماً من رغبتك في تصفير وحذف كافة أعمال ومشاريع الطالب (${studentCode})؟\n\nسيتم حذف الصور والتقييمات المسجلة وإتاحة رفع الأعمال من جديد للطالب.`)) return;
-    try {
-      const res = await fetch("/api/admin/portal/reset-artworks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_code: studentCode })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setWipeSuccessMsg(data.message || "تم تصفير أعمال الطالب بنجاح");
-        handleSearchStudentToWipe(undefined, studentCode);
-      } else {
-        setWipeErrorMsg(data.error || "تعذر تصفير الأعمال");
-      }
-    } catch (e: any) {
-      setWipeErrorMsg("خطأ: " + e.message);
-    }
-  };
-
-  const handleToggleSuspend = async (studentCode: string, currentStatus: string) => {
-    const newStatus = currentStatus === "suspended" ? "active" : "suspended";
-    const confirmMsg = newStatus === "suspended"
-      ? `هل أنت متأكد من تعليق حساب الطالب (${studentCode}) مؤقتاً؟\nسيتعذر على الطالب تسجيل الدخول للبوابة حتى يتم فك التعليق من الإدارة.`
-      : `هل ترغب في فك تعليق الحساب وتفعيله مجدداً للطالب (${studentCode})؟`;
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      const res = await fetch("/api/admin/portal/toggle-suspend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_code: studentCode, status: newStatus })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setWipeSuccessMsg(data.message || "تم تحديث حالة الحساب بنجاح");
-        handleSearchStudentToWipe(undefined, studentCode);
-      } else {
-        setWipeErrorMsg(data.error || "تعذر تحديث الحالة");
-      }
-    } catch (e: any) {
-      setWipeErrorMsg("خطأ: " + e.message);
-    }
-  };
-
-  const formatAuditAction = (action: string, details: any = {}) => {
-    switch (action) {
-      case "submit_project":
-      case "upload_artwork":
-      case "student_submit_project":
-        return `رفع عمل فني لمشروع «${details?.project_name || "مشروع"}» بمقرر «${details?.course_name || "مقرر"}»`;
-      case "login":
-      case "student_login":
-        return "تسجيل دخول الطالب إلى بوابة المنظومة";
-      case "register":
-      case "student_registered":
-        return "إنشاء الحساب لأول مرة وتصوير بطاقة الهوية الجامعية";
-      case "pin_verified_and_activated":
-      case "account_activated_by_coordinator":
-        return `اعتماد وتفعيل حساب الطالب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
-      case "registration_rejected_by_coordinator":
-        return `رفض بيانات التسجيل وتصفير الحساب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
-      case "sessions_terminated_by_coordinator":
-        return `إنهاء جلسات الأجهزة الأخرى لمنع التحايل بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
-      case "pin_issued_by_coordinator":
-        return `اعتماد الهوية وتفعيل الحساب بواسطة المنسق (${details?.coordinator || "منسق النظام"})`;
-      case "allow_retake":
-        return `فك قفل المشروع وإتاحة إعادة التصوير بواسطة (${details?.instructor || "المعيد"})`;
-      case "account_wiped_by_admin":
-      case "account_wiped":
-        return `فرمتة الحساب وإلغاء ارتباط الأجهزة بواسطة الإدارة (${details?.reason || "طلب إعادة تعيين"})`;
-      case "toggle_suspend":
-      case "suspend_account":
-      case "account_suspended":
-        return details?.status === "suspended" ? "تعليق الحساب مؤقتاً وحظر الدخول" : "فك تعليق الحساب وتنشيط الدخول";
-      case "account_unsuspended":
-        return "فك تعليق الحساب وتنشيط الدخول بواسطة الإدارة";
-      case "reset_artworks_by_admin":
-      case "admin_reset_submissions":
-        return "تصفير وحذف الأعمال والمشاريع المرفوعة وإتاحة الرفع مجدداً";
-      default:
-        return action;
-    }
-  };
-
-  const handleWipeAccountSubmit = async (codeToWipe?: string) => {
-    const targetCode = codeToWipe || searchedStudent?.student_code;
-    if (!targetCode) return;
-
-    const confirmWipe = confirm(
-      `هل أنت متأكد تماماً من رغبتك في فرمتة حساب الطالب (كود: ${targetCode})؟\n\nسيتم إلغاء ارتباط الجهاز ومسح الجلسة والسماح للطالب الأصلي بالتسجيل مجدداً برقم سري جديد.`
-    );
-    if (!confirmWipe) return;
-
-    setWipingAccount(true);
-    setWipeErrorMsg("");
-    setWipeSuccessMsg("");
-
-    try {
-      const res = await fetch("/api/admin/portal/wipe-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          student_code: targetCode,
-          reason: wipeReason || "فرمتة الحساب بسبب شبهة احتيال أو انتحال صفة"
-        })
-      });
-
-      const result = await res.json();
-      if (!res.ok) {
-        setWipeErrorMsg(result.error || "فشلت عملية الفرمتة");
-      } else {
-        setWipeSuccessMsg(result.message || "تمت فرمتة الحساب وإعادة تعيينه بنجاح تام.");
-        // Re-fetch search if same student
-        if (searchedStudent && searchedStudent.student_code === targetCode) {
-          setSearchedStudent({
-            ...searchedStudent,
-            telegram_browser_id: null,
-            parsedAccount: null
-          });
-        }
-        // If fraud was loaded, refresh fraud
-        if (fraudData) {
-          fetchFraudData();
-        }
-      }
-    } catch (err: any) {
-      setWipeErrorMsg(err.message || "حدث خطأ أثناء الاتصال بالخادم");
-    } finally {
-      setWipingAccount(false);
-    }
-  };
-
-  if (!isOpen) return null;
 
   const getPortalUrl = () => {
     if (typeof window !== "undefined") {
@@ -439,13 +330,14 @@ export default function StudentPortalHubModal({
   };
 
   const handleCopyPortalLink = () => {
-    const url = getPortalUrl();
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
+      navigator.clipboard.writeText(getPortalUrl());
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }
   };
+
+  if (!isOpen) return null;
 
   const filteredFraudDevices = (fraudData?.fraudDevices || []).filter((dev: any) => {
     if (!fraudFilter.trim()) return true;
@@ -458,6 +350,15 @@ export default function StudentPortalHubModal({
         String(a.student_code).includes(term) ||
         (a.mobile && a.mobile.includes(term))
       )
+    );
+  });
+
+  const filteredAccountsList = registeredStudentsList.filter((st: any) => {
+    if (!accountListFilter.trim()) return true;
+    const q = accountListFilter.trim().toLowerCase();
+    return (
+      (st.student_code && String(st.student_code).includes(q)) ||
+      (st.full_name && st.full_name.toLowerCase().includes(q))
     );
   });
 
@@ -490,7 +391,7 @@ export default function StudentPortalHubModal({
       >
         <div>
           <h3 style={{ margin: 0, color: "#38bdf8", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🎓</span> بوابة الطلاب وجناح الأمان الأكاديمي
+            <span>🎓</span> بوابة الطلاب وجناح الإدارة المركزية
           </h3>
           <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
             جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
@@ -505,7 +406,7 @@ export default function StudentPortalHubModal({
         </button>
       </div>
 
-      {/* Tabs Navigation */}
+      {/* Tabs Navigation - 100% Arabic & Clean */}
       <div style={{ 
         display: "flex", 
         flexWrap: "wrap", 
@@ -515,11 +416,10 @@ export default function StudentPortalHubModal({
         borderBottom: "1px solid #1e293b" 
       }}>
         {[
-          { id: "overview", label: "نظرة عامة وروابط 🌐", color: "#38bdf8" },
-          { id: "fraud", label: "كشف الاحتيال 🚨", color: "#ef4444" },
-          { id: "plagiarism", label: "كشف تطابق الأعمال 🔍", color: "#f59e0b" },
-          { id: "wipe", label: "بحث وفرمتة الحسابات 🧹", color: "#a855f7" },
-          { id: "complaints", label: "صندوق الشكاوى الطلابية 📬", color: "#ec4899" }
+          { id: "overview", label: "نظرة عامة وإحصائيات 🌐", color: "#38bdf8" },
+          { id: "accounts", label: "إدارة وبحث الحسابات 👤", color: "#10b981" },
+          { id: "fraud", label: "رادار الأجهزة المشتركة 🚨", color: "#ef4444" },
+          { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" }
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -548,46 +448,69 @@ export default function StudentPortalHubModal({
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px", maxWidth: "900px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px", maxWidth: "920px", width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
         
-        {/* ========================================== */}
-        {/* TAB 1: OVERVIEW & LINKS */}
-        {/* ========================================== */}
+        {/* ========================================================= */}
+        {/* التبويب 1: نظرة عامة وإحصائيات المنظومة */}
+        {/* ========================================================= */}
         {activeTab === "overview" && (
           <div className="animate-fade-in">
-            {/* Quick Stats Banner */}
+            
+            {/* بطاقات الإحصائيات السريعة */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: "12px",
                 marginBottom: "20px"
               }}
             >
-              <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "12px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#90CAF9" }}>إجمالي الطلاب</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+              {/* إجمالي الطلاب في الكشوف */}
+              <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "11px", color: "#90CAF9" }}>إجمالي الطلاب المقيدين</div>
+                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
                   {stats.totalStudents || "--"}
                 </div>
               </div>
-              <div style={{ background: "#1a2a1a", border: "1px solid #2e4a2e", padding: "12px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#81C784" }}>حسابات مسجلة بالبوابة</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+
+              {/* حسابات مسجلة بالبوابة (تفاعلي: عند النقر يفتح قائمة الحسابات) */}
+              <div 
+                onClick={openRegisteredAccountsModal}
+                style={{ 
+                  background: "linear-gradient(135deg, #132b1e, #1a3826)", 
+                  border: "1.5px solid #22c55e", 
+                  padding: "14px", 
+                  borderRadius: "12px", 
+                  textAlign: "center",
+                  cursor: "pointer",
+                  position: "relative",
+                  boxShadow: "0 4px 15px rgba(34, 197, 94, 0.15)",
+                  transition: "all 0.2s"
+                }}
+                title="انقر لاستعراض قائمة الحسابات المسجلة بالتفصيل"
+              >
+                <div style={{ fontSize: "11px", color: "#86efac", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                  <span>حسابات مسجلة بالبوابة</span>
+                  <span style={{ fontSize: "10px", background: "#15803d", color: "#fff", padding: "1px 5px", borderRadius: "6px" }}>↗ انقر للعرض</span>
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
                   {stats.registeredAccounts || "0"}
                 </div>
               </div>
-              <div style={{ background: "#2a1f14", border: "1px solid #5a3d1e", padding: "12px", borderRadius: "12px", textAlign: "center" }}>
+
+              {/* أعمال ومشاريع مرفوعة */}
+              <div style={{ background: "#2a1f14", border: "1px solid #5a3d1e", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
                 <div style={{ fontSize: "11px", color: "#FFB74D" }}>أعمال ومشاريع مرفوعة</div>
-                <div style={{ fontSize: "20px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
                   {stats.submissionsCount || "0"}
                 </div>
               </div>
             </div>
-            
+
             <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
               <button
-                onClick={fetchPortalStats}
-                disabled={loadingStats}
+                onClick={() => { fetchPortalStats(); fetchCoordinatorStats(); }}
+                disabled={loadingStats || loadingCoordStats}
                 style={{
                   background: "#1e293b",
                   border: "1px solid #334155",
@@ -601,12 +524,12 @@ export default function StudentPortalHubModal({
                   gap: "6px"
                 }}
               >
-                <RefreshCw size={14} className={loadingStats ? "spin" : ""} />
-                <span>{loadingStats ? "جاري التحديث..." : "تحديث الإحصائيات"}</span>
+                <RefreshCw size={14} className={(loadingStats || loadingCoordStats) ? "spin" : ""} />
+                <span>{(loadingStats || loadingCoordStats) ? "جاري التحديث..." : "تحديث الإحصائيات"}</span>
               </button>
             </div>
 
-            {/* Section 1: Main Public Student Portal */}
+            {/* القسم 1: رابط بوابة الطلاب العامة */}
             <div
               style={{
                 background: "#181d29",
@@ -672,7 +595,70 @@ export default function StudentPortalHubModal({
               </div>
             </div>
 
-            {/* Section 2: Instructor Gallery & Submissions */}
+            {/* القسم 2: إحصائية اعتماد الحسابات للمنسقين (بديل لوحة الاعتماد السابقة وفق توجيهك) */}
+            <div
+              style={{
+                background: "#181d29",
+                border: "1px solid #2a374f",
+                borderRadius: "14px",
+                padding: "18px",
+                marginBottom: "16px"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ background: "rgba(16, 185, 129, 0.2)", color: "#10b981", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
+                    🪪
+                  </div>
+                  <div>
+                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>إحصائية نشاط واعتماد المنسقين للحسابات</div>
+                    <div style={{ color: "#888", fontSize: "12px" }}>بيان بعدد الحسابات التي قام كل منسق باعتمادها وتفعيلها رسمياً للطلاب.</div>
+                  </div>
+                </div>
+
+                <span style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "4px 10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold" }}>
+                  إجمالي المعتمد: {coordStats.totalActivated} حساب
+                </span>
+              </div>
+
+              {loadingCoordStats ? (
+                <div style={{ textAlign: "center", color: "#94a3b8", padding: "20px" }}>جاري تحميل إحصائيات المنسقين...</div>
+              ) : coordStats.coordinators.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: "20px" }}>لم يسجل اعتماد حسابات حتى الآن</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {coordStats.coordinators.map((c, idx) => (
+                    <div 
+                      key={idx}
+                      style={{ 
+                        background: "#0d131f", 
+                        border: "1px solid #1e293b", 
+                        borderRadius: "10px", 
+                        padding: "12px 14px"
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "13px" }}>#{idx + 1}</span>
+                          <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>{c.coordinator_name}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#34d399", fontWeight: "bold", fontSize: "13px" }}>{c.count} حساب معتمد</span>
+                          <span style={{ color: "#64748b", fontSize: "11px" }}>({c.percentage}%)</span>
+                        </div>
+                      </div>
+                      
+                      {/* شريط نسبة بياني هادئ */}
+                      <div style={{ width: "100%", height: "6px", background: "#1e293b", borderRadius: "4px", overflow: "hidden" }}>
+                        <div style={{ width: `${c.percentage}%`, height: "100%", background: "linear-gradient(90deg, #10b981, #3b82f6)", borderRadius: "4px" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* القسم 3: معرض أعمال ومشاريع الطلاب للأساتذة */}
             <div
               style={{
                 background: "#181d29",
@@ -714,65 +700,246 @@ export default function StudentPortalHubModal({
               </div>
             </div>
 
-            {/* Section 3: Identity Verification shortcut */}
-            {onOpenIdentityModal && (
-              <div
-                style={{
-                  background: "#181d29",
-                  border: "1px solid #2a374f",
-                  borderRadius: "14px",
-                  padding: "16px",
-                  marginBottom: "16px"
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ background: "rgba(56, 189, 248, 0.2)", color: "#38bdf8", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
-                      🪪
-                    </div>
-                    <div>
-                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>إدارة اعتماد هوية الطلاب وتفعيل الحسابات</div>
-                      <div style={{ color: "#888", fontSize: "12px" }}>مطابقة بطاقات الرقم القومي وتفعيل حسابات الطلاب الرسمية فورياً.</div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => { onClose(); onOpenIdentityModal(); }}
-                    style={{
-                      background: "#38bdf8",
-                      color: "#000",
-                      border: "none",
-                      padding: "10px 18px",
-                      borderRadius: "8px",
-                      fontSize: "13px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px"
-                    }}
-                  >
-                    🪪 فتح نافذة اعتماد الهوية والتفعيل
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* ========================================== */}
-        {/* TAB 2: FRAUD DETECTION (كشف الاحتيال) */}
-        {/* ========================================== */}
+        {/* ========================================================= */}
+        {/* التبويب 2: إدارة وبحث الحسابات المركزية (مركز شامل للطالب) */}
+        {/* ========================================================= */}
+        {activeTab === "accounts" && (
+          <div className="animate-fade-in">
+            
+            {/* صندوق البحث الشامل الموحد */}
+            <div style={{ background: "#181d29", border: "1px solid #2a374f", borderRadius: "14px", padding: "18px", marginBottom: "18px" }}>
+              <label style={{ display: "block", color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "8px" }}>
+                البحث بكود الطالب لإدارة حسابه والتحكم في إعداداته:
+              </label>
+              
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  placeholder="أدخل كود الطالب (مثل: 0001)..."
+                  value={searchAccountCode}
+                  onChange={(e) => setSearchAccountCode(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleInspectAccount(); }}
+                  style={{ flex: 1, padding: "12px 14px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", fontWeight: "bold" }}
+                />
+                <button
+                  onClick={() => handleInspectAccount()}
+                  disabled={searchingAccount}
+                  style={{ background: "#2563eb", color: "#fff", border: "none", padding: "0 22px", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: searchingAccount ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <Search size={16} />
+                  <span>{searchingAccount ? "فحص..." : "فحص"}</span>
+                </button>
+              </div>
+
+              {accountInspectError && (
+                <div style={{ marginTop: "10px", color: "#f87171", fontSize: "12px" }}>
+                  {accountInspectError}
+                </div>
+              )}
+            </div>
+
+            {/* رسائل نجاح العمليات */}
+            {actionMessage && (
+              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginBottom: "16px", textAlign: "center", fontSize: "13px" }}>
+                {actionMessage}
+              </div>
+            )}
+
+            {/* كارت عرض وإدارة بيانات الطالب */}
+            {inspectedAccount && (
+              <div className="glass-card animate-fade-in" style={{ padding: "20px", borderRadius: "14px", border: "1px solid #2a374f" }}>
+                
+                {/* رأس الكارت والحالة */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid #1e293b", paddingBottom: "14px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+                  <div>
+                    <h2 style={{ color: "#fff", fontSize: "18px", fontWeight: "bold", margin: "0 0 4px 0" }}>
+                      {inspectedAccount.student?.full_name}
+                    </h2>
+                    <div style={{ color: "#38bdf8", fontSize: "13px" }}>
+                      كود: {formatStudentCode(inspectedAccount.student?.student_code)} • {inspectedAccount.student?.academic_year} (سكشن {inspectedAccount.student?.section || 'عام'})
+                    </div>
+                  </div>
+
+                  <div>
+                    {!inspectedAccount.isRegistered ? (
+                      <span style={{ background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.3)", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                        غير مسجل بالبوابة
+                      </span>
+                    ) : (
+                      <span style={{ 
+                        fontSize: "11px", 
+                        padding: "4px 10px", 
+                        borderRadius: "8px", 
+                        fontWeight: "bold",
+                        background: inspectedAccount.account?.status === 'suspended' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                        color: inspectedAccount.account?.status === 'suspended' ? '#f87171' : '#34d399',
+                        border: inspectedAccount.account?.status === 'suspended' ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)'
+                      }}>
+                        {inspectedAccount.account?.status === 'suspended' ? 'حساب معلق 🔒' : 'حساب نشط ومفعل ✅'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* التفاصيل الأساسية في شبكة نظيفة */}
+                {inspectedAccount.isRegistered && (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#0d131f", padding: "14px", borderRadius: "12px", marginBottom: "16px" }}>
+                      <div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>رقم الموبايل:</div>
+                        <div style={{ color: "#fff", fontWeight: "bold", direction: "ltr", textAlign: "right" }}>
+                          {inspectedAccount.account?.mobile || "غير مدخل"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>الرقم السري (PIN):</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#f59e0b", fontFamily: "monospace", fontWeight: "bold", fontSize: "16px" }}>
+                            {showInspectedPin ? (inspectedAccount.account?.pin_code || "----") : "••••"}
+                          </span>
+                          <button
+                            onClick={() => setShowInspectedPin(!showInspectedPin)}
+                            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer" }}
+                            title={showInspectedPin ? "إخفاء" : "إظهار"}
+                          >
+                            {showInspectedPin ? <EyeOff size={15} /> : <Eye size={15} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق المعتمد:</div>
+                        <div style={{ color: "#34d399", fontWeight: "bold" }}>
+                          {inspectedAccount.account?.activated_by || inspectedAccount.account?.pin_issued_by || "غير محدد"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>تاريخ الاعتماد:</div>
+                        <div style={{ color: "#cbd5e1" }}>
+                          {inspectedAccount.account?.activated_at ? new Date(inspectedAccount.account.activated_at).toLocaleString("ar-EG") : "غير مسجل"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* الأجهزة المسجلة للطالب */}
+                    {inspectedAccount.deviceSecurity?.devices?.length > 0 && (
+                      <div style={{ marginBottom: "16px" }}>
+                        <div style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+                          الأجهزة المسجلة للطالب ({inspectedAccount.deviceSecurity.devices.length}):
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {inspectedAccount.deviceSecurity.devices.map((d: any, idx: number) => {
+                            const parsed = parseDeviceBrand(d.userAgent, d.screen);
+                            return (
+                              <div key={idx} style={{ background: "#0d131f", padding: "10px", borderRadius: "8px", border: "1px solid #1e293b", fontSize: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <span>{parsed.icon}</span>
+                                  <span style={{ color: "#fff", fontWeight: "bold" }}>{parsed.brand}</span>
+                                </div>
+                                <span style={{ color: "#64748b", fontSize: "11px" }}>
+                                  {d.lastSeen ? new Date(d.lastSeen).toLocaleString("ar-EG") : "نشط"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* صورة بطاقة الهوية إن وجدت */}
+                    {inspectedAccount.account?.id_card_url && (
+                      <div style={{ marginBottom: "16px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                          <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>صورة بطاقة الهوية:</label>
+                          <button
+                            onClick={() => setZoomedIdCard(inspectedAccount.account.id_card_url)}
+                            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+                          >
+                            <Maximize2 size={12} />
+                            <span>تكبير</span>
+                          </button>
+                        </div>
+                        <div 
+                          onClick={() => setZoomedIdCard(inspectedAccount.account.id_card_url)}
+                          style={{ borderRadius: "10px", overflow: "hidden", border: "1px solid #334155", height: "130px", background: "#000", cursor: "zoom-in" }}
+                        >
+                          <img src={inspectedAccount.account.id_card_url} alt="بطاقة الطالب" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* أزرار العمليات الإدارية المباشرة (كل التحكم في مكان واحد) */}
+                    <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                      
+                      {/* زر تعليق أو فك تعليق الحساب */}
+                      {inspectedAccount.account?.status === 'suspended' ? (
+                        <button
+                          onClick={() => handleExecuteAccountAction('toggle_status', { status: 'active' })}
+                          disabled={actionLoading}
+                          style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        >
+                          <Unlock size={14} />
+                          <span>إلغاء تعليق الحساب</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleExecuteAccountAction('toggle_status', { status: 'suspended' })}
+                          disabled={actionLoading}
+                          style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        >
+                          <Lock size={14} />
+                          <span>تعليق وقفل الحساب</span>
+                        </button>
+                      )}
+
+                      {/* زر إعادة توليد رقم سري جديد */}
+                      <button
+                        onClick={() => handleExecuteAccountAction('reset_pin')}
+                        disabled={actionLoading}
+                        style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                      >
+                        <RotateCcw size={14} />
+                        <span>إعادة توليد رقم PIN</span>
+                      </button>
+
+                      {/* زر فرمتة وتصفير الحساب */}
+                      <button
+                        onClick={() => handleExecuteAccountAction('wipe_account')}
+                        disabled={actionLoading}
+                        style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#fca5a5", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                      >
+                        <Trash2 size={14} />
+                        <span>فرمتة وتصفير الحساب</span>
+                      </button>
+
+                    </div>
+                  </>
+                )}
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* التبويب 3: رادار الأجهزة المشتركة (كشف الاحتيال) */}
+        {/* ========================================================= */}
         {activeTab === "fraud" && (
           <div className="animate-fade-in">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
               <div>
                 <h3 style={{ margin: 0, color: "#f87171", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <ShieldAlert size={20} />
-                  <span>كشف أجهزة الموبايل المشتركة (شبهة الاحتيال)</span>
+                  <span>رادار الأجهزة المشتركة (كشف شبهات الدخول)</span>
                 </h3>
                 <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  يقوم النظام برصد أي هاتف تم استخدامه لفتح أكثر من حساب طالب، مع توضيح طراز الموبايل ومواعيد الدخول.
+                  رصد أي جهاز هاتف أو كمبيوتر تم استخدامه لفتح أكثر من حساب طالب في نفس الوقت.
                 </div>
               </div>
 
@@ -793,11 +960,11 @@ export default function StudentPortalHubModal({
                 }}
               >
                 <RefreshCw size={14} className={loadingFraud ? "spin" : ""} />
-                <span>{loadingFraud ? "جاري الفحص..." : "إعادة الفحص الآن"}</span>
+                <span>{loadingFraud ? "جاري الفحص..." : "إعادة الفحص"}</span>
               </button>
             </div>
 
-            {/* Quick Metrics */}
+            {/* شريط الإحصائيات السريع */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
               <div style={{ background: "#181d29", padding: "12px", borderRadius: "10px", border: "1px solid #2a374f", textAlign: "center" }}>
                 <div style={{ color: "#94a3b8", fontSize: "12px" }}>إجمالي الأجهزة المسجلة</div>
@@ -806,14 +973,14 @@ export default function StudentPortalHubModal({
                 </div>
               </div>
               <div style={{ background: "rgba(239, 68, 68, 0.1)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(239, 68, 68, 0.3)", textAlign: "center" }}>
-                <div style={{ color: "#fca5a5", fontSize: "12px" }}>أجهزة مشبوهة (2+ حساب)</div>
+                <div style={{ color: "#fca5a5", fontSize: "12px" }}>أجهزة مشتركة (2+ حساب)</div>
                 <div style={{ color: "#ef4444", fontSize: "22px", fontWeight: "bold", marginTop: "4px" }}>
                   {fraudData?.fraudIncidentsCount ?? (loadingFraud ? "..." : 0)}
                 </div>
               </div>
             </div>
 
-            {/* Filter Search */}
+            {/* فلتر البحث */}
             <div style={{ marginBottom: "16px" }}>
               <input
                 type="text"
@@ -824,91 +991,58 @@ export default function StudentPortalHubModal({
               />
             </div>
 
-            {/* Devices List */}
+            {/* قائمة الأجهزة */}
             {loadingFraud ? (
               <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
                 <RefreshCw size={28} className="spin" style={{ margin: "0 auto 10px" }} />
-                <div>جاري فحص وتدقيق بصمات الأجهزة المسجلة...</div>
+                <div>جاري تدقيق بصمات الأجهزة...</div>
               </div>
             ) : filteredFraudDevices.length === 0 ? (
               <div style={{ background: "#141b29", border: "1px solid #2a374f", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
                 <CheckCircle2 size={36} color="#10b981" style={{ margin: "0 auto 10px" }} />
                 <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>المنظومة آمنة تماماً!</div>
                 <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  لم يتم رصد أي هواتف تشترك في فتح أكثر من حساب طالب واحد حالياً.
+                  لم يتم رصد أي أجهزة تشترك في فتح أكثر من حساب طالب واحد حالياً.
                 </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 {filteredFraudDevices.map((dev: any, idx: number) => (
                   <div key={idx} style={{ background: "#141b29", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "14px", padding: "16px" }}>
-                    {/* Device Header */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #2a374f", paddingBottom: "10px", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "rgba(239, 68, 68, 0.15)", color: "#f87171", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <Smartphone size={20} />
                         </div>
                         <div>
-                          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
-                            {dev.phoneModel}
-                          </div>
-                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>
-                            أبعاد الشاشة: {dev.screen} • معرف الجهاز: {dev.deviceId.slice(0, 16)}...
-                          </div>
+                          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{dev.phoneModel || "هاتف ذكي"}</div>
+                          <div style={{ color: "#64748b", fontSize: "11px" }}>معرف الجهاز: {dev.deviceId}</div>
                         </div>
                       </div>
-
-                      <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", fontSize: "12px", fontWeight: "bold", padding: "4px 10px", borderRadius: "20px" }}>
-                        🚨 {dev.accounts.length} طلاب مسجلين على نفس الهاتف!
+                      <span style={{ background: "#7f1d1d", color: "#fecaca", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                        مشترك بين {dev.accounts.length} طلاب
                       </span>
                     </div>
 
-                    {/* Shared Students List */}
+                    {/* قائمة الطلاب في هذا الجهاز المشترك */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {dev.accounts.map((acc: any, aIdx: number) => (
-                        <div key={aIdx} style={{ background: "#0d131f", padding: "10px 14px", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", border: "1px solid #1e293b" }}>
+                        <div key={aIdx} style={{ background: "#0d131f", padding: "10px", borderRadius: "8px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
                           <div>
-                            <div style={{ color: "#e2e8f0", fontWeight: "bold", fontSize: "13px" }}>
-                              {acc.full_name}
-                            </div>
-                            <div style={{ color: "#94a3b8", fontSize: "11px", display: "flex", gap: "8px", marginTop: "2px" }}>
-                              <span>كود: {acc.student_code}</span>
-                              <span>•</span>
-                              <span>الفرقة: {acc.academic_year || "غير محدد"}</span>
-                              {acc.mobile && (
-                                <>
-                                  <span>•</span>
-                                  <span>موبايل: {acc.mobile}</span>
-                                </>
-                              )}
-                            </div>
-                            <div style={{ color: "#64748b", fontSize: "10px", marginTop: "2px" }}>
-                              آخر نشاط: {acc.lastSeen ? new Date(acc.lastSeen).toLocaleString("ar-EG") : "غير متوفر"}
-                            </div>
+                            <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>{acc.full_name}</span>
+                            <span style={{ color: "#38bdf8", fontSize: "11px", marginRight: "8px" }}>كود: {acc.student_code}</span>
+                            {acc.mobile && <span style={{ color: "#94a3b8", fontSize: "11px", marginRight: "8px", direction: "ltr", display: "inline-block" }}>📱 {acc.mobile}</span>}
                           </div>
-
+                          
                           <button
                             onClick={() => {
-                              setActiveTab("wipe");
-                              setSearchStudentTerm(acc.student_code);
-                              handleSearchStudentToWipe();
+                              setActiveTab("accounts");
+                              setSearchAccountCode(acc.student_code);
+                              handleInspectAccount(acc.student_code);
                             }}
-                            style={{
-                              background: "rgba(239, 68, 68, 0.15)",
-                              color: "#f87171",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                              padding: "6px 12px",
-                              borderRadius: "8px",
-                              fontSize: "11px",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
+                            style={{ background: "#1e293b", border: "1px solid #3b82f6", color: "#38bdf8", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", cursor: "pointer" }}
                           >
-                            <Trash2 size={13} />
-                            <span>فرمتة هذا الحساب</span>
+                            فحص الحساب 🔍
                           </button>
                         </div>
                       ))}
@@ -920,19 +1054,19 @@ export default function StudentPortalHubModal({
           </div>
         )}
 
-        {/* ========================================== */}
-        {/* TAB 3: PLAGIARISM AUDIT (كشف التلاعب) */}
-        {/* ========================================== */}
+        {/* ========================================================= */}
+        {/* التبويب 4: فحص تشابه اللوحات الفنية (الذكاء الاصطناعي) */}
+        {/* ========================================================= */}
         {activeTab === "plagiarism" && (
           <div className="animate-fade-in">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
               <div>
-                <h3 style={{ margin: 0, color: "#fbbf24", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <h3 style={{ margin: 0, color: "#f59e0b", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <Sparkles size={20} />
-                  <span>محرك الفحص الذكي لتطابق الأعمال والمجسمات الفنية</span>
+                  <span>كاشف تشابه وتطابق اللوحات الفنية بالذكاء الاصطناعي</span>
                 </h3>
                 <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  خوارزمية ذكية تقارن الأعمال الفنية ثنائية وثلاثية الأبعاد حتى لو تم تصويرها بهواتف مختلفة أو إضاءات وزوايا متباينة.
+                  فحص تلقائي لبصمات الصور (dHash) لكشف أي محاولات رفع لنفس اللوحة الفنية بين الطلاب.
                 </div>
               </div>
 
@@ -953,557 +1087,231 @@ export default function StudentPortalHubModal({
                 }}
               >
                 <RefreshCw size={14} className={loadingPlagiarism ? "spin" : ""} />
-                <span>{loadingPlagiarism ? "جاري الفحص..." : "فحص التطابق الآن"}</span>
+                <span>{loadingPlagiarism ? "جاري الفحص..." : "إعادة الفحص الآن"}</span>
               </button>
-            </div>
-
-            {/* Quick Metrics */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
-              <div style={{ background: "#181d29", padding: "12px", borderRadius: "10px", border: "1px solid #2a374f", textAlign: "center" }}>
-                <div style={{ color: "#94a3b8", fontSize: "12px" }}>إجمالي الأعمال المفحوصة</div>
-                <div style={{ color: "#38bdf8", fontSize: "22px", fontWeight: "bold", marginTop: "4px" }}>
-                  {plagiarismData?.totalSubmissionsScanned ?? (loadingPlagiarism ? "..." : 0)}
-                </div>
-              </div>
-              <div style={{ background: "rgba(245, 158, 11, 0.1)", padding: "12px", borderRadius: "10px", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center" }}>
-                <div style={{ color: "#fde68a", fontSize: "12px" }}>حالات التطابق والاشتباه</div>
-                <div style={{ color: "#f59e0b", fontSize: "22px", fontWeight: "bold", marginTop: "4px" }}>
-                  {plagiarismData?.suspiciousMatchesCount ?? (loadingPlagiarism ? "..." : 0)}
-                </div>
-              </div>
             </div>
 
             {loadingPlagiarism ? (
               <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
                 <RefreshCw size={28} className="spin" style={{ margin: "0 auto 10px" }} />
-                <div>جاري تحليل بصمات الصور وتدقيق التطابقات البصرية...</div>
+                <div>جاري تحليل بصمات اللوحات الفنية عبر الذكاء الاصطناعي...</div>
               </div>
-            ) : !plagiarismData?.matches || plagiarismData.matches.length === 0 ? (
+            ) : plagiarismData?.matches?.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {plagiarismData.matches.map((m: any, idx: number) => (
+                  <div key={idx} style={{ background: "#141b29", border: "1px solid #ef4444", borderRadius: "14px", padding: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "14px" }}>
+                        ⚠️ تطابق مشبوه بنسبة {m.similarityPercent}%!
+                      </span>
+                      <span style={{ background: "#ef4444", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                        مسافة هامد: {m.hammingDistance}
+                      </span>
+                    </div>
+
+                    {/* مقارنة اللوحتين جنباً إلى جنب */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", textAlign: "center" }}>
+                      <div>
+                        <div style={{ fontSize: "12px", color: "#fff", fontWeight: "bold", marginBottom: "4px" }}>{m.student1Name} (كود: {m.student1Code})</div>
+                        <div style={{ height: "130px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000" }}>
+                          <img src={m.image1Url} alt="عمل الطالب الأول" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: "12px", color: "#fff", fontWeight: "bold", marginBottom: "4px" }}>{m.student2Name} (كود: {m.student2Code})</div>
+                        <div style={{ height: "130px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000" }}>
+                          <img src={m.image2Url} alt="عمل الطالب الثاني" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
               <div style={{ background: "#141b29", border: "1px solid #2a374f", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
                 <CheckCircle2 size={36} color="#10b981" style={{ margin: "0 auto 10px" }} />
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>لا توجد أي حالات تطابق مشبوهة!</div>
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>جميع الأعمال أصلية 100%</div>
                 <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  كافة الأعمال المرفوعة فريدة ومتباينة ولم ترصد الخوارزمية أي تكرار لنفس العمل الفني بين الطلاب.
+                  لم يعثر الذكاء الاصطناعي على أي تطابق أو تشابه في بصمات اللوحات بين أي من الطلاب.
                 </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {plagiarismData.matches.map((m: any, idx: number) => {
-                  const isVeryHigh = m.similarity >= 85;
-                  const isHigh = m.similarity >= 70;
-                  const badgeColor = isVeryHigh ? "#ef4444" : isHigh ? "#f59e0b" : "#38bdf8";
-
-                  return (
-                    <div key={idx} style={{ background: "#141b29", border: `1px solid ${badgeColor}66`, borderRadius: "14px", padding: "16px" }}>
-                      {/* Match Score Header */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ 
-                            background: `${badgeColor}22`, 
-                            color: badgeColor, 
-                            fontWeight: "bold", 
-                            fontSize: "13px", 
-                            padding: "4px 12px", 
-                            borderRadius: "20px",
-                            border: `1px solid ${badgeColor}55`
-                          }}>
-                            {isVeryHigh ? "🚨 تطابق مؤكد بنسبة " : isHigh ? "⚠️ اشتباه قوي بنسبة " : "🔍 تشابه ملحوظ بنسبة "} 
-                            {m.similarity}%
-                          </span>
-                          <span style={{ color: "#94a3b8", fontSize: "12px" }}>المشروع: {m.project_name}</span>
-                        </div>
-                        <div style={{ color: "#64748b", fontSize: "11px" }}>{m.reason}</div>
-                      </div>
-
-                      {/* Side by side comparison */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                        {/* Student A */}
-                        <div style={{ background: "#0d131f", padding: "10px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-                          <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "13px" }}>{m.student_a.name}</div>
-                          <div style={{ color: "#94a3b8", fontSize: "11px", marginBottom: "8px" }}>كود: {m.student_a.code}</div>
-                          <div style={{ width: "100%", height: "140px", borderRadius: "8px", overflow: "hidden", background: "#000", border: "1px solid #334155" }}>
-                            {m.student_a.imageUrl ? (
-                              <img src={m.student_a.imageUrl} alt="عمل أ" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                            ) : (
-                              <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>لا توجد صورة</div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Student B */}
-                        <div style={{ background: "#0d131f", padding: "10px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-                          <div style={{ color: "#f472b6", fontWeight: "bold", fontSize: "13px" }}>{m.student_b.name}</div>
-                          <div style={{ color: "#94a3b8", fontSize: "11px", marginBottom: "8px" }}>كود: {m.student_b.code}</div>
-                          <div style={{ width: "100%", height: "140px", borderRadius: "8px", overflow: "hidden", background: "#000", border: "1px solid #334155" }}>
-                            {m.student_b.imageUrl ? (
-                              <img src={m.student_b.imageUrl} alt="عمل ب" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                            ) : (
-                              <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>لا توجد صورة</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* TAB 4: WIPE ACCOUNT (بحث وفرمتة الحسابات) */}
-        {/* ========================================== */}
-        {activeTab === "wipe" && (
-          <div className="animate-fade-in">
-            <div style={{ marginBottom: "16px" }}>
-              <h3 style={{ margin: 0, color: "#c084fc", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <Trash2 size={20} />
-                <span>بحث وفرمتة الحسابات المشبوهة (Account Wipe & Reset)</span>
-              </h3>
-              <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                في حال قام طالب بالتسجيل بحساب زميله أو تم اختراق الكود، يمكنك البحث عن الحساب وفرمتته بالكامل لتمكين الطالب الحقيقي من التسجيل برقم سري جديد.
-              </div>
-            </div>
-
-            {/* Search Input Box */}
-            <form onSubmit={handleSearchStudentToWipe} style={{ display: "flex", gap: "10px", marginBottom: "18px" }}>
-              <input
-                type="text"
-                placeholder="أدخل كود الطالب الجامعي أو اسمه..."
-                value={searchStudentTerm}
-                onChange={(e) => setSearchStudentTerm(e.target.value)}
-                style={{ flex: 1, padding: "0 14px", height: "46px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
-              />
-              <button
-                type="submit"
-                disabled={searchingStudent}
-                className="btn-compact"
-                style={{
-                  background: "#7c3aed",
-                  color: "#fff",
-                  border: "none",
-                  height: "46px",
-                  padding: "0 18px",
-                  borderRadius: "10px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                <Search size={16} />
-                <span>{searchingStudent ? "جاري البحث..." : "بحث"}</span>
-              </button>
-            </form>
-
-            {wipeErrorMsg && (
-              <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#fca5a5", padding: "10px 14px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>
-                ⚠️ {wipeErrorMsg}
-              </div>
-            )}
-
-            {wipeSuccessMsg && (
-              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "10px 14px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px" }}>
-                ✓ {wipeSuccessMsg}
-              </div>
-            )}
-
-            {/* Student Search Result Card */}
-            {searchedStudent && (
-              <div style={{ background: "#141b29", border: "1px solid #2a374f", borderRadius: "14px", padding: "18px", marginBottom: "16px" }}>
-                
-                {/* Header */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "12px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
-                  <div>
-                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px" }}>{searchedStudent.full_name}</div>
-                    <div style={{ color: "#38bdf8", fontSize: "12px", display: "flex", gap: "8px", marginTop: "2px" }}>
-                      <span>كود: {searchedStudent.student_code}</span>
-                      <span>•</span>
-                      <span>الفرقة: {searchedStudent.academic_year || "غير محدد"}</span>
-                      {searchedStudent.section && (
-                        <>
-                          <span>•</span>
-                          <span>السكشن: {searchedStudent.section}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {searchedStudent.parsedAccount?.status === "suspended" ? (
-                      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "bold", background: "rgba(239, 68, 68, 0.2)", color: "#f87171" }}>
-                        حساب معلق 🚫
-                      </span>
-                    ) : (
-                      <span style={{ 
-                        padding: "4px 10px", 
-                        borderRadius: "12px", 
-                        fontSize: "12px", 
-                        fontWeight: "bold",
-                        background: (searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "rgba(16, 185, 129, 0.2)" : "rgba(148, 163, 184, 0.2)",
-                        color: (searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "#34d399" : "#94a3b8"
-                      }}>
-                        {(searchedStudent.telegram_browser_id || searchedStudent.isRegistered) ? "حساب مسجل ونشط ✅" : "حساب غير مسجل / مفكوك"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quick Action Buttons (Browse as Student, Reset Artworks, Suspend/Unsuspend) */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "16px", background: "#0d131f", padding: "10px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-                  {/* زر تصفح بحساب الطالب */}
-                  <button
-                    onClick={() => window.open(`/system?impersonate=${encodeURIComponent(searchedStudent.student_code)}`, "_blank")}
-                    className="btn-compact"
-                    style={{ background: "#2563eb", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
-                  >
-                    <span>👁️</span>
-                    <span>تصفح بحساب الطالب</span>
-                  </button>
-
-                  {/* زر تصفير الأعمال */}
-                  <button
-                    onClick={() => handleResetArtworks(searchedStudent.student_code)}
-                    className="btn-compact"
-                    style={{ background: "rgba(245, 158, 11, 0.15)", border: "1px solid #f59e0b", color: "#fbbf24", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
-                  >
-                    <span>🗑️</span>
-                    <span>تصفير كافة الأعمال</span>
-                  </button>
-
-                  {/* زر تعليق أو فك تعليق الحساب */}
-                  <button
-                    onClick={() => handleToggleSuspend(searchedStudent.student_code, searchedStudent.parsedAccount?.status || "active")}
-                    className="btn-compact"
-                    style={{
-                      background: searchedStudent.parsedAccount?.status === "suspended" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                      border: `1px solid ${searchedStudent.parsedAccount?.status === "suspended" ? "#10b981" : "#ef4444"}`,
-                      color: searchedStudent.parsedAccount?.status === "suspended" ? "#34d399" : "#f87171",
-                      padding: "8px 14px",
-                      borderRadius: "8px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontSize: "12px"
-                    }}
-                  >
-                    <span>{searchedStudent.parsedAccount?.status === "suspended" ? "✅" : "🚫"}</span>
-                    <span>{searchedStudent.parsedAccount?.status === "suspended" ? "فك تعليق الحساب" : "تعليق الحساب مؤقتاً"}</span>
-                  </button>
-                </div>
-
-                {/* Account details */}
-                {searchedStudent.parsedAccount ? (
-                  <div style={{ background: "#0d131f", padding: "12px 14px", borderRadius: "10px", marginBottom: "14px", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.9" }}>
-                    <div>📱 <b>رقم الموبايل المسجل:</b> {searchedStudent.parsedAccount.mobile || "غير مسجل"}</div>
-                    <div>🔐 <b>حالة تفعيل الحساب:</b> {searchedStudent.parsedAccount.status === "active" || searchedStudent.parsedAccount.is_pin_used ? "مفعل ومعتمد رسمياً ✅" : "بانتظار اعتماد المنسق ⏳"}</div>
-                    <div>🕒 <b>آخر نشاط للدخول:</b> {searchedStudent.parsedAccount.last_login_at ? new Date(searchedStudent.parsedAccount.last_login_at).toLocaleString("ar-EG") : "غير مسجل"}</div>
-                    <div>📱 <b>الأجهزة المرتبطة:</b> {searchedStudent.parsedAccount.devices?.length || 1} جهاز</div>
-                    {searchedStudent.parsedAccount.devices && searchedStudent.parsedAccount.devices.length > 0 && (
-                      <div style={{ marginTop: "6px", color: "#94a3b8", fontSize: "11px", background: "rgba(255,255,255,0.03)", padding: "6px 10px", borderRadius: "6px" }}>
-                        {searchedStudent.parsedAccount.devices.map((d: any, dIdx: number) => {
-                          const devInfo = parseDeviceBrand(d.userAgent, d.screen);
-                          return (
-                            <div key={dIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px dashed rgba(255,255,255,0.06)" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <span>{devInfo.icon}</span>
-                                <span style={{ fontWeight: "bold", color: "#e2e8f0", fontSize: "12px" }}>{devInfo.brand}</span>
-                                <span style={{ color: "#94a3b8", fontSize: "11px" }}>({devInfo.osText})</span>
-                              </div>
-                              <div style={{ color: "#64748b", fontSize: "10px", direction: "ltr" }}>
-                                {d.screen ? `[${d.screen}] • ` : ""}{d.lastSeen ? new Date(d.lastSeen).toLocaleDateString("ar-EG") : ""}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <div style={{ color: "#38bdf8", fontSize: "11px", marginTop: "8px", background: "rgba(56, 189, 248, 0.08)", padding: "8px 12px", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.2)" }}>
-                      ℹ️ <b>توضيح أمني:</b> يتم التعرف على طراز الجهاز وماركته ونظام التشغيل تلقائياً وفورياً من بصمة المتصفح، أما تحديد الموقع الجغرافي الدقيق (GPS) فيتطلب موافقة الطالب على تصريح المتصفح.
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "14px" }}>
-                    لا توجد أي أجهزة أو جلسات مسجلة على هذا الحساب حالياً.
-                  </div>
-                )}
-
-                {/* Activity Log (سجل النشاط المعرب) */}
-                {searchedStudent.auditLogs && searchedStudent.auditLogs.length > 0 && (
-                  <div style={{ background: "#0d131f", padding: "12px", borderRadius: "10px", marginBottom: "14px", border: "1px solid #1e293b" }}>
-                    <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px" }}>
-                      📋 سجل النشاط والتدقيق الأمني:
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {searchedStudent.auditLogs.slice(0, 5).map((log: any, lIdx: number) => (
-                        <div key={lIdx} style={{ fontSize: "11px", color: "#cbd5e1", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px dashed #1e293b", paddingBottom: "4px" }}>
-                          <span>• {formatAuditAction(log.action, log.details)}</span>
-                          <span style={{ color: "#64748b", fontSize: "10px", whiteSpace: "nowrap" }}>
-                            {log.created_at ? new Date(log.created_at).toLocaleString("ar-EG") : ""}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Wipe Section */}
-                <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
-                    <div style={{ background: "rgba(239, 68, 68, 0.05)", border: "1px dashed rgba(239, 68, 68, 0.2)", padding: "10px", borderRadius: "10px" }}>
-                      <div style={{ color: "#f87171", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>🚫 تعليق الحساب مؤقتاً</div>
-                      <div style={{ color: "#94a3b8", fontSize: "10px" }}>يمنع الطالب من الدخول للبوابة مع الاحتفاظ بكافة بياناته وصوره وماريعه. استخدمه أثناء فحص المخالفات.</div>
-                    </div>
-                    <div style={{ background: "rgba(168, 85, 247, 0.05)", border: "1px dashed rgba(168, 85, 247, 0.2)", padding: "10px", borderRadius: "10px" }}>
-                      <div style={{ color: "#c084fc", fontSize: "12px", fontWeight: "bold", marginBottom: "4px" }}>⚠️ فرمتة الحساب بالكامل</div>
-                      <div style={{ color: "#94a3b8", fontSize: "10px" }}>يحذف ارتباط الأجهزة بالكامل ويمسح الحساب من البوابة، لتمكين الطالب الأصلي من التسجيل برقم سري جديد من الصفر.</div>
-                    </div>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="سبب الفرمتة (مثال: تسجيل هاتف غريب / شكوى انتحال صفة من الطالب)"
-                    value={wipeReason}
-                    onChange={(e) => setWipeReason(e.target.value)}
-                    style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #334155", borderRadius: "8px", color: "#fff", fontSize: "13px", marginBottom: "12px" }}
-                  />
-
-                  <button
-                    onClick={() => handleWipeAccountSubmit()}
-                    disabled={wipingAccount}
-                    style={{
-                      width: "100%",
-                      padding: "12px",
-                      background: "linear-gradient(135deg, #ef4444, #b91c1c)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "10px",
-                      fontWeight: "bold",
-                      fontSize: "14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    <Trash2 size={16} />
-                    <span>{wipingAccount ? "جاري فرمتة الحساب..." : "فرمتة هذا الحساب وإعادة تعيينه بالكامل 🧹"}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* TAB 5: STUDENT COMPLAINTS (صندوق الشكاوى الطلابية) */}
-        {/* ========================================== */}
-        {activeTab === "complaints" && (
-          <div className="animate-fade-in">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <div>
-                <h3 style={{ fontSize: "16px", color: "#fff", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>📬</span> صندوق شكاوى ومقترحات الطلاب
-                </h3>
-                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
-                  استعراض الشكاوى والمقترحات المرفوعة من بوابة الطلاب والرد عليها رسمياً
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  onClick={() => setComplaintFilter("all")}
-                  className="btn-compact"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: complaintFilter === "all" ? "#ec4899" : "#1e293b",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}
-                >
-                  الكل ({complaintsList.length})
-                </button>
-                <button
-                  onClick={() => setComplaintFilter("new")}
-                  className="btn-compact"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: complaintFilter === "new" ? "#f59e0b" : "#1e293b",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}
-                >
-                  جديدة ⏳ ({complaintsList.filter(c => c.status !== "تم الرد").length})
-                </button>
-                <button
-                  onClick={() => setComplaintFilter("replied")}
-                  className="btn-compact"
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: complaintFilter === "replied" ? "#10b981" : "#1e293b",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: "12px",
-                    cursor: "pointer"
-                  }}
-                >
-                  تم الرد ✅ ({complaintsList.filter(c => c.status === "تم الرد").length})
-                </button>
-              </div>
-            </div>
-
-            {replySuccessMsg && (
-              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginBottom: "14px", fontSize: "13px" }}>
-                ✓ {replySuccessMsg}
-              </div>
-            )}
-
-            {loadingComplaints ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#ec4899" }}>
-                <div style={{ width: "32px", height: "32px", border: "3px solid #ec4899", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
-                <div>جاري جلب الشكاوى الطلابية...</div>
-              </div>
-            ) : complaintsList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "50px 20px", color: "#94a3b8", background: "#141b29", borderRadius: "16px", border: "1px dashed #2a374f" }}>
-                <div style={{ fontSize: "40px", marginBottom: "10px" }}>📭</div>
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>لا توجد أي شكاوى أو مقترحات طلابية مسجلة حالياً</div>
-                <div style={{ fontSize: "12px", marginTop: "4px" }}>عندما يقوم أي طالب بإرسال شكوى من بوابته ستظهر هنا مباشرة.</div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {complaintsList
-                  .filter(c => {
-                    if (complaintFilter === "new") return c.status !== "تم الرد";
-                    if (complaintFilter === "replied") return c.status === "تم الرد";
-                    return true;
-                  })
-                  .map(c => {
-                    const isReplied = c.status === "تم الرد" || !!c.admin_reply;
-                    return (
-                      <div
-                        key={c.id}
-                        style={{
-                          background: "#141b29",
-                          border: isReplied ? "1px solid #1e293b" : "1px solid rgba(245, 158, 11, 0.4)",
-                          borderRadius: "14px",
-                          padding: "16px",
-                          boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
-                        }}
-                      >
-                        {/* Complaint Header */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px", marginBottom: "10px" }}>
-                          <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                              <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
-                                {c.student_name}
-                              </span>
-                              <span style={{ background: "rgba(56, 189, 248, 0.12)", color: "#38bdf8", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
-                                كود: {c.student_code}
-                              </span>
-                              <span style={{ color: "#94a3b8", fontSize: "11px" }}>
-                                الفرقة: {c.academic_year || "عام"}
-                              </span>
-                            </div>
-                            <div style={{ color: "#f59e0b", fontSize: "11px", marginTop: "4px" }}>
-                              موجهة إلى: <b>{c.target_entity}</b> • {c.created_at ? new Date(c.created_at).toLocaleString("ar-EG") : ""}
-                            </div>
-                          </div>
-
-                          <span style={{
-                            padding: "4px 10px",
-                            borderRadius: "8px",
-                            fontSize: "11px",
-                            fontWeight: "bold",
-                            background: isReplied ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                            color: isReplied ? "#34d399" : "#fbbf24",
-                            border: isReplied ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(245, 158, 11, 0.3)"
-                          }}>
-                            {isReplied ? "✅ تم الرد" : "⏳ جديدة"}
-                          </span>
-                        </div>
-
-                        {/* Complaint Body */}
-                        <div style={{ background: "#0d131f", padding: "12px 14px", borderRadius: "10px", border: "1px solid #1e293b", color: "#e2e8f0", fontSize: "13px", lineHeight: "1.7", marginBottom: "12px", whiteSpace: "pre-wrap" }}>
-                          {c.content}
-                        </div>
-
-                        {/* Existing Reply if already answered */}
-                        {isReplied && c.admin_reply && (
-                          <div style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "12px 14px", borderRadius: "10px", marginBottom: "12px" }}>
-                            <div style={{ color: "#34d399", fontWeight: "bold", fontSize: "12px", marginBottom: "4px" }}>
-                              💬 الرد الرسمي الموجه للطالب ({c.replied_by || "الإدارة"}):
-                            </div>
-                            <div style={{ color: "#fff", fontSize: "13px", lineHeight: "1.6" }}>
-                              {c.admin_reply}
-                            </div>
-                            {c.replied_at && (
-                              <div style={{ color: "#64748b", fontSize: "10px", marginTop: "6px" }}>
-                                تاريخ الرد: {new Date(c.replied_at).toLocaleString("ar-EG")}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Reply Form */}
-                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                          <input
-                            type="text"
-                            placeholder={isReplied ? "تعديل الرد أو إرسال رد إضافي..." : "اكتب رد الإدارة الرسمي للطالب هنا..."}
-                            value={replyTextMap[c.id] || ""}
-                            onChange={(e) => setReplyTextMap(prev => ({ ...prev, [c.id]: e.target.value }))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSendReply(c.id);
-                            }}
-                            style={{
-                              flex: 1,
-                              padding: "10px 14px",
-                              background: "#0d131f",
-                              border: "1px solid #2a374f",
-                              borderRadius: "8px",
-                              color: "#fff",
-                              fontSize: "13px"
-                            }}
-                          />
-                          <button
-                            onClick={() => handleSendReply(c.id)}
-                            disabled={sendingReplyId === c.id || !replyTextMap[c.id]?.trim()}
-                            className="btn-compact"
-                            style={{
-                              padding: "10px 16px",
-                              background: "linear-gradient(135deg, #10b981, #059669)",
-                              color: "#fff",
-                              border: "none",
-                              borderRadius: "8px",
-                              fontWeight: "bold",
-                              fontSize: "12px",
-                              cursor: (sendingReplyId === c.id || !replyTextMap[c.id]?.trim()) ? "not-allowed" : "pointer",
-                              opacity: (sendingReplyId === c.id || !replyTextMap[c.id]?.trim()) ? 0.6 : 1
-                            }}
-                          >
-                            {sendingReplyId === c.id ? "جاري الإرسال..." : "إرسال الرد 💬"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
               </div>
             )}
           </div>
         )}
 
       </div>
+
+      {/* =============================================================== */}
+      {/* النافذة التفاعلية: استعراض الحسابات المسجلة بالبوابة (الميزة 3) */}
+      {/* =============================================================== */}
+      {isAccountsModalOpen && (
+        <div
+          onClick={() => setIsAccountsModalOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99999,
+            background: "rgba(0, 0, 0, 0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px"
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#141b29",
+              border: "1.5px solid #2a374f",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "680px",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
+            }}
+          >
+            {/* Header */}
+            <div style={{ padding: "14px 18px", background: "#0d131f", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "18px" }}>📋</span>
+                <div>
+                  <h3 style={{ margin: 0, color: "#fff", fontSize: "15px", fontWeight: "bold" }}>
+                    قائمة حسابات الطلاب المسجلة بالبوابة
+                  </h3>
+                  <div style={{ color: "#34d399", fontSize: "11px", marginTop: "2px" }}>
+                    إجمالي الحسابات: {registeredStudentsList.length} طالب مسجل
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAccountsModalOpen(false)}
+                className="modal-close-btn"
+                title="إغلاق"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* شريط البحث الفوري */}
+            <div style={{ padding: "12px 18px", background: "#0d131f", borderBottom: "1px solid #1e293b" }}>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  placeholder="ابحث بالاسم أو كود الطالب للفلترة الفورية..."
+                  value={accountListFilter}
+                  onChange={(e) => setAccountListFilter(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", paddingRight: "36px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "8px", color: "#fff", fontSize: "13px" }}
+                  autoFocus
+                />
+                <Search size={16} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
+              </div>
+            </div>
+
+            {/* محتوى القائمة */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+              {loadingRegisteredList ? (
+                <div style={{ textAlign: "center", color: "#94a3b8", padding: "40px" }}>جاري تحميل قائمة الطلاب...</div>
+              ) : filteredAccountsList.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: "40px" }}>لا توجد حسابات مطابقة للبحث</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {filteredAccountsList.map((st, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: "#0d131f",
+                        border: "1px solid #1e293b",
+                        borderRadius: "10px",
+                        padding: "12px 14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: "8px"
+                      }}
+                    >
+                      {/* الاسم والكود فقط */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", fontFamily: "monospace", fontWeight: "bold", fontSize: "13px" }}>
+                          {formatStudentCode(st.student_code)}
+                        </span>
+                        <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
+                          {st.full_name}
+                        </span>
+                      </div>
+
+                      {/* تاريخ التسجيل وآخر زيارة */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "11px", color: "#94a3b8" }}>
+                        <div title="تاريخ التسجيل على البوابة">
+                          <span style={{ color: "#64748b" }}>سجّل في: </span>
+                          <span style={{ color: "#cbd5e1" }}>
+                            {st.created_at ? new Date(st.created_at).toLocaleDateString("ar-EG") : "غير مسجل"}
+                          </span>
+                        </div>
+
+                        <div title="آخر مرة زار الحساب">
+                          <span style={{ color: "#64748b" }}>آخر زيارة: </span>
+                          <span style={{ color: st.last_login_at ? "#34d399" : "#64748b", fontWeight: st.last_login_at ? "bold" : "normal" }}>
+                            {st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "لم يسجل دخول"}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setIsAccountsModalOpen(false);
+                            setActiveTab("accounts");
+                            setSearchAccountCode(st.student_code);
+                            handleInspectAccount(st.student_code);
+                          }}
+                          style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px" }}
+                        >
+                          إدارة
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "10px 18px", background: "#0d131f", borderTop: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#64748b" }}>
+              <span>عرض {filteredAccountsList.length} من {registeredStudentsList.length} طالب</span>
+              <button
+                onClick={() => setIsAccountsModalOpen(false)}
+                style={{ background: "#2563eb", color: "#fff", border: "none", padding: "6px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" }}
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* تكبير صورة البطاقة في إدارة الحسابات */}
+      {zoomedIdCard && (
+        <div 
+          onClick={() => setZoomedIdCard(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            background: "rgba(0, 0, 0, 0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+            cursor: "zoom-out"
+          }}
+        >
+          <img src={zoomedIdCard} alt="بطاقة مكبرة" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #38bdf8" }} />
+        </div>
+      )}
+
     </div>
   );
 }
