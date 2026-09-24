@@ -6,16 +6,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. جلب حسابات الطلاب لمعرفة منسق الاعتماد
-    const { data: dbAccounts } = await supabaseAdmin
-      .from('student_accounts')
-      .select('student_code, activated_by, pin_issued_by, status, is_pin_used');
-
-    // 2. فحص أيضاً students.telegram_browser_id
-    const { data: studentsWithBrowserId } = await supabaseAdmin
-      .from('students')
-      .select('student_code, telegram_browser_id')
-      .not('telegram_browser_id', 'is', null);
+    // جلب الحسابات وسجلات الاعتماد بالتوازي الفوري (Promise.all)
+    const [{ data: dbAccounts }, { data: studentsWithBrowserId }] = await Promise.all([
+      supabaseAdmin
+        .from('student_accounts')
+        .select('student_code, activated_by, pin_issued_by, status, is_pin_used'),
+      supabaseAdmin
+        .from('students')
+        .select('student_code, telegram_browser_id')
+        .not('telegram_browser_id', 'is', null)
+    ]);
 
     const coordinatorCounts: Record<string, number> = {};
     let totalActivated = 0;

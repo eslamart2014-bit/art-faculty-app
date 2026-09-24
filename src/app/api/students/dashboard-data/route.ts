@@ -101,26 +101,34 @@ export async function GET(request: Request) {
       section: student.section,
     };
 
-    // 2. جلب سجلات الحضور
-    const { data: attendanceRecords } = await supabaseAdmin
-      .from('attendance')
-      .select('id, course_id, date, status')
-      .eq('student_id', student.id)
-      .order('date', { ascending: false });
+    // 2. جلب الحضور، التقييمات، التسليمات، والمقررات بالتوازي الفوري (Promise.all) لتسريع الاستجابة
+    const [
+      { data: attendanceRecords },
+      { data: teacherEvals },
+      { data: subData },
+      { data: allCoursesData }
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('attendance')
+        .select('id, course_id, date, status')
+        .eq('student_id', student.id)
+        .order('date', { ascending: false }),
+      supabaseAdmin
+        .from('evaluations')
+        .select('id, course_id, project_name, score, photo_url, created_at')
+        .eq('student_id', student.id),
+      supabaseAdmin
+        .from('student_submissions')
+        .select('*')
+        .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`),
+      supabaseAdmin
+        .from('courses')
+        .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id')
+    ]);
 
-    // 3. جلب التقييمات والأعمال المسجلة من الأساتذة بكامل تفاصيلها بما فيها صور الأعمال (photo_url)
-    const { data: teacherEvals } = await supabaseAdmin
-      .from('evaluations')
-      .select('id, course_id, project_name, score, photo_url, created_at')
-      .eq('student_id', student.id);
-
-    // 4. جلب أعمال ومشاريع الطالب المرفوعة عبر البوابة
+    // معالجة أعمال ومشاريع الطالب المرفوعة عبر البوابة
     let studentSubmissions: any[] = [];
-    const { data: subData } = await supabaseAdmin
-      .from('student_submissions')
-      .select('*')
-      .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`);
-    if (subData) studentSubmissions = subData;
+    if (subData) studentSubmissions = [...subData];
 
     // دمج التسليمات المحلية إن وجدت
     try {
@@ -158,11 +166,6 @@ export async function GET(request: Request) {
         }
       });
     }
-
-    // 5. جلب المقررات مع المعيدين والأساتذة (فقط المقررات النشطة غير المؤرشفة)
-    const { data: allCoursesData } = await supabaseAdmin
-      .from('courses')
-      .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id');
 
     // استبعاد أي مقرر مؤرشف نهائياً
     const allCourses = (allCoursesData || []).filter((c: any) => c.custom_week_names?.__archived !== true);

@@ -262,7 +262,13 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
   const fetchStats = async (courseData: any, currentProjects: any[] = projects) => {
     try {
-      const { data: studentsData } = await supabase.from("students").select("id").eq("academic_year", courseData.academic_year);
+      const [studentsRes, evalsRes] = await Promise.all([
+        supabase.from("students").select("id").eq("academic_year", courseData.academic_year),
+        supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id)
+      ]);
+      const studentsData = studentsRes.data;
+      const evalsData = evalsRes.data;
+
       const excluded = courseData.excluded_students || [];
       const activeStudents = (studentsData || []).filter((s: any) => !excluded.includes(s.id));
       let count = activeStudents.length;
@@ -275,7 +281,6 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       }
       setTotalCourseStudents(count);
 
-      const { data: evalsData } = await supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id);
       const stats: Record<string, number> = {};
       (evalsData || []).forEach((ev: any) => {
         if (ev.score !== null && ev.score > 0) {

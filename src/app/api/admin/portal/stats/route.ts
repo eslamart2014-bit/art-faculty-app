@@ -6,26 +6,18 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. Total students in college roster
-    const { count: totalStudents, error: stErr } = await supabaseAdmin
-      .from('students')
-      .select('id', { count: 'exact', head: true });
-
-    // 2. Accounts in student_accounts table
-    const { data: dbAccounts } = await supabaseAdmin
-      .from('student_accounts')
-      .select('student_code, id_card_verified, status');
-
-    // 3. Accounts in students table with telegram_browser_id
-    const { data: studentsWithBrowserId } = await supabaseAdmin
-      .from('students')
-      .select('student_code, telegram_browser_id')
-      .not('telegram_browser_id', 'is', null);
-
-    // 4. Submissions count
-    const { count: totalSubs } = await supabaseAdmin
-      .from('student_submissions')
-      .select('id', { count: 'exact', head: true });
+    // تنفيذ كافة استعلامات الإحصائيات بالتوازي الفوري (Promise.all)
+    const [
+      { count: totalStudents },
+      { data: dbAccounts },
+      { data: studentsWithBrowserId },
+      { count: totalSubs }
+    ] = await Promise.all([
+      supabaseAdmin.from('students').select('id', { count: 'exact', head: true }),
+      supabaseAdmin.from('student_accounts').select('student_code, id_card_verified, status'),
+      supabaseAdmin.from('students').select('student_code, telegram_browser_id').not('telegram_browser_id', 'is', null),
+      supabaseAdmin.from('student_submissions').select('id', { count: 'exact', head: true })
+    ]);
 
     // Consolidate unique registered student codes
     const registeredCodes = new Set<string>();

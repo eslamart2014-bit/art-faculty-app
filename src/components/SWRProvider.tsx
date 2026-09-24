@@ -21,13 +21,26 @@ export default function SWRProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const map = getLocalCache();
     
-    // Create a custom provider wrapper that syncs to localStorage on set/delete
+    // Create a custom provider wrapper that syncs to localStorage on set/delete asynchronously
     const syncMap = new Map(map);
     
+    let saveTimeout: any = null;
     const saveToLocal = () => {
-      try {
-        localStorage.setItem('app-cache', JSON.stringify(Array.from(syncMap.entries())));
-      } catch (e) {}
+      if (saveTimeout) clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        try {
+          const runSave = () => {
+            try {
+              localStorage.setItem('app-cache', JSON.stringify(Array.from(syncMap.entries())));
+            } catch (e) {}
+          };
+          if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(runSave, { timeout: 1000 });
+          } else {
+            runSave();
+          }
+        } catch (e) {}
+      }, 400);
     };
 
     const originalSet = syncMap.set.bind(syncMap);
@@ -45,6 +58,10 @@ export default function SWRProvider({ children }: { children: React.ReactNode })
     };
 
     setProvider(syncMap);
+
+    return () => {
+      if (saveTimeout) clearTimeout(saveTimeout);
+    };
   }, []);
 
   if (!provider) {

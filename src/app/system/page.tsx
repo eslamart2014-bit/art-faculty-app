@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { 
   UserCheck, 
@@ -113,6 +113,65 @@ export default function SystemPage() {
   const [projectCourseFilter, setProjectCourseFilter] = useState<string>("all");
   const [expandedAttendanceCourseId, setExpandedAttendanceCourseId] = useState<string | null>(null);
   const [complaintSuccessMsg, setComplaintSuccessMsg] = useState<string>("");
+
+  // 1. تجميع وحساب كافة المشاريع المعينة لجميع المقررات (Memoized لمنع إعادة الحساب وتفادي اللاج)
+  const allStudentProjects = useMemo(() => {
+    const list: any[] = [];
+    (dashboardData?.projects || []).forEach((course: any) => {
+      (course.assignedProjects || []).forEach((proj: any) => {
+        const sub = proj.submission || (course.submissions || []).find((s: any) => (s.project_name || '').trim() === (proj.title || '').trim());
+        const ev = proj.evaluation;
+        const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
+        const score = isGraded ? (ev?.score ?? proj.score) : null;
+        const isSubmitted = isGraded || proj.status === 'submitted' || proj.status === 'evaluated' || !!sub || !!(ev?.photo_url);
+        const subImgList = Array.isArray(sub?.images) ? sub.images : [];
+        const hasStage1Image = proj.hasStage1Image ?? (isSubmitted && (subImgList.some((i: any) => i.stage === 'stage1' || !i.stage) || !!ev?.photo_url));
+        const hasStage2Image = proj.hasStage2Image ?? (isSubmitted && subImgList.some((i: any) => i.stage === 'stage2'));
+        const isFullySubmitted = proj.multiStageEnabled ? (hasStage1Image && hasStage2Image) : isSubmitted;
+
+        list.push({
+          ...proj,
+          courseId: course.courseId,
+          courseName: course.courseName,
+          academicYear: course.academicYear,
+          instructorTitle: course.instructorTitle || "أستاذ المقرر",
+          instructorName: course.instructorName,
+          submission: sub,
+          evaluation: ev,
+          isGraded,
+          isSubmitted,
+          hasStage1Image,
+          hasStage2Image,
+          isFullySubmitted,
+          score
+        });
+      });
+    });
+    return list;
+  }, [dashboardData]);
+
+  const courseFilteredProjects = useMemo(() => {
+    return projectCourseFilter === "all"
+      ? allStudentProjects
+      : allStudentProjects.filter((p: any) => p.courseId === projectCourseFilter);
+  }, [allStudentProjects, projectCourseFilter]);
+
+  const { requiredProjects, submittedProjects } = useMemo(() => {
+    const req = courseFilteredProjects.filter((p: any) => !p.isFullySubmitted);
+    const sub = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted || p.isGraded);
+    return { requiredProjects: req, submittedProjects: sub };
+  }, [courseFilteredProjects]);
+
+  const displayedProjects = projectSubTab === "required" ? requiredProjects : submittedProjects;
+
+  const activeCourseAssignedProjects = selectedCourseForEval?.assignedProjects || [];
+  const activeCourseSubmissions = selectedCourseForEval?.submissions || [];
+
+  const filteredSubmissions = useMemo(() => {
+    return selectedProjectTab === "all"
+      ? activeCourseSubmissions
+      : activeCourseSubmissions.filter((s: any) => s.project_name === selectedProjectTab);
+  }, [activeCourseSubmissions, selectedProjectTab]);
 
   // Smart Camera State (Strict Live Camera, 2D/3D Mode, Anti-flicker)
   const [showArtworkCamera, setShowArtworkCamera] = useState(false);
@@ -1311,57 +1370,6 @@ export default function SystemPage() {
   // VIEW 2: شاشة لوحة بيانات الطالب المفعل (Active Student Dashboard)
   // ==========================================
   if (currentStudent && accountStatus === "active") {
-    // 1. تجميع كافة المشاريع المعينة لجميع المقررات في شبكة كروت موحدة
-    const allStudentProjects: any[] = [];
-    (dashboardData?.projects || []).forEach((course: any) => {
-      (course.assignedProjects || []).forEach((proj: any) => {
-        const sub = proj.submission || (course.submissions || []).find((s: any) => (s.project_name || '').trim() === (proj.title || '').trim());
-        const ev = proj.evaluation;
-        const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
-        const score = isGraded ? (ev?.score ?? proj.score) : null;
-        const isSubmitted = isGraded || proj.status === 'submitted' || proj.status === 'evaluated' || !!sub || !!(ev?.photo_url);
-        const subImgList = Array.isArray(sub?.images) ? sub.images : [];
-        const hasStage1Image = proj.hasStage1Image ?? (isSubmitted && (subImgList.some((i: any) => i.stage === 'stage1' || !i.stage) || !!ev?.photo_url));
-        const hasStage2Image = proj.hasStage2Image ?? (isSubmitted && subImgList.some((i: any) => i.stage === 'stage2'));
-        const isFullySubmitted = proj.multiStageEnabled ? (hasStage1Image && hasStage2Image) : isSubmitted;
-
-        allStudentProjects.push({
-          ...proj,
-          courseId: course.courseId,
-          courseName: course.courseName,
-          academicYear: course.academicYear,
-          instructorTitle: course.instructorTitle || "أستاذ المقرر",
-          instructorName: course.instructorName,
-          submission: sub,
-          evaluation: ev,
-          isGraded,
-          isSubmitted,
-          hasStage1Image,
-          hasStage2Image,
-          isFullySubmitted,
-          score
-        });
-      });
-    });
-
-    const courseFilteredProjects = projectCourseFilter === "all"
-      ? allStudentProjects
-      : allStudentProjects.filter((p: any) => p.courseId === projectCourseFilter);
-
-    // تقسيم المشروعات إلى المطلوبة والمُسلَّمة
-    const requiredProjects = courseFilteredProjects.filter((p: any) => !p.isFullySubmitted);
-    const submittedProjects = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted || p.isGraded);
-    const displayedProjects = projectSubTab === "required" ? requiredProjects : submittedProjects;
-
-    // Filter projects for selected course
-    const activeCourseAssignedProjects = selectedCourseForEval?.assignedProjects || [];
-    const activeCourseSubmissions = selectedCourseForEval?.submissions || [];
-
-    // Filter by active project tab
-    const filteredSubmissions = selectedProjectTab === "all"
-      ? activeCourseSubmissions
-      : activeCourseSubmissions.filter((s: any) => s.project_name === selectedProjectTab);
-
     return (
       <div style={{ minHeight: "100vh", padding: "10px 14px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
         

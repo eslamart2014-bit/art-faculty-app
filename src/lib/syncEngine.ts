@@ -91,14 +91,32 @@ export const processQueue = async () => {
       }
       else if (action.type === 'CAMERA_ATTENDANCE') {
         const { course_id, date, students, teacher_id } = action.payload;
-        for (const s of students) {
-          const { data: ex } = await supabase.from("attendance").select("id, status").eq("course_id", course_id).eq("student_id", s.id).eq("date", date).maybeSingle();
-          if (ex) {
-            if (ex.status !== 'حاضر') {
-              await supabase.from("attendance").update({ status: 'حاضر', created_at: action.timestamp }).eq("id", ex.id);
+        if (students && students.length > 0) {
+          const studentIds = students.map((s: any) => s.id);
+          const { data: existingRecords } = await supabase
+            .from("attendance")
+            .select("id, student_id, status")
+            .eq("course_id", course_id)
+            .eq("date", date)
+            .in("student_id", studentIds);
+
+          const existingMap = new Map();
+          (existingRecords || []).forEach((r: any) => existingMap.set(r.student_id, r));
+
+          const toInsert: any[] = [];
+          for (const s of students) {
+            const ex = existingMap.get(s.id);
+            if (ex) {
+              if (ex.status !== 'حاضر') {
+                await supabase.from("attendance").update({ status: 'حاضر', created_at: action.timestamp }).eq("id", ex.id);
+              }
+            } else {
+              toInsert.push({ course_id, student_id: s.id, date, status: 'حاضر', teacher_id, created_at: action.timestamp });
             }
-          } else {
-            await supabase.from("attendance").insert({ course_id, student_id: s.id, date, status: 'حاضر', teacher_id, created_at: action.timestamp });
+          }
+
+          if (toInsert.length > 0) {
+            await supabase.from("attendance").insert(toInsert);
           }
         }
         success = true;

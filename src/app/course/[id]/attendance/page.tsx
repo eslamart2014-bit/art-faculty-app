@@ -313,28 +313,52 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       if (courseData) {
         setCourse(courseData);
 
-        const { data: studentsData } = await supabase
+        const { start: wStart, end: wEnd } = getWeekRangeFromKey(selectedWeekKey);
+        const wStartStr = getTodayLocalDateStr(wStart);
+        const wEndStr = getTodayLocalDateStr(wEnd);
+
+        const studentsPromise = supabase
           .from("students")
           .select("*")
           .eq("academic_year", courseData.academic_year);
 
-        const loadedStudents = studentsData || [];
+        const makeupPromise = (courseData.makeup_students && courseData.makeup_students.length > 0)
+          ? supabase.from("students").select("*").in("id", courseData.makeup_students)
+          : Promise.resolve({ data: [] });
+
+        const allAttPromise = supabase
+          .from("attendance")
+          .select("student_id, date")
+          .eq("course_id", resolvedParams.id);
+
+        const currentAttPromise = supabase
+          .from("attendance")
+          .select("*")
+          .eq("course_id", resolvedParams.id)
+          .gte("date", wStartStr)
+          .lte("date", wEndStr);
+
+        const userPromise = supabase.auth.getUser();
+
+        const [studentsRes, makeupRes, allAttRes, attRes, userRes] = await Promise.all([
+          studentsPromise,
+          makeupPromise,
+          allAttPromise,
+          currentAttPromise,
+          userPromise
+        ]);
+
+        const loadedStudents = studentsRes.data || [];
         setStudents(loadedStudents);
 
-        let loadedMakeup: any[] = [];
+        const loadedMakeup = makeupRes.data || [];
         if (courseData.makeup_students && courseData.makeup_students.length > 0) {
-          const { data: makeupData } = await supabase
-            .from("students")
-            .select("*")
-            .in("id", courseData.makeup_students);
-          loadedMakeup = makeupData || [];
           setMakeupStudents(loadedMakeup);
         }
 
         let instName = instructorName;
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
-          const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userData.user.id).single();
+        if (userRes.data?.user) {
+          const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userRes.data.user.id).single();
           if (profile && profile.full_name) {
             const title = profile.degree ? `${profile.degree}/` : '';
             instName = `${title}${profile.full_name}`;
@@ -342,11 +366,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           }
         }
 
-        const { data: allAtt } = await supabase
-          .from("attendance")
-          .select("student_id, date")
-          .eq("course_id", resolvedParams.id);
-        const loadedAllAtt = allAtt || [];
+        const loadedAllAtt = allAttRes.data || [];
         setAllAttendances(loadedAllAtt);
 
         const distinctWeekStarts = new Set();
@@ -361,18 +381,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         const countWeeks = distinctWeekStarts.size;
         setTotalWeeksCount(countWeeks);
 
-        const { start: wStart, end: wEnd } = getWeekRangeFromKey(selectedWeekKey);
-        const wStartStr = getTodayLocalDateStr(wStart);
-        const wEndStr = getTodayLocalDateStr(wEnd);
-
-        const { data: attData } = await supabase
-          .from("attendance")
-          .select("*")
-          .eq("course_id", resolvedParams.id)
-          .gte("date", wStartStr)
-          .lte("date", wEndStr);
-        
-        const loadedAtt = attData || [];
+        const loadedAtt = attRes.data || [];
         setAttendance(loadedAtt);
         const presentIds = new Set<string>(
           (loadedAtt as any[])

@@ -6,16 +6,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // 1. جلب حسابات الطلاب المسجلة
-    const { data: dbAccounts, error: accErr } = await supabaseAdmin
-      .from('student_accounts')
-      .select('student_code, full_name, created_at, last_login_at, status')
-      .order('created_at', { ascending: false });
-
-    // 2. جلب بيانات الطلاب لاستكمال الأسماء إن كانت فارغة
-    const { data: studentsList } = await supabaseAdmin
-      .from('students')
-      .select('student_code, full_name, telegram_browser_id');
+    // جلب الحسابات وقائمة الطلاب بالتوازي الفوري (Promise.all)
+    const [{ data: dbAccounts }, { data: studentsList }] = await Promise.all([
+      supabaseAdmin
+        .from('student_accounts')
+        .select('student_code, full_name, created_at, last_login_at, status')
+        .order('created_at', { ascending: false }),
+      supabaseAdmin
+        .from('students')
+        .select('student_code, full_name, telegram_browser_id')
+    ]);
 
     const studentMap = new Map<string, any>();
     (studentsList || []).forEach((st: any) => {
