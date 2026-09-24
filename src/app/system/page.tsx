@@ -28,7 +28,9 @@ import {
   RotateCw,
   ShieldCheck,
   Check,
-  Archive
+  Archive,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
@@ -58,6 +60,7 @@ function formatRemainingTime(deadlineStr?: string | null): { text: string; isExp
 export default function SystemPage() {
   // Navigation & Auth State
   const [authMode, setAuthMode] = useState<"register" | "login">("register");
+  const [showLoginPin, setShowLoginPin] = useState(false);
   const [currentStudent, setCurrentStudent] = useState<any>(null);
   const [accountStatus, setAccountStatus] = useState<"pending" | "active" | null>(null);
   const [projectSubTab, setProjectSubTab] = useState<"required" | "submitted">("required");
@@ -232,8 +235,39 @@ export default function SystemPage() {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.student_code) {
           setCurrentStudent(parsed);
-          setAccountStatus(parsed.is_pin_used || parsed.status === "active" ? "active" : "pending");
-          loadDashboard(parsed.student_code, parsed.pin_code);
+          const isAct = parsed.is_pin_used || parsed.status === "active";
+          setAccountStatus(isAct ? "active" : "pending");
+          if (isAct) {
+            loadDashboard(parsed.student_code, parsed.pin_code);
+          } else {
+            // فحص فوري لحالة اعتماد المنسق عند فتح المتصفح لأول مرة
+            const devInfo = getOrCreateDeviceInfo();
+            fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
+              .then(r => r.json())
+              .then(data => {
+                if (data.isAlreadyActive) {
+                  const activeSession = {
+                    ...parsed,
+                    ...(data.student || {}),
+                    pin_code: data.student?.pin_code || parsed.pin_code,
+                    status: "active",
+                    is_pin_used: true
+                  };
+                  localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                  setCurrentStudent(activeSession);
+                  setAccountStatus("active");
+                  setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
+                  loadDashboard(parsed.student_code, activeSession.pin_code);
+                } else if (data.isNew) {
+                  localStorage.removeItem("fania_student_session");
+                  setCurrentStudent(null);
+                  setAccountStatus(null);
+                  setAuthMode("register");
+                  setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
+                }
+              })
+              .catch(e => console.error("Initial lookup check failed:", e));
+          }
           fetchCoordinators(parsed.student_code);
           return;
         }
@@ -294,13 +328,16 @@ export default function SystemPage() {
     let isMounted = true;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}`);
+        const devInfo = getOrCreateDeviceInfo();
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`);
         const data = await res.json();
         if (!isMounted) return;
 
         if (data.isAlreadyActive) {
           const activeSession = {
             ...currentStudent,
+            ...(data.student || {}),
+            pin_code: data.student?.pin_code || currentStudent.pin_code,
             status: "active",
             is_pin_used: true
           };
@@ -308,7 +345,7 @@ export default function SystemPage() {
           setCurrentStudent(activeSession);
           setAccountStatus("active");
           setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
-          loadDashboard(currentStudent.student_code);
+          loadDashboard(currentStudent.student_code, activeSession.pin_code);
         } else if (data.isNew) {
           localStorage.removeItem("fania_student_session");
           setCurrentStudent(null);
@@ -317,7 +354,7 @@ export default function SystemPage() {
           setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
         }
       } catch (e) {}
-    }, 3500);
+    }, 3000);
 
     return () => {
       isMounted = false;
@@ -951,7 +988,7 @@ export default function SystemPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regCode || !enteredPin) {
-      setErrorMsg("يرجى إدخال كود الطالب والرقم السري أو رقم الموبايل المسجل");
+      setErrorMsg("يرجى إدخال كود الطالب والرقم السري الخاص بك");
       return;
     }
 
@@ -1210,15 +1247,22 @@ export default function SystemPage() {
             onClick={async () => {
               setLoading(true);
               try {
-                const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}&_t=${Date.now()}`);
+                const devInfo = getOrCreateDeviceInfo();
+                const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`);
                 const data = await res.json();
                 if (data.isAlreadyActive) {
-                  const activeSession = { ...currentStudent, status: "active", is_pin_used: true };
+                  const activeSession = {
+                    ...currentStudent,
+                    ...(data.student || {}),
+                    pin_code: data.student?.pin_code || currentStudent.pin_code,
+                    status: "active",
+                    is_pin_used: true
+                  };
                   localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
                   setCurrentStudent(activeSession);
                   setAccountStatus("active");
                   setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
-                  loadDashboard(currentStudent.student_code);
+                  loadDashboard(currentStudent.student_code, activeSession.pin_code);
                 } else if (data.isNew) {
                   localStorage.removeItem("fania_student_session");
                   setCurrentStudent(null);
@@ -3219,16 +3263,61 @@ export default function SystemPage() {
             </div>
 
             <div style={{ marginBottom: "18px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                الرقم السري أو رقم الموبايل المسجل:
-              </label>
-              <input
-                type="text"
-                placeholder="أدخل الرمز السري أو رقم الموبايل..."
-                value={enteredPin}
-                onChange={(e) => setEnteredPin(e.target.value)}
-                style={{ width: "100%", padding: "12px", textAlign: "center", direction: "ltr", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fbbf24", fontSize: "15px", fontWeight: "bold" }}
-              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>
+                  الرقم السري (PIN):
+                </label>
+                <span style={{ color: "#64748b", fontSize: "11px" }}>مشفر وخاص بالطالب</span>
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showLoginPin ? "text" : "password"}
+                  placeholder="أدخل الرقم السري الخاص بك..."
+                  value={enteredPin}
+                  onChange={(e) => setEnteredPin(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "46px",
+                    padding: "0 44px 0 14px",
+                    textAlign: "center",
+                    direction: "ltr",
+                    background: "#141b29",
+                    border: "1px solid #2a374f",
+                    borderRadius: "10px",
+                    color: "#fbbf24",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    letterSpacing: showLoginPin ? "normal" : "4px",
+                    boxSizing: "border-box",
+                    margin: 0
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-compact"
+                  onClick={() => setShowLoginPin(!showLoginPin)}
+                  style={{
+                    position: "absolute",
+                    left: "10px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    background: "transparent",
+                    border: "none",
+                    color: "#94a3b8",
+                    cursor: "pointer",
+                    padding: 0,
+                    margin: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                  title={showLoginPin ? "إخفاء الرقم السري" : "إظهار الرقم السري"}
+                >
+                  {showLoginPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             <button

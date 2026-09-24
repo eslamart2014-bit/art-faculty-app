@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawCode = (searchParams.get('code') || '').trim();
+  const deviceId = (searchParams.get('deviceId') || searchParams.get('device_id') || '').trim();
 
   if (!rawCode) {
     return NextResponse.json({ success: false, message: 'يرجى إدخال كود الطالب' }, { status: 400 });
@@ -64,12 +65,21 @@ export async function GET(request: Request) {
       existingAccount = localStore.getAccount(student.student_code);
     }
 
+    // التحقق مما إذا كان الطلب قادماً من جهاز معتمد مسجل في الحساب
+    let isAuthorizedDevice = false;
+    if (deviceId && Array.isArray(existingAccount?.devices)) {
+      isAuthorizedDevice = existingAccount.devices.some((d: any) => d.deviceId === deviceId);
+    }
+
     if (existingAccount && existingAccount.status === 'active' && existingAccount.is_pin_used) {
       return NextResponse.json({
         success: true,
-        student: safeStudent,
+        student: {
+          ...safeStudent,
+          ...(isAuthorizedDevice && existingAccount.pin_code ? { pin_code: existingAccount.pin_code } : {})
+        },
         isAlreadyActive: true,
-        message: 'هذا الحساب مسجل ومفعل بالفعل بالرقم السري. يمكنك التوجه لتسجيل الدخول مباشرة.',
+        message: 'هذا الحساب مسجل ومفعل بالفعل بالرقم السري.',
       });
     }
 

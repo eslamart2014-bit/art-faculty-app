@@ -121,25 +121,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, data: null });
     }
 
-    if (action === 'clear_telegram_db') {
-      await supabaseAdmin.from('students').update({
-        telegram_id: null,
-        telegram_username: null,
-        telegram_first_name: null
-      }).not('telegram_id', 'is', null);
-
-      await supabaseAdmin.from('profiles').update({
-        telegram_id: null,
-        telegram_link_token: null
-      }).not('telegram_id', 'is', null);
-
-      try {
-        await supabaseAdmin.from('telegram_bot_states').delete().neq('chat_id', '0');
-      } catch (e) {}
-
-      return NextResponse.json({ success: true, message: 'تم تفريغ كافة بيانات وسجلات التليجرام بالكامل بنجاح.' });
-    }
-
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: any) {

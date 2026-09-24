@@ -175,6 +175,7 @@ export async function POST(request: Request) {
         student_code: studentRecord.student_code,
         academic_year: studentRecord.academic_year,
         section: studentRecord.section || 'عام',
+        pin_code: pinCode,
       },
       message: 'تم تسجيل بياناتك المبدئية بنجاح! يرجى مراجعة منسق المنظومة لتفعيل حسابك.',
     });
