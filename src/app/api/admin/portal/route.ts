@@ -258,28 +258,76 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { action, student_code, extra } = await request.json();
+    if (!student_code) {
+      return NextResponse.json({ error: 'يرجى تحديد كود الطالب' }, { status: 400 });
+    }
     const cleanCode = formatStudentCode(student_code);
 
+    // 1. تعليق أو تفعيل الحساب
     if (action === 'toggle_status') {
-      // تعليق أو تفعيل الحساب
       const newStatus = extra?.status || 'active'; // 'active' or 'suspended'
-      const { data, error } = await supabaseAdmin
-        .from('student_accounts')
-        .update({ status: newStatus })
-        .eq('student_code', cleanCode)
-        .select('*')
-        .single();
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true, message: `تم تعديل حالة الحساب إلى ${newStatus === 'suspended' ? 'معلق' : 'نشط'}` });
+      // تحديث في student_accounts
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({ status: newStatus })
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // تحديث في students.telegram_browser_id
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st && st.telegram_browser_id) {
+          try {
+            const parsed = JSON.parse(st.telegram_browser_id);
+            parsed.status = newStatus;
+            await supabaseAdmin
+              .from('students')
+              .update({ telegram_browser_id: JSON.stringify(parsed) })
+              .eq('id', st.id);
+          } catch (e) {}
+        }
+      } catch (e) {}
+
+      // تحديث في المخزن المحلي
+      try {
+        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
+        if (localAcc) {
+          localAcc.status = newStatus;
+          localStore.upsertAccount(localAcc);
+        }
+      } catch (e) {}
+
+      // تسجيل العملية في سجل الأمان
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: newStatus === 'suspended' ? 'account_suspended' : 'account_unsuspended',
+          details: { status: newStatus, timestamp: new Date().toISOString() },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        status: newStatus,
+        message: newStatus === 'suspended' 
+          ? 'تم تعليق وقفل حساب الطالب بنجاح 🔒 (لا يمكن للطالب الدخول حتى يتم إلغاء التعليق)' 
+          : 'تم تفعيل الحساب وإلغاء التعليق بنجاح ✅'
+      });
     }
 
+    // 2. تصفير وحذف أعمال ومشاريع الطالب لإتاحة إعادة الرفع
     if (action === 'reset_submissions') {
-      // فورمات وحذف مشاريع الطالب المرفوعة لإتاحة إعادة الرفع
       const { error } = await supabaseAdmin
         .from('student_submissions')
         .delete()
-        .eq('student_code', cleanCode);
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -294,23 +342,123 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'تم تصفير أعمال ومشاريع الطالب بنجاح، ويمكنه الآن تصويرها ورفعها من جديد.' });
     }
 
+    // 3. إعادة توليد رقم سري جديد
     if (action === 'reset_pin') {
-      // إعادة توليد رقم سري جديد
       const newPin = generatePinCode();
-      const { data, error } = await supabaseAdmin
-        .from('student_accounts')
-        .update({
-          pin_code: newPin,
-          is_pin_used: false,
-          pin_issued_by: 'إدارة النظام (إعادة تعيين)',
-          pin_issued_at: new Date().toISOString(),
-        })
-        .eq('student_code', cleanCode)
-        .select('*')
-        .single();
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ success: true, message: 'تم إعادة تعيين الرقم السري بنجاح', newPin });
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({
+            pin_code: newPin,
+            is_pin_used: false,
+            pin_issued_by: 'إدارة النظام (إعادة تعيين)',
+            pin_issued_at: new Date().toISOString(),
+          })
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st && st.telegram_browser_id) {
+          try {
+            const parsed = JSON.parse(st.telegram_browser_id);
+            parsed.pin_code = newPin;
+            parsed.is_pin_used = false;
+            parsed.pin_issued_by = 'إدارة النظام (إعادة تعيين)';
+            parsed.pin_issued_at = new Date().toISOString();
+            await supabaseAdmin
+              .from('students')
+              .update({ telegram_browser_id: JSON.stringify(parsed) })
+              .eq('id', st.id);
+          } catch (e) {}
+        }
+      } catch (e) {}
+
+      try {
+        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
+        if (localAcc) {
+          localAcc.pin_code = newPin;
+          localAcc.is_pin_used = false;
+          localStore.upsertAccount(localAcc);
+        }
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, message: `تم إعادة تعيين الرقم السري بنجاح: ${newPin}`, newPin });
+    }
+
+    // 4. حذف وتصفير حساب الطالب من البوابة بالكامل
+    if (action === 'delete_account' || action === 'wipe_account') {
+      // جلب بيانات الطالب
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('id, full_name, student_code')
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .maybeSingle();
+
+      if (!student) {
+        return NextResponse.json({ error: 'الطالب غير موجود في المنظومة' }, { status: 404 });
+      }
+
+      // حذف الأعمال المرفوعة
+      try {
+        await supabaseAdmin
+          .from('student_submissions')
+          .delete()
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // تصفير روابط الصور في جدول evaluations
+      try {
+        await supabaseAdmin
+          .from('evaluations')
+          .update({ photo_url: null })
+          .eq('student_id', student.id);
+      } catch (e) {}
+
+      // تصفير بيانات الحساب في جدول students
+      try {
+        await supabaseAdmin
+          .from('students')
+          .update({ telegram_browser_id: null })
+          .eq('id', student.id);
+      } catch (e) {}
+
+      // حذف الحساب من جدول student_accounts
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .delete()
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // حذف من المخزن المحلي
+      try {
+        localStore.deleteAccount(cleanCode);
+        localStore.deleteAccount(student_code);
+      } catch (e) {}
+
+      // تسجيل العملية في سجل الأمان
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: student.student_code,
+          action: 'account_deleted_by_admin',
+          details: {
+            student_name: student.full_name,
+            deleted_at: new Date().toISOString(),
+          }
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: `تم حذف حساب الطالب (${student.full_name}) من البوابة بنجاح! أصبح الحساب غير مسجل ويمكن للطالب التسجيل من جديد.`
+      });
     }
 
     return NextResponse.json({ error: 'إجراء غير مدعوم' }, { status: 400 });

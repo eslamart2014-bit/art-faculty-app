@@ -199,6 +199,40 @@ export default function StudentPortalHubModal({
     }
   };
 
+  // حذف مباشر لحساب الطالب من قائمة الحسابات المسجلة
+  const handleDeleteAccountDirect = async (studentCode: string, studentName: string) => {
+    if (!confirm(`تحذير أمني:\nهل أنت متأكد تماماً من حذف حساب الطالب (${studentName}) نهائياً من البوابة؟\n\nسيتم إلغاء تسجيل الطالب والسماح له بالتسجيل من جديد.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_account",
+          student_code: studentCode,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✓ " + (data.message || "تم حذف الحساب بنجاح"));
+        setRegisteredStudentsList(prev => prev.filter(s => s.student_code !== studentCode));
+        setStats(prev => ({
+          ...prev,
+          registeredAccounts: Math.max(0, prev.registeredAccounts - 1)
+        }));
+        if (inspectedAccount?.student?.student_code === studentCode) {
+          handleInspectAccount(studentCode);
+        }
+      } else {
+        alert(data.error || "فشل حذف الحساب");
+      }
+    } catch (e: any) {
+      alert("خطأ في الاتصال: " + e.message);
+    }
+  };
+
   // فحص حساب طالب محدد
   const handleInspectAccount = async (codeToInspect?: string) => {
     const code = (codeToInspect || searchAccountCode).trim();
@@ -225,30 +259,33 @@ export default function StudentPortalHubModal({
     }
   };
 
-  // تنفيذ العمليات الإدارية على الحساب (توليد PIN، تعليق، فورمات)
+  // تنفيذ العمليات الإدارية على الحساب (توليد PIN، تعليق، حذف)
   const handleExecuteAccountAction = async (actionType: string, extra?: any) => {
     if (!inspectedAccount?.student?.student_code) return;
     const cleanCode = inspectedAccount.student.student_code;
 
-    if (actionType === "wipe_account") {
-      const ok = confirm(`تحذير أمني هام:\nهل أنت متأكد تماماً من رغبتك في فرمتة وتصفير حساب الطالب (كود: ${cleanCode})؟\n\nسيتم فك ارتباط الجهاز ومسح الجلسة والسماح للطالب بالتسجيل مجدداً.`);
+    if (actionType === "wipe_account" || actionType === "delete_account") {
+      const studentName = inspectedAccount.student?.full_name || cleanCode;
+      const ok = confirm(`تحذير أمني هام:\nهل أنت متأكد تماماً من رغبتك في حذف حساب الطالب (${studentName}) نهائياً من البوابة؟\n\nسيتم حذف بيانات الحساب وفك ارتباط الأجهزة وتصفيرها بالكامل، ليتمكن الطالب من التسجيل بحساب جديد.`);
       if (!ok) return;
 
       setActionLoading(true);
       try {
-        const res = await fetch("/api/admin/portal/wipe-account", {
+        const res = await fetch("/api/admin/portal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            student_code: cleanCode,
-            reason: "فرمتة الحساب عبر لوحة الإدارة المركزية"
+            action: "delete_account",
+            student_code: cleanCode
           })
         });
         const data = await res.json();
         if (res.ok) {
-          alert("✓ تمت فرمتة الحساب وتصفيره بنجاح.");
+          alert("✓ " + (data.message || "تم حذف الحساب بنجاح."));
           handleInspectAccount(cleanCode);
           fetchPortalStats();
+          fetchCoordinatorStats();
+          setRegisteredStudentsList(prev => prev.filter(s => s.student_code !== cleanCode && s.student_code !== inspectedAccount.student?.student_code));
         } else {
           alert(data.error || "فشلت العملية");
         }
@@ -726,33 +763,40 @@ export default function StudentPortalHubModal({
                   value={searchAccountCode}
                   onChange={(e) => setSearchAccountCode(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleInspectAccount(); }}
-                  style={{ flex: 1, minWidth: 0, height: "44px", padding: "0 12px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", fontWeight: "bold", boxSizing: "border-box" }}
+                  style={{ flex: "1 1 auto", minWidth: 0, width: "100%", height: "44px", padding: "0 12px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", fontWeight: "bold", boxSizing: "border-box", margin: 0 }}
                 />
                 <button
+                  type="button"
+                  className="btn-compact"
                   onClick={() => handleInspectAccount()}
                   disabled={searchingAccount}
-                  style={{ height: "44px", background: "#2563eb", color: "#fff", border: "none", padding: "0 16px", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: searchingAccount ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box" }}
+                  style={{ width: "auto", minWidth: "80px", maxWidth: "95px", height: "44px", background: "#2563eb", color: "#fff", border: "none", padding: "0 14px", borderRadius: "10px", fontWeight: "bold", fontSize: "13px", cursor: searchingAccount ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", flexShrink: 0, boxSizing: "border-box", margin: 0 }}
                 >
                   <Search size={16} />
                   <span>{searchingAccount ? "فحص..." : "فحص"}</span>
                 </button>
                 <button
                   type="button"
+                  className="btn-compact"
                   onClick={() => setIsScanningQr(!isScanningQr)}
                   style={{
-                    height: "44px",
                     width: "44px",
+                    minWidth: "44px",
+                    maxWidth: "44px",
+                    height: "44px",
                     background: isScanningQr ? "#ef4444" : "#1e293b",
                     border: "1px solid",
                     borderColor: isScanningQr ? "#ef4444" : "#3b82f6",
                     color: "#fff",
                     borderRadius: "10px",
                     cursor: "pointer",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
-                    boxSizing: "border-box"
+                    boxSizing: "border-box",
+                    margin: 0,
+                    padding: 0
                   }}
                   title={isScanningQr ? "إغلاق الكاميرا" : "مسح QR بالكاميرا"}
                 >
@@ -972,14 +1016,14 @@ export default function StudentPortalHubModal({
                         <span>تصفير الأعمال لإعادة الرفع</span>
                       </button>
 
-                      {/* زر فرمتة وتصفير الحساب */}
+                      {/* زر حذف الحساب نهائياً */}
                       <button
-                        onClick={() => handleExecuteAccountAction('wipe_account')}
+                        onClick={() => handleExecuteAccountAction('delete_account')}
                         disabled={actionLoading}
-                        style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#fca5a5", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        style={{ background: "rgba(239, 68, 68, 0.2)", border: "1.5px solid #ef4444", color: "#fca5a5", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
-                        <Trash2 size={14} />
-                        <span>فرمتة وتصفير الحساب</span>
+                        <Trash2 size={15} />
+                        <span>حذف الحساب نهائياً 🗑️</span>
                       </button>
 
                     </div>
@@ -1326,15 +1370,28 @@ export default function StudentPortalHubModal({
                         </div>
 
                         <button
+                          type="button"
+                          className="btn-compact"
                           onClick={() => {
                             setIsAccountsModalOpen(false);
                             setActiveTab("accounts");
                             setSearchAccountCode(st.student_code);
                             handleInspectAccount(st.student_code);
                           }}
-                          style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px" }}
+                          style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", margin: 0 }}
                         >
                           إدارة
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn-compact"
+                          onClick={() => handleDeleteAccountDirect(st.student_code, st.full_name)}
+                          style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", margin: 0 }}
+                          title="حذف حساب الطالب نهائياً من البوابة"
+                        >
+                          <Trash2 size={12} />
+                          <span>حذف</span>
                         </button>
                       </div>
                     </div>

@@ -60,6 +60,13 @@ button {
   touch-action: manipulation;
 }
 
+.btn-compact,
+button.btn-compact {
+  width: auto !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 button:not(.btn-compact):not(.icon-btn):not(.modal-close-btn):not(.btn-close):not(.close-btn):not([aria-label="close"]):not([aria-label="Close"]):not([data-compact]):not([style*="display: inline"]):not([style*="width: auto"]):not([style*="width:fit-content"]):not([style*="width: 2"]):not([style*="width: 3"]):not([style*="width: 4"]):not([style*="border-radius: 50%"]):not([style*="border-radius:50%"]) {
   width: 100%;
   padding: 14px;
