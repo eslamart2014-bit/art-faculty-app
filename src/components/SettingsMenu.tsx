@@ -105,7 +105,7 @@ export default function SettingsMenu({
             onClick={() => { onClose(); if (onOpenIdentityVerification) onOpenIdentityVerification(); else window.open("/coordinator", "_blank"); }}
             style={{ background: "rgba(33, 150, 243, 0.12)", color: "#90CAF9", fontWeight: "bold" }}
           >
-            <span style={{ marginLeft: "10px", fontSize: "18px" }}>🪪</span> اعتماد هوية الطلاب وتفعيل الحسابات
+            <span style={{ marginLeft: "10px", fontSize: "18px" }}>🪪</span> تفعيل حسابات الطلاب
           </div>
         )}
 

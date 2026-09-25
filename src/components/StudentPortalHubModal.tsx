@@ -894,8 +894,10 @@ export default function StudentPortalHubModal({
                             {showInspectedPin ? (inspectedAccount.account?.pin_code || "----") : "••••"}
                           </span>
                           <button
+                            type="button"
+                            className="btn-compact"
                             onClick={() => setShowInspectedPin(!showInspectedPin)}
-                            style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "11px" }}
+                            style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", margin: 0, width: "auto" }}
                             title={showInspectedPin ? "إخفاء" : "إظهار"}
                           >
                             {showInspectedPin ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -952,8 +954,10 @@ export default function StudentPortalHubModal({
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                           <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>صورة بطاقة الهوية:</label>
                           <button
+                            type="button"
+                            className="btn-compact"
                             onClick={() => setZoomedIdCard(inspectedAccount.account.id_card_url)}
-                            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
+                            style={{ background: "none", border: "none", color: "#38bdf8", cursor: "pointer", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "4px", margin: 0, width: "auto", padding: "2px 6px" }}
                           >
                             <Maximize2 size={12} />
                             <span>تكبير</span>
@@ -974,18 +978,22 @@ export default function StudentPortalHubModal({
                       {/* زر تعليق أو فك تعليق الحساب */}
                       {inspectedAccount.account?.status === 'suspended' ? (
                         <button
+                          type="button"
+                          className="btn-compact"
                           onClick={() => handleExecuteAccountAction('toggle_status', { status: 'active' })}
                           disabled={actionLoading}
-                          style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                          style={{ width: "100%", margin: 0, background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                         >
                           <Unlock size={14} />
                           <span>إلغاء تعليق الحساب</span>
                         </button>
                       ) : (
                         <button
+                          type="button"
+                          className="btn-compact"
                           onClick={() => handleExecuteAccountAction('toggle_status', { status: 'suspended' })}
                           disabled={actionLoading}
-                          style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                          style={{ width: "100%", margin: 0, background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                         >
                           <Lock size={14} />
                           <span>تعليق وقفل الحساب</span>
@@ -994,9 +1002,11 @@ export default function StudentPortalHubModal({
 
                       {/* زر إعادة توليد رقم سري جديد */}
                       <button
+                        type="button"
+                        className="btn-compact"
                         onClick={() => handleExecuteAccountAction('reset_pin')}
                         disabled={actionLoading}
-                        style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        style={{ width: "100%", margin: 0, background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
                         <RotateCcw size={14} />
                         <span>إعادة توليد رقم PIN</span>
@@ -1004,13 +1014,15 @@ export default function StudentPortalHubModal({
 
                       {/* زر تصفير أعمال الطالب لإعادة الرفع */}
                       <button
+                        type="button"
+                        className="btn-compact"
                         onClick={() => {
                           if (confirm("هل أنت متأكد من رغبتك في حذف وتصفير جميع أعمال ومشاريع هذا الطالب لإتاحة إعادة التصوير والرفع له؟")) {
                             handleExecuteAccountAction('reset_submissions');
                           }
                         }}
                         disabled={actionLoading}
-                        style={{ background: "#1e293b", border: "1px solid #eab308", color: "#facc15", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        style={{ width: "100%", margin: 0, background: "#1e293b", border: "1px solid #eab308", color: "#facc15", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
                         <RefreshCw size={14} />
                         <span>تصفير الأعمال لإعادة الرفع</span>
@@ -1018,9 +1030,11 @@ export default function StudentPortalHubModal({
 
                       {/* زر حذف الحساب نهائياً */}
                       <button
+                        type="button"
+                        className="btn-compact"
                         onClick={() => handleExecuteAccountAction('delete_account')}
                         disabled={actionLoading}
-                        style={{ background: "rgba(239, 68, 68, 0.2)", border: "1.5px solid #ef4444", color: "#fca5a5", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                        style={{ width: "100%", margin: 0, background: "rgba(239, 68, 68, 0.2)", border: "1.5px solid #ef4444", color: "#fca5a5", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
                         <Trash2 size={15} />
                         <span>حذف الحساب نهائياً 🗑️</span>

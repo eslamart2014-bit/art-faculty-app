@@ -67,7 +67,20 @@ button.btn-compact {
   margin-bottom: 0 !important;
 }
 
-button:not(.btn-compact):not(.icon-btn):not(.modal-close-btn):not(.btn-close):not(.close-btn):not([aria-label="close"]):not([aria-label="Close"]):not([data-compact]):not([style*="display: inline"]):not([style*="width: auto"]):not([style*="width:fit-content"]):not([style*="width: 2"]):not([style*="width: 3"]):not([style*="width: 4"]):not([style*="border-radius: 50%"]):not([style*="border-radius:50%"]) {
+.icon-btn,
+button.icon-btn {
+  width: auto !important;
+  margin: 0 !important;
+}
+
+.glass-card {
+  background: #181d29;
+  border: 1px solid #2a374f;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+button:not(.btn-compact):not(.icon-btn):not(.modal-close-btn):not(.btn-close):not(.close-btn):not([aria-label="close"]):not([aria-label="Close"]):not([data-compact]):not([style*="display: inline"]):not([style*="display: inline-flex"]):not([style*="display:inline-flex"]):not([style*="display: flex"]):not([style*="display:flex"]):not([style*="width:"]):not([style*="padding: 0"]):not([style*="padding:0"]):not([style*="background: none"]):not([style*="background:none"]):not([style*="border-radius: 50%"]):not([style*="border-radius:50%"]) {
   width: 100%;
   padding: 14px;
   margin-top: 5px;
