@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Papa from "papaparse";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
 import { downloadPdf } from "@/lib/downloadPdf";
+import { normalizeAcademicYear } from "@/lib/codeHelper";
 
 interface AdminDashboardProps {
   activeModal: "users" | "roster" | null;
@@ -96,33 +97,69 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
       const { data: activeStudents, error } = await supabase.from("students").select("*").eq("is_active", true);
       if (error) throw error;
 
-      // 2. Build DB Map for matching
-      const dbMap = new Map();
-      (activeStudents || []).forEach(s => dbMap.set(normalizeName(s.full_name), s));
+      // 2. Build DB Maps for matching (by code and by normalized name)
+      const dbCodeMap = new Map<string, any>();
+      const dbNameMap = new Map<string, any>();
 
-      // 3. Diffing logic
-      const updateList: any[] = [];
-      const insertList: any[] = [];
-      const sheetActiveKeys = new Set();
-
-      sheetData.forEach(row => {
-        const rawName = row["اسم الطالب"] || row["Name"] || row["الاسم"];
-        if (!rawName) return; // Skip empty names
-        
-        const normName = normalizeName(rawName);
-        const year = row["الفرقة"] || row["Level"] || row["السنة"] || "الأولى";
-        const section = row["السكشن"] || row["Section"] || row["المجموعة"] || "عام";
-
-        const existing = dbMap.get(normName);
-        if (existing) {
-          updateList.push({ ...existing, academic_year: year, section: section });
-          sheetActiveKeys.add(normName);
-        } else {
-          insertList.push({ full_name: rawName, academic_year: year, section: section, is_active: true });
+      (activeStudents || []).forEach(s => {
+        if (s.student_code) {
+          dbCodeMap.set(String(s.student_code).trim(), s);
+        }
+        const norm = normalizeName(s.full_name);
+        if (norm && !dbNameMap.has(norm)) {
+          dbNameMap.set(norm, s);
         }
       });
 
-      const archiveList = (activeStudents || []).filter(s => !sheetActiveKeys.has(normalizeName(s.full_name)));
+      // 3. Diffing logic using Maps to guarantee uniqueness and prevent duplicate rows
+      const updateListMap = new Map<string, any>(); // key = s.id (guarantees 100% unique IDs)
+      const insertListMap = new Map<string, any>(); // key = normName
+      const sheetActiveIds = new Set<string>();
+
+      sheetData.forEach(row => {
+        const rawName = row["اسم الطالب"] || row["Name"] || row["الاسم"] || row["اسم_الطالب"] || row["اسم الطالب بالكامل"];
+        if (!rawName) return; // Skip empty names
+        
+        const normName = normalizeName(String(rawName));
+        if (!normName) return;
+
+        const rawYear = row["الفرقة"] || row["Level"] || row["السنة"] || row["الفرقة الدراسية"] || "الفرقة الأولى";
+        const year = normalizeAcademicYear(String(rawYear));
+        const section = String(row["السكشن"] || row["Section"] || row["المجموعة"] || "عام").trim();
+
+        // Check if row has student code
+        const rawCode = row["كود الطالب"] || row["الكود"] || row["Code"] || row["student_code"];
+        const cleanCode = rawCode ? String(rawCode).replace(/[="']/g, '').trim() : '';
+
+        // Match by code first, then by normalized name
+        let existing = cleanCode ? dbCodeMap.get(cleanCode) : null;
+        if (!existing) {
+          existing = dbNameMap.get(normName);
+        }
+
+        if (existing) {
+          updateListMap.set(existing.id, {
+            ...existing,
+            academic_year: year,
+            section: section,
+            is_active: true
+          });
+          sheetActiveIds.add(existing.id);
+        } else {
+          if (!insertListMap.has(normName)) {
+            insertListMap.set(normName, {
+              full_name: String(rawName).trim(),
+              academic_year: year,
+              section: section,
+              is_active: true
+            });
+          }
+        }
+      });
+
+      const updateList = Array.from(updateListMap.values());
+      const insertList = Array.from(insertListMap.values());
+      const archiveList = (activeStudents || []).filter(s => !sheetActiveIds.has(s.id));
 
       setPreviewData({ updateList, insertList, archiveList });
       setMsg("");
@@ -138,31 +175,45 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
     setMsg("جاري تنفيذ العمليات، يرجى عدم إغلاق الشاشة...");
 
     try {
-      // 1. Process Archive
+      // 1. Process Archive in chunks of 200
       if (previewData.archiveList.length > 0) {
         const archiveIds = previewData.archiveList.map(s => s.id);
-        const { error: archiveErr } = await supabase.from("students").update({ is_active: false }).in("id", archiveIds);
-        if (archiveErr) throw new Error("خطأ أثناء الأرشفة: " + archiveErr.message);
+        for (let i = 0; i < archiveIds.length; i += 200) {
+          const chunk = archiveIds.slice(i, i + 200);
+          const { error: archiveErr } = await supabase
+            .from("students")
+            .update({ is_active: false })
+            .in("id", chunk);
+          if (archiveErr) throw new Error("خطأ أثناء الأرشفة: " + archiveErr.message);
+        }
       }
 
-      // 2. Process Updates
+      // 2. Process Updates in chunks of 200 (guaranteed 100% unique IDs to avoid PostgreSQL ON CONFLICT error)
       if (previewData.updateList.length > 0) {
-        const { error: updateErr } = await supabase.from("students").upsert(
-          previewData.updateList.map(s => ({
-            id: s.id,
-            student_code: s.student_code,
-            full_name: s.full_name,
-            academic_year: s.academic_year,
-            section: s.section,
-            is_active: s.is_active,
-            created_at: s.created_at
-          })), 
-          { onConflict: "id" }
-        );
-        if (updateErr) throw new Error("خطأ أثناء التحديث: " + updateErr.message);
+        const uniqueUpdatesMap = new Map<string, any>();
+        previewData.updateList.forEach(s => uniqueUpdatesMap.set(s.id, s));
+        const uniqueUpdates = Array.from(uniqueUpdatesMap.values());
+
+        const payload = uniqueUpdates.map(s => ({
+          id: s.id,
+          student_code: s.student_code,
+          full_name: s.full_name,
+          academic_year: s.academic_year,
+          section: s.section,
+          is_active: s.is_active,
+          created_at: s.created_at
+        }));
+
+        for (let i = 0; i < payload.length; i += 200) {
+          const chunk = payload.slice(i, i + 200);
+          const { error: updateErr } = await supabase
+            .from("students")
+            .upsert(chunk, { onConflict: "id" });
+          if (updateErr) throw new Error("خطأ أثناء التحديث: " + updateErr.message);
+        }
       }
 
-      // 3. Process Inserts (Generate Codes)
+      // 3. Process Inserts (Generate Codes) in chunks of 200
       if (previewData.insertList.length > 0) {
         // Fetch all student codes to find max
         const { data: allCodes } = await supabase.from("students").select("student_code");
@@ -176,13 +227,19 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
 
         const finalInsertData = previewData.insertList.map(s => {
           maxCode++;
-          s.student_code = maxCode.toString().padStart(4, "0");
-          return s;
+          return {
+            ...s,
+            student_code: maxCode.toString().padStart(4, "0")
+          };
         });
 
-        // Insert in batches of 1000 if necessary, but assume <1000 inserts per year
-        const { error: insertErr } = await supabase.from("students").insert(finalInsertData);
-        if (insertErr) throw new Error("خطأ أثناء الإضافة: " + insertErr.message);
+        for (let i = 0; i < finalInsertData.length; i += 200) {
+          const chunk = finalInsertData.slice(i, i + 200);
+          const { error: insertErr } = await supabase
+            .from("students")
+            .insert(chunk);
+          if (insertErr) throw new Error("خطأ أثناء الإضافة: " + insertErr.message);
+        }
       }
 
       setMsg(`تمت المزامنة بنجاح! تم إضافة ${previewData.insertList.length} وتحديث ${previewData.updateList.length} وأرشفة ${previewData.archiveList.length} طالب.`);
