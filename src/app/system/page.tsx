@@ -721,7 +721,8 @@ export default function SystemPage() {
       setLookupMessage(null);
 
       try {
-        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(queryCode)}`);
+        const devInfo = getOrCreateDeviceInfo();
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(queryCode)}&deviceId=${encodeURIComponent(devInfo.deviceId)}`);
         const data = await res.json();
 
         if (res.ok && data.student) {

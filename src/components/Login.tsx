@@ -338,7 +338,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
     setFirstTimeLookupLoading(true);
     setFirstTimeLookupError("");
     try {
-      const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(clean)}`);
+      const dev = getOrCreateDeviceInfo();
+      const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(clean)}&deviceId=${encodeURIComponent(dev.deviceId)}`);
       const data = await res.json();
       if (data.student) {
         setLookedUpStudent(data.student);

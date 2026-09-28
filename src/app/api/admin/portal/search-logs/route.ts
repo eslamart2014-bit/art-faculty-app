@@ -46,9 +46,17 @@ export async function GET(request: Request) {
     let totalQrDownloads = 0;
 
     logs.forEach(log => {
-      const devId = log.device_id && log.device_id !== 'unknown_device' && log.device_id !== 'server' 
-        ? log.device_id 
-        : (log.user_agent ? `ua_${log.user_agent.slice(0, 30)}` : 'unknown');
+      // التحقق الصارم من أن معرّف الجهاز حقيقي ومميز (مثل dev_XXXXX)
+      // نمنع تماماً التجميع بالـ User-Agent العام لتفادي دمج هواتف الطلاب المختلفة التي تشترك بنفس النظام
+      const rawDevId = log.device_id;
+      const isValidDevId = rawDevId && 
+        rawDevId !== 'unknown_device' && 
+        rawDevId !== 'server' && 
+        rawDevId !== 'unknown' &&
+        !rawDevId.startsWith('ua_') &&
+        rawDevId.length >= 8;
+
+      const devId = isValidDevId ? rawDevId : null;
 
       const sCode = log.student_code && !log.student_code.startsWith('query:') ? log.student_code : null;
       const sName = log.details?.student_name || null;
@@ -60,7 +68,7 @@ export async function GET(request: Request) {
         if (sCode) qrDownloadedStudentCodes.add(sCode);
       }
 
-      if (devId !== 'unknown' && sCode) {
+      if (devId && sCode) {
         if (!deviceStudentsMap.has(devId)) {
           deviceStudentsMap.set(devId, {
             codes: new Set<string>(),
@@ -95,11 +103,16 @@ export async function GET(request: Request) {
 
     // 4. إثراء كل سجل في القائمة بمعلومات التحذير إذا كان الجهاز مشبوهاً
     const formattedLogs = logs.map(log => {
-      const devId = log.device_id && log.device_id !== 'unknown_device' && log.device_id !== 'server' 
-        ? log.device_id 
-        : (log.user_agent ? `ua_${log.user_agent.slice(0, 30)}` : 'unknown');
+      const rawDevId = log.device_id;
+      const isValidDevId = rawDevId && 
+        rawDevId !== 'unknown_device' && 
+        rawDevId !== 'server' && 
+        rawDevId !== 'unknown' &&
+        !rawDevId.startsWith('ua_') &&
+        rawDevId.length >= 8;
 
-      const deviceData = deviceStudentsMap.get(devId);
+      const devId = isValidDevId ? rawDevId : null;
+      const deviceData = devId ? deviceStudentsMap.get(devId) : null;
       const isSuspicious = deviceData ? deviceData.codes.size > 1 : false;
       const otherStudents = deviceData && isSuspicious
         ? Array.from(deviceData.names).filter(n => n !== log.details?.student_name)
