@@ -22,6 +22,8 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   useEffect(() => {
     if (isOpen && user) {
       if (activeTab === "general") fetchArchives();
@@ -42,13 +44,21 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
 
   const fetchGraduates = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("students")
-      .select("*")
-      .eq("is_active", false)
-      .order("updated_at", { ascending: false });
-    
-    setGraduates(data || []);
+    let all: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("is_active", false)
+        .order("student_code", { ascending: true })
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      all = all.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    setGraduates(all);
     setLoading(false);
   };
 
@@ -194,7 +204,7 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
             onClick={() => setActiveTab("graduates")}
             style={{ flex: 1, padding: "12px", background: activeTab === "graduates" ? "#222" : "transparent", color: activeTab === "graduates" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "graduates" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
           >
-            أرشيف الخريجين 🎓
+            أرشيف الخريجين 🎓 {graduates.length > 0 && `(${graduates.length})`}
           </button>
         </div>
 
@@ -246,17 +256,36 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
 
           {activeTab === "graduates" && (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <p style={{ color: "#aaa", fontSize: "14px", margin: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "15px" }}>
+                <p style={{ color: "#aaa", fontSize: "13px", margin: 0 }}>
                   الطلاب الذين اختفوا من شيت المزامنة وتم تحويلهم لخريجين/منقولين للحفاظ على أكوادهم القديمة وبياناتهم.
                 </p>
                 <button 
                   onClick={handleExportGraduatesCSV}
                   disabled={graduates.length === 0}
-                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px 15px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
+                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
                 >
-                  📥 تحميل أرشيف الخريجين
+                  📥 تحميل أرشيف الخريجين CSV
                 </button>
+              </div>
+
+              {/* Search input for graduates */}
+              <div style={{ marginBottom: "15px" }}>
+                <input
+                  type="text"
+                  placeholder="🔍 بحث في الخريجين بالاسم أو الكود..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    background: "#111827",
+                    border: "1px solid #374151",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "13px"
+                  }}
+                />
               </div>
 
               {loading ? (
@@ -267,23 +296,45 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
                   لا يوجد خريجين في الأرشيف
                 </div>
               ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "15px" }}>
-                  {graduates.map(g => (
-                    <div key={g.id} style={{ background: "#222", border: "1px solid #444", borderRadius: "10px", padding: "15px" }}>
-                      <h4 style={{ margin: "0 0 10px 0", color: "#fff", fontSize: "15px" }}>{g.full_name}</h4>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#aaa", marginBottom: "15px" }}>
-                        <span>الكود: <strong style={{ color: "#2196F3" }}>{g.student_code}</strong></span>
-                        <span>الفرقة: {g.academic_year}</span>
+                (() => {
+                  const filtered = graduates.filter(g => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.trim().toLowerCase();
+                    return (
+                      (g.full_name && g.full_name.toLowerCase().includes(q)) ||
+                      (g.student_code && String(g.student_code).includes(q)) ||
+                      (g.academic_year && g.academic_year.includes(q))
+                    );
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div style={{ textAlign: "center", color: "#888", marginTop: "30px", fontSize: "14px" }}>
+                        لم يتم العثور على نتائج مطابقة للبحث &quot;{searchQuery}&quot;
                       </div>
-                      <button 
-                        onClick={() => handleRestoreGraduate(g.id)}
-                        style={{ width: "100%", background: "transparent", color: "#4CAF50", border: "1px solid #4CAF50", padding: "8px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
-                      >
-                        🔄 تنشيط وإعادة للنظام
-                      </button>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+                      {filtered.map(g => (
+                        <div key={g.id} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: "8px", padding: "14px" }}>
+                          <h4 style={{ margin: "0 0 8px 0", color: "#fff", fontSize: "14px", lineHeight: "1.4" }}>{g.full_name}</h4>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#9ca3af", marginBottom: "12px" }}>
+                            <span>الكود: <strong style={{ color: "#38bdf8", letterSpacing: "1px" }}>{g.student_code}</strong></span>
+                            <span>الفرقة: {g.academic_year}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleRestoreGraduate(g.id)}
+                            style={{ width: "100%", background: "transparent", color: "#4ade80", border: "1px solid #4ade80", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}
+                          >
+                            🔄 تنشيط وإعادة للنظام
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
               )}
             </>
           )}

@@ -60,13 +60,21 @@ export function generatePinCode(): string {
   return pin.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-// توحيد مسمى الفرقة الدراسية
+// توحيد مسمى الفرقة الدراسية ليتطابق مع قاعدة البيانات والمقررات (الاولي، الثانية، الثالثة، الرابعة)
 export function normalizeAcademicYear(year: string): string {
   if (!year) return "";
-  const y = year.trim();
-  if (y.includes('أول') || y.includes('اول')) return 'الفرقة الأولى';
-  if (y.includes('ثاني') || y.includes('تاني')) return 'الفرقة الثانية';
-  if (y.includes('ثالث') || y.includes('تالت')) return 'الفرقة الثالثة';
-  if (y.includes('رابع')) return 'الفرقة الرابعة';
+  const y = year.replace(/[\uFFFD\u0000-\u001F]/g, "").trim().replace(/^الفرقة\s+/, "");
+  if (y.includes('أول') || y.includes('اول') || y === '1') return 'الاولي';
+  if (y.includes('ثان') || y.includes('تان') || y === '2') return 'الثانية';
+  if (y.includes('ثالث') || y.includes('تالت') || y === '3') return 'الثالثة';
+  if (y.includes('رابع') || y === '4') return 'الرابعة';
   return y;
+}
+
+// عرض اسم الفرقة بالبادئة (الفرقة الرابعة، الفرقة الثالثة ...)
+export function displayAcademicYear(year: string): string {
+  if (!year) return "";
+  const y = year.trim();
+  if (y.startsWith("الفرقة")) return y;
+  return `الفرقة ${y}`;
 }
