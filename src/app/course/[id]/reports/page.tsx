@@ -61,7 +61,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
   const [weeks, setWeeks] = useState<{ key: string; name: string; subtitle: string; start: Date; end: Date }[]>([]);
   const [instructorName, setInstructorName] = useState<string>("........................");
-  const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>("all");
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
 
   // Tab 2 State
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -103,6 +103,19 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       });
     
     setStudents(allStudents);
+
+    // Initialize selected sections with all available sections by default
+    const uniqueSecs = Array.from(
+      new Set(allStudents.map((s: any) => s.section ? String(s.section).trim() : 'تخلفات'))
+    ).sort((a: any, b: any) => {
+      const numA = parseInt(a, 10);
+      const numB = parseInt(b, 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      if (!isNaN(numA)) return -1;
+      if (!isNaN(numB)) return 1;
+      return a.localeCompare(b, 'ar');
+    }) as string[];
+    setSelectedSections(uniqueSecs);
 
     // Fetch Instructor Name from profiles table
     const { data: userData } = await supabase.auth.getUser();
@@ -256,13 +269,19 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   const printDetailedAttendance = async () => {
     const termInfo = await getTermAndWeekInfo();
 
-    // 1. Filter students by selected section (or all)
-    const targetStudents = selectedSectionFilter === "all"
-      ? students
-      : students.filter(s => (s.section ? String(s.section).trim() : "تخلفات") === selectedSectionFilter);
+    if (selectedSections.length === 0) {
+      alert("يرجى تحديد سكشن واحد على الأقل لطباعة الكشف.");
+      return;
+    }
+
+    // 1. Filter students by selected sections
+    const targetStudents = students.filter(s => {
+      const secKey = s.section ? String(s.section).trim() : "تخلفات";
+      return selectedSections.includes(secKey);
+    });
 
     if (!targetStudents || targetStudents.length === 0) {
-      alert("لا يوجد طلاب مسجلين في هذا السكشن للطباعة.");
+      alert("لا يوجد طلاب مسجلين في السكاشن المحددة للطباعة.");
       return;
     }
 
@@ -484,9 +503,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       `;
     });
 
-    const filename = selectedSectionFilter === 'all'
-      ? `${course?.name || 'course'}_attendance_detailed_all_sections.pdf`
-      : `${course?.name || 'course'}_attendance_section_${selectedSectionFilter}.pdf`;
+    const filename = selectedSections.length === availableSections.length
+      ? `${course?.name || 'course'}_attendance_all_sections.pdf`
+      : selectedSections.length === 1
+        ? `${course?.name || 'course'}_attendance_section_${selectedSections[0]}.pdf`
+        : `${course?.name || 'course'}_attendance_sections_${selectedSections.join('_')}.pdf`;
 
     await downloadPdf(
       filename,
@@ -726,6 +747,12 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     return a.localeCompare(b, 'ar');
   });
 
+  useEffect(() => {
+    if (availableSections.length > 0 && selectedSections.length === 0) {
+      setSelectedSections(availableSections);
+    }
+  }, [availableSections.length]);
+
   // UI Tabs Definition
   const tabs = [
     { id: "attendance", label: "الحضور التفصيلي", icon: "📅" },
@@ -793,62 +820,110 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               يُنشئ هذا الكشف جدولاً أفقياً بالعرض (Landscape)، ويقسم كل سكشن تلقائياً في ورقة أو ورقتين مع كتابة اسم ورقم السكشن والترويسة الرسمية في أعلى كل ورقة. يتم تظليل خانات الحضور بالكامل باللون الأخضر مع التاريخ الفعلي للتسجيل، بينما تُظلل خانات الأعذار باللون الأحمر مع كتابة سبب العذر.
             </p>
 
-            {/* Section Selection */}
-            <div style={{ background: "#1e1e1e", padding: "16px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "10px", color: "#e2e8f0", fontSize: "14px", fontWeight: "bold" }}>
-                🗂️ نطاق تصدير السكاشن:
-              </label>
-              <select 
-                value={selectedSectionFilter}
-                onChange={(e) => setSelectedSectionFilter(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: "#2a2a2a",
-                  border: "1px solid #555",
-                  borderRadius: "10px",
-                  color: "#fff",
-                  fontSize: "15px",
-                  outline: "none",
-                  fontWeight: "bold",
-                  cursor: "pointer"
-                }}
-              >
-                <option value="all">📁 جميع السكاشن (مقسمة تلقائياً: كل سكشن في ورقة/صفحات مستقلة)</option>
-                {availableSections.map(sec => (
-                  <option key={sec} value={sec}>
-                    {sec === "تخلفات" ? "طلاب الباقين للإعادة / التخلفات" : `سكشن (${sec}) فقط`}
-                  </option>
-                ))}
-              </select>
+            {/* Multi-Section Selection Box */}
+            <div style={{ background: "#1e1e1e", padding: "18px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", color: "#e2e8f0", fontSize: "14px", fontWeight: "bold" }}>
+                    🗂️ تحديد السكاشن للطباعة (تحديد متعدد):
+                  </label>
+                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                    انقر على أي سكشن لاختياره أو استبعاده من التقرير (يمكنك تحديد سكشنين أو أكثر)
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSections([...availableSections])}
+                    style={{
+                      background: "#334155",
+                      color: "#38bdf8",
+                      border: "1px solid #475569",
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    ✓ تحديد الكل ({availableSections.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSections([])}
+                    style={{
+                      background: "#334155",
+                      color: "#f87171",
+                      border: "1px solid #475569",
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    ✕ إلغاء التحديد
+                  </button>
+                </div>
+              </div>
 
-              {/* Sections Badges List */}
-              <div style={{ marginTop: "15px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {/* Sections Grid Selection */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "10px", marginTop: "14px" }}>
                 {availableSections.map(sec => {
                   const secCount = students.filter(s => (s.section ? String(s.section).trim() : 'تخلفات') === sec).length;
-                  const isSelected = selectedSectionFilter === 'all' || selectedSectionFilter === sec;
+                  const isChecked = selectedSections.includes(sec);
                   return (
-                    <span 
+                    <div
                       key={sec}
-                      onClick={() => setSelectedSectionFilter(sec)}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedSections(selectedSections.filter(x => x !== sec));
+                        } else {
+                          setSelectedSections([...selectedSections, sec]);
+                        }
+                      }}
                       style={{
-                        fontSize: "12px",
-                        padding: "5px 12px",
-                        borderRadius: "8px",
-                        background: selectedSectionFilter === sec ? "#4CAF50" : (isSelected ? "#333" : "#222"),
-                        color: selectedSectionFilter === sec ? "#fff" : "#ccc",
-                        border: selectedSectionFilter === sec ? "1px solid #4CAF50" : "1px solid #444",
-                        cursor: "pointer",
-                        display: "inline-flex",
+                        display: "flex",
                         alignItems: "center",
-                        gap: "6px"
+                        gap: "10px",
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        background: isChecked ? "rgba(76, 175, 80, 0.16)" : "#262626",
+                        border: isChecked ? "2px solid #4CAF50" : "1px solid #444",
+                        cursor: "pointer",
+                        userSelect: "none",
+                        transition: "all 0.15s ease"
                       }}
                     >
-                      <b>{sec === 'تخلفات' ? 'تخلفات' : `س${sec}`}</b>
-                      <span style={{ opacity: 0.8, fontSize: "11px" }}>({secCount} طالب)</span>
-                    </span>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {}} // handled by parent onClick
+                        style={{ width: "17px", height: "17px", accentColor: "#4CAF50", cursor: "pointer" }}
+                      />
+                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ fontSize: "13px", fontWeight: "bold", color: isChecked ? "#4CAF50" : "#eee", whiteSpace: "nowrap" }}>
+                          {sec === 'تخلفات' ? 'تخلفات' : `سكشن ${sec}`}
+                        </span>
+                        <span style={{ fontSize: "11px", color: isChecked ? "#a5d6a7" : "#888" }}>
+                          {secCount} طالب
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
+              </div>
+
+              {/* Status Message */}
+              <div style={{ marginTop: "14px", padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", flexWrap: "wrap", gap: "6px" }}>
+                <span style={{ color: "#aaa" }}>
+                  السكاشن المحددة: <b style={{ color: selectedSections.length > 0 ? "#4CAF50" : "#f87171" }}>{selectedSections.length} من أصل {availableSections.length}</b>
+                </span>
+                <span style={{ color: "#aaa" }}>
+                  إجمالي طلاب السكاشن المحددة: <b style={{ color: "#38bdf8" }}>{students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب</b>
+                </span>
               </div>
             </div>
 
@@ -860,8 +935,8 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
                 <span style={{ color: "#aaa" }}>إجمالي طلاب الكشف الحالي:</span>
-                <span style={{ color: "#4CAF50", fontWeight: "bold" }}>
-                  {selectedSectionFilter === 'all' ? students.length : students.filter(s => (s.section ? String(s.section).trim() : 'تخلفات') === selectedSectionFilter).length} طالب
+                <span style={{ color: selectedSections.length > 0 ? "#4CAF50" : "#f87171", fontWeight: "bold" }}>
+                  {students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -870,11 +945,18 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
+            {selectedSections.length === 0 && (
+              <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "10px", padding: "12px", color: "#fca5a5", fontSize: "14px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>
+                ⚠️ يرجى تحديد سكشن واحد على الأقل من القائمة أعلاه لتتمكن من إنشاء التقرير.
+              </div>
+            )}
+
             <button 
               onClick={printDetailedAttendance} 
+              disabled={selectedSections.length === 0}
               style={{ 
                 width: "100%", 
-                background: "#4CAF50", 
+                background: selectedSections.length > 0 ? "#4CAF50" : "#555", 
                 color: "#fff", 
                 border: "none", 
                 padding: "16px", 
@@ -885,8 +967,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
                 justifyContent: "center", 
                 alignItems: "center", 
                 gap: "10px",
-                cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(76, 175, 80, 0.3)"
+                cursor: selectedSections.length > 0 ? "pointer" : "not-allowed",
+                boxShadow: selectedSections.length > 0 ? "0 4px 15px rgba(76, 175, 80, 0.3)" : "none",
+                opacity: selectedSections.length > 0 ? 1 : 0.6
               }}
             >
               <span style={{ fontSize: "20px" }}>🖨️</span> طباعة وتحميل كشف الحضور التفصيلي (بالعرض)
