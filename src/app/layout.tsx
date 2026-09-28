@@ -7,6 +7,7 @@ import OfflineSyncManager from "@/components/OfflineSyncManager";
 import SWRProvider from "@/components/SWRProvider";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import GlobalHaptics from "@/components/GlobalHaptics";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"] });
 
@@ -51,6 +52,7 @@ export default function RootLayout({
               <ServiceWorkerRegister />
               <OfflineSyncManager />
               {children}
+              <PwaInstallPrompt />
             </SWRProvider>
           </MaintenanceGuard>
         </div>

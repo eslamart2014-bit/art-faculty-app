@@ -508,13 +508,19 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const { data: globalStudent } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
     
     if (!globalStudent) {
-      vibrateError();
-      alert("لم يتم العثور على طالب بهذا الكود في أي فرقة!");
+      vibrateHeavyError();
+      setScannerStatus('error');
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
 
-    vibrateError(); // Small alert pattern
-    const confirmAdd = window.confirm(`الطالب (${globalStudent.full_name}) مقيد بفرقة ${globalStudent.academic_year} - سكشن ${globalStudent.section} وهو غير مدرج في قوائم هذا المقرر.\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
+    // Heavy rough vibration for student from another cohort + display full details
+    vibrateHeavyError();
+    setScannerStatus('error');
+    setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section}) ❌`);
+    
+    const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
       const updatedMakeup = [...(course.makeup_students || []), globalStudent.id];
@@ -537,8 +543,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const { data: student } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
     
     if (!student) {
-      vibrateError();
-      alert("لم يتم العثور على طالب بهذا الكود في أي فرقة!");
+      vibrateHeavyError();
+      setScannerStatus('error');
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
 
@@ -549,14 +557,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       return student;
     }
 
-    // If not in the course naturally or via makeup, trigger makeup prompt
+    // If not in the course naturally or via makeup, trigger makeup prompt with full details
     return await handleCrossCourseMakeup(code);
   };
 
 
-  // --- CAMERA LOGIC ---
-  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([60, 40, 60]); };
-  const vibrateError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([80, 50, 80, 50, 80]); };
+  // --- CAMERA LOGIC: Exact requested haptic patterns ---
+  // 1. First-time valid scan: single vibration (100ms)
+  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); };
+  // 2. Duplicate scan: two rapid vibrations
+  const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
+  // 3. Heavy error vibration (wrong code / different cohort / invalid)
+  const vibrateHeavyError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); };
 
   const handleCameraScan = async (decodedText: string) => {
     if (!decodedText || !showCameraScanner || isProcessingScanRef.current || scannerStatus !== 'idle') return;
@@ -567,7 +579,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (!cleanCode) {
       setScannerStatus('error');
       setScannerStatusText("كود غير صالح ❌");
-      vibrateError();
+      vibrateHeavyError();
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
@@ -576,11 +588,11 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    // Immediate check if student code is already in scannedStudents
+    // Immediate check if student code is already in scannedStudents (Duplicate: 2 rapid vibrations)
     if (scannedStudents.some(s => s.student_code === cleanCode || s.id === cleanCode)) {
       setScannerStatus('error');
-      setScannerStatusText("طالب مسجل بالفعل في هذه الجلسة ⚠️");
-      vibrateError();
+      setScannerStatusText("طالب مكرر مسجل بالفعل في هذه الجلسة ⚠️");
+      vibrateDuplicate();
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
@@ -603,8 +615,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         if (alreadyAdded) {
           setScannerStatus('error');
-          setScannerStatusText(`طالب مسجل بالفعل: ${student.full_name} ⚠️`);
-          vibrateError();
+          setScannerStatusText(`طالب مكرر مسجل بالفعل: ${student.full_name} ⚠️`);
+          vibrateDuplicate();
         } else {
           setScannerStatus('success');
           setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
@@ -613,12 +625,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       } else {
         setScannerStatus('error');
         setScannerStatusText("طالب غير مسجل في المقرر ❌");
-        vibrateError();
+        vibrateHeavyError();
       }
     } catch (err) {
       setScannerStatus('error');
       setScannerStatusText("خطأ في قراءة بيانات الطالب ❌");
-      vibrateError();
+      vibrateHeavyError();
     } finally {
       setTimeout(() => {
         setScannerStatus('idle');

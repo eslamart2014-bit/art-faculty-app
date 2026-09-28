@@ -8,7 +8,6 @@ import Login from "@/components/Login";
 
 import AppBar from "@/components/AppBar";
 import SettingsMenu from "@/components/SettingsMenu";
-import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AddCourseModal from "@/components/courses/AddCourseModal";
 import CoursesList from "@/components/courses/CoursesList";
@@ -238,17 +237,11 @@ export default function Home() {
   }
 
   if (!user) {
-    return (
-      <>
-        <PwaInstallPrompt />
-        <Login onLogin={setUser} />
-      </>
-    );
+    return <Login onLogin={setUser} />;
   }
 
   return (
     <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column" }}>
-      <PwaInstallPrompt />
       <AppBar
         user={user}
         onOpenSettings={() => setIsSettingsOpen(true)}

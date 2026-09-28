@@ -10,7 +10,7 @@ export async function GET() {
     const [{ data: dbAccounts }, { data: studentsList }] = await Promise.all([
       supabaseAdmin
         .from('student_accounts')
-        .select('student_code, full_name, created_at, last_login_at, status')
+        .select('student_code, full_name, created_at, last_login_at, status, activated_by, pin_issued_by, activated_at')
         .order('created_at', { ascending: false }),
       supabaseAdmin
         .from('students')
@@ -35,7 +35,9 @@ export async function GET() {
           full_name: acc.full_name || student?.full_name || 'طالب مسجل',
           created_at: acc.created_at || null,
           last_login_at: acc.last_login_at || null,
-          status: acc.status || 'active'
+          status: acc.status || 'active',
+          activated_by: acc.activated_by || acc.pin_issued_by || null,
+          activated_at: acc.activated_at || null
         });
       }
     });
@@ -51,7 +53,9 @@ export async function GET() {
               full_name: st.full_name,
               created_at: parsed.activated_at || parsed.created_at || null,
               last_login_at: parsed.last_login_at || null,
-              status: parsed.status || 'active'
+              status: parsed.status || 'active',
+              activated_by: parsed.activated_by || parsed.pin_issued_by || null,
+              activated_at: parsed.activated_at || null
             });
           }
         } catch (e) {}
@@ -68,7 +72,9 @@ export async function GET() {
           full_name: la.full_name || student?.full_name || 'طالب مسجل',
           created_at: la.created_at || la.activated_at || null,
           last_login_at: la.last_login_at || null,
-          status: la.status || 'active'
+          status: la.status || 'active',
+          activated_by: la.activated_by || la.pin_issued_by || null,
+          activated_at: la.activated_at || null
         });
       }
     });

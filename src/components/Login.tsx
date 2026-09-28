@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
   const [appVersion, setAppVersion] = useState("");
@@ -13,6 +14,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -235,13 +238,39 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             />
-            <input
-              type="password"
-              placeholder="كلمة المرور"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
+            <div style={{ position: "relative", width: "100%", marginBottom: "15px" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="كلمة المرور"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                style={{ width: "100%", paddingLeft: "42px", boxSizing: "border-box", margin: 0 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  left: "10px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "auto",
+                  margin: 0
+                }}
+                title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <div style={{ textAlign: "right", marginBottom: "15px", display: "flex", justifyContent: "space-between" }}>
               <span onClick={async () => {
                 if (!email) { alert("أدخل بريدك الإلكتروني أولاً"); return; }
@@ -270,18 +299,71 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                <input
-                  type="password"
-                  placeholder="أنشئ كلمة مرور جديدة"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <input
-                  type="password"
-                  placeholder="تأكيد كلمة المرور"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                />
+                <div style={{ position: "relative", width: "100%", marginBottom: "15px" }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="أنشئ كلمة مرور جديدة"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ width: "100%", paddingLeft: "42px", boxSizing: "border-box", margin: 0 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: "absolute",
+                      left: "10px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "transparent",
+                      border: "none",
+                      color: "#94a3b8",
+                      cursor: "pointer",
+                      padding: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "auto",
+                      margin: 0
+                    }}
+                    title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <div style={{ position: "relative", width: "100%", marginBottom: "15px" }}>
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="تأكيد كلمة المرور"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    style={{ width: "100%", paddingLeft: "42px", boxSizing: "border-box", margin: 0 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: "absolute",
+                      left: "10px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "transparent",
+                      border: "none",
+                      color: "#94a3b8",
+                      cursor: "pointer",
+                      padding: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "auto",
+                      margin: 0
+                    }}
+                    title={showConfirmPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 <button onClick={handleFirstTimeStep1} disabled={loading} style={{ background: "var(--success)" }}>
                   {loading ? "جاري التحقق..." : "التالي: استكمال البيانات"}
                 </button>

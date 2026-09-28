@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
+import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
 
 const LEVELS = [
   "الكل",
@@ -62,6 +63,28 @@ export default function HomePage() {
     }
   };
 
+  // اختيار الطالب وتسجيل عملية البحث والاستعلام أمنياً
+  const handleSelectStudent = (st: any) => {
+    setSelectedStudent(st);
+    try {
+      const dev = getOrCreateDeviceInfo();
+      fetch('/api/students/search-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'student_search',
+          student_code: st.student_code,
+          student_name: st.full_name,
+          academic_year: st.academic_year,
+          section: st.section,
+          query: query,
+          device_id: dev.deviceId,
+          device_info: dev
+        })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
   // توليد نص الـ QR (يحمل الكود والاسم فقط لكي يترجم النظام الفرقة والسكشن تلقائياً)
   const getQRValue = (st: any) => {
     return `كود الطالب: ${formatStudentCode(st.student_code)}\nاسم الطالب: ${st.full_name}`;
@@ -71,6 +94,24 @@ export default function HomePage() {
   const downloadCardAsImage = async () => {
     if (!selectedStudent) return;
     setDownloading(true);
+
+    // تسجيل عملية سحب وتحميل الكيو ار كود في سجلات البوابة
+    try {
+      const dev = getOrCreateDeviceInfo();
+      fetch('/api/students/search-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'download_card',
+          student_code: selectedStudent.student_code,
+          student_name: selectedStudent.full_name,
+          academic_year: selectedStudent.academic_year,
+          section: selectedStudent.section,
+          device_id: dev.deviceId,
+          device_info: dev
+        })
+      }).catch(() => {});
+    } catch (e) {}
 
     try {
       const canvas = document.createElement("canvas");
@@ -350,7 +391,7 @@ export default function HomePage() {
                 {students.map((st) => (
                   <div 
                     key={st.id}
-                    onClick={() => setSelectedStudent(st)}
+                    onClick={() => handleSelectStudent(st)}
                     style={{ padding: "14px", borderBottom: "1px solid #1a2336", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "background 0.15s" }}
                     onMouseEnter={(e) => e.currentTarget.style.background = "#18243b"}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}

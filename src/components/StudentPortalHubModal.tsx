@@ -80,8 +80,8 @@ export default function StudentPortalHubModal({
   user,
   onOpenIdentityModal
 }: StudentPortalHubModalProps) {
-  // Tabs: overview, accounts, fraud, plagiarism
-  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "fraud" | "plagiarism">("overview");
+  // Tabs: overview, accounts, search_logs, fraud, plagiarism
+  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "search_logs" | "fraud" | "plagiarism">("overview");
 
   // General Portal Stats
   const [copiedLink, setCopiedLink] = useState(false);
@@ -96,6 +96,12 @@ export default function StudentPortalHubModal({
   // Coordinator Stats
   const [coordStats, setCoordStats] = useState<{ totalActivated: number; coordinators: any[] }>({ totalActivated: 0, coordinators: [] });
   const [loadingCoordStats, setLoadingCoordStats] = useState(false);
+
+  // Search Logs State (سجلات البحث والاستعلام الأمني)
+  const [searchLogsData, setSearchLogsData] = useState<any>(null);
+  const [loadingSearchLogs, setLoadingSearchLogs] = useState(false);
+  const [searchLogsFilter, setSearchLogsFilter] = useState<"all" | "qr_only" | "suspicious_only">("all");
+  const [searchLogsTextFilter, setSearchLogsTextFilter] = useState("");
 
   // Modal: Registered Accounts List (عند النقر على مربع الإحصائيات)
   const [isAccountsModalOpen, setIsAccountsModalOpen] = useState(false);
@@ -128,10 +134,14 @@ export default function StudentPortalHubModal({
       window.history.pushState({ modal: true }, "");
       fetchPortalStats();
       fetchCoordinatorStats();
+      fetchSearchLogs();
     }
   }, [isOpen]);
 
   useEffect(() => {
+    if (isOpen && activeTab === "search_logs" && !searchLogsData && !loadingSearchLogs) {
+      fetchSearchLogs();
+    }
     if (isOpen && activeTab === "fraud" && !fraudData && !loadingFraud) {
       fetchFraudData();
     }
@@ -139,6 +149,21 @@ export default function StudentPortalHubModal({
       fetchPlagiarismData();
     }
   }, [isOpen, activeTab]);
+
+  const fetchSearchLogs = async () => {
+    setLoadingSearchLogs(true);
+    try {
+      const res = await fetch("/api/admin/portal/search-logs");
+      const data = await res.json();
+      if (data && data.success) {
+        setSearchLogsData(data);
+      }
+    } catch (e) {
+      console.error("Error fetching search logs:", e);
+    } finally {
+      setLoadingSearchLogs(false);
+    }
+  };
 
   const fetchPortalStats = async () => {
     setLoadingStats(true);
@@ -403,6 +428,20 @@ export default function StudentPortalHubModal({
     );
   });
 
+  const filteredSearchLogs = (searchLogsData?.logs || []).filter((log: any) => {
+    if (searchLogsFilter === "qr_only" && log.action !== "download_card") return false;
+    if (searchLogsFilter === "suspicious_only" && !log.is_suspicious_device) return false;
+
+    if (searchLogsTextFilter.trim()) {
+      const q = searchLogsTextFilter.trim().toLowerCase();
+      const nameMatch = log.student_name && log.student_name.toLowerCase().includes(q);
+      const codeMatch = log.student_code && String(log.student_code).includes(q);
+      const otherMatch = log.other_students && log.other_students.some((s: string) => s.toLowerCase().includes(q));
+      if (!nameMatch && !codeMatch && !otherMatch) return false;
+    }
+    return true;
+  });
+
   return (
     <div
       style={{
@@ -459,6 +498,7 @@ export default function StudentPortalHubModal({
         {[
           { id: "overview", label: "نظرة عامة وإحصائيات 🌐", color: "#38bdf8" },
           { id: "accounts", label: "إدارة وبحث الحسابات 👤", color: "#10b981" },
+          { id: "search_logs", label: "سجلات البحث 🔍", color: "#8b5cf6" },
           { id: "fraud", label: "رادار الأجهزة المشتركة 🚨", color: "#ef4444" },
           { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" }
         ].map(tab => {
@@ -546,12 +586,37 @@ export default function StudentPortalHubModal({
                   {stats.submissionsCount || "0"}
                 </div>
               </div>
+
+              {/* سجلات البحث وسحب الكارت */}
+              <div 
+                onClick={() => { setActiveTab("search_logs"); fetchSearchLogs(); }}
+                style={{ 
+                  background: "linear-gradient(135deg, #1b1330, #271a47)", 
+                  border: "1.5px solid #8b5cf6", 
+                  padding: "14px", 
+                  borderRadius: "12px", 
+                  textAlign: "center",
+                  cursor: "pointer",
+                  position: "relative",
+                  boxShadow: "0 4px 15px rgba(139, 92, 246, 0.15)",
+                  transition: "all 0.2s"
+                }}
+                title="انقر لعرض سجلات بحث الطلاب وسحب الكيو ار كود"
+              >
+                <div style={{ fontSize: "11px", color: "#c4b5fd", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                  <span>سجلات البحث وسحب الـ QR</span>
+                  <span style={{ fontSize: "10px", background: "#6d28d9", color: "#fff", padding: "1px 5px", borderRadius: "6px" }}>↗ انقر للعرض</span>
+                </div>
+                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                  {searchLogsData?.stats?.uniqueQrStudentsCount !== undefined ? `${searchLogsData.stats.uniqueQrStudentsCount} سحبوا` : (searchLogsData?.stats?.totalSearches || "0")}
+                </div>
+              </div>
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", marginBottom: "20px" }}>
               <button
-                onClick={() => { fetchPortalStats(); fetchCoordinatorStats(); }}
-                disabled={loadingStats || loadingCoordStats}
+                onClick={() => { fetchPortalStats(); fetchCoordinatorStats(); fetchSearchLogs(); }}
+                disabled={loadingStats || loadingCoordStats || loadingSearchLogs}
                 style={{
                   background: "#1e293b",
                   border: "1px solid #334155",
@@ -1263,6 +1328,268 @@ export default function StudentPortalHubModal({
           </div>
         )}
 
+        {/* ========================================================= */}
+        {/* التبويب: سجلات البحث وسحب الكيو ار كود (الميزة الجديدة) */}
+        {/* ========================================================= */}
+        {activeTab === "search_logs" && (
+          <div className="animate-fade-in">
+            {/* Header & Refresh */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <h3 style={{ margin: 0, color: "#a78bfa", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>🔍</span> سجلات بحث الطلاب وسحب بطاقات الـ QR
+                </h3>
+                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                  سجل حي ومباشر يوضح كل طالب بحث عن نفسه أو استخرج بطاقته الذكية، مع رصد أمني لأي هواتف مشتركة.
+                </div>
+              </div>
+              <button
+                onClick={fetchSearchLogs}
+                disabled={loadingSearchLogs}
+                style={{
+                  background: "#1e293b",
+                  border: "1px solid #334155",
+                  color: "#fff",
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <RefreshCw size={14} className={loadingSearchLogs ? "spin" : ""} />
+                <span>{loadingSearchLogs ? "جاري التحديث..." : "تحديث السجلات"}</span>
+              </button>
+            </div>
+
+            {/* بطاقات الإحصائيات السريعة الثلاثة */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "12px",
+                marginBottom: "16px"
+              }}
+            >
+              {/* 1. إجمالي عمليات البحث */}
+              <div style={{ background: "#181d29", border: "1px solid #2a374f", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: "bold" }}>🔍 إجمالي عمليات البحث والاستعلام</div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                  {searchLogsData?.stats?.totalSearches ?? "--"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>عملية استعلام مسجلة</div>
+              </div>
+
+              {/* 2. طلاب سحبوا كارت الـ QR */}
+              <div style={{ background: "linear-gradient(135deg, #06281e, #0e3d2f)", border: "1.5px solid #10b981", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#6ee7b7", fontWeight: "bold" }}>📥 كم طالب سحب الكيو ار كود</div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                  {searchLogsData?.stats?.uniqueQrStudentsCount ?? "--"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#34d399", marginTop: "2px" }}>
+                  طالب سحب كارت QR (من {searchLogsData?.stats?.totalQrDownloads ?? 0} تنزيل)
+                </div>
+              </div>
+
+              {/* 3. تنبيهات الهواتف المشتركة */}
+              <div style={{ 
+                background: (searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 ? "linear-gradient(135deg, #3d1414, #2a0e0e)" : "#181d29", 
+                border: `1.5px solid ${(searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 ? "#ef4444" : "#2a374f"}`, 
+                padding: "14px", 
+                borderRadius: "12px", 
+                textAlign: "center" 
+              }}>
+                <div style={{ fontSize: "12px", color: (searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 ? "#fca5a5" : "#94a3b8", fontWeight: "bold" }}>
+                  🚨 أجهزة بحثت عن أكثر من طالب
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: (searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 ? "#ef4444" : "#fff", marginTop: "4px" }}>
+                  {searchLogsData?.stats?.suspiciousDevicesCount ?? 0}
+                </div>
+                <div style={{ fontSize: "11px", color: (searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 ? "#f87171" : "#64748b", marginTop: "2px" }}>
+                  موبايل مشترك تم رصده
+                </div>
+              </div>
+            </div>
+
+            {/* تحذير أمني بارز إذا وُجدت هواتف بحثت عن أكثر من طالب */}
+            {(searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 && (
+              <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1.5px solid #ef4444", borderRadius: "12px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <ShieldAlert size={22} color="#ef4444" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <div style={{ color: "#ef4444", fontWeight: "bold", fontSize: "13px" }}>
+                    ⚠️ تحذير أمني: تم رصد {searchLogsData.stats.suspiciousDevicesCount} أجهزة قامت بالبحث عن أكثر من طالب من نفس الموبايل!
+                  </div>
+                  <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "4px", lineHeight: "1.5" }}>
+                    تم تظليل السجلات الصادرة من هذه الهواتف باللون الأحمر أدناه، مع كشف أسماء الطلاب المشتركين لنفس الجهاز لضمان دقة الرقابة.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* شريط الفلترة والبحث */}
+            <div style={{ background: "#181d29", border: "1px solid #2a374f", borderRadius: "12px", padding: "12px", marginBottom: "16px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setSearchLogsFilter("all")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: searchLogsFilter === "all" ? "1px solid #8b5cf6" : "1px solid #334155",
+                    background: searchLogsFilter === "all" ? "rgba(139, 92, 246, 0.25)" : "transparent",
+                    color: searchLogsFilter === "all" ? "#fff" : "#94a3b8",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer"
+                  }}
+                >
+                  الكل ({searchLogsData?.logs?.length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchLogsFilter("qr_only")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: searchLogsFilter === "qr_only" ? "1px solid #10b981" : "1px solid #334155",
+                    background: searchLogsFilter === "qr_only" ? "rgba(16, 185, 129, 0.25)" : "transparent",
+                    color: searchLogsFilter === "qr_only" ? "#fff" : "#94a3b8",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer"
+                  }}
+                >
+                  📥 سحب الـ QR فقط ({searchLogsData?.logs?.filter((l: any) => l.action === 'download_card').length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchLogsFilter("suspicious_only")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: searchLogsFilter === "suspicious_only" ? "1px solid #ef4444" : "1px solid #334155",
+                    background: searchLogsFilter === "suspicious_only" ? "rgba(239, 68, 68, 0.25)" : "transparent",
+                    color: searchLogsFilter === "suspicious_only" ? "#fff" : "#94a3b8",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer"
+                  }}
+                >
+                  🚨 أجهزة مشبوهة فقط ({searchLogsData?.logs?.filter((l: any) => l.is_suspicious_device).length || 0})
+                </button>
+              </div>
+
+              <div style={{ position: "relative", minWidth: "200px", flex: 1, maxWidth: "320px" }}>
+                <input
+                  type="text"
+                  placeholder="فلترة بالاسم أو الكود..."
+                  value={searchLogsTextFilter}
+                  onChange={(e) => setSearchLogsTextFilter(e.target.value)}
+                  style={{ width: "100%", padding: "8px 12px", paddingRight: "32px", background: "#0d131f", border: "1px solid #2a374f", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
+                />
+                <Search size={14} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
+              </div>
+            </div>
+
+            {/* قائمة السجلات */}
+            {loadingSearchLogs ? (
+              <div style={{ textAlign: "center", color: "#94a3b8", padding: "40px" }}>جاري تحميل سجلات البحث والاستعلام...</div>
+            ) : filteredSearchLogs.length === 0 ? (
+              <div style={{ background: "#181d29", border: "1px solid #2a374f", borderRadius: "12px", padding: "30px", textAlign: "center", color: "#64748b" }}>
+                لا توجد سجلات مطابقة للفلتر المحدد
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {filteredSearchLogs.map((log: any, idx: number) => {
+                  const devInfo = parseDeviceBrand(log.user_agent, '');
+                  const isDownload = log.action === 'download_card';
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        background: log.is_suspicious_device ? "rgba(239, 68, 68, 0.08)" : "#141b29",
+                        border: log.is_suspicious_device ? "1.5px solid #ef4444" : "1px solid #2a374f",
+                        borderRadius: "12px",
+                        padding: "14px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      {/* السطر الأول: الاسم والكود ونوع الإجراء */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ 
+                            background: isDownload ? "rgba(16, 185, 129, 0.2)" : "rgba(139, 92, 246, 0.2)", 
+                            color: isDownload ? "#34d399" : "#a78bfa", 
+                            padding: "4px 8px", 
+                            borderRadius: "6px", 
+                            fontSize: "11px", 
+                            fontWeight: "bold",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}>
+                            {isDownload ? "📥 سحب كارت QR" : "🔍 بحث واستعلام"}
+                          </span>
+                          <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
+                            {log.student_name}
+                          </span>
+                          {log.student_code && !log.student_code.startsWith('query:') && (
+                            <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#38bdf8", padding: "2px 6px", borderRadius: "4px", fontFamily: "monospace", fontSize: "12px" }}>
+                              {formatStudentCode(log.student_code)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>
+                          {log.created_at ? new Date(log.created_at).toLocaleString("ar-EG") : "--"}
+                        </div>
+                      </div>
+
+                      {/* السطر الثاني: الفرقة والسكشن ومعلومات الموبايل */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", fontSize: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" }}>
+                        <div style={{ display: "flex", gap: "12px", color: "#94a3b8" }}>
+                          <span>الفرقة: <strong style={{ color: "#cbd5e1" }}>{log.academic_year}</strong></span>
+                          <span>السكشن: <strong style={{ color: "#cbd5e1" }}>{log.section}</strong></span>
+                          {log.query && (
+                            <span>نص البحث: <code style={{ color: "#f59e0b" }}>"{log.query}"</code></span>
+                          )}
+                        </div>
+
+                        {/* نوع الموبايل المستخدم */}
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "#0d131f", padding: "4px 10px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                          <span>{devInfo.icon}</span>
+                          <span style={{ color: "#fff", fontWeight: "bold", fontSize: "11px" }}>{devInfo.brand}</span>
+                        </div>
+                      </div>
+
+                      {/* تحذير مشع أحمر إذا كان الجهاز بحث عن أكثر من طالب */}
+                      {log.is_suspicious_device && (
+                        <div style={{ background: "rgba(239, 68, 68, 0.18)", border: "1px dashed #ef4444", borderRadius: "8px", padding: "8px 12px", marginTop: "2px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "11px" }}>
+                            ⚠️ تحذير: تم استخدام نفس هذا الموبايل للبحث عن ({log.device_searched_count}) طلاب:
+                          </span>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {log.other_students && log.other_students.map((name: string, i: number) => (
+                              <span key={i} style={{ background: "#ef4444", color: "#fff", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" }}>
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* =============================================================== */}
@@ -1380,6 +1707,13 @@ export default function StudentPortalHubModal({
                           <span style={{ color: "#64748b" }}>آخر زيارة: </span>
                           <span style={{ color: st.last_login_at ? "#34d399" : "#64748b", fontWeight: st.last_login_at ? "bold" : "normal" }}>
                             {st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "لم يسجل دخول"}
+                          </span>
+                        </div>
+
+                        <div title="المنسق الذي قام باعتماد وتفعيل الحساب">
+                          <span style={{ color: "#64748b" }}>المنسق المعتمد: </span>
+                          <span style={{ color: st.activated_by ? "#34d399" : "#f59e0b", fontWeight: "bold" }}>
+                            {st.activated_by || "غير معتمد بعد"}
                           </span>
                         </div>
 

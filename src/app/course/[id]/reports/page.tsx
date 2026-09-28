@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { generatePrintableHtml } from "@/lib/pdfHelper";
 import { downloadPdf } from "@/lib/downloadPdf";
 import { getTermAndWeekInfo } from "@/lib/termHelper";
+import { getCurrentWeekRange } from "@/lib/dateHelpers";
 
 export default function ReportsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -126,22 +127,44 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     const { data: evalData } = await supabase.from("evaluations").select("*").eq("course_id", resolvedParams.id);
     setEvaluations(evalData || []);
 
-    // Generate Weeks List based on Course Created_at
+    // Generate Weeks List based on official term start date from system_settings
     if (courseData) {
-      // Logic for weeks (omitted from modification block for brevity, keeping existing)
-      const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر"];
-      const startCourseDate = new Date(courseData.created_at || new Date());
-      const dayOfWeek = startCourseDate.getDay();
+      const { data: systemTerms } = await supabase
+        .from("system_settings")
+        .select("term1_start, term2_start, term1_end, term2_end")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"];
+      
+      let termStartDateStr: string | null = null;
+      const courseCreatedAt = courseData.created_at ? new Date(courseData.created_at) : new Date();
+
+      if (systemTerms) {
+        const t2s = systemTerms.term2_start;
+        const t1s = systemTerms.term1_start;
+        if (t2s && (courseCreatedAt >= new Date(t2s + "T00:00:00") || new Date() >= new Date(t2s + "T00:00:00"))) {
+          termStartDateStr = t2s;
+        } else if (t1s) {
+          termStartDateStr = t1s;
+        }
+      }
+
+      let startRefDate: Date;
+      if (termStartDateStr) {
+        const [y, m, d] = termStartDateStr.split('-').map(Number);
+        startRefDate = new Date(y, m - 1, d, 0, 0, 0);
+      } else {
+        startRefDate = courseData.created_at ? new Date(courseData.created_at) : new Date();
+      }
+
+      const dayOfWeek = startRefDate.getDay();
       const daysToSubtract = (dayOfWeek + 1) % 7; 
-      const termStart = new Date(startCourseDate);
-      termStart.setDate(startCourseDate.getDate() - daysToSubtract);
+      const termStart = new Date(startRefDate);
+      termStart.setDate(startRefDate.getDate() - daysToSubtract);
       termStart.setHours(0,0,0,0);
 
-      const now = new Date();
-      const currentDaysToSubtract = (now.getDay() + 1) % 7;
-      const currentWeekStart = new Date(now);
-      currentWeekStart.setDate(now.getDate() - currentDaysToSubtract);
-      currentWeekStart.setHours(0,0,0,0);
+      const { startOfWeek: currentWeekStart } = getCurrentWeekRange();
 
       const weeksList = [];
       let current = new Date(termStart);
@@ -193,8 +216,17 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     students.forEach((s, i) => {
       let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right; white-space: nowrap;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td>`;
       weeks.forEach(w => {
-        // Find attendance in this week by exact week key
-        const att = attendance.find(a => a.student_id === s.id && a.date === w.key);
+        // Find attendance in this week by key or within week date range (Saturday to Friday)
+        const att = attendance.find(a => {
+          if (a.student_id !== s.id) return false;
+          if (a.date === w.key) return true;
+          if (w.start && w.end && a.date) {
+            const [ay, am, ad] = a.date.split('-').map(Number);
+            const aDate = new Date(ay, am - 1, ad, 12, 0, 0);
+            return aDate >= w.start && aDate <= w.end;
+          }
+          return false;
+        });
         if (att) {
           if (att.status === 'غياب بعذر') {
             const dateStr = new Date(att.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' });

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
 
 interface PasswordConfirmModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface PasswordConfirmModalProps {
 
 export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userEmail }: PasswordConfirmModalProps) {
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -77,14 +79,39 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userE
 
         {error && <div style={{ color: "#f44336", fontSize: "13px", marginBottom: "15px", textAlign: "center" }}>{error}</div>}
 
-        <input 
-          type="password" 
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="كلمة المرور..."
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#fff", outline: "none", marginBottom: "20px", fontSize: "15px" }}
-          onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-        />
+        <div style={{ position: "relative", width: "100%", marginBottom: "20px" }}>
+          <input 
+            type={showPassword ? "text" : "password"} 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="كلمة المرور..."
+            style={{ width: "100%", padding: "12px", paddingLeft: "42px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#fff", outline: "none", fontSize: "15px", boxSizing: "border-box" }}
+            onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: "absolute",
+              left: "10px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "transparent",
+              border: "none",
+              color: "#94a3b8",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "auto",
+              margin: 0
+            }}
+            title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
 
         <button 
           onClick={handleVerify}

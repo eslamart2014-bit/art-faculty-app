@@ -69,16 +69,13 @@ export default function QRScanner({
     isLockedRef.current = true;
     lastScannedRef.current = { code: cleanCode, time: now };
 
-    // Trigger subtle success haptic
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      try { navigator.vibrate(50); } catch (e) {}
+    // Fallback feedback only if parent didn't provide custom status
+    if (!parentStatus) {
+      setInternalStatus("success");
+      setInternalStatusText(`تم الرصد: ${cleanCode} ✅`);
     }
 
-    // Visual feedback
-    setInternalStatus("success");
-    setInternalStatusText(`تم الرصد: ${cleanCode} ✅`);
-
-    // Call consumer callback
+    // Call consumer callback to validate and trigger exact vibration pattern
     onScanRef.current(rawText);
 
     // Release lock after short cooldown

@@ -560,8 +560,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     return Array.from({ length: safeMax + 1 }, (_, i) => i);
   };
 
-  const vibrateSuccess = () => { if (navigator.vibrate) navigator.vibrate(100); };
-  const vibrateError = () => { if (navigator.vibrate) navigator.vibrate([50, 100, 50]); };
+  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); };
+  const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
+  const vibrateHeavyError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); };
+  const vibrateError = vibrateHeavyError;
 
   const getAttendanceCount = async (studentId: string) => {
     const { data } = await supabase.from("attendance").select("id").eq("course_id", course.id).eq("student_id", studentId);
@@ -572,13 +574,19 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const { data: globalStudent } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
     
     if (!globalStudent) {
-      vibrateError();
-      alert("لم يتم العثور على طالب بهذا الكود في أي فرقة!");
+      vibrateHeavyError();
+      setScannerStatus('error');
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
 
-    vibrateError();
-    const confirmAdd = window.confirm(`الطالب (${globalStudent.full_name}) مقيد بفرقة ${globalStudent.academic_year} - سكشن ${globalStudent.section} وهو غير مدرج في قوائم هذا المقرر.\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
+    // Heavy rough vibration for student from another cohort + show student info
+    vibrateHeavyError();
+    setScannerStatus('error');
+    setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section}) ❌`);
+
+    const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
       const updatedMakeup = [...(course.makeup_students || []), globalStudent.id];
@@ -637,7 +645,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     if (!cleanCode) {
       setScannerStatus('error');
       setScannerStatusText("كود غير صالح ❌");
-      vibrateError();
+      vibrateHeavyError();
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
@@ -646,10 +654,11 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       return;
     }
 
+    // Duplicate scan: two rapid vibrations
     if (scannedStudents.some(s => s.student?.student_code === cleanCode || s.student?.id === cleanCode)) {
       setScannerStatus('error');
-      setScannerStatusText("تم رصد هذا الطالب مسبقاً ⚠️");
-      vibrateError();
+      setScannerStatusText("طالب مكرر تم رصده مسبقاً ⚠️");
+      vibrateDuplicate();
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
@@ -721,7 +730,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       } else {
         setScannerStatus('error');
         setScannerStatusText("طالب غير مسجل في هذا المقرر ❌");
-        vibrateError();
+        vibrateHeavyError();
         setTimeout(() => {
           setScannerStatus('idle');
           setScannerStatusText("");
@@ -731,7 +740,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     } catch (err) {
       setScannerStatus('error');
       setScannerStatusText("خطأ في قراءة بيانات الطالب ❌");
-      vibrateError();
+      vibrateHeavyError();
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");

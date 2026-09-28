@@ -44,6 +44,36 @@ export async function GET(request: Request) {
       section: student.section,
     };
 
+    // تسجيل عملية الاستعلام أمنياً في سجلات البحث
+    try {
+      const userAgent = request.headers.get('user-agent') || '';
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+      const logEntry = {
+        student_code: student.student_code,
+        action: 'student_lookup',
+        device_id: deviceId || 'unknown_device',
+        user_agent: userAgent,
+        details: {
+          student_name: student.full_name,
+          academic_year: student.academic_year,
+          section: student.section,
+          ip: ip,
+          timestamp: new Date().toISOString()
+        },
+        created_at: new Date().toISOString()
+      };
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: logEntry.student_code,
+          action: logEntry.action,
+          device_id: logEntry.device_id,
+          user_agent: logEntry.user_agent,
+          details: logEntry.details
+        });
+      } catch (err) {}
+      localStore.saveAuditLog(logEntry);
+    } catch (e) {}
+
     // 2. التحقق من حالة حساب الطالب (مفعل، معلق، أو جديد)
     let existingAccount: any = null;
     try {

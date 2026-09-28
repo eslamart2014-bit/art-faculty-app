@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download, X } from "lucide-react";
 
 export default function PwaInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -8,34 +9,31 @@ export default function PwaInstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // Don't show if already installed as standalone
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
     if (isStandalone) return;
 
-    // Check if user dismissed recently (within 3 days)
-    const dismissed = localStorage.getItem("pwa_dismissed");
-    if (dismissed) {
-      const dismissedTime = parseInt(dismissed);
-      const threeDays = 3 * 24 * 60 * 60 * 1000;
-      if (Date.now() - dismissedTime < threeDays) return;
-    }
-
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(ios);
 
     if (ios) {
-      // Show iOS instructions after 2 seconds
-      setTimeout(() => setShowPrompt(true), 2000);
+      // Check if user dismissed iOS hint recently (within 24 hours)
+      const dismissed = localStorage.getItem("pwa_dismissed_ios");
+      if (!dismissed || Date.now() - parseInt(dismissed) > 24 * 60 * 60 * 1000) {
+        setShowPrompt(true);
+      }
       return;
     }
 
-    // Android / Chrome
+    // Android / Chrome - listen for beforeinstallprompt event and show prompt immediately!
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setTimeout(() => setShowPrompt(true), 2000);
+      setShowPrompt(true);
     };
 
     window.addEventListener("beforeinstallprompt", handler);
@@ -44,7 +42,9 @@ export default function PwaInstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem("pwa_dismissed", Date.now().toString());
+    if (isIOS) {
+      localStorage.setItem("pwa_dismissed_ios", Date.now().toString());
+    }
   };
 
   const handleInstall = async () => {
@@ -53,7 +53,6 @@ export default function PwaInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === "accepted") {
         setShowPrompt(false);
-        localStorage.removeItem("pwa_dismissed");
       }
       setDeferredPrompt(null);
     }
@@ -68,67 +67,83 @@ export default function PwaInstallPrompt() {
         bottom: 0,
         left: 0,
         right: 0,
-        background: "#1e1e1e",
-        borderTop: "2px solid #2196F3",
-        zIndex: 99999,
-        padding: "16px 20px",
+        background: "rgba(18, 24, 38, 0.96)",
+        backdropFilter: "blur(12px)",
+        borderTop: "2px solid #2563eb",
+        zIndex: 999999,
+        padding: "12px 18px",
         display: "flex",
         alignItems: "center",
+        justifyContent: "space-between",
         gap: "12px",
         direction: "rtl",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+        boxShadow: "0 -6px 25px rgba(0,0,0,0.6)",
       }}
     >
-      <img
-        src="/icon-192.png"
-        style={{ width: "50px", height: "50px", borderRadius: "12px", flexShrink: 0 }}
-        alt="icon"
-      />
-      <div style={{ flex: 1 }}>
-        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", marginBottom: "2px" }}>
-          ثبّت التطبيق على جهازك
-        </div>
-        <div style={{ color: "#aaa", fontSize: "12px" }}>
-          {isIOS
-            ? 'اضغط على زر المشاركة ثم "أضف إلى الشاشة الرئيسية"'
-            : "للوصول السريع بدون إنترنت"}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
+        <img
+          src="/icon-192.png"
+          style={{ width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0, border: "1px solid rgba(255,255,255,0.15)" }}
+          alt="icon"
+        />
+        <div>
+          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>تثبيت التطبيق على جهازك</span>
+            <span style={{ fontSize: "10px", background: "rgba(37,99,235,0.3)", color: "#60a5fa", padding: "2px 6px", borderRadius: "4px" }}>
+              تثبيت عادي
+            </span>
+          </div>
+          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+            {isIOS
+              ? 'اضغط على زر المشاركة (Share) في المتصفح ثم اختر "إضافة إلى الصفحة الرئيسية"'
+              : "للوصول المباشر والعمل السريع بدون تشتت"}
+          </div>
         </div>
       </div>
-      <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
         {!isIOS && (
           <button
             onClick={handleInstall}
             style={{
-              background: "#2196F3",
+              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
               color: "#fff",
               border: "none",
-              borderRadius: "20px",
-              padding: "8px 16px",
+              borderRadius: "10px",
+              padding: "9px 16px",
               fontSize: "13px",
               fontWeight: "bold",
               cursor: "pointer",
-              width: "auto",
-              margin: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 2px 10px rgba(37, 99, 235, 0.4)",
+              margin: 0
             }}
           >
-            تثبيت
+            <Download size={15} />
+            <span>تثبيت التطبيق</span>
           </button>
         )}
         <button
           onClick={handleDismiss}
           style={{
-            background: "transparent",
-            color: "#aaa",
-            border: "1px solid #444",
-            borderRadius: "20px",
+            background: "rgba(255,255,255,0.06)",
+            color: "#94a3b8",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "10px",
             padding: "8px 12px",
-            fontSize: "13px",
+            fontSize: "12px",
             cursor: "pointer",
-            width: "auto",
-            margin: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            margin: 0
           }}
+          title="إغلاق التنبيه"
         >
-          لاحقاً
+          <X size={14} />
+          <span>لاحقاً</span>
         </button>
       </div>
     </div>
