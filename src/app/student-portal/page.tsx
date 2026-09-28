@@ -145,33 +145,38 @@ export default function HomePage() {
       // الترويسة الأكاديمية
       ctx.textAlign = "center";
       ctx.fillStyle = "#93c5fd";
-      ctx.font = "bold 32px Cairo, sans-serif";
-      ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 100);
-      ctx.font = "bold 26px 'Cairo', sans-serif";
+      ctx.font = "bold 30px Cairo, sans-serif";
+      ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 85);
+      ctx.font = "bold 24px 'Cairo', sans-serif";
       ctx.fillStyle = "#38bdf8";
-      ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 145);
+      ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 122);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(100, 175);
-      ctx.lineTo(900, 175);
+      ctx.moveTo(100, 145);
+      ctx.lineTo(900, 145);
       ctx.stroke();
 
       // عنوان البطاقة
       ctx.fillStyle = "#ffffff";
-      ctx.font = "900 44px Cairo, sans-serif";
-      ctx.fillText("بطاقة الهوية الرقمية للطالب", 500, 245);
+      ctx.font = "900 36px Cairo, sans-serif";
+      ctx.fillText("بطاقة الهوية الرقمية للطالب", 500, 190);
 
-      // رسم حاوية الـ QR البيضاء
-      const qrBoxSize = 520;
+      // رسم حاوية الـ QR البيضاء (كبيرة جداً)
+      const qrBoxSize = 720;
       const qrBoxX = (1000 - qrBoxSize) / 2;
-      const qrBoxY = 290;
+      const qrBoxY = 215;
 
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 28);
       ctx.fill();
+
+      // إطار خفيف أنيق لحاوية الـ QR
+      ctx.strokeStyle = "rgba(59, 130, 246, 0.5)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
 
       // استخراج صورة الـ QR من العنصر
       const svgElement = document.getElementById("student-qr-svg");
@@ -184,7 +189,8 @@ export default function HomePage() {
         const qrImg = new Image();
         await new Promise((resolve) => {
           qrImg.onload = () => {
-            ctx.drawImage(qrImg, qrBoxX + 30, qrBoxY + 30, qrBoxSize - 60, qrBoxSize - 60);
+            const qrPadding = 20;
+            ctx.drawImage(qrImg, qrBoxX + qrPadding, qrBoxY + qrPadding, qrBoxSize - (qrPadding * 2), qrBoxSize - (qrPadding * 2));
             resolve(true);
           };
           qrImg.src = blobURL;
@@ -193,45 +199,45 @@ export default function HomePage() {
 
       // بيانات الطالب تحت الـ QR
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 44px Cairo, sans-serif";
-      ctx.fillText(selectedStudent.full_name, 500, 890);
+      ctx.font = "bold 42px Cairo, sans-serif";
+      ctx.fillText(selectedStudent.full_name, 500, 990);
 
       // شارة الفرقة والسكشن
       ctx.fillStyle = "#1e293b";
       ctx.beginPath();
-      ctx.roundRect(250, 930, 500, 65, 30);
+      ctx.roundRect(220, 1018, 560, 58, 29);
       ctx.fill();
       ctx.strokeStyle = "#38bdf8";
       ctx.lineWidth = 2;
       ctx.stroke();
 
       ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 30px Cairo, sans-serif";
-      ctx.fillText(`${selectedStudent.academic_year} • سكشن ${selectedStudent.section || 'عام'}`, 500, 974);
+      ctx.font = "bold 28px Cairo, sans-serif";
+      ctx.fillText(`${selectedStudent.academic_year} • سكشن ${selectedStudent.section || 'عام'}`, 500, 1056);
 
       // كود الطالب البارز
       ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 28px Cairo, sans-serif";
-      ctx.fillText("الكود الجامعي المعتمد", 500, 1050);
+      ctx.font = "bold 24px Cairo, sans-serif";
+      ctx.fillText("الكود الجامعي المعتمد", 500, 1118);
 
       ctx.fillStyle = "#f59e0b";
       ctx.font = "900 64px monospace, Cairo";
-      ctx.fillText(formatStudentCode(selectedStudent.student_code), 500, 1120);
+      ctx.fillText(formatStudentCode(selectedStudent.student_code), 500, 1184);
 
       // تعليمات التنبيه
       ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
       ctx.beginPath();
-      ctx.roundRect(100, 1170, 800, 80, 16);
+      ctx.roundRect(80, 1220, 840, 68, 16);
       ctx.fill();
 
       ctx.fillStyle = "#34d399";
-      ctx.font = "bold 24px Cairo, sans-serif";
-      ctx.fillText("📸 احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1220);
+      ctx.font = "bold 22px Cairo, sans-serif";
+      ctx.fillText("📸 احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1262);
 
       // ذيل البطاقة
       ctx.fillStyle = "#64748b";
       ctx.font = "20px Cairo, sans-serif";
-      ctx.fillText("نظام التربية الفنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن", 500, 1320);
+      ctx.fillText("نظام التربية الفنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن", 500, 1340);
 
       // التنزيل المباشر
       const link = document.createElement("a");
@@ -279,7 +285,7 @@ export default function HomePage() {
                 <QRCode 
                   id="student-qr-svg"
                   value={getQRValue(selectedStudent)} 
-                  size={200}
+                  size={240}
                   level="H"
                 />
               </div>

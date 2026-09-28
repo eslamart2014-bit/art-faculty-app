@@ -536,50 +536,75 @@ export default function SystemPage() {
       }
     }
 
-    try {
-      const saved = localStorage.getItem("fania_student_session");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.student_code) {
-          setCurrentStudent(parsed);
-          const isAct = parsed.is_pin_used || parsed.status === "active";
-          setAccountStatus(isAct ? "active" : "pending");
-          if (isAct) {
-            loadDashboard(parsed.student_code, parsed.pin_code);
-          } else {
-            // فحص فوري لحالة اعتماد المنسق عند فتح المتصفح لأول مرة
-            const devInfo = getOrCreateDeviceInfo();
-            fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
-              .then(r => r.json())
-              .then(data => {
-                if (data.isAlreadyActive) {
-                  const activeSession = {
-                    ...parsed,
-                    ...(data.student || {}),
-                    pin_code: data.student?.pin_code || parsed.pin_code,
-                    status: "active",
-                    is_pin_used: true
-                  };
-                  localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                  setCurrentStudent(activeSession);
-                  setAccountStatus("active");
-                  setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
-                  loadDashboard(parsed.student_code, activeSession.pin_code);
-                } else if (data.isNew) {
-                  localStorage.removeItem("fania_student_session");
-                  setCurrentStudent(null);
-                  setAccountStatus(null);
-                  setAuthMode("register");
-                  setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
-                }
-              })
-              .catch(e => console.error("Initial lookup check failed:", e));
+    const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const incomingCode = searchParams?.get("code") || (typeof window !== "undefined" ? localStorage.getItem("fania_pending_reg_code") : null);
+    const incomingMode = searchParams?.get("mode");
+
+    if (incomingMode === "register" || incomingCode) {
+      if (incomingCode) {
+        setRegCode(incomingCode);
+        setAuthMode("register");
+        try {
+          const prefetched = sessionStorage.getItem("fania_prefetched_student");
+          if (prefetched) {
+            const parsed = JSON.parse(prefetched);
+            if (parsed && formatStudentCode(parsed.student_code) === formatStudentCode(incomingCode)) {
+              setMatchedStudent(parsed);
+              setRegName(parsed.full_name);
+            }
           }
-          fetchCoordinators(parsed.student_code);
-          return;
+        } catch (e) {}
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("fania_pending_reg_code");
+          sessionStorage.removeItem("fania_prefetched_student");
         }
       }
-    } catch (e) {}
+    } else {
+      try {
+        const saved = localStorage.getItem("fania_student_session");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.student_code) {
+            setCurrentStudent(parsed);
+            const isAct = parsed.is_pin_used || parsed.status === "active";
+            setAccountStatus(isAct ? "active" : "pending");
+            if (isAct) {
+              loadDashboard(parsed.student_code, parsed.pin_code);
+            } else {
+              // فحص فوري لحالة اعتماد المنسق عند فتح المتصفح لأول مرة
+              const devInfo = getOrCreateDeviceInfo();
+              fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
+                .then(r => r.json())
+                .then(data => {
+                  if (data.isAlreadyActive) {
+                    const activeSession = {
+                      ...parsed,
+                      ...(data.student || {}),
+                      pin_code: data.student?.pin_code || parsed.pin_code,
+                      status: "active",
+                      is_pin_used: true
+                    };
+                    localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                    setCurrentStudent(activeSession);
+                    setAccountStatus("active");
+                    setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
+                    loadDashboard(parsed.student_code, activeSession.pin_code);
+                  } else if (data.isNew) {
+                    localStorage.removeItem("fania_student_session");
+                    setCurrentStudent(null);
+                    setAccountStatus(null);
+                    setAuthMode("register");
+                    setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
+                  }
+                })
+                .catch(e => console.error("Initial lookup check failed:", e));
+            }
+            fetchCoordinators(parsed.student_code);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
 
     fetchCoordinators();
 
@@ -3729,16 +3754,67 @@ export default function SystemPage() {
         ) : (
           /* نموذج تسجيل طالب جديد */
           <form onSubmit={handleRegisterSubmit} className="glass-card" style={{ padding: "20px" }}>
+            {matchedStudent && (
+              <div style={{
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(37, 99, 235, 0.2))",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                borderRadius: "12px",
+                padding: "12px 14px",
+                marginBottom: "16px",
+                textAlign: "right"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "16px" }}>✨</span>
+                  <span style={{ fontSize: "13px", fontWeight: "bold", color: "#34d399" }}>
+                    استكمال تفعيل الحساب وتأكيد الهوية
+                  </span>
+                </div>
+                <div style={{ fontSize: "12px", color: "#e2e8f0", lineHeight: "1.5" }}>
+                  مرحباً <b>{matchedStudent.full_name}</b> ({matchedStudent.academic_year} • سكشن {matchedStudent.section || 'عام'}).
+                  <div style={{ color: "#93c5fd", marginTop: "2px" }}>
+                    يرجى إدخال رقم هاتفك ورفع بطاقة الرقم القومي أو الكارنيه لإرسال طلب الاعتماد فوراً.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
-                كود الطالب الجامعي:
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>
+                  كود الطالب الجامعي:
+                </label>
+                {matchedStudent && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMatchedStudent(null);
+                      setRegCode("");
+                      setRegName("");
+                      setLookupStatus(null);
+                      setLookupMessage(null);
+                    }}
+                    style={{ background: "transparent", border: "none", color: "#60a5fa", fontSize: "11px", cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    تغيير الكود 🔄
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="أدخل كودك الجامعي (مثل: 0001)..."
                 value={regCode}
                 onChange={(e) => setRegCode(e.target.value)}
-                style={{ width: "100%", padding: "12px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
+                readOnly={!!matchedStudent}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  background: matchedStudent ? "rgba(16, 185, 129, 0.08)" : "#141b29",
+                  border: matchedStudent ? "1px solid #10b981" : "1px solid #2a374f",
+                  borderRadius: "10px",
+                  color: matchedStudent ? "#34d399" : "#fff",
+                  fontSize: "14px",
+                  fontWeight: matchedStudent ? "bold" : "normal"
+                }}
               />
               {isLookingUpCode && (
                 <div style={{ color: "#38bdf8", fontSize: "11px", marginTop: "4px" }}>جاري التحقق من الكود...</div>
@@ -3794,9 +3870,18 @@ export default function SystemPage() {
               <input
                 type="text"
                 placeholder="اسم الطالب الرباعي..."
-                value={regName}
+                value={regName || matchedStudent?.full_name || ""}
                 onChange={(e) => setRegName(e.target.value)}
-                style={{ width: "100%", padding: "12px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
+                readOnly={!!matchedStudent}
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  background: matchedStudent ? "rgba(255, 255, 255, 0.05)" : "#141b29",
+                  border: "1px solid #2a374f",
+                  borderRadius: "10px",
+                  color: "#fff",
+                  fontSize: "14px"
+                }}
               />
             </div>
 
@@ -3857,17 +3942,24 @@ export default function SystemPage() {
               disabled={loading || !regCode || !regMobile || !idCardPhoto}
               style={{
                 width: "100%",
-                padding: "12px",
+                padding: "14px",
                 background: "linear-gradient(135deg, #2563eb, #10b981)",
                 color: "#fff",
                 border: "none",
                 borderRadius: "10px",
                 fontWeight: "bold",
-                fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer"
+                fontSize: "15px",
+                cursor: (loading || !regCode || !regMobile || !idCardPhoto) ? "not-allowed" : "pointer",
+                opacity: (loading || !regCode || !regMobile || !idCardPhoto) ? 0.6 : 1,
+                boxShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px"
               }}
             >
-              {loading ? "جاري التسجيل..." : "تسجيل بيانات الطالب 🚀"}
+              <CheckCircle2 size={18} />
+              <span>{loading ? "جاري إرسال البيانات..." : "تأكيد واستكمال تفعيل الحساب 🚀"}</span>
             </button>
           </form>
         )}

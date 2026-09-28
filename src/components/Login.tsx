@@ -177,33 +177,38 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       // الترويسة الأكاديمية
       ctx.textAlign = "center";
       ctx.fillStyle = "#93c5fd";
-      ctx.font = "bold 32px Cairo, sans-serif";
-      ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 100);
-      ctx.font = "bold 26px Cairo, sans-serif";
+      ctx.font = "bold 30px Cairo, sans-serif";
+      ctx.fillText("جامعة قنا • كلية التربية النوعية", 500, 85);
+      ctx.font = "bold 24px Cairo, sans-serif";
       ctx.fillStyle = "#38bdf8";
-      ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 145);
+      ctx.fillText("قسم التربية الفنية • المنظومة الذكية", 500, 122);
 
       ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(100, 175);
-      ctx.lineTo(900, 175);
+      ctx.moveTo(100, 145);
+      ctx.lineTo(900, 145);
       ctx.stroke();
 
       // عنوان البطاقة
       ctx.fillStyle = "#ffffff";
-      ctx.font = "900 44px Cairo, sans-serif";
-      ctx.fillText("بطاقة الهوية الرقمية للطالب", 500, 245);
+      ctx.font = "900 36px Cairo, sans-serif";
+      ctx.fillText("بطاقة الهوية الرقمية للطالب", 500, 190);
 
-      // رسم حاوية الـ QR البيضاء
-      const qrBoxSize = 520;
+      // رسم حاوية الـ QR البيضاء (كبيرة جداً وسريعة المسح)
+      const qrBoxSize = 720;
       const qrBoxX = (1000 - qrBoxSize) / 2;
-      const qrBoxY = 290;
+      const qrBoxY = 215;
 
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 28);
       ctx.fill();
+
+      // إطار خفيف أنيق لحاوية الـ QR
+      ctx.strokeStyle = "rgba(59, 130, 246, 0.5)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
 
       // استخراج صورة الـ QR من العنصر
       const svgElement = document.getElementById("student-login-qr-svg");
@@ -216,7 +221,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         const qrImg = new Image();
         await new Promise((resolve) => {
           qrImg.onload = () => {
-            ctx.drawImage(qrImg, qrBoxX + 30, qrBoxY + 30, qrBoxSize - 60, qrBoxSize - 60);
+            const qrPadding = 20;
+            ctx.drawImage(qrImg, qrBoxX + qrPadding, qrBoxY + qrPadding, qrBoxSize - (qrPadding * 2), qrBoxSize - (qrPadding * 2));
             resolve(true);
           };
           qrImg.src = blobURL;
@@ -225,45 +231,45 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
       // بيانات الطالب تحت الـ QR
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 44px Cairo, sans-serif";
-      ctx.fillText(selectedStudent.full_name, 500, 890);
+      ctx.font = "bold 42px Cairo, sans-serif";
+      ctx.fillText(selectedStudent.full_name, 500, 990);
 
       // شارة الفرقة والسكشن
       ctx.fillStyle = "#1e293b";
       ctx.beginPath();
-      ctx.roundRect(250, 930, 500, 65, 30);
+      ctx.roundRect(220, 1018, 560, 58, 29);
       ctx.fill();
       ctx.strokeStyle = "#38bdf8";
       ctx.lineWidth = 2;
       ctx.stroke();
 
       ctx.fillStyle = "#38bdf8";
-      ctx.font = "bold 30px Cairo, sans-serif";
-      ctx.fillText(`${selectedStudent.academic_year} • سكشن ${selectedStudent.section || 'عام'}`, 500, 974);
+      ctx.font = "bold 28px Cairo, sans-serif";
+      ctx.fillText(`${selectedStudent.academic_year} • سكشن ${selectedStudent.section || 'عام'}`, 500, 1056);
 
       // كود الطالب البارز
       ctx.fillStyle = "#94a3b8";
-      ctx.font = "bold 28px Cairo, sans-serif";
-      ctx.fillText("الكود الجامعي المعتمد", 500, 1050);
+      ctx.font = "bold 24px Cairo, sans-serif";
+      ctx.fillText("الكود الجامعي المعتمد", 500, 1118);
 
       ctx.fillStyle = "#f59e0b";
       ctx.font = "900 64px monospace, Cairo";
-      ctx.fillText(formatStudentCode(selectedStudent.student_code), 500, 1120);
+      ctx.fillText(formatStudentCode(selectedStudent.student_code), 500, 1184);
 
       // تعليمات التنبيه
       ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
       ctx.beginPath();
-      ctx.roundRect(100, 1170, 800, 80, 16);
+      ctx.roundRect(80, 1220, 840, 68, 16);
       ctx.fill();
 
       ctx.fillStyle = "#34d399";
-      ctx.font = "bold 24px Cairo, sans-serif";
-      ctx.fillText("📸 احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1220);
+      ctx.font = "bold 22px Cairo, sans-serif";
+      ctx.fillText("📸 احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1262);
 
       // ذيل البطاقة
       ctx.fillStyle = "#64748b";
       ctx.font = "20px Cairo, sans-serif";
-      ctx.fillText("نظام التربية الفنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن", 500, 1320);
+      ctx.fillText("نظام التربية الفنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن", 500, 1340);
 
       // التنزيل المباشر
       const link = document.createElement("a");
@@ -760,15 +766,16 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
                       <div style={{
                         background: "#fff",
-                        padding: "10px",
-                        borderRadius: "12px",
+                        padding: "14px",
+                        borderRadius: "16px",
                         display: "inline-block",
-                        marginBottom: "12px"
+                        marginBottom: "14px",
+                        boxShadow: "0 8px 25px rgba(0, 0, 0, 0.45)"
                       }}>
                         <QRCode
                           id="student-login-qr-svg"
                           value={`كود الطالب: ${formatStudentCode(selectedStudent.student_code)}\nاسم الطالب: ${selectedStudent.full_name}`}
-                          size={150}
+                          size={230}
                           level="H"
                         />
                       </div>
@@ -981,31 +988,42 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
                 <button
                   type="button"
+                  disabled={!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading}
                   onClick={() => {
                     if (typeof window !== "undefined") {
-                      if (firstTimeCode) {
-                        localStorage.setItem("fania_pending_reg_code", formatStudentCode(firstTimeCode));
+                      const codeToUse = firstTimeCode ? formatStudentCode(firstTimeCode) : "";
+                      if (codeToUse) {
+                        localStorage.setItem("fania_pending_reg_code", codeToUse);
+                        if (lookedUpStudent) {
+                          try {
+                            sessionStorage.setItem("fania_prefetched_student", JSON.stringify(lookedUpStudent));
+                          } catch (e) {}
+                        }
                       }
                       localStorage.setItem("fania_last_portal", "/system");
                       localStorage.setItem("fania_app_mode", "student");
-                      window.location.href = "/system";
+                      const targetUrl = codeToUse ? `/system?mode=register&code=${encodeURIComponent(codeToUse)}` : "/system?mode=register";
+                      window.location.href = targetUrl;
                     }
                   }}
                   style={{
                     width: "100%",
                     padding: "12px",
-                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    background: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading)
+                      ? "#334155"
+                      : "linear-gradient(135deg, #10b981, #059669)",
                     color: "#fff",
                     border: "none",
                     borderRadius: "10px",
                     fontSize: "14px",
                     fontWeight: "bold",
-                    cursor: "pointer",
+                    cursor: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading) ? "not-allowed" : "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)"
+                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
+                    opacity: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading) ? 0.6 : 1
                   }}
                 >
                   <span>استكمال التفعيل ورفع الهوية في البوابة</span>
@@ -1013,43 +1031,6 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                 </button>
               </div>
             )}
-
-            {/* Direct Jump to Full Student Portal */}
-            <div style={{
-              marginTop: "18px",
-              paddingTop: "14px",
-              borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-              textAlign: "center"
-            }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("fania_last_portal", "/system");
-                    localStorage.setItem("fania_app_mode", "student");
-                    window.location.href = "/system";
-                  }
-                }}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  background: "transparent",
-                  color: "#60a5fa",
-                  border: "1px solid rgba(59, 130, 246, 0.35)",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px"
-                }}
-              >
-                <span>الانتقال لبوابة الخدمات الطلابية الشاملة</span>
-                <span>←</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
