@@ -6,7 +6,9 @@ export const downloadPdf = async (
   title: string,
   subtitle: string,
   tableHtml: string,
-  instructorName: string = "........................"
+  instructorName: string = "........................",
+  orientation: 'portrait' | 'landscape' = 'portrait',
+  customLayout: boolean = false
 ) => {
   if (typeof window === "undefined") return;
 
@@ -98,7 +100,7 @@ export const downloadPdf = async (
     btnCancel.onclick = cleanup;
 
     btnPrint.onclick = () => {
-      const htmlString = generatePrintableHtml(courseName, title, subtitle, tableHtml, instructorName, false);
+      const htmlString = generatePrintableHtml(courseName, title, subtitle, tableHtml, instructorName, false, orientation, customLayout);
       const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(htmlString);
@@ -120,15 +122,17 @@ export const downloadPdf = async (
 
       try {
         const html2pdf = (await import("html2pdf.js")).default;
-        const htmlString = generatePrintableHtml(courseName, title, subtitle, tableHtml, instructorName, true);
+        const htmlString = generatePrintableHtml(courseName, title, subtitle, tableHtml, instructorName, true, orientation, customLayout);
         
         const container = document.createElement("div");
         container.innerHTML = htmlString;
         
-        // A4 width is 210mm. If margin is 10mm (all sides), 210 - 20 = 190mm
-        container.style.width = "190mm";
-        container.style.maxWidth = "190mm";
-        // Override padding so we don't add extra size that causes clipping
+        const isLandscape = orientation === 'landscape';
+        // A4 Portrait: 210mm - 20mm = 190mm
+        // A4 Landscape: 297mm - 20mm = 277mm
+        const containerWidth = isLandscape ? "277mm" : "190mm";
+        container.style.width = containerWidth;
+        container.style.maxWidth = containerWidth;
         container.style.padding = "0"; 
         container.style.background = "#fff";
         container.style.color = "#000";
@@ -139,9 +143,19 @@ export const downloadPdf = async (
           margin: 10,
           filename: filename,
           image: { type: 'jpeg' as const, quality: 0.98 },
-          // Force a desktop-like windowWidth to prevent mobile responsive clipping/wrapping
-          html2canvas: { scale: 2, useCORS: true, windowWidth: 1024 },
-          jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+          html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            windowWidth: isLandscape ? 1400 : 1024 
+          },
+          jsPDF: { 
+            unit: 'mm' as const, 
+            format: 'a4' as const, 
+            orientation: orientation 
+          },
+          pagebreak: { 
+            mode: ['css', 'legacy'] 
+          }
         };
 
         await html2pdf().set(opt).from(container).save();
