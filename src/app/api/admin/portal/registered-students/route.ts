@@ -30,33 +30,66 @@ export async function GET() {
     (dbAccounts || []).forEach((acc: any) => {
       if (acc.student_code) {
         const student = studentMap.get(acc.student_code);
+        let telegramAccount: any = null;
+        if (student?.telegram_browser_id) {
+          try { telegramAccount = JSON.parse(student.telegram_browser_id); } catch (e) {}
+        }
+
+        const activatedBy = acc.activated_by || acc.pin_issued_by || telegramAccount?.activated_by || telegramAccount?.pin_issued_by || null;
+        const activatedAt = acc.activated_at || acc.pin_issued_at || telegramAccount?.activated_at || telegramAccount?.pin_issued_at || null;
+        const isActivated = acc.status === 'active' || telegramAccount?.status === 'active' || telegramAccount?.is_pin_used;
+        const status = (acc.status === 'suspended' || telegramAccount?.status === 'suspended')
+          ? 'suspended'
+          : isActivated
+            ? 'active'
+            : (acc.status || telegramAccount?.status || 'pending');
+
+        const createdAt = acc.created_at || telegramAccount?.created_at || telegramAccount?.activated_at || acc.last_login_at || null;
+
         accountsMap.set(acc.student_code, {
           student_code: acc.student_code,
           full_name: acc.full_name || student?.full_name || 'طالب مسجل',
-          created_at: acc.created_at || null,
-          last_login_at: acc.last_login_at || null,
-          status: acc.status || 'active',
-          activated_by: acc.activated_by || acc.pin_issued_by || null,
-          activated_at: acc.activated_at || null
+          created_at: createdAt,
+          last_login_at: acc.last_login_at || telegramAccount?.last_login_at || null,
+          status: status,
+          activated_by: activatedBy,
+          activated_at: activatedAt
         });
       }
     });
 
     // فحص الحسابات المسجلة عبر telegram_browser_id
     (studentsList || []).forEach((st: any) => {
-      if (st.student_code && !accountsMap.has(st.student_code) && st.telegram_browser_id && st.telegram_browser_id.trim().length > 2) {
+      if (st.student_code && st.telegram_browser_id && st.telegram_browser_id.trim().length > 2) {
         try {
           const parsed = JSON.parse(st.telegram_browser_id);
-          if (parsed && (parsed.is_pin_used || parsed.status === 'active' || parsed.pin_code)) {
-            accountsMap.set(st.student_code, {
-              student_code: st.student_code,
-              full_name: st.full_name,
-              created_at: parsed.activated_at || parsed.created_at || null,
-              last_login_at: parsed.last_login_at || null,
-              status: parsed.status || 'active',
-              activated_by: parsed.activated_by || parsed.pin_issued_by || null,
-              activated_at: parsed.activated_at || null
-            });
+          if (parsed && (parsed.is_pin_used || parsed.status || parsed.pin_code || parsed.mobile || parsed.id_card_url)) {
+            const existing = accountsMap.get(st.student_code);
+            if (existing) {
+              if (!existing.activated_by && (parsed.activated_by || parsed.pin_issued_by)) {
+                existing.activated_by = parsed.activated_by || parsed.pin_issued_by;
+              }
+              if (!existing.activated_at && (parsed.activated_at || parsed.pin_issued_at)) {
+                existing.activated_at = parsed.activated_at || parsed.pin_issued_at;
+              }
+              if (parsed.status === 'active' || parsed.is_pin_used) {
+                if (existing.status !== 'suspended') existing.status = 'active';
+              }
+              if (!existing.created_at && (parsed.created_at || parsed.activated_at)) {
+                existing.created_at = parsed.created_at || parsed.activated_at;
+              }
+            } else {
+              const isAct = parsed.status === 'active' || parsed.is_pin_used;
+              accountsMap.set(st.student_code, {
+                student_code: st.student_code,
+                full_name: st.full_name,
+                created_at: parsed.created_at || parsed.activated_at || parsed.last_login_at || null,
+                last_login_at: parsed.last_login_at || null,
+                status: parsed.status === 'suspended' ? 'suspended' : isAct ? 'active' : (parsed.status || 'pending'),
+                activated_by: parsed.activated_by || parsed.pin_issued_by || null,
+                activated_at: parsed.activated_at || parsed.pin_issued_at || null
+              });
+            }
           }
         } catch (e) {}
       }

@@ -208,19 +208,56 @@ export default function StudentPortalHubModal({
   const openRegisteredAccountsModal = async () => {
     setIsAccountsModalOpen(true);
     setAccountListFilter("");
-    if (registeredStudentsList.length === 0) {
-      setLoadingRegisteredList(true);
-      try {
-        const res = await fetch("/api/admin/portal/registered-students");
-        const data = await res.json();
-        if (data && data.success) {
-          setRegisteredStudentsList(data.students || []);
-        }
-      } catch (e) {
-        console.error("Error fetching registered students list:", e);
-      } finally {
-        setLoadingRegisteredList(false);
+    setLoadingRegisteredList(true);
+    try {
+      const res = await fetch("/api/admin/portal/registered-students", { cache: "no-store" });
+      const data = await res.json();
+      if (data && data.success) {
+        setRegisteredStudentsList(data.students || []);
       }
+    } catch (e) {
+      console.error("Error fetching registered students list:", e);
+    } finally {
+      setLoadingRegisteredList(false);
+    }
+  };
+
+  // اعتماد وتفعيل الحساب مباشرة من داخل نافذة الإدارة والبحث
+  const handleDirectActivateInInspector = async () => {
+    if (!inspectedAccount?.student?.student_code) return;
+    const studentCode = inspectedAccount.student.student_code;
+
+    setActionLoading(true);
+    setActionMessage("");
+    try {
+      const res = await fetch("/api/admin/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "activate_account",
+          student_code: studentCode,
+          extra: { coordinator_name: "إدارة المنظومة" }
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setActionMessage("✓ " + (data.message || "تم اعتماد وتفعيل الحساب بنجاح"));
+        // Re-inspect the account to refresh details immediately
+        await handleInspectAccount(studentCode);
+        // Refresh registered accounts list
+        const listRes = await fetch("/api/admin/portal/registered-students", { cache: "no-store" });
+        const listData = await listRes.json();
+        if (listData?.success) {
+          setRegisteredStudentsList(listData.students || []);
+        }
+      } else {
+        alert(data.error || "فشل تفعيل الحساب");
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -928,11 +965,27 @@ export default function StudentPortalHubModal({
                         padding: "4px 10px", 
                         borderRadius: "8px", 
                         fontWeight: "bold",
-                        background: inspectedAccount.account?.status === 'suspended' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                        color: inspectedAccount.account?.status === 'suspended' ? '#f87171' : '#34d399',
-                        border: inspectedAccount.account?.status === 'suspended' ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)'
+                        background: inspectedAccount.account?.status === 'suspended' 
+                          ? 'rgba(239, 68, 68, 0.2)' 
+                          : (inspectedAccount.account?.status === 'pending' || (!inspectedAccount.account?.activated_by && !inspectedAccount.account?.is_pin_used))
+                            ? 'rgba(245, 158, 11, 0.2)'
+                            : 'rgba(16, 185, 129, 0.2)',
+                        color: inspectedAccount.account?.status === 'suspended' 
+                          ? '#f87171' 
+                          : (inspectedAccount.account?.status === 'pending' || (!inspectedAccount.account?.activated_by && !inspectedAccount.account?.is_pin_used))
+                            ? '#f59e0b'
+                            : '#34d399',
+                        border: inspectedAccount.account?.status === 'suspended' 
+                          ? '1px solid rgba(239, 68, 68, 0.4)' 
+                          : (inspectedAccount.account?.status === 'pending' || (!inspectedAccount.account?.activated_by && !inspectedAccount.account?.is_pin_used))
+                            ? '1px solid rgba(245, 158, 11, 0.4)'
+                            : '1px solid rgba(16, 185, 129, 0.4)'
                       }}>
-                        {inspectedAccount.account?.status === 'suspended' ? 'حساب معلق 🔒' : 'حساب نشط ومفعل ✅'}
+                        {inspectedAccount.account?.status === 'suspended' 
+                          ? 'حساب معلق 🔒' 
+                          : (inspectedAccount.account?.status === 'pending' || (!inspectedAccount.account?.activated_by && !inspectedAccount.account?.is_pin_used))
+                            ? 'قيد الانتظار (لم يعتمد بعد) ⏳'
+                            : 'حساب نشط ومفعل ✅'}
                       </span>
                     )}
                   </div>
@@ -974,8 +1027,12 @@ export default function StudentPortalHubModal({
                       {/* السطر الثالث: المنسق المعتمد */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
                         <span style={{ color: "#94a3b8", fontSize: "12px" }}>المنسق المعتمد:</span>
-                        <span style={{ color: "#34d399", fontWeight: "bold", fontSize: "12px" }}>
-                          {inspectedAccount.account?.activated_by || inspectedAccount.account?.pin_issued_by || "غير محدد"}
+                        <span style={{ 
+                          color: (inspectedAccount.account?.activated_by || inspectedAccount.account?.pin_issued_by) ? "#34d399" : "#f59e0b", 
+                          fontWeight: "bold", 
+                          fontSize: "12px" 
+                        }}>
+                          {inspectedAccount.account?.activated_by || inspectedAccount.account?.pin_issued_by || "غير معتمد بعد ⏳"}
                         </span>
                       </div>
 
@@ -983,10 +1040,42 @@ export default function StudentPortalHubModal({
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ color: "#94a3b8", fontSize: "12px" }}>تاريخ الاعتماد:</span>
                         <span style={{ color: "#cbd5e1", fontSize: "12px" }}>
-                          {inspectedAccount.account?.activated_at ? new Date(inspectedAccount.account.activated_at).toLocaleString("ar-EG") : "غير مسجل"}
+                          {inspectedAccount.account?.activated_at 
+                            ? new Date(inspectedAccount.account.activated_at).toLocaleString("ar-EG") 
+                            : (inspectedAccount.account?.activated_by ? "معتمد" : "غير مسجل (بانتظار الاعتماد)")}
                         </span>
                       </div>
                     </div>
+
+                    {/* زر اعتماد وتفعيل الحساب مباشرة إن لم يكن معتمداً */}
+                    {inspectedAccount.isRegistered && (!inspectedAccount.account?.activated_by || inspectedAccount.account?.status === 'pending') && (
+                      <div style={{ marginBottom: "16px" }}>
+                        <button
+                          type="button"
+                          onClick={handleDirectActivateInInspector}
+                          disabled={actionLoading}
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            background: "linear-gradient(135deg, #10b981, #059669)",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            fontWeight: "bold",
+                            cursor: actionLoading ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px",
+                            boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)"
+                          }}
+                        >
+                          <span>⚡</span>
+                          <span>{actionLoading ? "جاري الاعتماد والتفعيل..." : "اعتماد وتفعيل حساب الطالب الآن"}</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* الأجهزة المسجلة للطالب */}
                     {inspectedAccount.deviceSecurity?.devices?.length > 0 && (
@@ -1637,13 +1726,24 @@ export default function StudentPortalHubModal({
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setIsAccountsModalOpen(false)}
-                className="modal-close-btn"
-                title="إغلاق"
-              >
-                ✕
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => openRegisteredAccountsModal()}
+                  style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "bold" }}
+                  title="تحديث القائمة الآن"
+                >
+                  <RefreshCw size={13} className={loadingRegisteredList ? "animate-spin" : ""} />
+                  <span>تحديث</span>
+                </button>
+                <button
+                  onClick={() => setIsAccountsModalOpen(false)}
+                  className="modal-close-btn"
+                  title="إغلاق"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* شريط البحث الفوري */}
@@ -1699,7 +1799,9 @@ export default function StudentPortalHubModal({
                         <div title="تاريخ التسجيل على البوابة">
                           <span style={{ color: "#64748b" }}>سجّل في: </span>
                           <span style={{ color: "#cbd5e1" }}>
-                            {st.created_at ? new Date(st.created_at).toLocaleDateString("ar-EG") : "غير مسجل"}
+                            {st.created_at 
+                              ? new Date(st.created_at).toLocaleDateString("ar-EG") 
+                              : (st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "مسجل")}
                           </span>
                         </div>
 
@@ -1710,8 +1812,18 @@ export default function StudentPortalHubModal({
                           </span>
                         </div>
 
+                        <div title="حالة اعتماد الحساب">
+                          <span style={{ color: "#64748b" }}>الحالة: </span>
+                          <span style={{ 
+                            color: st.status === 'suspended' ? "#f87171" : (st.activated_by || st.status === 'active') ? "#34d399" : "#f59e0b", 
+                            fontWeight: "bold" 
+                          }}>
+                            {st.status === 'suspended' ? "معلق 🔒" : (st.activated_by || st.status === 'active') ? "مفعل ✅" : "قيد الاعتماد ⏳"}
+                          </span>
+                        </div>
+
                         <div title="المنسق الذي قام باعتماد وتفعيل الحساب">
-                          <span style={{ color: "#64748b" }}>المنسق المعتمد: </span>
+                          <span style={{ color: "#64748b" }}>المنسق: </span>
                           <span style={{ color: st.activated_by ? "#34d399" : "#f59e0b", fontWeight: "bold" }}>
                             {st.activated_by || "غير معتمد بعد"}
                           </span>

@@ -35,20 +35,35 @@ export async function GET(request: Request) {
       const { data } = await supabaseAdmin
         .from('student_accounts')
         .select('*')
-        .eq('student_code', student.student_code)
+        .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`)
         .maybeSingle();
       account = data;
     } catch (e) {}
 
     // التحقق من الحساب المخزن في جدول students (telegram_browser_id)
-    if (!account && student.telegram_browser_id) {
+    let telegramAccount: any = null;
+    if (student.telegram_browser_id) {
       try {
-        account = JSON.parse(student.telegram_browser_id);
+        telegramAccount = JSON.parse(student.telegram_browser_id);
       } catch (e) {}
     }
 
     if (!account) {
-      account = localStore.getAccount(student.student_code);
+      account = telegramAccount || localStore.getAccount(student.student_code) || localStore.getAccount(cleanCode);
+    } else if (telegramAccount) {
+      // دمج البيانات الذكي لاستعادة أي حقول اعتماد مفقودة
+      account = {
+        ...telegramAccount,
+        ...account,
+        activated_by: account.activated_by || telegramAccount.activated_by || telegramAccount.pin_issued_by || null,
+        activated_at: account.activated_at || telegramAccount.activated_at || telegramAccount.pin_issued_at || null,
+        status: (account.status === 'suspended' || telegramAccount.status === 'suspended')
+          ? 'suspended'
+          : (account.status === 'active' || telegramAccount.status === 'active' || telegramAccount.is_pin_used)
+            ? 'active'
+            : (account.status || telegramAccount.status || 'pending'),
+        created_at: account.created_at || telegramAccount.created_at || telegramAccount.activated_at || null
+      };
     }
 
     // 3. جلب سجل النشاط والتدقيق الأمني
@@ -262,6 +277,89 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'يرجى تحديد كود الطالب' }, { status: 400 });
     }
     const cleanCode = formatStudentCode(student_code);
+
+    // 0. اعتماد وتفعيل الحساب مباشرة
+    if (action === 'activate_account') {
+      const nowIso = new Date().toISOString();
+      const coordName = extra?.coordinator_name || 'إدارة المنظومة';
+
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({
+            status: 'active',
+            is_pin_used: true,
+            id_card_verified: true,
+            activated_by: coordName,
+            activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
+          })
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {
+        try {
+          await supabaseAdmin
+            .from('student_accounts')
+            .update({ status: 'active', is_pin_used: true })
+            .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+        } catch (e2) {}
+      }
+
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, student_code, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st) {
+          let parsed: any = {};
+          try { parsed = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
+          const merged = {
+            ...parsed,
+            student_code: st.student_code,
+            status: 'active',
+            is_pin_used: true,
+            id_card_verified: true,
+            activated_by: coordName,
+            activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
+          };
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(merged) })
+            .eq('id', st.id);
+        }
+      } catch (e) {}
+
+      try {
+        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
+        if (localAcc) {
+          localAcc.status = 'active';
+          localAcc.is_pin_used = true;
+          localAcc.activated_by = coordName;
+          localAcc.activated_at = nowIso;
+          localStore.upsertAccount(localAcc);
+        }
+      } catch (e) {}
+
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: 'account_activated_by_admin',
+          details: { activatedBy: coordName, timestamp: nowIso },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        status: 'active',
+        activated_by: coordName,
+        activated_at: nowIso,
+        message: 'تم اعتماد وتفعيل حساب الطالب بنجاح! أصبح الحساب نشطاً بالكامل.'
+      });
+    }
 
     // 1. تعليق أو تفعيل الحساب
     if (action === 'toggle_status') {

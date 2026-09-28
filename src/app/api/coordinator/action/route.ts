@@ -31,19 +31,32 @@ export async function POST(request: Request) {
         const { data } = await supabaseAdmin
           .from('student_accounts')
           .select('*')
-          .eq('student_code', student.student_code)
+          .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`)
           .maybeSingle();
         account = data;
       } catch (e) {}
 
-      if (!account && (student as any).telegram_browser_id) {
+      let telegramAccount: any = null;
+      if ((student as any).telegram_browser_id) {
         try {
-          account = JSON.parse((student as any).telegram_browser_id);
+          telegramAccount = JSON.parse((student as any).telegram_browser_id);
         } catch (e) {}
       }
 
       if (!account) {
-        account = localStore.getAccount(student.student_code);
+        account = telegramAccount || localStore.getAccount(student.student_code) || localStore.getAccount(cleanCode);
+      } else if (telegramAccount) {
+        account = {
+          ...telegramAccount,
+          ...account,
+          activated_by: account.activated_by || telegramAccount.activated_by || telegramAccount.pin_issued_by || null,
+          activated_at: account.activated_at || telegramAccount.activated_at || telegramAccount.pin_issued_at || null,
+          status: (account.status === 'suspended' || telegramAccount.status === 'suspended')
+            ? 'suspended'
+            : (account.status === 'active' || telegramAccount.status === 'active' || telegramAccount.is_pin_used)
+              ? 'active'
+              : (account.status || telegramAccount.status || 'pending'),
+        };
       }
 
       if (!account) {
@@ -90,41 +103,63 @@ export async function POST(request: Request) {
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
           })
-          .eq('student_code', cleanCode)
-          .select('*')
-          .single();
-        updatedAccount = res.data;
-      } catch (e) {}
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .select('*');
+        if (res.data && res.data.length > 0) {
+          updatedAccount = res.data[0];
+        }
+      } catch (e) {
+        try {
+          const res = await supabaseAdmin
+            .from('student_accounts')
+            .update({
+              status: 'active',
+              is_pin_used: true,
+            })
+            .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+            .select('*');
+          if (res.data && res.data.length > 0) {
+            updatedAccount = res.data[0];
+          }
+        } catch (e2) {}
+      }
 
       // تحديث students.telegram_browser_id
       try {
         const { data: st } = await supabaseAdmin
           .from('students')
-          .select('id, telegram_browser_id')
+          .select('id, student_code, telegram_browser_id')
           .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
           .maybeSingle();
 
         if (st) {
           let curr: any = {};
-          try { curr = JSON.parse(st.telegram_browser_id || '{}'); } catch(e){}
+          try { curr = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
           const merged = {
             ...curr,
+            student_code: st.student_code,
             status: 'active',
             is_pin_used: true,
             id_card_verified: true,
             activated_by: coordName,
             activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
           };
           await supabaseAdmin
             .from('students')
             .update({ telegram_browser_id: JSON.stringify(merged) })
             .eq('id', st.id);
           if (!updatedAccount) updatedAccount = merged;
+          else {
+            updatedAccount.activated_by = coordName;
+            updatedAccount.activated_at = nowIso;
+          }
         }
       } catch (e) {}
 
       // تحديث التخزين المحلي
-      const localAcc = localStore.getAccount(cleanCode);
+      const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
       if (localAcc) {
         localAcc.status = 'active';
         localAcc.is_pin_used = true;

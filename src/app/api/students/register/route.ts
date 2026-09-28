@@ -130,6 +130,7 @@ export async function POST(request: Request) {
       is_pin_used: false,
       status: 'pending',
       devices: updatedDevices,
+      created_at: existingAccount?.created_at || new Date().toISOString(),
       last_login_at: new Date().toISOString(),
     };
 
