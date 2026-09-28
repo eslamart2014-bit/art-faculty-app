@@ -40,9 +40,22 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
   }, [isOpen]);
 
   const fetchAvailableYears = async () => {
-    const { data } = await supabase.from("students").select("academic_year").eq("is_active", true);
-    if (data) {
-      const uniqueYears = Array.from(new Set(data.map((d: any) => d.academic_year))).filter(Boolean) as string[];
+    let all: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("students")
+        .select("academic_year")
+        .eq("is_active", true)
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      all = all.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+
+    if (all.length > 0) {
+      const uniqueYears = Array.from(new Set(all.map((d: any) => d.academic_year))).filter(Boolean) as string[];
       // Sort them roughly
       const sortOrder: Record<string, number> = { "الأولى": 1, "الاولي": 1, "الثانية": 2, "الثالثة": 3, "الرابعة": 4 };
       uniqueYears.sort((a, b) => (sortOrder[a] || 99) - (sortOrder[b] || 99));
@@ -61,34 +74,70 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
 
   const fetchAvailableSections = async (year: string) => {
     setLoadingSections(true);
-    // Fetch unique sections from students table for the selected year
-    const { data, error } = await supabase
-      .from("students")
-      .select("section")
-      .eq("academic_year", year);
+    let all: any[] = [];
+    let from = 0;
 
-    if (data && !error) {
-      const unique = Array.from(new Set(data.map((d: any) => String(d.section).trim()))).filter(Boolean) as string[];
+    // 1. First fetch active students in this academic year with pagination
+    while (true) {
+      const { data, error } = await supabase
+        .from("students")
+        .select("section")
+        .eq("academic_year", year)
+        .eq("is_active", true)
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      all = all.concat(data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+
+    // 2. Fallback if no active students found yet for this year
+    if (all.length === 0) {
+      from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("students")
+          .select("section")
+          .eq("academic_year", year)
+          .range(from, from + 999);
+        if (error || !data || data.length === 0) break;
+        all = all.concat(data);
+        if (data.length < 1000) break;
+        from += 1000;
+      }
+    }
+
+    if (all.length > 0) {
+      const unique = Array.from(new Set(all.map((d: any) => String(d.section).trim()))).filter(Boolean) as string[];
       unique.sort((a, b) => {
-        const numA = parseInt(a);
-        const numB = parseInt(b);
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
         if (!isNaN(numA) && !isNaN(numB)) {
           return numA - numB;
         }
         return a.localeCompare(b, 'ar');
       });
       setAvailableSections(unique);
+    } else {
+      setAvailableSections([]);
     }
     setLoadingSections(false);
   };
 
   const toggleSection = (sec: string) => {
-
     if (selectedSections.includes(sec)) {
       setSelectedSections(prev => prev.filter(s => s !== sec));
     } else {
       setSelectedSections(prev => [...prev, sec]);
     }
+  };
+
+  const selectAllSections = () => {
+    setSelectedSections([...availableSections]);
+  };
+
+  const deselectAllSections = () => {
+    setSelectedSections([]);
   };
 
   const saveCourse = async () => {
@@ -165,16 +214,38 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
           
           {courseType === "sections" && (
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "4px", display: "block", textAlign: "right" }}>4. السكاشن المتاحة:</label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <label style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", margin: 0, textAlign: "right" }}>
+                  4. السكاشن المتاحة {availableSections.length > 0 && `(${availableSections.length} سكشن)`}:
+                </label>
+                {availableSections.length > 0 && (
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button 
+                      type="button" 
+                      onClick={selectAllSections}
+                      style={{ background: "rgba(33, 150, 243, 0.15)", color: "var(--primary)", border: "1px solid var(--primary)", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", margin: 0 }}
+                    >
+                      تحديد الكل
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={deselectAllSections}
+                      style={{ background: "transparent", color: "var(--text-muted)", border: "1px solid #444", padding: "3px 8px", borderRadius: "4px", fontSize: "11px", cursor: "pointer", margin: 0 }}
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {!academicYear ? (
                 <div style={{ textAlign: "center", color: "#999", padding: "15px", border: "1px dashed #444", borderRadius: "8px" }}>اختر الفرقة أولاً</div>
               ) : loadingSections ? (
-                <div style={{ textAlign: "center", color: "#999", padding: "15px", border: "1px dashed #444", borderRadius: "8px" }}>جاري تحميل السكاشن...</div>
+                <div style={{ textAlign: "center", color: "#999", padding: "15px", border: "1px dashed #444", borderRadius: "8px" }}>جاري تحميل كافة السكاشن...</div>
               ) : availableSections.length === 0 ? (
                 <div style={{ textAlign: "center", color: "var(--danger)", padding: "15px", border: "1px dashed #444", borderRadius: "8px" }}>لم يتم العثور على أي سكاشن في قاعدة بيانات هذه الفرقة. تأكد من رفع كشوف الطلاب أولاً.</div>
               ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px", maxHeight: "150px", overflowY: "auto" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "10px", maxHeight: "160px", overflowY: "auto" }}>
                   {availableSections.map(sec => {
                     const isActive = selectedSections.includes(sec);
                     return (
