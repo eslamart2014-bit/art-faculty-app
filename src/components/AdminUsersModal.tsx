@@ -136,6 +136,24 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     }
   };
 
+  const handleDeleteInvitation = async (invId: string, email: string) => {
+    if (!confirm(`هل أنت متأكد من حذف هذه الدعوة المعلقة نهائياً؟\nالبريد: ${email}`)) return;
+    const { error } = await supabase.from("invitations").delete().eq("id", invId);
+    if (error) {
+      alert("خطأ أثناء الحذف: " + error.message);
+    } else {
+      fetchData();
+    }
+  };
+
+  const handleSelectPendingInvitation = (email: string) => {
+    setInviteEmail(email);
+    const nameInput = document.getElementById("invite-colleague-name");
+    if (nameInput) {
+      nameInput.focus();
+    }
+  };
+
   const handleToggleSuspend = async (user: any) => {
     const newStatus = !user.is_suspended;
     await supabase.from("profiles").update({ is_suspended: newStatus }).eq("id", user.id);
@@ -536,6 +554,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
             <div>
               <label style={{ fontSize: "12px", color: "#ccc", display: "block", marginBottom: "4px" }}>اسم الزميل (باللغة العربية):</label>
               <input 
+                id="invite-colleague-name"
                 type="text"
                 value={inviteFullName}
                 onChange={e => setInviteFullName(e.target.value)}
@@ -598,12 +617,84 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
         {/* Pending Invitations */}
         {invitations.length > 0 && (
           <div style={{ marginBottom: "25px" }}>
-            <h3 style={{ margin: "0 0 15px 0", color: "#aaa", fontSize: "14px" }}>دعوات في انتظار التسجيل ({invitations.length})</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <h3 style={{ margin: 0, color: "#ff9800", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>⏳</span> دعوات في انتظار التسجيل ({invitations.length})
+              </h3>
+              <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                اضغط "إكمال" لتوليد الحساب والكارت فوراً
+              </span>
+            </div>
+
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {invitations.map(inv => (
-                <div key={inv.id} style={{ background: "rgba(255, 152, 0, 0.1)", border: "1px solid rgba(255, 152, 0, 0.3)", padding: "12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "#fff", fontSize: "14px" }}>{inv.email}</span>
-                  <span style={{ color: "#FF9800", fontSize: "12px", fontWeight: "bold" }}>⏳ قيد الانتظار</span>
+                <div 
+                  key={inv.id} 
+                  style={{ 
+                    background: "rgba(255, 152, 0, 0.08)", 
+                    border: "1px solid rgba(255, 152, 0, 0.25)", 
+                    padding: "12px 14px", 
+                    borderRadius: "10px", 
+                    display: "flex", 
+                    justifyContent: "space-between", 
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "10px"
+                  }}
+                >
+                  <div>
+                    <div style={{ color: "#fff", fontSize: "14px", fontWeight: "bold", direction: "ltr", textAlign: "right" }}>
+                      {inv.email}
+                    </div>
+                    <div style={{ color: "#ff9800", fontSize: "11px", marginTop: "2px" }}>
+                      ⏳ دعوة معلقة (بانتظار الاسم وتوليد الحساب)
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPendingInvitation(inv.email)}
+                      style={{
+                        background: "rgba(34, 197, 94, 0.15)",
+                        color: "#22c55e",
+                        border: "1px solid rgba(34, 197, 94, 0.4)",
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                      title="استكمال بيانات الزميل وتوليد الحساب والكارت"
+                    >
+                      <span>⚡</span>
+                      <span>إكمال وتوليد الحساب</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteInvitation(inv.id, inv.email)}
+                      style={{
+                        background: "rgba(239, 68, 68, 0.15)",
+                        color: "#f87171",
+                        border: "1px solid rgba(239, 68, 68, 0.35)",
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                      title="حذف هذه الدعوة المعلقة"
+                    >
+                      <span>🗑️</span>
+                      <span>حذف</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
