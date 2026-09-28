@@ -56,9 +56,7 @@ export default function Home() {
       }
       const isFaculty = !!localStorage.getItem('cached_profile');
       const hasStudentSession = !!localStorage.getItem('fania_student_session');
-      const lastPortal = localStorage.getItem('fania_last_portal');
-      const appMode = localStorage.getItem('fania_app_mode');
-      if (!isFaculty && (hasStudentSession || lastPortal === '/system' || appMode === 'student')) {
+      if (!isFaculty && hasStudentSession) {
         return true;
       }
     }
@@ -84,10 +82,8 @@ export default function Home() {
       } else {
         const isFaculty = !!localStorage.getItem('cached_profile');
         const hasStudentSession = !!localStorage.getItem('fania_student_session');
-        const lastPortal = localStorage.getItem('fania_last_portal');
-        const appMode = localStorage.getItem('fania_app_mode');
 
-        if (!isFaculty && (hasStudentSession || lastPortal === '/system' || appMode === 'student')) {
+        if (!isFaculty && hasStudentSession) {
           setIsRedirectingToStudent(true);
           window.location.replace('/system');
           return;

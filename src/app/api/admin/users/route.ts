@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   try {
-    const { action, userId, newPassword, newRole, adminId } = await request.json();
+    const { action, userId, newPassword, newRole, adminId, email, fullName, degree } = await request.json();
 
     if (!adminId) {
       return NextResponse.json({ error: 'Missing adminId' }, { status: 401 });
@@ -43,9 +43,102 @@ export async function POST(request: Request) {
     }
 
     // Fetch target user to prevent Assistant from modifying Manager
-    const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
-    if (profile.role === 'مدير مساعد' && targetProfile?.role === 'مدير') {
-      return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
+    if (userId) {
+      const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', userId).maybeSingle();
+      if (profile.role === 'مدير مساعد' && targetProfile?.role === 'مدير') {
+        return NextResponse.json({ error: 'غير مصرح: لا يمكنك التعديل على حساب المدير الأساسي' }, { status: 403 });
+      }
+    }
+
+    if (action === 'create_faculty_user') {
+      if (!email || !fullName) {
+        return NextResponse.json({ error: 'يرجى إدخال اسم الزميل والبريد الإلكتروني' }, { status: 400 });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanName = fullName.trim();
+      const userDegree = degree || 'م';
+      
+      // Generate clean memorable password
+      const randomDigits = Math.floor(100000 + Math.random() * 900000);
+      const generatedPassword = `Art#${randomDigits}`;
+
+      let createdAuthUserId: string | null = null;
+      let isExisting = false;
+
+      // Try creating user in Supabase Auth
+      const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: cleanEmail,
+        password: generatedPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: cleanName,
+          degree: userDegree
+        }
+      });
+
+      if (createError) {
+        if (createError.message.toLowerCase().includes('already registered') || createError.message.toLowerCase().includes('already exists')) {
+          // If already exists, find user to update their password and profile
+          isExisting = true;
+          const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+          const found = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail);
+          if (found) {
+            createdAuthUserId = found.id;
+            await supabaseAdmin.auth.admin.updateUserById(found.id, {
+              password: generatedPassword,
+              user_metadata: { full_name: cleanName, degree: userDegree }
+            });
+          } else {
+            return NextResponse.json({ error: 'البريد مسجل مسبقاً ولكن تعذر العثور على الحساب لتحديثه.' }, { status: 400 });
+          }
+        } else {
+          return NextResponse.json({ error: 'خطأ في إنشاء الحساب: ' + createError.message }, { status: 400 });
+        }
+      } else if (createData?.user) {
+        createdAuthUserId = createData.user.id;
+      }
+
+      if (!createdAuthUserId) {
+        return NextResponse.json({ error: 'فشل إنشاء أو تحديث المستخدم' }, { status: 500 });
+      }
+
+      // Upsert profile
+      const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
+        id: createdAuthUserId,
+        email: cleanEmail,
+        full_name: cleanName,
+        degree: userDegree,
+        role: newRole || 'عضو هيئة تدريس',
+        is_suspended: false,
+        failed_attempts: 0,
+        locked_until: null
+      });
+
+      if (profileError) {
+        console.error('Error upserting profile:', profileError);
+      }
+
+      // Upsert invitations table as completed
+      try {
+        await supabaseAdmin.from('invitations').upsert({
+          email: cleanEmail,
+          created_by: adminId,
+          status: 'completed'
+        }, { onConflict: 'email' });
+      } catch (invErr) {
+        console.error('Error updating invitations:', invErr);
+      }
+
+      return NextResponse.json({
+        success: true,
+        userId: createdAuthUserId,
+        email: cleanEmail,
+        password: generatedPassword,
+        fullName: cleanName,
+        degree: userDegree,
+        isExisting
+      });
     }
 
     if (action === 'unlock') {
