@@ -164,6 +164,254 @@ export default function SystemPage() {
 
   const displayedProjects = projectSubTab === "required" ? requiredProjects : submittedProjects;
 
+  // -------------------------------------------------------------
+  // محرك الإشعارات الذكي وحساب الشارات الحمراء للتبويبات الـ 5
+  // -------------------------------------------------------------
+  const [seenNotifications, setSeenNotifications] = useState<{
+    seenProjects: Record<string, { seen: boolean; seenScore?: number | null }>;
+    seenAttendanceRecords: string[];
+    seenWarnings: string[];
+    seenLockerKey: string | null;
+    seenComplaintsReplies: string[];
+  }>({
+    seenProjects: {},
+    seenAttendanceRecords: [],
+    seenWarnings: [],
+    seenLockerKey: null,
+    seenComplaintsReplies: []
+  });
+
+  // استرجاع الإشعارات المقروءة الخاصة بالطالب الحالي من التخزين المحلي
+  useEffect(() => {
+    if (currentStudent?.student_code) {
+      try {
+        const stored = localStorage.getItem(`fania_seen_notifications_${currentStudent.student_code}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setSeenNotifications({
+            seenProjects: parsed.seenProjects || {},
+            seenAttendanceRecords: Array.isArray(parsed.seenAttendanceRecords) ? parsed.seenAttendanceRecords : [],
+            seenWarnings: Array.isArray(parsed.seenWarnings) ? parsed.seenWarnings : [],
+            seenLockerKey: parsed.seenLockerKey ?? null,
+            seenComplaintsReplies: Array.isArray(parsed.seenComplaintsReplies) ? parsed.seenComplaintsReplies : []
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to load seen notifications", e);
+      }
+    }
+  }, [currentStudent?.student_code]);
+
+  // حفظ التحديثات في التخزين المحلي للطالب
+  const saveSeenNotifications = (updater: (prev: typeof seenNotifications) => typeof seenNotifications) => {
+    setSeenNotifications(prev => {
+      const next = updater(prev);
+      if (currentStudent?.student_code) {
+        try {
+          localStorage.setItem(`fania_seen_notifications_${currentStudent.student_code}`, JSON.stringify(next));
+        } catch (e) {}
+      }
+      return next;
+    });
+  };
+
+  // 1. تعليم مشروع معين كمقروء عند فتحه
+  const markProjectAsSeen = (proj: any) => {
+    if (!proj) return;
+    const key = `${proj.courseId}_${proj.title || proj.id}`;
+    saveSeenNotifications(prev => ({
+      ...prev,
+      seenProjects: {
+        ...prev.seenProjects,
+        [key]: {
+          seen: true,
+          seenScore: proj.isGraded ? proj.score : null
+        }
+      }
+    }));
+  };
+
+  // 2. تعليم كافة سجلات الحضور الحالية كمقروءة عند فتح تبويب الحضور
+  const markAttendanceAsSeen = () => {
+    if (!dashboardData?.attendance) return;
+    const allRecords: string[] = [];
+    (dashboardData.attendance || []).forEach((c: any) => {
+      (c.records || []).forEach((r: any) => {
+        allRecords.push(`${c.courseId}_${r.date}_${r.status}`);
+      });
+    });
+    saveSeenNotifications(prev => ({
+      ...prev,
+      seenAttendanceRecords: Array.from(new Set([...(prev.seenAttendanceRecords || []), ...allRecords]))
+    }));
+  };
+
+  // 3. تعليم الإنذارات الحالية كمقروءة عند فتح تبويب الإنذارات
+  const markWarningsAsSeen = () => {
+    if (!dashboardData?.warnings) return;
+    const allWarnKeys: string[] = [];
+    (dashboardData.warnings || []).forEach((w: any) => {
+      allWarnKeys.push(`${w.courseId}_absent_${w.absent}`);
+    });
+    saveSeenNotifications(prev => ({
+      ...prev,
+      seenWarnings: Array.from(new Set([...(prev.seenWarnings || []), ...allWarnKeys]))
+    }));
+  };
+
+  // 4. تعليم حالة الدواليب كمقروءة عند فتح تبويب الدواليب
+  const markLockerAsSeen = () => {
+    const locker = dashboardData?.locker;
+    const booking = locker?.booking || locker;
+    const currentKey = `${booking?.id || ''}_${booking?.status || ''}_${booking?.locker_number || ''}`;
+    saveSeenNotifications(prev => ({
+      ...prev,
+      seenLockerKey: currentKey
+    }));
+  };
+
+  // 5. تعليم ردود الشكاوى كمقروءة عند فتح تبويب الشكاوى
+  const markComplaintsAsSeen = () => {
+    if (!dashboardData?.complaints) return;
+    const repliedIds: string[] = [];
+    (dashboardData.complaints || []).forEach((c: any) => {
+      const hasReply = c.status === 'تم الرد' || Boolean(c.admin_reply) || Boolean(c.officialReply);
+      if (hasReply && c.id) {
+        repliedIds.push(String(c.id));
+      }
+    });
+    saveSeenNotifications(prev => ({
+      ...prev,
+      seenComplaintsReplies: Array.from(new Set([...(prev.seenComplaintsReplies || []), ...repliedIds]))
+    }));
+  };
+
+  // دالة موحدة لفتح كارت المشروع وتعليمه كمقروء
+  const handleSelectProjectForView = (proj: any) => {
+    setSelectedProjectForView(proj);
+    markProjectAsSeen(proj);
+  };
+
+  // عند تحديث بيانات المشروع المفتوح حالياً إذا رُصدت له درجة
+  useEffect(() => {
+    if (selectedProjectForView) {
+      markProjectAsSeen(selectedProjectForView);
+    }
+  }, [selectedProjectForView?.score, selectedProjectForView?.isGraded]);
+
+  // حساب الأعداد الدقيقة للإشعارات غير المقروءة لكل تبويب
+  const unreadProjectsCount = useMemo(() => {
+    if (!dashboardData?.projects) return 0;
+    let count = 0;
+    const seenMap = seenNotifications.seenProjects || {};
+
+    allStudentProjects.forEach((proj: any) => {
+      const key = `${proj.courseId}_${proj.title || proj.id}`;
+      const rec = seenMap[key];
+      if (!rec) {
+        // مشروع جديد بالكامل لم يفتحه الطالب
+        count++;
+      } else if (proj.isGraded) {
+        // مشروع تم رصد درجة له: هل رآها الطالب؟
+        const seenScore = rec.seenScore;
+        if (seenScore === undefined || seenScore === null || Number(seenScore) !== Number(proj.score)) {
+          count++;
+        }
+      }
+    });
+
+    return count;
+  }, [dashboardData?.projects, allStudentProjects, seenNotifications.seenProjects]);
+
+  const unreadRequiredCount = useMemo(() => {
+    const seenMap = seenNotifications.seenProjects || {};
+    return requiredProjects.filter((p: any) => {
+      const k = `${p.courseId}_${p.title || p.id}`;
+      return !seenMap[k];
+    }).length;
+  }, [requiredProjects, seenNotifications.seenProjects]);
+
+  const unreadSubmittedCount = useMemo(() => {
+    const seenMap = seenNotifications.seenProjects || {};
+    return submittedProjects.filter((p: any) => {
+      const k = `${p.courseId}_${p.title || p.id}`;
+      const r = seenMap[k];
+      if (!r) return true;
+      if (p.isGraded) {
+        const ss = r.seenScore;
+        if (ss === undefined || ss === null || Number(ss) !== Number(p.score)) return true;
+      }
+      return false;
+    }).length;
+  }, [submittedProjects, seenNotifications.seenProjects]);
+
+  const unreadAttendanceCount = useMemo(() => {
+    if (!dashboardData?.attendance) return 0;
+    const seenSet = new Set(seenNotifications.seenAttendanceRecords || []);
+    let count = 0;
+    (dashboardData.attendance || []).forEach((c: any) => {
+      (c.records || []).forEach((r: any) => {
+        const key = `${c.courseId}_${r.date}_${r.status}`;
+        if (!seenSet.has(key)) {
+          count++;
+        }
+      });
+    });
+    return count;
+  }, [dashboardData?.attendance, seenNotifications.seenAttendanceRecords]);
+
+  const unreadWarningsCount = useMemo(() => {
+    if (!dashboardData?.warnings) return 0;
+    const seenSet = new Set(seenNotifications.seenWarnings || []);
+    let count = 0;
+    (dashboardData.warnings || []).forEach((w: any) => {
+      const key = `${w.courseId}_absent_${w.absent}`;
+      if (!seenSet.has(key)) {
+        count++;
+      }
+    });
+    return count;
+  }, [dashboardData?.warnings, seenNotifications.seenWarnings]);
+
+  const unreadLockersCount = useMemo(() => {
+    const locker = dashboardData?.locker;
+    if (!locker) return 0;
+    const booking = locker?.booking || locker;
+    if (booking && (booking.status || booking.locker_number || booking.id)) {
+      const currentKey = `${booking.id || ''}_${booking.status || ''}_${booking.locker_number || ''}`;
+      if (seenNotifications.seenLockerKey !== currentKey) {
+        return 1;
+      }
+    }
+    return 0;
+  }, [dashboardData?.locker, seenNotifications.seenLockerKey]);
+
+  const unreadComplaintsCount = useMemo(() => {
+    if (!dashboardData?.complaints) return 0;
+    const seenSet = new Set(seenNotifications.seenComplaintsReplies || []);
+    let count = 0;
+    (dashboardData.complaints || []).forEach((c: any) => {
+      const hasReply = c.status === 'تم الرد' || Boolean(c.admin_reply) || Boolean(c.officialReply);
+      if (hasReply && c.id && !seenSet.has(String(c.id))) {
+        count++;
+      }
+    });
+    return count;
+  }, [dashboardData?.complaints, seenNotifications.seenComplaintsReplies]);
+
+  // مسح الإشعار تلقائياً إذا كان الطالب متواجداً بالفعل في التبويب ووردت بيانات جديدة
+  useEffect(() => {
+    if (activeTab === "attendance" && unreadAttendanceCount > 0) {
+      markAttendanceAsSeen();
+    } else if (activeTab === "warnings" && unreadWarningsCount > 0) {
+      markWarningsAsSeen();
+    } else if (activeTab === "lockers" && unreadLockersCount > 0) {
+      markLockerAsSeen();
+    } else if (activeTab === "complaints" && unreadComplaintsCount > 0) {
+      markComplaintsAsSeen();
+    }
+  }, [activeTab, unreadAttendanceCount, unreadWarningsCount, unreadLockersCount, unreadComplaintsCount]);
+
   const activeCourseAssignedProjects = selectedCourseForEval?.assignedProjects || [];
   const activeCourseSubmissions = selectedCourseForEval?.submissions || [];
 
@@ -1516,22 +1764,23 @@ export default function SystemPage() {
             width: "100%"
           }}
         >
-          {(() => {
-            const repliedComplaintsCount = (dashboardData?.complaints || []).filter((c: any) => c.status === 'تم الرد' || Boolean(c.officialReply)).length;
-            return [
-              { id: "evaluation", label: "المشاريع 🎨", color: "#10b981" },
-              { id: "attendance", label: "الحضور 📅", color: "#38bdf8" },
-              { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: dashboardData?.warnings?.length || 0 },
-              { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7" },
-              { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b", badge: repliedComplaintsCount }
-            ];
-          })().map(tab => {
+          {[
+            { id: "evaluation", label: "المشاريع 🎨", color: "#10b981", badge: unreadProjectsCount },
+            { id: "attendance", label: "الحضور 📅", color: "#38bdf8", badge: unreadAttendanceCount },
+            { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: unreadWarningsCount },
+            { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7", badge: unreadLockersCount },
+            { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b", badge: unreadComplaintsCount }
+          ].map(tab => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id as any);
+                  if (tab.id === "attendance") markAttendanceAsSeen();
+                  if (tab.id === "warnings") markWarningsAsSeen();
+                  if (tab.id === "lockers") markLockerAsSeen();
+                  if (tab.id === "complaints") markComplaintsAsSeen();
                   if (tab.id !== "evaluation") {
                     setSelectedProjectForView(null);
                     setSelectedCourseForEval(null);
@@ -1558,19 +1807,30 @@ export default function SystemPage() {
               >
                 <span>{tab.label}</span>
                 {tab.badge && tab.badge > 0 ? (
-                  <span style={{
-                    position: "absolute",
-                    top: "-5px",
-                    left: "2px",
-                    background: "#ef4444",
-                    color: "#fff",
-                    borderRadius: "999px",
-                    padding: "1px 6px",
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    boxShadow: "0 0 8px rgba(239, 68, 68, 0.8)"
-                  }}>
-                    {tab.badge}
+                  <span 
+                    title={`${tab.badge} جديد`}
+                    style={{
+                      position: "absolute",
+                      top: "-7px",
+                      left: "-2px",
+                      background: "#ef4444",
+                      color: "#fff",
+                      borderRadius: "999px",
+                      minWidth: "19px",
+                      height: "19px",
+                      padding: "0 4px",
+                      fontSize: "10px",
+                      fontWeight: "900",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 0 10px rgba(239, 68, 68, 0.85), 0 2px 4px rgba(0,0,0,0.5)",
+                      border: "2px solid #0b1120",
+                      zIndex: 10,
+                      animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                    }}
+                  >
+                    {tab.badge > 99 ? "+99" : tab.badge}
                   </span>
                 ) : null}
               </button>
@@ -1611,29 +1871,74 @@ export default function SystemPage() {
                         border: projectCourseFilter === "all" ? "1px solid #38bdf8" : "1px solid #2a374f",
                         background: projectCourseFilter === "all" ? "rgba(56, 189, 248, 0.2)" : "rgba(255,255,255,0.03)",
                         color: projectCourseFilter === "all" ? "#fff" : "#94a3b8",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
                       }}
                     >
-                      كافة المقررات ({allStudentProjects.length})
+                      <span>كافة المقررات ({allStudentProjects.length})</span>
+                      {unreadProjectsCount > 0 && (
+                        <span style={{
+                          background: "#ef4444",
+                          color: "#fff",
+                          borderRadius: "999px",
+                          fontSize: "10px",
+                          fontWeight: "bold",
+                          padding: "1px 6px"
+                        }}>
+                          {unreadProjectsCount}
+                        </span>
+                      )}
                     </button>
-                    {dashboardData.projects.map((c: any) => (
-                      <button
-                        key={c.courseId}
-                        onClick={() => setProjectCourseFilter(c.courseId)}
-                        className="btn-compact"
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                          border: projectCourseFilter === c.courseId ? "1px solid #10b981" : "1px solid #2a374f",
-                          background: projectCourseFilter === c.courseId ? "rgba(16, 185, 129, 0.2)" : "rgba(255,255,255,0.03)",
-                          color: projectCourseFilter === c.courseId ? "#fff" : "#94a3b8",
-                          cursor: "pointer"
-                        }}
-                      >
-                        {c.courseName}
-                      </button>
-                    ))}
+                    {dashboardData.projects.map((c: any) => {
+                      const courseUnread = allStudentProjects.filter((p: any) => {
+                        if (p.courseId !== c.courseId) return false;
+                        const k = `${p.courseId}_${p.title || p.id}`;
+                        const r = seenNotifications.seenProjects?.[k];
+                        if (!r) return true;
+                        if (p.isGraded) {
+                          const ss = r.seenScore;
+                          if (ss === undefined || ss === null || Number(ss) !== Number(p.score)) return true;
+                        }
+                        return false;
+                      }).length;
+
+                      return (
+                        <button
+                          key={c.courseId}
+                          onClick={() => setProjectCourseFilter(c.courseId)}
+                          className="btn-compact"
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            border: projectCourseFilter === c.courseId ? "1px solid #10b981" : "1px solid #2a374f",
+                            background: projectCourseFilter === c.courseId ? "rgba(16, 185, 129, 0.2)" : "rgba(255,255,255,0.03)",
+                            color: projectCourseFilter === c.courseId ? "#fff" : "#94a3b8",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <span>{c.courseName}</span>
+                          {courseUnread > 0 && (
+                            <span style={{
+                              background: "#ef4444",
+                              color: "#fff",
+                              borderRadius: "999px",
+                              fontSize: "10px",
+                              fontWeight: "bold",
+                              padding: "1px 6px",
+                              boxShadow: "0 0 6px rgba(239, 68, 68, 0.6)"
+                            }}>
+                              {courseUnread}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -1654,7 +1959,8 @@ export default function SystemPage() {
                       justifyContent: "center",
                       gap: "8px",
                       cursor: "pointer",
-                      transition: "all 0.2s"
+                      transition: "all 0.2s",
+                      position: "relative"
                     }}
                   >
                     <span>⏳ المشروعات المطلوبة</span>
@@ -1668,6 +1974,26 @@ export default function SystemPage() {
                     }}>
                       {requiredProjects.length}
                     </span>
+                    {unreadRequiredCount > 0 && (
+                      <span style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        borderRadius: "999px",
+                        minWidth: "18px",
+                        height: "18px",
+                        padding: "0 5px",
+                        fontSize: "10px",
+                        fontWeight: "900",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 8px rgba(239, 68, 68, 0.8)",
+                        border: "1.5px solid #0b1120",
+                        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                      }}>
+                        {unreadRequiredCount}
+                      </span>
+                    )}
                   </button>
 
                   <button
@@ -1685,7 +2011,8 @@ export default function SystemPage() {
                       justifyContent: "center",
                       gap: "8px",
                       cursor: "pointer",
-                      transition: "all 0.2s"
+                      transition: "all 0.2s",
+                      position: "relative"
                     }}
                   >
                     <span>✅ المشروعات المُسلَّمة</span>
@@ -1699,6 +2026,26 @@ export default function SystemPage() {
                     }}>
                       {submittedProjects.length}
                     </span>
+                    {unreadSubmittedCount > 0 && (
+                      <span style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        borderRadius: "999px",
+                        minWidth: "18px",
+                        height: "18px",
+                        padding: "0 5px",
+                        fontSize: "10px",
+                        fontWeight: "900",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 8px rgba(239, 68, 68, 0.8)",
+                        border: "1.5px solid #0b1120",
+                        animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                      }}>
+                        {unreadSubmittedCount}
+                      </span>
+                    )}
                   </button>
                 </div>
 
@@ -1706,6 +2053,12 @@ export default function SystemPage() {
                 {displayedProjects.length > 0 ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
                     {displayedProjects.map((proj: any) => {
+                      const projKey = `${proj.courseId}_${proj.title || proj.id}`;
+                      const seenRec = seenNotifications.seenProjects?.[projKey];
+                      const isNewProject = !seenRec;
+                      const hasNewGrade = proj.isGraded && (seenRec?.seenScore === undefined || seenRec?.seenScore === null || Number(seenRec?.seenScore) !== Number(proj.score));
+                      const isCardUnread = isNewProject || hasNewGrade;
+
                       const activeDeadline = proj.multiStageEnabled
                         ? (!proj.hasStage1Image ? (proj.stage1Deadline || proj.submissionDeadline) : (!proj.hasStage2Image ? (proj.stage2Deadline || proj.submissionDeadline) : null))
                         : (!proj.isSubmitted ? proj.submissionDeadline : null);
@@ -1715,10 +2068,13 @@ export default function SystemPage() {
                       return (
                         <div
                           key={`${proj.courseId}_${proj.id || proj.title}`}
-                          onClick={() => setSelectedProjectForView(proj)}
+                          onClick={() => handleSelectProjectForView(proj)}
                           style={{
                             background: "#141b29",
-                            border: proj.isGraded ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid #2a374f",
+                            border: isCardUnread 
+                              ? "2px solid #ef4444" 
+                              : (proj.isGraded ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid #2a374f"),
+                            boxShadow: isCardUnread ? "0 0 16px rgba(239, 68, 68, 0.35)" : "none",
                             borderRadius: "14px",
                             padding: "16px",
                             cursor: "pointer",
@@ -1729,14 +2085,38 @@ export default function SystemPage() {
                             position: "relative"
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = "#38bdf8";
+                            e.currentTarget.style.borderColor = isCardUnread ? "#f87171" : "#38bdf8";
                             e.currentTarget.style.transform = "translateY(-2px)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = proj.isGraded ? "rgba(239, 68, 68, 0.6)" : "#2a374f";
+                            e.currentTarget.style.borderColor = isCardUnread ? "#ef4444" : (proj.isGraded ? "rgba(239, 68, 68, 0.6)" : "#2a374f");
                             e.currentTarget.style.transform = "translateY(0)";
                           }}
                         >
+                          {/* شارة إشعار غير مقروء لكارت المشروع */}
+                          {isCardUnread && (
+                            <div style={{
+                              position: "absolute",
+                              top: "-9px",
+                              left: "14px",
+                              background: "#ef4444",
+                              color: "#fff",
+                              padding: "2px 9px",
+                              borderRadius: "999px",
+                              fontSize: "10px",
+                              fontWeight: "900",
+                              boxShadow: "0 0 10px rgba(239, 68, 68, 0.85)",
+                              border: "2px solid #0b1120",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              zIndex: 4,
+                              animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                            }}>
+                              <span style={{ fontSize: "8px" }}>🔴</span>
+                              <span>{hasNewGrade ? `درجة جديدة: ${proj.score}` : "مشروع جديد"}</span>
+                            </div>
+                          )}
                           {/* رأس الكارت: اسم المشروع وحالة الرفع والمؤقت */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                             <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px", lineHeight: "1.4" }}>
