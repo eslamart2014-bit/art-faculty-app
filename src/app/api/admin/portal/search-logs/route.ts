@@ -14,7 +14,7 @@ export async function GET(request: Request) {
         .select('*')
         .in('action', ['student_search', 'download_card', 'view_card', 'student_lookup'])
         .order('created_at', { ascending: false })
-        .limit(300);
+        .limit(1000);
       logs = data || [];
     } catch (dbErr) {
       console.warn('Failed fetching logs from Supabase:', dbErr);
@@ -38,8 +38,25 @@ export async function GET(request: Request) {
     logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     // 2. تحليل الأجهزة واكتشاف من بحث عن أكثر من طالب من نفس الموبايل
-    // خريطة: device_id -> Set of student_codes
-    const deviceStudentsMap = new Map<string, { codes: Set<string>; names: Set<string>; lastSeen: string; userAgent: string }>();
+    // تتبع الطلاب وتواريخ ظهورهم على كل جهاز لتحديد صاحب الهاتف الأصلي (الأسبق زمنياً)
+    interface DeviceStudentInfo {
+      student_code: string;
+      student_name: string;
+      academic_year: string;
+      section: string;
+      firstSeenAt: string;
+      lastSeenAt: string;
+      count: number;
+    }
+
+    interface DeviceTrackingEntry {
+      deviceId: string;
+      userAgent: string;
+      lastSeen: string;
+      studentsMap: Map<string, DeviceStudentInfo>;
+    }
+
+    const deviceTrackingMap = new Map<string, DeviceTrackingEntry>();
 
     let totalSearches = 0;
     const qrDownloadedStudentCodes = new Set<string>();
@@ -58,7 +75,7 @@ export async function GET(request: Request) {
 
       const devId = isValidDevId ? rawDevId : null;
 
-      const sCode = log.student_code && !log.student_code.startsWith('query:') ? log.student_code : null;
+      const sCode = log.student_code && !log.student_code.startsWith('query:') ? String(log.student_code).trim() : null;
       const sName = log.details?.student_name || null;
 
       if (log.action === 'student_search' || log.action === 'student_lookup') {
@@ -69,29 +86,98 @@ export async function GET(request: Request) {
       }
 
       if (devId && sCode) {
-        if (!deviceStudentsMap.has(devId)) {
-          deviceStudentsMap.set(devId, {
-            codes: new Set<string>(),
-            names: new Set<string>(),
+        if (!deviceTrackingMap.has(devId)) {
+          deviceTrackingMap.set(devId, {
+            deviceId: devId,
+            userAgent: log.user_agent || '',
             lastSeen: log.created_at,
-            userAgent: log.user_agent || ''
+            studentsMap: new Map<string, DeviceStudentInfo>()
           });
         }
-        const devEntry = deviceStudentsMap.get(devId)!;
-        devEntry.codes.add(sCode);
-        if (sName) devEntry.names.add(sName);
+        const devEntry = deviceTrackingMap.get(devId)!;
+        if (!devEntry.userAgent && log.user_agent) devEntry.userAgent = log.user_agent;
+        if (new Date(log.created_at).getTime() > new Date(devEntry.lastSeen).getTime()) {
+          devEntry.lastSeen = log.created_at;
+        }
+
+        const logTime = log.created_at;
+        if (!devEntry.studentsMap.has(sCode)) {
+          devEntry.studentsMap.set(sCode, {
+            student_code: sCode,
+            student_name: sName || 'طالب غير محدد',
+            academic_year: log.details?.academic_year || 'غير محدد',
+            section: log.details?.section || 'عام',
+            firstSeenAt: logTime,
+            lastSeenAt: logTime,
+            count: 1
+          });
+        } else {
+          const st = devEntry.studentsMap.get(sCode)!;
+          if (new Date(logTime).getTime() < new Date(st.firstSeenAt).getTime()) {
+            st.firstSeenAt = logTime;
+          }
+          if (new Date(logTime).getTime() > new Date(st.lastSeenAt).getTime()) {
+            st.lastSeenAt = logTime;
+          }
+          if (sName && (!st.student_name || st.student_name === 'طالب غير محدد')) {
+            st.student_name = sName;
+          }
+          if (log.details?.academic_year && st.academic_year === 'غير محدد') {
+            st.academic_year = log.details.academic_year;
+          }
+          if (log.details?.section && st.section === 'عام') {
+            st.section = log.details.section;
+          }
+          st.count++;
+        }
       }
     });
 
-    // 3. بناء قائمة الأجهزة المشبوهة (التي بحثت عن أكثر من طالب)
+    // 3. بناء قائمة الأجهزة المشبوهة وتحديد صاحب الجهاز الأصلي (الباحث الأول زمنياً)
     const suspiciousDevices: any[] = [];
-    deviceStudentsMap.forEach((entry, devId) => {
-      if (entry.codes.size > 1) {
+    const devicePrimaryMap = new Map<string, {
+      primaryStudent: DeviceStudentInfo;
+      otherStudents: DeviceStudentInfo[];
+      studentsList: DeviceStudentInfo[];
+    }>();
+
+    deviceTrackingMap.forEach((entry, devId) => {
+      const studentsList = Array.from(entry.studentsMap.values());
+      // إذا كان الجهاز قد استعلم عن أكثر من طالب (2 فأكثر)
+      if (studentsList.length > 1) {
+        // ترتيب تصاعدي زمني: الأسبق تاريخاً وظهوراً هو صاحب الهاتف الذي بحث عن الباقين
+        studentsList.sort((a, b) => new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime());
+
+        const primaryStudent = studentsList[0];
+        const otherStudents = studentsList.slice(1);
+
+        devicePrimaryMap.set(devId, {
+          primaryStudent,
+          otherStudents,
+          studentsList
+        });
+
         suspiciousDevices.push({
           deviceId: devId,
-          studentCount: entry.codes.size,
-          studentCodes: Array.from(entry.codes),
-          studentNames: Array.from(entry.names),
+          studentCount: studentsList.length,
+          primaryStudent: {
+            student_code: primaryStudent.student_code,
+            student_name: primaryStudent.student_name,
+            academic_year: primaryStudent.academic_year,
+            section: primaryStudent.section,
+            firstSeenAt: primaryStudent.firstSeenAt,
+            searchCount: primaryStudent.count
+          },
+          otherStudents: otherStudents.map(s => ({
+            student_code: s.student_code,
+            student_name: s.student_name,
+            academic_year: s.academic_year,
+            section: s.section,
+            firstSeenAt: s.firstSeenAt,
+            searchCount: s.count
+          })),
+          studentCodes: studentsList.map(s => s.student_code),
+          studentNames: studentsList.map(s => s.student_name),
           lastSeen: entry.lastSeen,
           userAgent: entry.userAgent
         });
@@ -101,7 +187,7 @@ export async function GET(request: Request) {
     // ترتيب الأجهزة المشبوهة بالأعلى عدداً
     suspiciousDevices.sort((a, b) => b.studentCount - a.studentCount);
 
-    // 4. إثراء كل سجل في القائمة بمعلومات التحذير إذا كان الجهاز مشبوهاً
+    // 4. إثراء كل سجل في القائمة بمعلومات التحذير إذا كان الجهاز مشبوهاً مع عزل صاحب الجهاز الأصلي
     const formattedLogs = logs.map(log => {
       const rawDevId = log.device_id;
       const isValidDevId = rawDevId && 
@@ -112,10 +198,17 @@ export async function GET(request: Request) {
         rawDevId.length >= 8;
 
       const devId = isValidDevId ? rawDevId : null;
-      const deviceData = devId ? deviceStudentsMap.get(devId) : null;
-      const isSuspicious = deviceData ? deviceData.codes.size > 1 : false;
-      const otherStudents = deviceData && isSuspicious
-        ? Array.from(deviceData.names).filter(n => n !== log.details?.student_name)
+      const pData = devId ? devicePrimaryMap.get(devId) : null;
+      const isSuspicious = !!pData;
+
+      const sCode = log.student_code && !log.student_code.startsWith('query:') ? String(log.student_code).trim() : null;
+
+      const isPrimaryOwner = isSuspicious && pData ? sCode === pData.primaryStudent.student_code : false;
+      const primaryOwnerName = pData ? pData.primaryStudent.student_name : null;
+      const primaryOwnerCode = pData ? pData.primaryStudent.student_code : null;
+
+      const otherStudentsNames = isSuspicious && pData
+        ? pData.studentsList.filter(s => s.student_code !== sCode).map(s => s.student_name)
         : [];
 
       return {
@@ -131,8 +224,12 @@ export async function GET(request: Request) {
         ip: log.details?.ip,
         created_at: log.created_at,
         is_suspicious_device: isSuspicious,
-        device_searched_count: deviceData ? deviceData.codes.size : 1,
-        other_students: otherStudents
+        device_searched_count: pData ? pData.studentsList.length : 1,
+        is_primary_device_owner: isPrimaryOwner,
+        primary_owner_name: primaryOwnerName,
+        primary_owner_code: primaryOwnerCode,
+        other_students: otherStudentsNames,
+        other_students_details: isSuspicious && isPrimaryOwner ? pData.otherStudents : []
       };
     });
 
@@ -143,7 +240,8 @@ export async function GET(request: Request) {
         totalSearches,
         totalQrDownloads,
         uniqueQrStudentsCount: qrDownloadedStudentCodes.size,
-        suspiciousDevicesCount: suspiciousDevices.length
+        suspiciousDevicesCount: suspiciousDevices.length,
+        primaryOwnersCount: suspiciousDevices.length
       },
       suspiciousDevices,
       logs: formattedLogs

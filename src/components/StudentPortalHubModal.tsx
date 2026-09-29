@@ -100,7 +100,7 @@ export default function StudentPortalHubModal({
   // Search Logs State (سجلات البحث والاستعلام الأمني)
   const [searchLogsData, setSearchLogsData] = useState<any>(null);
   const [loadingSearchLogs, setLoadingSearchLogs] = useState(false);
-  const [searchLogsFilter, setSearchLogsFilter] = useState<"all" | "qr_only" | "suspicious_only">("all");
+  const [searchLogsFilter, setSearchLogsFilter] = useState<"all" | "qr_only" | "suspicious_only" | "primary_only">("all");
   const [searchLogsTextFilter, setSearchLogsTextFilter] = useState("");
 
   // Modal: Registered Accounts List (عند النقر على مربع الإحصائيات)
@@ -468,13 +468,15 @@ export default function StudentPortalHubModal({
   const filteredSearchLogs = (searchLogsData?.logs || []).filter((log: any) => {
     if (searchLogsFilter === "qr_only" && log.action !== "download_card") return false;
     if (searchLogsFilter === "suspicious_only" && !log.is_suspicious_device) return false;
+    if (searchLogsFilter === "primary_only" && (!log.is_suspicious_device || !log.is_primary_device_owner)) return false;
 
     if (searchLogsTextFilter.trim()) {
       const q = searchLogsTextFilter.trim().toLowerCase();
       const nameMatch = log.student_name && log.student_name.toLowerCase().includes(q);
       const codeMatch = log.student_code && String(log.student_code).includes(q);
       const otherMatch = log.other_students && log.other_students.some((s: string) => s.toLowerCase().includes(q));
-      if (!nameMatch && !codeMatch && !otherMatch) return false;
+      const primaryMatch = log.primary_owner_name && log.primary_owner_name.toLowerCase().includes(q);
+      if (!nameMatch && !codeMatch && !otherMatch && !primaryMatch) return false;
     }
     return true;
   });
@@ -1304,11 +1306,40 @@ export default function StudentPortalHubModal({
                     {/* قائمة الطلاب في هذا الجهاز المشترك */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {dev.accounts.map((acc: any, aIdx: number) => (
-                        <div key={aIdx} style={{ background: "#0d131f", padding: "10px", borderRadius: "8px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                        <div
+                          key={aIdx}
+                          style={{
+                            background: acc.isPrimaryOwner ? "rgba(16, 185, 129, 0.08)" : "#0d131f",
+                            padding: "10px 14px",
+                            borderRadius: "8px",
+                            border: acc.isPrimaryOwner ? "1.5px solid #10b981" : "1px solid #1e293b",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: "8px"
+                          }}
+                        >
                           <div>
-                            <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>{acc.full_name}</span>
-                            <span style={{ color: "#38bdf8", fontSize: "11px", marginRight: "8px" }}>كود: {acc.student_code}</span>
-                            {acc.mobile && <span style={{ color: "#94a3b8", fontSize: "11px", marginRight: "8px", direction: "ltr", display: "inline-block" }}>📱 {acc.mobile}</span>}
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              {acc.isPrimaryOwner ? (
+                                <span style={{ background: "rgba(16, 185, 129, 0.2)", color: "#34d399", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  <span>👑</span> صاحب الهاتف / أول حساب مسجل
+                                </span>
+                              ) : (
+                                <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  <span>⚠️</span> حساب إضافي فُتح لاحقاً
+                                </span>
+                              )}
+                              <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>{acc.full_name}</span>
+                              <span style={{ color: "#38bdf8", fontSize: "11px" }}>كود: {acc.student_code}</span>
+                              {acc.firstSeen && (
+                                <span style={{ color: "#64748b", fontSize: "11px" }}>
+                                  (أول ظهور: {new Date(acc.firstSeen).toLocaleDateString("ar-EG")})
+                                </span>
+                              )}
+                            </div>
+                            {acc.mobile && <div style={{ color: "#94a3b8", fontSize: "11px", marginRight: "4px", direction: "ltr", display: "inline-block", marginTop: "3px" }}>📱 {acc.mobile}</div>}
                           </div>
                           
                           <button
@@ -1453,18 +1484,18 @@ export default function StudentPortalHubModal({
               </button>
             </div>
 
-            {/* بطاقات الإحصائيات السريعة الثلاثة */}
+            {/* بطاقات الإحصائيات السريعة */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
                 gap: "12px",
                 marginBottom: "16px"
               }}
             >
               {/* 1. إجمالي عمليات البحث */}
               <div style={{ background: "#181d29", border: "1px solid #2a374f", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: "bold" }}>🔍 إجمالي عمليات البحث والاستعلام</div>
+                <div style={{ fontSize: "12px", color: "#a78bfa", fontWeight: "bold" }}>🔍 إجمالي عمليات البحث</div>
                 <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
                   {searchLogsData?.stats?.totalSearches ?? "--"}
                 </div>
@@ -1473,7 +1504,7 @@ export default function StudentPortalHubModal({
 
               {/* 2. طلاب سحبوا كارت الـ QR */}
               <div style={{ background: "linear-gradient(135deg, #06281e, #0e3d2f)", border: "1.5px solid #10b981", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", color: "#6ee7b7", fontWeight: "bold" }}>📥 كم طالب سحب الكيو ار كود</div>
+                <div style={{ fontSize: "12px", color: "#6ee7b7", fontWeight: "bold" }}>📥 كم طالب سحب الكيو ار</div>
                 <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
                   {searchLogsData?.stats?.uniqueQrStudentsCount ?? "--"}
                 </div>
@@ -1500,19 +1531,125 @@ export default function StudentPortalHubModal({
                   موبايل مشترك تم رصده
                 </div>
               </div>
+
+              {/* 4. أصحاب الهواتف فقط (الباحث الأول) */}
+              <div
+                onClick={() => setSearchLogsFilter(searchLogsFilter === "primary_only" ? "all" : "primary_only")}
+                style={{ 
+                  background: searchLogsFilter === "primary_only" ? "linear-gradient(135deg, #451a03, #78350f)" : "linear-gradient(135deg, #241808, #181d29)", 
+                  border: `1.5px solid ${searchLogsFilter === "primary_only" ? "#fbbf24" : "#d97706"}`, 
+                  padding: "14px", 
+                  borderRadius: "12px", 
+                  textAlign: "center",
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                <div style={{ fontSize: "12px", color: "#fcd34d", fontWeight: "bold" }}>
+                  👑 أصحاب الهواتف (الباحث الأول)
+                </div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#f59e0b", marginTop: "4px" }}>
+                  {searchLogsData?.stats?.primaryOwnersCount ?? (searchLogsData?.suspiciousDevices?.length || 0)}
+                </div>
+                <div style={{ fontSize: "11px", color: "#fbbf24", marginTop: "2px" }}>
+                  {searchLogsFilter === "primary_only" ? "✓ الفلتر نشط (انقر للإلغاء)" : "انقر لعرض أصحاب الهواتف فقط 🎯"}
+                </div>
+              </div>
             </div>
 
-            {/* تحذير أمني بارز إذا وُجدت هواتف بحثت عن أكثر من طالب */}
-            {(searchLogsData?.stats?.suspiciousDevicesCount || 0) > 0 && (
-              <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1.5px solid #ef4444", borderRadius: "12px", padding: "14px 16px", marginBottom: "16px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                <ShieldAlert size={22} color="#ef4444" style={{ flexShrink: 0, marginTop: "2px" }} />
-                <div>
-                  <div style={{ color: "#ef4444", fontWeight: "bold", fontSize: "13px" }}>
-                    ⚠️ تحذير أمني: تم رصد {searchLogsData.stats.suspiciousDevicesCount} أجهزة قامت بالبحث عن أكثر من طالب من نفس الموبايل!
+            {/* تحذير أمني بارز وكشف أصحاب الهواتف والطلاب الذين استعلموا عنهم */}
+            {(searchLogsData?.suspiciousDevices || []).length > 0 && (
+              <div style={{ background: "#181d29", border: "1.5px solid rgba(245, 158, 11, 0.5)", borderRadius: "14px", padding: "16px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "20px" }}>👑</span>
+                    <div>
+                      <div style={{ color: "#fcd34d", fontWeight: "bold", fontSize: "14px" }}>
+                        حصر أصحاب الهواتف الأصلية (الباحث الأول الذي بحث عن زملائه)
+                      </div>
+                      <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                        تم فرز الطلاب زمنياً لتحديد صاحب الهاتف الفعلي وعزله عن الطلاب الذين تم الاستعلام عنهم.
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ color: "#cbd5e1", fontSize: "12px", marginTop: "4px", lineHeight: "1.5" }}>
-                    تم تظليل السجلات الصادرة من هذه الهواتف باللون الأحمر أدناه، مع كشف أسماء الطلاب المشتركين لنفس الجهاز لضمان دقة الرقابة.
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSearchLogsFilter(searchLogsFilter === "primary_only" ? "all" : "primary_only")}
+                    style={{
+                      background: searchLogsFilter === "primary_only" ? "#f59e0b" : "rgba(245, 158, 11, 0.2)",
+                      color: searchLogsFilter === "primary_only" ? "#000" : "#fcd34d",
+                      border: "1px solid #f59e0b",
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    <span>{searchLogsFilter === "primary_only" ? "✓ مفعل: عرض أصحاب الهواتف فقط" : "👑 فلترة: عرض أصحاب الهواتف فقط"}</span>
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {searchLogsData.suspiciousDevices.map((dev: any, dIdx: number) => {
+                    const devInfo = parseDeviceBrand(dev.userAgent, '');
+                    return (
+                      <div key={dIdx} style={{ background: "#0d131f", border: "1px solid #2a374f", borderRadius: "10px", padding: "12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{ background: "rgba(245, 158, 11, 0.25)", color: "#fcd34d", border: "1px solid rgba(245, 158, 11, 0.5)", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                              👑 صاحب الهاتف
+                            </span>
+                            <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
+                              {dev.primaryStudent?.student_name}
+                            </span>
+                            <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#38bdf8", padding: "2px 6px", borderRadius: "4px", fontSize: "12px", fontFamily: "monospace" }}>
+                              {formatStudentCode(dev.primaryStudent?.student_code)}
+                            </span>
+                            <span style={{ color: "#94a3b8", fontSize: "11px" }}>
+                              ({dev.primaryStudent?.academic_year} - سكشن {dev.primaryStudent?.section})
+                            </span>
+                          </div>
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ color: "#64748b", fontSize: "11px" }}>{devInfo.icon} {devInfo.brand}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSearchLogsTextFilter(dev.primaryStudent?.student_code || dev.primaryStudent?.student_name || '');
+                              }}
+                              style={{ background: "#1e293b", border: "1px solid #3b82f6", color: "#38bdf8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", cursor: "pointer" }}
+                            >
+                              عرض سجلاته 🔍
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* قائمة الطلاب الذين تم البحث عنهم من هذا الهاتف */}
+                        <div style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px dashed rgba(239, 68, 68, 0.3)", borderRadius: "8px", padding: "8px 10px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ color: "#f87171", fontSize: "11px", fontWeight: "bold" }}>
+                            🔍 بحث من هاتفه عن ({dev.otherStudents?.length || 0}) طلاب:
+                          </span>
+                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                            {(dev.otherStudents || []).map((os: any, oIdx: number) => (
+                              <span
+                                key={oIdx}
+                                onClick={() => setSearchLogsTextFilter(os.student_code || os.student_name)}
+                                title="انقر للبحث عن هذا الطالب"
+                                style={{ background: "#1e293b", border: "1px solid #334155", color: "#e2e8f0", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", cursor: "pointer" }}
+                              >
+                                {os.student_name} <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>({formatStudentCode(os.student_code)})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1566,7 +1703,35 @@ export default function StudentPortalHubModal({
                     cursor: "pointer"
                   }}
                 >
-                  🚨 أجهزة مشبوهة فقط ({searchLogsData?.logs?.filter((l: any) => l.is_suspicious_device).length || 0})
+                  🚨 جميع المشبوهين ({searchLogsData?.logs?.filter((l: any) => l.is_suspicious_device).length || 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchLogsFilter("primary_only")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    border: searchLogsFilter === "primary_only" ? "1px solid #f59e0b" : "1px solid #334155",
+                    background: searchLogsFilter === "primary_only" ? "rgba(245, 158, 11, 0.25)" : "transparent",
+                    color: searchLogsFilter === "primary_only" ? "#fcd34d" : "#94a3b8",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <span>👑 أصحاب الهواتف فقط</span>
+                  <span style={{ 
+                    background: searchLogsFilter === "primary_only" ? "#f59e0b" : "#334155", 
+                    color: searchLogsFilter === "primary_only" ? "#000" : "#fff",
+                    padding: "1px 6px", 
+                    borderRadius: "10px", 
+                    fontSize: "10px" 
+                  }}>
+                    {searchLogsData?.logs?.filter((l: any) => l.is_suspicious_device && l.is_primary_device_owner).length || 0}
+                  </span>
                 </button>
               </div>
 
@@ -1598,8 +1763,12 @@ export default function StudentPortalHubModal({
                     <div
                       key={idx}
                       style={{
-                        background: log.is_suspicious_device ? "rgba(239, 68, 68, 0.08)" : "#141b29",
-                        border: log.is_suspicious_device ? "1.5px solid #ef4444" : "1px solid #2a374f",
+                        background: log.is_suspicious_device 
+                          ? (log.is_primary_device_owner ? "rgba(245, 158, 11, 0.08)" : "rgba(59, 130, 246, 0.06)") 
+                          : "#141b29",
+                        border: log.is_suspicious_device 
+                          ? (log.is_primary_device_owner ? "1.5px solid #f59e0b" : "1px dashed #3b82f6") 
+                          : "1px solid #2a374f",
                         borderRadius: "12px",
                         padding: "14px",
                         display: "flex",
@@ -1610,7 +1779,7 @@ export default function StudentPortalHubModal({
                     >
                       {/* السطر الأول: الاسم والكود ونوع الإجراء */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           <span style={{ 
                             background: isDownload ? "rgba(16, 185, 129, 0.2)" : "rgba(139, 92, 246, 0.2)", 
                             color: isDownload ? "#34d399" : "#a78bfa", 
@@ -1624,6 +1793,20 @@ export default function StudentPortalHubModal({
                           }}>
                             {isDownload ? "📥 سحب كارت QR" : "🔍 بحث واستعلام"}
                           </span>
+
+                          {/* شارة توضيحية هل هو صاحب الهاتف أم تم البحث عنه */}
+                          {log.is_suspicious_device && (
+                            log.is_primary_device_owner ? (
+                              <span style={{ background: "rgba(245, 158, 11, 0.25)", color: "#fcd34d", border: "1px solid rgba(245, 158, 11, 0.5)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <span>👑</span> صاحب الهاتف (الباحث)
+                              </span>
+                            ) : (
+                              <span style={{ background: "rgba(59, 130, 246, 0.2)", color: "#93c5fd", border: "1px solid rgba(59, 130, 246, 0.3)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <span>ℹ️</span> تم الاستعلام عنه
+                              </span>
+                            )
+                          )}
+
                           <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
                             {log.student_name}
                           </span>
@@ -1656,20 +1839,44 @@ export default function StudentPortalHubModal({
                         </div>
                       </div>
 
-                      {/* تحذير مشع أحمر إذا كان الجهاز بحث عن أكثر من طالب */}
+                      {/* تفاصيل الذكاء الأمني في حال الجهاز المشترك */}
                       {log.is_suspicious_device && (
-                        <div style={{ background: "rgba(239, 68, 68, 0.18)", border: "1px dashed #ef4444", borderRadius: "8px", padding: "8px 12px", marginTop: "2px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "11px" }}>
-                            ⚠️ تحذير: تم استخدام نفس هذا الموبايل للبحث عن ({log.device_searched_count}) طلاب:
-                          </span>
-                          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                            {log.other_students && log.other_students.map((name: string, i: number) => (
-                              <span key={i} style={{ background: "#ef4444", color: "#fff", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: "bold" }}>
-                                {name}
+                        log.is_primary_device_owner ? (
+                          <div style={{ background: "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.08))", border: "1.5px solid #f59e0b", borderRadius: "8px", padding: "10px 14px", marginTop: "2px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#fbbf24", fontWeight: "bold", fontSize: "12px" }}>
+                                <span>👑</span>
+                                <span>صاحب الهاتف الأصلي (الباحث): تم استخدام هذا الجهاز للبحث عن ({log.device_searched_count - 1}) طلاب آخرين</span>
+                              </div>
+                              <span style={{ background: "#78350f", color: "#fef3c7", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                                ⏱️ الباحث الأول زمنيّاً على الجهاز
                               </span>
-                            ))}
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ color: "#94a3b8", fontSize: "11px" }}>الطلاب المستعلم عنهم من هاتفه:</span>
+                              {log.other_students && log.other_students.map((name: string, i: number) => (
+                                <span key={i} style={{ background: "#f59e0b", color: "#000", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "bold" }}>
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px dashed #3b82f6", borderRadius: "8px", padding: "10px 14px", marginTop: "2px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: "15px" }}>ℹ️</span>
+                              <span style={{ color: "#93c5fd", fontSize: "12px" }}>
+                                تم الاستعلام عن هذا الطالب بواسطة هاتف زميله:
+                              </span>
+                              <span style={{ background: "#1e3a8a", border: "1px solid #3b82f6", color: "#bfdbfe", padding: "2px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold" }}>
+                                👑 {log.primary_owner_name} {log.primary_owner_code ? `(كود: ${formatStudentCode(log.primary_owner_code)})` : ''}
+                              </span>
+                            </div>
+                            <span style={{ color: "#64748b", fontSize: "11px" }}>
+                              (استعلام صادر من هاتف مشترك)
+                            </span>
+                          </div>
+                        )
                       )}
                     </div>
                   );

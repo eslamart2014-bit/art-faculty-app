@@ -109,8 +109,23 @@ export async function GET() {
     const cleanDevices: any[] = [];
 
     deviceMap.forEach((val) => {
+      // ترتيب الحسابات تصاعدياً حسب أول تاريخ ظهور / تسجيل على الجهاز
+      val.accounts.sort((a, b) => new Date(a.firstSeen || 0).getTime() - new Date(b.firstSeen || 0).getTime());
+
+      // تمييز الحساب الأول زمنيّاً كصاحب الجهاز الأصلي
+      if (val.accounts.length > 0) {
+        (val.accounts[0] as any).isPrimaryOwner = true;
+        for (let i = 1; i < val.accounts.length; i++) {
+          (val.accounts[i] as any).isPrimaryOwner = false;
+        }
+      }
+
       if (val.accounts.length > 1) {
-        fraudDevices.push(val);
+        fraudDevices.push({
+          ...val,
+          primaryAccount: val.accounts[0],
+          secondaryAccounts: val.accounts.slice(1)
+        });
       } else {
         cleanDevices.push(val);
       }
