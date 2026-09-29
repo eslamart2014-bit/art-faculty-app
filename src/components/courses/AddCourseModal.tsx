@@ -155,21 +155,32 @@ export default function AddCourseModal({ isOpen, onClose, user, onCourseAdded }:
     }
 
     setSaving(true);
-    const { error } = await supabase.from("courses").insert({
-      name: courseName.trim(),
-      academic_year: academicYear,
-      course_type: courseType,
-      sections: courseType === "sections" ? selectedSections : [],
-      teacher_id: user.id
-    });
+    try {
+      const res = await fetch("/api/courses/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: courseName.trim(),
+          academic_year: academicYear,
+          course_type: courseType,
+          sections: courseType === "sections" ? selectedSections : [],
+          teacher_id: user?.id || null
+        })
+      });
 
-    setSaving(false);
-    if (error) {
-      alert("حدث خطأ أثناء حفظ المقرر: " + error.message);
-    } else {
-      alert("تم حفظ المقرر بنجاح!");
-      onCourseAdded();
-      onClose();
+      const data = await res.json();
+      setSaving(false);
+
+      if (!res.ok || !data.success) {
+        alert("حدث خطأ أثناء حفظ المقرر: " + (data.message || "خطأ غير معروف في السيرفر"));
+      } else {
+        alert("تم حفظ المقرر بنجاح!");
+        onCourseAdded();
+        onClose();
+      }
+    } catch (err: any) {
+      setSaving(false);
+      alert("فشل الاتصال بالسيرفر لحفظ المقرر: " + (err.message || "تأكد من اتصالك بالإنترنت"));
     }
   };
 

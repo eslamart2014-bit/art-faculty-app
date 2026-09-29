@@ -147,7 +147,15 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     setCourses(updatedCourses);
     try { localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(updatedCourses)); } catch (e) {}
     
-    await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", course.id);
+    try {
+      await fetch('/api/courses/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_custom', course_id: course.id, custom_week_names: updatedCustom })
+      });
+    } catch (e) {
+      await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", course.id);
+    }
   };
 
   const openRenameModal = (e: React.MouseEvent, course: any) => {
@@ -164,9 +172,18 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const updatedCourses = courses.map(c => c.id === courseToRename.id ? { ...c, name: newName } : c);
     setCourses(updatedCourses);
     try { localStorage.setItem(`cached_courses_${user.id}`, JSON.stringify(updatedCourses)); } catch (e) {}
+    const cId = courseToRename.id;
     setCourseToRename(null);
 
-    await supabase.from("courses").update({ name: newName }).eq("id", courseToRename.id);
+    try {
+      await fetch('/api/courses/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rename', course_id: cId, name: newName })
+      });
+    } catch (e) {
+      await supabase.from("courses").update({ name: newName }).eq("id", cId);
+    }
   };
 
   const openDeleteModal = (e: React.MouseEvent, course: any) => {
@@ -179,24 +196,33 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     if (!courseToDelete) return;
     const currentCustom = courseToDelete.custom_week_names || {};
     const updatedCustom = { ...currentCustom, __archived: true };
+    const cId = courseToDelete.id;
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
+    setCourses(courses.filter(c => c.id !== cId));
     
     await supabase.from("archives").insert({
       user_id: user?.id,
       item_type: "course",
       description: `حذف مقرر للجميع: ${courseToDelete.name}`,
-      original_data: { course_id: courseToDelete.id }
+      original_data: { course_id: cId }
     });
 
-    await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
+    try {
+      await fetch('/api/courses/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_custom', course_id: cId, custom_week_names: updatedCustom })
+      });
+    } catch (e) {
+      await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", cId);
+    }
     
     // تفريغ وحذف كافة صور وتسليمات المقرر من سحابة التخزين تلقائياً
     try {
       await fetch('/api/courses/delete-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ course_id: courseToDelete.id })
+        body: JSON.stringify({ course_id: cId })
       });
     } catch (e) {}
 
@@ -208,9 +234,18 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     const currentCustom = courseToDelete.custom_week_names || {};
     const hiddenFor = currentCustom.__hidden_for || [];
     const updatedCustom = { ...currentCustom, __hidden_for: [...hiddenFor, user.id] };
+    const cId = courseToDelete.id;
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
-    await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", courseToDelete.id);
+    setCourses(courses.filter(c => c.id !== cId));
+    try {
+      await fetch('/api/courses/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_custom', course_id: cId, custom_week_names: updatedCustom })
+      });
+    } catch (e) {
+      await supabase.from("courses").update({ custom_week_names: updatedCustom }).eq("id", cId);
+    }
     setCourseToDelete(null);
   };
 
@@ -218,9 +253,18 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     if (!courseToDelete) return;
     const sharedWith = courseToDelete.shared_with || [];
     const newShared = sharedWith.filter((id: string) => id !== user.id);
+    const cId = courseToDelete.id;
 
-    setCourses(courses.filter(c => c.id !== courseToDelete.id));
-    await supabase.from("courses").update({ shared_with: newShared }).eq("id", courseToDelete.id);
+    setCourses(courses.filter(c => c.id !== cId));
+    try {
+      await fetch('/api/courses/manage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_shared', course_id: cId, shared_with: newShared })
+      });
+    } catch (e) {
+      await supabase.from("courses").update({ shared_with: newShared }).eq("id", cId);
+    }
     setCourseToDelete(null);
   };
 
