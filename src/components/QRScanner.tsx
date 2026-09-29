@@ -75,8 +75,8 @@ export default function QRScanner({
       setInternalStatusText(`تم الرصد: ${cleanCode} ✅`);
     }
 
-    // Call consumer callback with clean resolved code
-    onScanRef.current(cleanCode);
+    // Call consumer callback to validate and trigger exact vibration pattern
+    onScanRef.current(rawText);
 
     // Release lock after short cooldown
     setTimeout(() => {
@@ -84,7 +84,7 @@ export default function QRScanner({
       setInternalStatus("idle");
       setInternalStatusText("");
     }, 700);
-  }, [cooldownMs, parentStatus]);
+  }, [cooldownMs]);
 
   // Scanner lifecycle
   useEffect(() => {
@@ -104,36 +104,24 @@ export default function QRScanner({
       containerRef.current.appendChild(div);
     }
 
-    // Enforce playsinline on iOS Safari as soon as video element is created
-    const observer = new MutationObserver(() => {
-      const v = div.querySelector("video") as HTMLVideoElement;
-      if (v) {
-        v.setAttribute("playsinline", "true");
-        v.setAttribute("webkit-playsinline", "true");
-        v.muted = true;
-        v.autoplay = true;
-      }
-    });
-    observer.observe(div, { childList: true, subtree: true });
-
-    // CRITICAL FOR IOS: Disable BarcodeDetector because WebKit on iOS 17/18 exposes window.BarcodeDetector
-    // but fails on live camera video frames, causing silent scan failure.
-    // Setting useBarCodeDetectorIfSupported: false forces ZXing pure JS engine which works 100% on iOS.
     const scanner = new Html5Qrcode(scannerId, {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-      useBarCodeDetectorIfSupported: false,
       experimentalFeatures: {
-        useBarCodeDetectorIfSupported: false
+        useBarCodeDetectorIfSupported: true
       },
       verbose: false
     });
     scannerRef.current = scanner;
 
-    // Scan full frame without artificial aspect distortion or offset cropping on iOS WebKit
     scanner.start(
       { facingMode },
       {
-        fps: 15
+        fps: 25,
+        aspectRatio: 1.0,
+        qrbox: (viewWidth, viewHeight) => {
+          const edge = Math.min(viewWidth, viewHeight);
+          return { width: Math.floor(edge * 0.72), height: Math.floor(edge * 0.72) };
+        }
       },
       (text: string) => {
         if (!isDestroyed) {
@@ -162,17 +150,11 @@ export default function QRScanner({
         }
       } catch (e) {}
 
-      // Intercept underlying stream for emergency instant track stop and iOS video inline enforcement
+      // Intercept underlying stream for emergency instant track stop
       try {
         const videoEl = div.querySelector("video") as HTMLVideoElement;
-        if (videoEl) {
-          videoEl.setAttribute("playsinline", "true");
-          videoEl.setAttribute("webkit-playsinline", "true");
-          videoEl.muted = true;
-          videoEl.autoplay = true;
-          if (videoEl.srcObject instanceof MediaStream) {
-            streamRef.current = videoEl.srcObject;
-          }
+        if (videoEl && videoEl.srcObject instanceof MediaStream) {
+          streamRef.current = videoEl.srcObject;
         }
       } catch (e) {}
     }).catch(err => {
@@ -185,7 +167,6 @@ export default function QRScanner({
 
     return () => {
       isDestroyed = true;
-      observer.disconnect();
 
       // 1. Immediately kill all camera tracks to turn off camera hardware in 0ms!
       if (streamRef.current) {

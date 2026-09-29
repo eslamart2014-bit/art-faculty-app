@@ -508,12 +508,27 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const variants = getStudentCodeVariants(code);
     const filter = buildStudentCodeFilter(variants);
 
-    const { data: globalStudent } = await supabase
-      .from("students")
-      .select("*")
-      .or(filter)
-      .limit(1)
-      .maybeSingle();
+    let globalStudent: any = null;
+    try {
+      const { data } = await supabase
+        .from("students")
+        .select("*")
+        .or(filter)
+        .limit(1)
+        .maybeSingle();
+      globalStudent = data;
+    } catch (e) {}
+
+    // Fallback to server API if client-side query blocked by RLS / session
+    if (!globalStudent) {
+      try {
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const lData = await res.json();
+          if (lData.student) globalStudent = lData.student;
+        }
+      } catch (e) {}
+    }
     
     if (!globalStudent) {
       vibrateHeavyError();
@@ -550,12 +565,27 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const filter = buildStudentCodeFilter(variants);
     
     // First, find the student globally by code variants
-    const { data: student } = await supabase
-      .from("students")
-      .select("*")
-      .or(filter)
-      .limit(1)
-      .maybeSingle();
+    let student: any = null;
+    try {
+      const { data } = await supabase
+        .from("students")
+        .select("*")
+        .or(filter)
+        .limit(1)
+        .maybeSingle();
+      student = data;
+    } catch (e) {}
+
+    // Fallback to server API if client-side query blocked by RLS / session
+    if (!student) {
+      try {
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const lData = await res.json();
+          if (lData.student) student = lData.student;
+        }
+      } catch (e) {}
+    }
     
     if (!student) {
       vibrateHeavyError();

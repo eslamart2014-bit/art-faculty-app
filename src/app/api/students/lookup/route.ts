@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
+import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 
 export const dynamic = 'force-dynamic';
@@ -15,13 +15,16 @@ export async function GET(request: Request) {
   }
 
   const cleanCode = formatStudentCode(rawCode);
+  const variants = getStudentCodeVariants(cleanCode || rawCode);
+  const filter = buildStudentCodeFilter(variants);
 
   try {
     // 1. البحث في كشوف الكلية الأصلية
     const { data: student, error } = await supabaseAdmin
       .from('students')
       .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-      .or(`student_code.eq.${rawCode},student_code.eq.${cleanCode}`)
+      .or(filter)
+      .limit(1)
       .maybeSingle();
 
     if (error) {

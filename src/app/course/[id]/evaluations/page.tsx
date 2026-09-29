@@ -574,12 +574,27 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const variants = getStudentCodeVariants(code);
     const filter = buildStudentCodeFilter(variants);
 
-    const { data: globalStudent } = await supabase
-      .from("students")
-      .select("*")
-      .or(filter)
-      .limit(1)
-      .maybeSingle();
+    let globalStudent: any = null;
+    try {
+      const { data } = await supabase
+        .from("students")
+        .select("*")
+        .or(filter)
+        .limit(1)
+        .maybeSingle();
+      globalStudent = data;
+    } catch (e) {}
+
+    // Fallback to server API if client-side query blocked by RLS / session
+    if (!globalStudent) {
+      try {
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const lData = await res.json();
+          if (lData.student) globalStudent = lData.student;
+        }
+      } catch (e) {}
+    }
     
     if (!globalStudent) {
       vibrateHeavyError();
@@ -610,21 +625,27 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const variants = getStudentCodeVariants(code);
     const filter = buildStudentCodeFilter(variants);
 
-    let { data: student } = await supabase.from("students")
-      .select("*")
-      .eq("academic_year", course.academic_year)
-      .or(filter)
-      .limit(1)
-      .maybeSingle();
-
-    if (!student && course.makeup_students && course.makeup_students.length > 0) {
-      const { data: makeupStudent } = await supabase.from("students")
+    let student: any = null;
+    try {
+      const { data } = await supabase.from("students")
         .select("*")
-        .in("id", course.makeup_students)
+        .eq("academic_year", course.academic_year)
         .or(filter)
         .limit(1)
         .maybeSingle();
-      if (makeupStudent) student = makeupStudent;
+      student = data;
+    } catch (e) {}
+
+    if (!student && course.makeup_students && course.makeup_students.length > 0) {
+      try {
+        const { data: makeupStudent } = await supabase.from("students")
+          .select("*")
+          .in("id", course.makeup_students)
+          .or(filter)
+          .limit(1)
+          .maybeSingle();
+        if (makeupStudent) student = makeupStudent;
+      } catch (e) {}
     }
 
     if (!student) {
