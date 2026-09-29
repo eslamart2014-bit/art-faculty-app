@@ -8,7 +8,7 @@ import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
-import { extractStudentCode } from "@/lib/scannerHelper";
+import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -505,7 +505,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   // --- CROSS-COURSE MAKEUP LOGIC ---
   const handleCrossCourseMakeup = async (code: string) => {
-    const { data: globalStudent } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
+    const variants = getStudentCodeVariants(code);
+    const filter = buildStudentCodeFilter(variants);
+
+    const { data: globalStudent } = await supabase
+      .from("students")
+      .select("*")
+      .or(filter)
+      .limit(1)
+      .maybeSingle();
     
     if (!globalStudent) {
       vibrateHeavyError();
@@ -538,9 +546,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   const checkStudentLocalOrGlobal = async (code: string) => {
     const isMakeup = course.makeup_students && course.makeup_students.length > 0;
+    const variants = getStudentCodeVariants(code);
+    const filter = buildStudentCodeFilter(variants);
     
-    // First, find the student globally by code
-    const { data: student } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
+    // First, find the student globally by code variants
+    const { data: student } = await supabase
+      .from("students")
+      .select("*")
+      .or(filter)
+      .limit(1)
+      .maybeSingle();
     
     if (!student) {
       vibrateHeavyError();
@@ -589,7 +604,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     }
 
     // Immediate check if student code is already in scannedStudents (Duplicate: 2 rapid vibrations)
-    if (scannedStudents.some(s => s.student_code === cleanCode || s.id === cleanCode)) {
+    const codeVariants = getStudentCodeVariants(cleanCode);
+    if (scannedStudents.some(s => codeVariants.includes(s.student_code) || codeVariants.includes(s.id))) {
       setScannerStatus('error');
       setScannerStatusText("طالب مكرر مسجل بالفعل في هذه الجلسة ⚠️");
       vibrateDuplicate();

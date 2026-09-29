@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
+import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 
 export const dynamic = 'force-dynamic';
@@ -9,13 +9,16 @@ export async function POST(request: Request) {
   try {
     const { action, student_code, coordinator_name } = await request.json();
     const cleanCode = formatStudentCode(student_code);
+    const variants = getStudentCodeVariants(cleanCode || student_code);
+    const filter = buildStudentCodeFilter(variants);
 
     if (action === 'lookup') {
       // 1. البحث عن الطالب في جدول الطلاب
       const { data: student, error: stErr } = await supabaseAdmin
         .from('students')
         .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .or(filter)
+        .limit(1)
         .maybeSingle();
 
       if (stErr || !student) {
@@ -26,12 +29,15 @@ export async function POST(request: Request) {
       }
 
       // 2. البحث عن الحساب المسجل
+      const accVariants = getStudentCodeVariants(student.student_code || cleanCode);
+      const accFilter = buildStudentCodeFilter(accVariants);
       let account: any = null;
       try {
         const { data } = await supabaseAdmin
           .from('student_accounts')
           .select('*')
-          .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`)
+          .or(accFilter)
+          .limit(1)
           .maybeSingle();
         account = data;
       } catch (e) {}
@@ -44,7 +50,13 @@ export async function POST(request: Request) {
       }
 
       if (!account) {
-        account = telegramAccount || localStore.getAccount(student.student_code) || localStore.getAccount(cleanCode);
+        account = telegramAccount;
+        if (!account) {
+          for (const v of accVariants) {
+            const f = localStore.getAccount(v);
+            if (f) { account = f; break; }
+          }
+        }
       } else if (telegramAccount) {
         account = {
           ...telegramAccount,

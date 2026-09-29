@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, generatePinCode } from '@/lib/codeHelper';
+import { formatStudentCode, generatePinCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { compareDHashes } from '@/lib/imageCompressor';
 import { localStore } from '@/lib/localFallbackStore';
 
@@ -16,13 +16,16 @@ export async function GET(request: Request) {
   }
 
   const cleanCode = formatStudentCode(code);
+  const variants = getStudentCodeVariants(cleanCode || code);
+  const filter = buildStudentCodeFilter(variants);
 
   try {
     // 1. جلب بيانات الطالب الأصلية
     const { data: student, error: stErr } = await supabaseAdmin
       .from('students')
       .select('*')
-      .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
+      .or(filter)
+      .limit(1)
       .maybeSingle();
 
     if (stErr || !student) {
@@ -30,12 +33,15 @@ export async function GET(request: Request) {
     }
 
     // 2. جلب الحساب في بوابة فنية
+    const accVariants = getStudentCodeVariants(student.student_code || cleanCode);
+    const accFilter = buildStudentCodeFilter(accVariants);
     let account: any = null;
     try {
       const { data } = await supabaseAdmin
         .from('student_accounts')
         .select('*')
-        .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`)
+        .or(accFilter)
+        .limit(1)
         .maybeSingle();
       account = data;
     } catch (e) {}
@@ -49,7 +55,13 @@ export async function GET(request: Request) {
     }
 
     if (!account) {
-      account = telegramAccount || localStore.getAccount(student.student_code) || localStore.getAccount(cleanCode);
+      account = telegramAccount;
+      if (!account) {
+        for (const v of accVariants) {
+          const f = localStore.getAccount(v);
+          if (f) { account = f; break; }
+        }
+      }
     } else if (telegramAccount) {
       // دمج البيانات الذكي لاستعادة أي حقول اعتماد مفقودة
       account = {

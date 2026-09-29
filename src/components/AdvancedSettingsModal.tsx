@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import QRScanner from "@/components/QRScanner";
 
-import { extractStudentCode } from "@/lib/scannerHelper";
+import { extractStudentCode, sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
 import LockerAdminTab from "./lockers/LockerAdminTab";
 
 interface AdvancedSettingsModalProps {
@@ -252,25 +252,24 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
   };
 
   const performGlobalSearch = async (query: string) => {
-    const raw = query ? query.trim() : '';
+    const raw = query ? sanitizeScannedString(query) : '';
     if (!raw) return;
     setSearchLoading(true);
     setStudentsList(null);
     setSelectedStudentResult(null);
 
     try {
-      const cleanNumeric = raw.replace(/^0+/, '') || '0';
-      const padded4 = cleanNumeric.padStart(4, '0');
       const isNum = /^\d+$/.test(raw);
-
       let foundStudents: any[] = [];
 
       if (isNum) {
+        const variants = getStudentCodeVariants(raw);
+        const filter = buildStudentCodeFilter(variants);
         // Query by numeric codes (exact, unpadded, padded)
         const { data: byCode } = await supabase
           .from('students')
           .select('*')
-          .or(`student_code.eq.${raw},student_code.eq.${cleanNumeric},student_code.eq.${padded4}`);
+          .or(filter);
         
         if (byCode && byCode.length > 0) {
           foundStudents = byCode;
@@ -287,12 +286,13 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
 
         if (allStudents && allStudents.length > 0) {
           const normQ = normalizeArabic(raw);
+          const rawVariants = getStudentCodeVariants(raw);
           // 1. Try matching normalized name or code
           foundStudents = allStudents.filter(s => {
             const normName = normalizeArabic(s.full_name || '');
             const sc = (s.student_code || '').trim();
-            const scClean = sc.replace(/^0+/, '');
-            return normName.includes(normQ) || sc === raw || scClean === cleanNumeric || sc === padded4;
+            const scVariants = getStudentCodeVariants(sc);
+            return normName.includes(normQ) || rawVariants.some(v => scVariants.includes(v));
           });
 
           // 2. If still not found, try multi-word matching

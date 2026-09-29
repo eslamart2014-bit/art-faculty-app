@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
-import { extractStudentCode } from "@/lib/scannerHelper";
+import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
 
 
 
@@ -571,7 +571,15 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   };
 
   const handleCrossCourseMakeup = async (code: string) => {
-    const { data: globalStudent } = await supabase.from("students").select("*").eq("student_code", code).maybeSingle();
+    const variants = getStudentCodeVariants(code);
+    const filter = buildStudentCodeFilter(variants);
+
+    const { data: globalStudent } = await supabase
+      .from("students")
+      .select("*")
+      .or(filter)
+      .limit(1)
+      .maybeSingle();
     
     if (!globalStudent) {
       vibrateHeavyError();
@@ -599,17 +607,22 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   };
 
   const checkStudentLocalOrGlobal = async (code: string) => {
+    const variants = getStudentCodeVariants(code);
+    const filter = buildStudentCodeFilter(variants);
+
     let { data: student } = await supabase.from("students")
       .select("*")
       .eq("academic_year", course.academic_year)
-      .eq("student_code", code)
+      .or(filter)
+      .limit(1)
       .maybeSingle();
 
     if (!student && course.makeup_students && course.makeup_students.length > 0) {
       const { data: makeupStudent } = await supabase.from("students")
         .select("*")
         .in("id", course.makeup_students)
-        .eq("student_code", code)
+        .or(filter)
+        .limit(1)
         .maybeSingle();
       if (makeupStudent) student = makeupStudent;
     }
@@ -655,7 +668,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     }
 
     // Duplicate scan: two rapid vibrations
-    if (scannedStudents.some(s => s.student?.student_code === cleanCode || s.student?.id === cleanCode)) {
+    const codeVariants = getStudentCodeVariants(cleanCode);
+    if (scannedStudents.some(s => codeVariants.includes(s.student?.student_code) || codeVariants.includes(s.student?.id))) {
       setScannerStatus('error');
       setScannerStatusText("طالب مكرر تم رصده مسبقاً ⚠️");
       vibrateDuplicate();

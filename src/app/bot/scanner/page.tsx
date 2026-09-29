@@ -2,6 +2,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import QRScanner from "@/components/QRScanner";
 import { useSearchParams } from "next/navigation";
+import { extractStudentCode } from "@/lib/scannerHelper";
 
 function ScannerContent() {
   const [init, setInit] = useState(false);
@@ -29,6 +30,9 @@ function ScannerContent() {
 
   const handleScan = (result: string) => {
     if (scanned || !result) return;
+    const cleanCode = extractStudentCode(result) || result.trim();
+    if (!cleanCode) return;
+
     setScanned(true);
 
     if (navigator.vibrate) {
@@ -36,10 +40,10 @@ function ScannerContent() {
     }
 
     if (tg) {
-      tg.sendData(JSON.stringify({ type: 'SCAN_RESULT', code: result, crs, proj }));
+      tg.sendData(JSON.stringify({ type: 'SCAN_RESULT', code: cleanCode, crs, proj }));
       tg.close();
     } else {
-      alert("Scanned: " + result);
+      alert("Scanned: " + cleanCode);
     }
   };
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
+import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,10 +103,13 @@ export async function GET(request: Request) {
         stQuery = stQuery.in('academic_year', myAcademicYears);
       }
 
-      if (/^\d+$/.test(searchQuery)) {
-        stQuery = stQuery.ilike('student_code', `%${searchQuery}%`);
+      const cleanQ = sanitizeScannedString(searchQuery);
+      if (/^\d+$/.test(cleanQ)) {
+        const variants = getStudentCodeVariants(cleanQ);
+        const filter = buildStudentCodeFilter(variants);
+        stQuery = stQuery.or(filter);
       } else {
-        stQuery = stQuery.ilike('full_name', `%${searchQuery}%`);
+        stQuery = stQuery.ilike('full_name', `%${cleanQ}%`);
       }
 
       const { data: foundStudents } = await stQuery.limit(15);
