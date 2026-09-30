@@ -54,6 +54,31 @@ export default function QRScanner({
   // Device detection
   const [isIOS] = useState(() => checkIsIOS());
 
+  // Apple Mode (وضع الآيفون الخاص - لتثبيت العدسة الرئيسية ومنع التبديل التلقائي للعدسة الواسعة)
+  const [appleMode, setAppleMode] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("qr_apple_mode");
+      if (saved !== null) return saved === "true";
+    }
+    return false;
+  });
+
+  const [availableLenses, setAvailableLenses] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedLensIndex, setSelectedLensIndex] = useState<number>(0);
+
+  const toggleAppleMode = () => {
+    const next = !appleMode;
+    setAppleMode(next);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("qr_apple_mode", next ? "true" : "false");
+    }
+  };
+
+  const cycleLens = () => {
+    if (availableLenses.length <= 1) return;
+    setSelectedLensIndex((prev) => (prev + 1) % availableLenses.length);
+  };
+
   // UI States
   const [internalStatus, setInternalStatus] = useState<"idle" | "success" | "error">("idle");
   const [internalStatusText, setInternalStatusText] = useState("");
@@ -164,27 +189,24 @@ export default function QRScanner({
       containerRef.current.appendChild(div);
     }
 
-    // Android/Desktop: use native BarcodeDetector. iOS: use ZXing to avoid experimental WebKit bugs
+    // Default mode: Android & Desktop use hardware BarcodeDetector
+    // Apple mode: iOS uses ZXing to avoid experimental WebKit BarcodeDetector stubs
     const scanner = new Html5Qrcode(scannerId, {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       experimentalFeatures: {
-        useBarCodeDetectorIfSupported: !isIOS
+        useBarCodeDetectorIfSupported: !appleMode
       },
       verbose: false
     });
     scannerRef.current = scanner;
 
-    // For Android: preserve exact working config (fps 25, aspectRatio 1.0, qrbox 0.72)
-    // For iOS: fps 15, NO aspectRatio constraint (prevents WebKit 4:3 -> 1:1 distortion), qrbox 0.75
-    const scanConfig = isIOS
-      ? {
-          fps: 15,
-          qrbox: (viewWidth: number, viewHeight: number) => {
-            const edge = Math.min(viewWidth, viewHeight);
-            return { width: Math.floor(edge * 0.75), height: Math.floor(edge * 0.75) };
-          }
-        }
-      : {
+    const startScannerSession = async () => {
+      let cameraIdOrConfig: any = { facingMode };
+      let scanConfig: any;
+
+      if (!appleMode) {
+        // EXACT UNTOUCHED WORKING DEFAULT CONFIG FOR ANDROID & DESKTOP (100% PRESERVED)
+        scanConfig = {
           fps: 25,
           aspectRatio: 1.0,
           qrbox: (viewWidth: number, viewHeight: number) => {
@@ -192,17 +214,58 @@ export default function QRScanner({
             return { width: Math.floor(edge * 0.72), height: Math.floor(edge * 0.72) };
           }
         };
+        cameraIdOrConfig = { facingMode };
+      } else {
+        // APPLE MODE FOR IPHONE:
+        // Enumerate cameras and lock to standard 1x sensor to prevent iOS from auto-switching to ultra-wide
+        try {
+          const devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            const backCams = devices.filter(d => {
+              const lbl = (d.label || "").toLowerCase();
+              return !lbl.includes("front") && !lbl.includes("user") && !lbl.includes("selfie");
+            });
 
-    scanner.start(
-      { facingMode },
-      scanConfig,
-      (text: string) => {
-        if (!isDestroyed) {
-          handleDecoded(text);
+            // Filter out ultra-wide lenses (labels containing ultra, 0.5, wide angle)
+            const mainBackCams = backCams.filter(d => {
+              const lbl = (d.label || "").toLowerCase();
+              return !lbl.includes("ultra") && !lbl.includes("0.5") && !lbl.includes("wide angle") && !lbl.includes("واسعة");
+            });
+
+            const candidateLenses = mainBackCams.length > 0 ? mainBackCams : (backCams.length > 0 ? backCams : devices);
+            setAvailableLenses(candidateLenses);
+
+            const chosen = candidateLenses[selectedLensIndex % candidateLenses.length] || candidateLenses[0];
+            if (chosen && chosen.id) {
+              cameraIdOrConfig = chosen.id; // Passing ID locks WebKit to this specific physical sensor!
+            }
+          }
+        } catch (e) {
+          console.warn("Apple mode camera enum warning:", e);
         }
-      },
-      () => {}
-    ).then(() => {
+
+        scanConfig = {
+          fps: 15,
+          qrbox: (viewWidth: number, viewHeight: number) => {
+            const edge = Math.min(viewWidth, viewHeight);
+            return { width: Math.floor(edge * 0.75), height: Math.floor(edge * 0.75) };
+          }
+        };
+      }
+
+      if (isDestroyed) return;
+
+      await scanner.start(
+        cameraIdOrConfig,
+        scanConfig,
+        (text: string) => {
+          if (!isDestroyed) {
+            handleDecoded(text);
+          }
+        },
+        () => {}
+      );
+
       isStarting = false;
       if (isDestroyed) {
         try {
@@ -236,7 +299,9 @@ export default function QRScanner({
           }
         }
       } catch (e) {}
-    }).catch(err => {
+    };
+
+    startScannerSession().catch(err => {
       isStarting = false;
       if (!isDestroyed) {
         console.warn("Unified camera warning:", err);
@@ -273,7 +338,7 @@ export default function QRScanner({
         } catch (e) {}
       }
     };
-  }, [facingMode, handleDecoded]);
+  }, [facingMode, handleDecoded, appleMode, selectedLensIndex]);
 
   // Toggle Torch / Flashlight
   const toggleTorch = async () => {
@@ -334,7 +399,7 @@ export default function QRScanner({
           outline: none !important;
         }
         video {
-          object-fit: cover !important;
+          object-fit: ${appleMode ? "contain" : "cover"} !important;
           width: 100% !important;
           height: 100% !important;
         }
@@ -355,7 +420,7 @@ export default function QRScanner({
         </div>
       )}
 
-      {/* Top HUD Controls (Torch, Flip Camera, Close) */}
+      {/* Top HUD Controls (Torch, Flip Camera, Apple Button, Photo, Close) */}
       <div
         style={{
           position: "absolute",
@@ -369,7 +434,7 @@ export default function QRScanner({
           pointerEvents: "auto"
         }}
       >
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
           {hasTorch && (
             <button
               type="button"
@@ -415,6 +480,61 @@ export default function QRScanner({
             <RefreshCw size={17} />
           </button>
 
+          {/* زر تفاحة خاص بهواتف الآيفون (لتثبيت العدسة الرئيسية ومنع العدسة الواسعة) */}
+          <button
+            type="button"
+            onClick={toggleAppleMode}
+            title={appleMode ? "إلغاء وضع الآيفون والرجوع للوضع القياسي" : "تفعيل وضع الآيفون (تثبيت العدسة الرئيسية والفوكس)"}
+            style={{
+              height: "36px",
+              padding: "0 10px",
+              borderRadius: "10px",
+              background: appleMode ? "rgba(16, 185, 129, 0.25)" : "rgba(15, 23, 42, 0.75)",
+              border: `1px solid ${appleMode ? "#10b981" : isIOS ? "#f59e0b" : "rgba(255,255,255,0.25)"}`,
+              color: appleMode ? "#34d399" : "#fff",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold",
+              boxShadow: appleMode ? "0 0 12px rgba(16, 185, 129, 0.5)" : isIOS ? "0 0 8px rgba(245, 158, 11, 0.4)" : "none",
+              transition: "all 0.2s"
+            }}
+          >
+            <span style={{ fontSize: "15px" }}>🍎</span>
+            <span style={{ whiteSpace: "nowrap" }}>
+              {appleMode ? "آيفون نشط ✓" : "وضع الآيفون"}
+            </span>
+          </button>
+
+          {/* زر تبديل عدسة الآيفون إذا توفرت أكثر من عدسة خلفية */}
+          {appleMode && availableLenses.length > 1 && (
+            <button
+              type="button"
+              onClick={cycleLens}
+              title="تبديل عدسة الآيفون"
+              style={{
+                height: "36px",
+                padding: "0 8px",
+                borderRadius: "10px",
+                background: "rgba(15, 23, 42, 0.8)",
+                border: "1px solid #38bdf8",
+                color: "#38bdf8",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                cursor: "pointer",
+                fontSize: "11px",
+                fontWeight: "bold",
+                transition: "all 0.2s"
+              }}
+            >
+              <RefreshCw size={13} />
+              <span>عدسة {selectedLensIndex + 1}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -423,9 +543,9 @@ export default function QRScanner({
               height: "36px",
               padding: "0 10px",
               borderRadius: "10px",
-              background: "rgba(15, 23, 42, 0.75)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              color: "#38bdf8",
+              background: appleMode ? "rgba(245, 158, 11, 0.2)" : "rgba(15, 23, 42, 0.75)",
+              border: `1px solid ${appleMode ? "#f59e0b" : "rgba(255,255,255,0.2)"}`,
+              color: appleMode ? "#fbbf24" : "#38bdf8",
               display: "flex",
               alignItems: "center",
               gap: "6px",
@@ -436,7 +556,7 @@ export default function QRScanner({
             }}
           >
             <Camera size={16} />
-            <span style={{ whiteSpace: "nowrap" }}>{isIOS ? "التقاط صورة" : "فحص صورة"}</span>
+            <span style={{ whiteSpace: "nowrap" }}>التقاط صورة</span>
           </button>
 
           <input
@@ -546,8 +666,10 @@ export default function QRScanner({
             ? "تم الرصد بنجاح! ✅" 
             : currentStatus === "error" 
             ? "كود غير صالح ❌" 
+            : appleMode 
+            ? "🍎 وضع الآيفون نشط (العدسة مثبتة) | حافظ على مسافة 15-20 سم" 
             : isIOS 
-            ? "وجه الكاميرا داخل الإطار (على بعد 15-20 سم) 📷" 
+            ? "💡 هواتف آبل: اضغط زر (وضع الآيفون 🍎) لتثبيت الفوكس والعدسة" 
             : "وجه الكاميرا داخل الإطار الأزرق 📷")}
       </div>
     </div>
