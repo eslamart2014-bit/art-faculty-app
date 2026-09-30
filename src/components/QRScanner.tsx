@@ -161,7 +161,7 @@ export default function QRScanner({
           facingMode: facingMode === "environment" ? "environment" : "user"
         };
         scanConfig = {
-          fps: 10,
+          fps: 15,
           qrbox: (viewWidth: number, viewHeight: number) => {
             const edge = Math.min(viewWidth, viewHeight);
             return { width: Math.floor(edge * 0.85), height: Math.floor(edge * 0.85) };
@@ -428,38 +428,38 @@ export default function QRScanner({
           )}
         </div>
 
-        {/* Status Pill */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: "12px",
-            background: currentStatus === "success"
-              ? "rgba(16, 185, 129, 0.95)"
-              : currentStatus === "error"
-              ? "rgba(239, 68, 68, 0.95)"
-              : isBusy
-              ? "rgba(245, 158, 11, 0.9)"
-              : "rgba(15, 23, 42, 0.85)",
-            backdropFilter: "blur(8px)",
-            color: "#fff",
-            padding: "7px 18px",
-            borderRadius: "20px",
-            fontSize: "12px",
-            fontWeight: "bold",
-            zIndex: 20,
-            boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
-            border: `1px solid ${currentStatus === "success" ? "#34d399" : currentStatus === "error" ? "#f87171" : "rgba(255,255,255,0.15)"}`,
-            transition: "all 0.2s ease"
-          }}
-        >
-          {isBusy
-            ? "جاري المعالجة والفحص... ⏳"
-            : currentStatusText || (currentStatus === "success"
-              ? "تم الرصد بنجاح! ✅"
-              : currentStatus === "error"
-              ? "كود غير صالح ❌"
-              : "وجه الكاميرا داخل الإطار الأزرق 📷")}
-        </div>
+        {/* Status Pill — only shown when there is something meaningful to show */}
+        {(isBusy || currentStatus === "success" || currentStatus === "error" || currentStatusText) && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "12px",
+              background: currentStatus === "success"
+                ? "rgba(16, 185, 129, 0.95)"
+                : currentStatus === "error"
+                ? "rgba(239, 68, 68, 0.95)"
+                : isBusy
+                ? "rgba(245, 158, 11, 0.9)"
+                : "rgba(15, 23, 42, 0.85)",
+              backdropFilter: "blur(8px)",
+              color: "#fff",
+              padding: "7px 18px",
+              borderRadius: "20px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              zIndex: 20,
+              boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
+              border: `1px solid ${currentStatus === "success" ? "#34d399" : currentStatus === "error" ? "#f87171" : "rgba(255,255,255,0.15)"}`,
+              transition: "all 0.2s ease"
+            }}
+          >
+            {isBusy
+              ? "جاري المعالجة والفحص... ⏳"
+              : currentStatusText || (currentStatus === "success"
+                ? "تم الرصد بنجاح! ✅"
+                : "كود غير صالح ❌")}
+          </div>
+        )}
       </div>
 
       {/* ── Manual Code Entry ── */}
