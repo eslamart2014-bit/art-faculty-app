@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
-import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
+import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
 
 
 
@@ -570,30 +570,32 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     return data ? data.length : 0;
   };
 
-  const handleCrossCourseMakeup = async (code: string) => {
-    const variants = getStudentCodeVariants(code);
-    const filter = buildStudentCodeFilter(variants);
-
-    let globalStudent: any = null;
-    try {
-      const { data } = await supabase
-        .from("students")
-        .select("*")
-        .or(filter)
-        .limit(1)
-        .maybeSingle();
-      globalStudent = data;
-    } catch (e) {}
-
-    // Fallback to server API if client-side query blocked by RLS / session
+  const handleCrossCourseMakeup = async (code: string, preFetchedStudent?: any) => {
+    let globalStudent = preFetchedStudent;
     if (!globalStudent) {
+      const variants = getStudentCodeVariants(code);
+      const filter = buildStudentCodeFilter(variants);
+
       try {
-        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
-        if (res.ok) {
-          const lData = await res.json();
-          if (lData.student) globalStudent = lData.student;
-        }
+        const { data } = await supabase
+          .from("students")
+          .select("*")
+          .or(filter)
+          .limit(1)
+          .maybeSingle();
+        globalStudent = data;
       } catch (e) {}
+
+      // Fallback to server API if client-side query blocked by RLS / session
+      if (!globalStudent) {
+        try {
+          const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+          if (res.ok) {
+            const lData = await res.json();
+            if (lData.student) globalStudent = lData.student;
+          }
+        } catch (e) {}
+      }
     }
     
     if (!globalStudent) {
@@ -629,29 +631,41 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     try {
       const { data } = await supabase.from("students")
         .select("*")
-        .eq("academic_year", course.academic_year)
         .or(filter)
         .limit(1)
         .maybeSingle();
       student = data;
     } catch (e) {}
 
-    if (!student && course.makeup_students && course.makeup_students.length > 0) {
+    // Fallback to server API if client-side query blocked by RLS / session
+    if (!student) {
       try {
-        const { data: makeupStudent } = await supabase.from("students")
-          .select("*")
-          .in("id", course.makeup_students)
-          .or(filter)
-          .limit(1)
-          .maybeSingle();
-        if (makeupStudent) student = makeupStudent;
+        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+        if (res.ok) {
+          const lData = await res.json();
+          if (lData.student) student = lData.student;
+        }
       } catch (e) {}
     }
 
     if (!student) {
-      student = await handleCrossCourseMakeup(code);
+      vibrateHeavyError();
+      setScannerStatus('error');
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
+      return null;
     }
-    return student;
+
+    // مطابقة مرنة للفرقة الدراسية تتسامح مع مختلف التنسيقات (الفرقة الأولى vs الاولي)
+    const isSameYear = normalizeAcademicYear(student.academic_year) === normalizeAcademicYear(course.academic_year);
+    const inMakeup = course.makeup_students && course.makeup_students.includes(student.id);
+
+    if (isSameYear || inMakeup) {
+      return student;
+    }
+
+    // إذا كان الطالب مقيداً بفرقة دراسية أخرى تماماً
+    return await handleCrossCourseMakeup(code, student);
   };
 
   // --- SCANNER LOGIC ---

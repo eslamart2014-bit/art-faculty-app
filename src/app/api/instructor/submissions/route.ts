@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
-import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
+import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, getAcademicYearVariants } from '@/lib/codeHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +100,8 @@ export async function GET(request: Request) {
 
       // حصر البحث في الفرق الدراسية المسندة للمعيد ما لم يكن مديراً
       if (!isAdmin && myAcademicYears.length > 0) {
-        stQuery = stQuery.in('academic_year', myAcademicYears);
+        const expandedYears = Array.from(new Set(myAcademicYears.flatMap((y: string) => getAcademicYearVariants(y))));
+        stQuery = stQuery.in('academic_year', expandedYears);
       }
 
       const cleanQ = sanitizeScannedString(searchQuery);

@@ -8,7 +8,7 @@ import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
-import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
+import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -504,30 +504,32 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
 
   // --- CROSS-COURSE MAKEUP LOGIC ---
-  const handleCrossCourseMakeup = async (code: string) => {
-    const variants = getStudentCodeVariants(code);
-    const filter = buildStudentCodeFilter(variants);
-
-    let globalStudent: any = null;
-    try {
-      const { data } = await supabase
-        .from("students")
-        .select("*")
-        .or(filter)
-        .limit(1)
-        .maybeSingle();
-      globalStudent = data;
-    } catch (e) {}
-
-    // Fallback to server API if client-side query blocked by RLS / session
+  const handleCrossCourseMakeup = async (code: string, preFetchedStudent?: any) => {
+    let globalStudent = preFetchedStudent;
     if (!globalStudent) {
+      const variants = getStudentCodeVariants(code);
+      const filter = buildStudentCodeFilter(variants);
+
       try {
-        const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
-        if (res.ok) {
-          const lData = await res.json();
-          if (lData.student) globalStudent = lData.student;
-        }
+        const { data } = await supabase
+          .from("students")
+          .select("*")
+          .or(filter)
+          .limit(1)
+          .maybeSingle();
+        globalStudent = data;
       } catch (e) {}
+
+      // Fallback to server API if client-side query blocked by RLS / session
+      if (!globalStudent) {
+        try {
+          const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(code)}`);
+          if (res.ok) {
+            const lData = await res.json();
+            if (lData.student) globalStudent = lData.student;
+          }
+        } catch (e) {}
+      }
     }
     
     if (!globalStudent) {
@@ -596,14 +598,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     }
 
     const inMakeup = isMakeup && course.makeup_students.includes(student.id);
-    const inCourseSections = course.sections && course.sections.includes(student.section) && student.academic_year === course.academic_year;
+    const isSameYear = normalizeAcademicYear(student.academic_year) === normalizeAcademicYear(course.academic_year);
+    const inCourseSections = (!course.sections || course.sections.length === 0 || course.sections.includes(student.section)) && isSameYear;
 
     if (inMakeup || inCourseSections) {
       return student;
     }
 
     // If not in the course naturally or via makeup, trigger makeup prompt with full details
-    return await handleCrossCourseMakeup(code);
+    return await handleCrossCourseMakeup(code, student);
   };
 
 

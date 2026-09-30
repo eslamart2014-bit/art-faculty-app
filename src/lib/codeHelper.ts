@@ -153,3 +153,35 @@ export function displayAcademicYear(year: string): string {
   if (y.startsWith("الفرقة")) return y;
   return `الفرقة ${y}`;
 }
+
+// توليد جميع المتغيرات المحتملة للفرقة الدراسية لمطابقة دقيقة في الاستعلامات
+export function getAcademicYearVariants(year: string): string[] {
+  if (!year) return [];
+  const variants = new Set<string>();
+  variants.add(year.trim());
+  const norm = normalizeAcademicYear(year);
+  if (norm) variants.add(norm);
+  const disp = displayAcademicYear(year);
+  if (disp) variants.add(disp);
+
+  if (norm === 'الاولي') {
+    variants.add('الأولى');
+    variants.add('الاولي');
+    variants.add('الفرقة الأولى');
+    variants.add('الفرقة الاولي');
+    variants.add('1');
+  } else if (norm === 'الثانية') {
+    variants.add('الثانية');
+    variants.add('الفرقة الثانية');
+    variants.add('2');
+  } else if (norm === 'الثالثة') {
+    variants.add('الثالثة');
+    variants.add('الفرقة الثالثة');
+    variants.add('3');
+  } else if (norm === 'الرابعة') {
+    variants.add('الرابعة');
+    variants.add('الفرقة الرابعة');
+    variants.add('4');
+  }
+  return Array.from(variants).filter(Boolean);
+}

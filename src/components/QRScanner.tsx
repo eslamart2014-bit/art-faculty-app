@@ -2,8 +2,17 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { Zap, ZapOff, RefreshCw, X } from "lucide-react";
+import { Zap, ZapOff, RefreshCw, X, Camera } from "lucide-react";
 import { extractStudentCode } from "@/lib/scannerHelper";
+
+// فحص موثوق لأجهزة آبل (آيفون، آيباد) للتعامل الدقيق مع محرك سفاري
+const checkIsIOS = () => {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent || "") ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+};
 
 export interface QRScannerProps {
   onScan: (result: string) => void;
@@ -31,6 +40,7 @@ export default function QRScanner({
   const containerRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
@@ -40,6 +50,9 @@ export default function QRScanner({
   // Locks and Cooldowns
   const isLockedRef = useRef(false);
   const lastScannedRef = useRef<{ code: string; time: number }>({ code: "", time: 0 });
+
+  // Device detection
+  const [isIOS] = useState(() => checkIsIOS());
 
   // UI States
   const [internalStatus, setInternalStatus] = useState<"idle" | "success" | "error">("idle");
@@ -86,6 +99,53 @@ export default function QRScanner({
     }, 700);
   }, [cooldownMs]);
 
+  // Handle direct photo capture or image file selection (Ideal backup for iOS macro lenses / low light)
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so user can pick the same file again if desired
+    e.target.value = "";
+
+    setInternalStatus("idle");
+    setInternalStatusText("جاري فحص الصورة... ⏳");
+
+    const tempId = "temp-file-qr-" + Math.random().toString(36).slice(2, 9);
+    const tempDiv = document.createElement("div");
+    tempDiv.id = tempId;
+    tempDiv.style.display = "none";
+    document.body.appendChild(tempDiv);
+
+    try {
+      const fileScanner = new Html5Qrcode(tempId, {
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        verbose: false
+      });
+      const decodedText = await fileScanner.scanFile(file, false);
+      try { await fileScanner.clear(); } catch (err) {}
+      if (tempDiv.parentNode) tempDiv.parentNode.removeChild(tempDiv);
+
+      if (decodedText) {
+        handleDecoded(decodedText);
+      } else {
+        setInternalStatus("error");
+        setInternalStatusText("لم يتم العثور على باركود واضح في الصورة ❌");
+        setTimeout(() => {
+          setInternalStatus("idle");
+          setInternalStatusText("");
+        }, 2200);
+      }
+    } catch (err) {
+      if (tempDiv.parentNode) tempDiv.parentNode.removeChild(tempDiv);
+      setInternalStatus("error");
+      setInternalStatusText("تعذر قراءة الصورة، يرجى التقاط صورة أقرب وأوضح ❌");
+      setTimeout(() => {
+        setInternalStatus("idle");
+        setInternalStatusText("");
+      }, 2500);
+    }
+  };
+
   // Scanner lifecycle
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -104,25 +164,38 @@ export default function QRScanner({
       containerRef.current.appendChild(div);
     }
 
+    // Android/Desktop: use native BarcodeDetector. iOS: use ZXing to avoid experimental WebKit bugs
     const scanner = new Html5Qrcode(scannerId, {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       experimentalFeatures: {
-        useBarCodeDetectorIfSupported: true
+        useBarCodeDetectorIfSupported: !isIOS
       },
       verbose: false
     });
     scannerRef.current = scanner;
 
+    // For Android: preserve exact working config (fps 25, aspectRatio 1.0, qrbox 0.72)
+    // For iOS: fps 15, NO aspectRatio constraint (prevents WebKit 4:3 -> 1:1 distortion), qrbox 0.75
+    const scanConfig = isIOS
+      ? {
+          fps: 15,
+          qrbox: (viewWidth: number, viewHeight: number) => {
+            const edge = Math.min(viewWidth, viewHeight);
+            return { width: Math.floor(edge * 0.75), height: Math.floor(edge * 0.75) };
+          }
+        }
+      : {
+          fps: 25,
+          aspectRatio: 1.0,
+          qrbox: (viewWidth: number, viewHeight: number) => {
+            const edge = Math.min(viewWidth, viewHeight);
+            return { width: Math.floor(edge * 0.72), height: Math.floor(edge * 0.72) };
+          }
+        };
+
     scanner.start(
       { facingMode },
-      {
-        fps: 25,
-        aspectRatio: 1.0,
-        qrbox: (viewWidth, viewHeight) => {
-          const edge = Math.min(viewWidth, viewHeight);
-          return { width: Math.floor(edge * 0.72), height: Math.floor(edge * 0.72) };
-        }
-      },
+      scanConfig,
       (text: string) => {
         if (!isDestroyed) {
           handleDecoded(text);
@@ -150,11 +223,17 @@ export default function QRScanner({
         }
       } catch (e) {}
 
-      // Intercept underlying stream for emergency instant track stop
+      // Intercept underlying stream for emergency instant track stop and iOS video inline enforcement
       try {
         const videoEl = div.querySelector("video") as HTMLVideoElement;
-        if (videoEl && videoEl.srcObject instanceof MediaStream) {
-          streamRef.current = videoEl.srcObject;
+        if (videoEl) {
+          videoEl.setAttribute("playsinline", "true");
+          videoEl.setAttribute("webkit-playsinline", "true");
+          videoEl.muted = true;
+          videoEl.autoplay = true;
+          if (videoEl.srcObject instanceof MediaStream) {
+            streamRef.current = videoEl.srcObject;
+          }
         }
       } catch (e) {}
     }).catch(err => {
@@ -290,7 +369,7 @@ export default function QRScanner({
           pointerEvents: "auto"
         }}
       >
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           {hasTorch && (
             <button
               type="button"
@@ -335,6 +414,38 @@ export default function QRScanner({
           >
             <RefreshCw size={17} />
           </button>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="التقاط صورة واضحة بالكاميرا أو اختيار صورة من المعرض"
+            style={{
+              height: "36px",
+              padding: "0 10px",
+              borderRadius: "10px",
+              background: "rgba(15, 23, 42, 0.75)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              color: "#38bdf8",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "bold",
+              transition: "all 0.2s"
+            }}
+          >
+            <Camera size={16} />
+            <span style={{ whiteSpace: "nowrap" }}>{isIOS ? "التقاط صورة" : "فحص صورة"}</span>
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleFileSelect}
+          />
         </div>
 
         {title && (
@@ -429,7 +540,15 @@ export default function QRScanner({
           transition: "all 0.2s ease"
         }}
       >
-        {isBusy ? "جاري المعالجة والفحص... ⏳" : currentStatusText || (currentStatus === "success" ? "تم الرصد بنجاح! ✅" : currentStatus === "error" ? "كود غير صالح ❌" : "وجه الكاميرا داخل الإطار الأزرق 📷")}
+        {isBusy 
+          ? "جاري المعالجة والفحص... ⏳" 
+          : currentStatusText || (currentStatus === "success" 
+            ? "تم الرصد بنجاح! ✅" 
+            : currentStatus === "error" 
+            ? "كود غير صالح ❌" 
+            : isIOS 
+            ? "وجه الكاميرا داخل الإطار (على بعد 15-20 سم) 📷" 
+            : "وجه الكاميرا داخل الإطار الأزرق 📷")}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import QRScanner from "@/components/QRScanner";
 
-import { extractStudentCode, sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter } from "@/lib/scannerHelper";
+import { extractStudentCode, sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
 import LockerAdminTab from "./lockers/LockerAdminTab";
 
 interface AdvancedSettingsModalProps {
@@ -370,7 +370,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
 
       // First, include all courses for the student's academic year
       (allCourses || []).forEach(c => {
-        if (c.academic_year === student.academic_year) {
+        if (normalizeAcademicYear(c.academic_year) === normalizeAcademicYear(student.academic_year)) {
           courseStats.set(c.id, {
             courseId: c.id,
             courseName: c.name,
