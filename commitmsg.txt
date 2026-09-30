@@ -1,1 +1,1 @@
-fix: remove extra buttons, enlarge qrbox, fix iOS via videoConstraints v3.6.46
+fix: replace photo capture button with manual code input and search v3.6.47
