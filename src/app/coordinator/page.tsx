@@ -217,6 +217,35 @@ export default function CoordinatorPortalPage() {
     }
   };
 
+  // 3.5 تسجيل الخروج من جميع الأجهزة (فك القيد)
+  const handleLogoutAllDevices = async () => {
+    if (!searchResult?.student?.student_code) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/coordinator/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "logout_all_devices",
+          student_code: searchResult.student.student_code,
+          coordinator_name: coordinatorName || "منسق النظام",
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert("🔓 " + (data.message || "تم تسجيل الخروج من جميع الأجهزة بنجاح. يمكن للطالب الدخول من جهاز جديد الآن."));
+      } else {
+        alert(data.error || "تعذر العملية");
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 4. إعادة توليد رقم سري جديد وفك القفل فوراً
   const handleRegeneratePin = async () => {
     if (!searchResult?.student?.student_code) return;
@@ -861,6 +890,32 @@ export default function CoordinatorPortalPage() {
                   </div>
                 </div>
               )}
+
+              {/* زر تسجيل الخروج من جميع الأجهزة */}
+              <button
+                type="button"
+                onClick={handleLogoutAllDevices}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  background: "rgba(245, 158, 11, 0.15)",
+                  border: "1px solid #f59e0b",
+                  color: "#f59e0b",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  boxSizing: "border-box",
+                  margin: "0 0 8px 0"
+                }}
+              >
+                <span>🔓 تسجيل الخروج من جميع الأجهزة (فك قيد الجهاز)</span>
+              </button>
 
               {/* زر إنهاء جلسات الأجهزة الأخرى */}
               <button

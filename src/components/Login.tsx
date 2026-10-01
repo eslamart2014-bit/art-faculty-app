@@ -308,7 +308,11 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
       const data = await res.json();
       if (!res.ok || !data.success) {
-        setStudentError(data.error || "بيانات الدخول غير صحيحة");
+        if (data.device_locked) {
+          setStudentError("هذا الحساب مقيّد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد.");
+        } else {
+          setStudentError(data.error || "بيانات الدخول غير صحيحة");
+        }
         setStudentLoginLoading(false);
         return;
       }

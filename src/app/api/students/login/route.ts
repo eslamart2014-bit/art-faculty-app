@@ -129,6 +129,38 @@ export async function POST(request: Request) {
       account.is_pin_used = true;
     }
 
+    const isAdminSession = request.headers.get('X-Admin-Impersonate') === 'true' || device_info?.is_admin_session === true;
+    const deviceId = device_info?.deviceId || 'unknown';
+
+    // استخراج bound_device_id
+    let boundDeviceId = account.bound_device_id;
+    if (!boundDeviceId && studentRecord?.telegram_browser_id) {
+      try {
+        const tbData = JSON.parse(studentRecord.telegram_browser_id);
+        if (tbData.bound_device_id) {
+          boundDeviceId = tbData.bound_device_id;
+        }
+      } catch (e) {}
+    }
+
+    if (!isAdminSession && deviceId !== 'unknown') {
+      if (boundDeviceId) {
+        if (boundDeviceId !== deviceId) {
+          return NextResponse.json(
+            {
+              device_locked: true,
+              error: 'هذا الحساب مقيّد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد والسماح بتسجيل الدخول من هذا الجهاز.',
+              coordinator_name: account.activated_by || 'منسق النظام'
+            },
+            { status: 403 }
+          );
+        }
+      } else {
+        boundDeviceId = deviceId;
+        resetSecurity.bound_device_id = deviceId;
+      }
+    }
+
     await supabaseAdmin
       .from('student_accounts')
       .update(resetSecurity)
@@ -138,7 +170,7 @@ export async function POST(request: Request) {
     let updatedDevices = account.devices || [];
     if (!Array.isArray(updatedDevices)) updatedDevices = [];
 
-    const deviceId = device_info?.deviceId || 'unknown';
+    // deviceId already defined above
     const existingDev = updatedDevices.find((d: any) => d.deviceId === deviceId);
     if (existingDev) {
       existingDev.lastSeen = new Date().toISOString();

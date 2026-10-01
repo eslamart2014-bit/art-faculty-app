@@ -28,7 +28,8 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
-  Camera
+  Camera,
+  LogOut
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
@@ -74,6 +75,18 @@ function parseDeviceBrand(userAgent?: string, screen?: string): { brand: string;
     brand = 'جهاز أبل ماك (MacBook / iMac)'; icon = '💻'; osText = 'نظام macOS';
   }
   return { brand, icon, osText };
+}
+
+function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'لم يسجل دخول بعد';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (mins < 1) return 'منذ لحظات';
+  if (mins < 60) return `منذ ${mins} دقيقة`;
+  if (hours < 24) return `منذ ${hours} ساعة`;
+  return `منذ ${days} يوم`;
 }
 
 export default function StudentPortalHubModal({
@@ -1242,6 +1255,18 @@ export default function StudentPortalHubModal({
                         <span>إعادة توليد رقم PIN</span>
                       </button>
 
+                      {/* زر تسجيل الخروج من جميع الأجهزة */}
+                      <button
+                        type="button"
+                        className="btn-compact"
+                        onClick={() => handleExecuteAccountAction('logout_all_devices')}
+                        disabled={actionLoading}
+                        style={{ width: "100%", margin: 0, background: "rgba(245, 158, 11, 0.15)", border: "1px solid #f59e0b", color: "#f59e0b", padding: "10px", borderRadius: "10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                      >
+                        <LogOut size={14} />
+                        <span>تسجيل الخروج من جميع الأجهزة</span>
+                      </button>
+
                       {/* زر تصفير أعمال الطالب لإعادة الرفع */}
                       <button
                         type="button"
@@ -2110,6 +2135,10 @@ export default function StudentPortalHubModal({
 
                             <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", wordBreak: "break-word" }}>
                               {st.full_name}
+                            </span>
+
+                            <span style={{ color: "#94a3b8", fontSize: "11px", whiteSpace: "nowrap" }}>
+                              {formatRelativeTime(st.last_login_at)}
                             </span>
 
                             {/* الحالة تفضل ظاهرة جنب الاسم كما طلب المستخدم تماماً */}

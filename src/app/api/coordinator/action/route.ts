@@ -398,6 +398,50 @@ export async function POST(request: Request) {
       });
     }
 
+    // 5. تسجيل الخروج من جميع الأجهزة (فك القيد)
+    if (action === 'logout_all_devices') {
+      const coordName = coordinator_name || 'منسق النظام';
+
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({ devices: [], bound_device_id: null })
+          .eq('student_code', cleanCode);
+      } catch (e) {}
+
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st && st.telegram_browser_id) {
+          let curr: any = {};
+          try { curr = JSON.parse(st.telegram_browser_id); } catch(e){}
+          curr.devices = [];
+          curr.bound_device_id = null;
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(curr) })
+            .eq('id', st.id);
+        }
+      } catch (e) {}
+
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: 'devices_unbound_by_coordinator',
+          details: { coordinator: coordName, timestamp: new Date().toISOString() },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم تسجيل الخروج من جميع الأجهزة بنجاح. يمكن للطالب الدخول من جهاز جديد الآن.',
+      });
+    }
+
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err: any) {
     console.error('Coordinator action error:', err);
