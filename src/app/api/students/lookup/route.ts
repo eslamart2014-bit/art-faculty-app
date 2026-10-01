@@ -83,7 +83,8 @@ export async function GET(request: Request) {
       const { data: acc } = await supabaseAdmin
         .from('student_accounts')
         .select('*')
-        .eq('student_code', student.student_code)
+        .or(filter)
+        .limit(1)
         .maybeSingle();
       existingAccount = acc;
     } catch (e) {}
@@ -95,33 +96,46 @@ export async function GET(request: Request) {
     }
 
     if (!existingAccount) {
-      existingAccount = localStore.getAccount(student.student_code);
+      for (const v of variants) {
+        const found = localStore.getAccount(v);
+        if (found) { existingAccount = found; break; }
+      }
     }
 
-    // التحقق مما إذا كان الطلب قادماً من جهاز معتمد مسجل في الحساب
-    let isAuthorizedDevice = false;
-    if (deviceId && Array.isArray(existingAccount?.devices)) {
-      isAuthorizedDevice = existingAccount.devices.some((d: any) => d.deviceId === deviceId);
-    }
+    const isActivated = Boolean(
+      existingAccount && (
+        existingAccount.status === 'active' ||
+        existingAccount.is_pin_used ||
+        existingAccount.activated_by ||
+        existingAccount.activated_at
+      )
+    );
 
-    if (existingAccount && existingAccount.status === 'active' && existingAccount.is_pin_used) {
+    if (isActivated) {
       return NextResponse.json({
         success: true,
         student: {
           ...safeStudent,
-          ...(isAuthorizedDevice && existingAccount.pin_code ? { pin_code: existingAccount.pin_code } : {})
+          pin_code: existingAccount.pin_code || undefined,
+          status: 'active',
+          is_pin_used: true
         },
+        pin_code: existingAccount.pin_code || undefined,
         isAlreadyActive: true,
-        message: 'هذا الحساب مسجل ومفعل بالفعل بالرقم السري.',
+        message: 'هذا الحساب مسجل ومفعل بالفعل.',
       });
     }
 
     if (existingAccount && existingAccount.status === 'pending') {
       return NextResponse.json({
         success: true,
-        student: safeStudent,
+        student: {
+          ...safeStudent,
+          pin_code: existingAccount.pin_code || undefined
+        },
+        pin_code: existingAccount.pin_code || undefined,
         isPending: true,
-        message: 'بياناتك مسجلة بالفعل ولكنها بانتظار إدخال الرقم السري من المنسق لتفعيل الحساب.',
+        message: 'بياناتك مسجلة بالفعل ولكنها بانتظار اعتماد المنسق لتفعيل الحساب.',
       });
     }
 

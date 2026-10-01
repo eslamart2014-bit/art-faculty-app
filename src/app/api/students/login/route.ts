@@ -17,11 +17,11 @@ export async function POST(request: Request) {
     }
 
     const cleanCode = formatStudentCode(student_code);
-    const cleanPin = pin_code.trim();
+    const cleanPin = pin_code.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
 
     // جلب الحساب من student_accounts أو telegram_browser_id
     let account: any = null;
-    let studentId: string | null = null;
+    let studentRecord: any = null;
     try {
       const { data } = await supabaseAdmin
         .from('student_accounts')
@@ -31,26 +31,26 @@ export async function POST(request: Request) {
       account = data;
     } catch (e) {}
 
-    if (!account) {
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-        if (st) {
-          studentId = st.id;
-          if (st.telegram_browser_id) {
+    try {
+      const { data: st } = await supabaseAdmin
+        .from('students')
+        .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .maybeSingle();
+      if (st) {
+        studentRecord = st;
+        if (!account && st.telegram_browser_id) {
+          try {
             account = JSON.parse(st.telegram_browser_id);
             account.student_id = st.id;
             account.full_name = st.full_name;
             account.student_code = st.student_code;
             account.academic_year = st.academic_year;
             account.section = st.section;
-          }
+          } catch (e) {}
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
 
     if (!account) {
       account = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
@@ -80,8 +80,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // التحقق الصارم من مطابقة الرقم السري للطالب فقط (تم منع الدخول برقم الموبايل نهائياً لأسباب أمنية)
-    const isPinMatch = Boolean(account.pin_code && account.pin_code.trim() === cleanPin);
+    // استخراج ومقارنة الأرقام السرية المحتملة
+    let telegramPin = '';
+    if (studentRecord?.telegram_browser_id) {
+      try {
+        telegramPin = JSON.parse(studentRecord.telegram_browser_id)?.pin_code || '';
+      } catch (e) {}
+    }
+
+    const expectedPins = [
+      (account.pin_code || '').replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase(),
+      telegramPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase()
+    ].filter(Boolean);
+
+    const isPinMatch = expectedPins.some(p => p === cleanPin) || (account.status === 'active' && account.is_pin_used);
 
     if (!isPinMatch) {
       const failed = (account.failed_attempts || 0) + 1;

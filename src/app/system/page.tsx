@@ -30,7 +30,8 @@ import {
   Check,
   Archive,
   Eye,
-  EyeOff
+  EyeOff,
+  KeyRound
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
@@ -580,7 +581,7 @@ export default function SystemPage() {
                     const activeSession = {
                       ...parsed,
                       ...(data.student || {}),
-                      pin_code: data.student?.pin_code || parsed.pin_code,
+                      pin_code: data.student?.pin_code || data.pin_code || parsed.pin_code || "",
                       status: "active",
                       is_pin_used: true
                     };
@@ -669,7 +670,7 @@ export default function SystemPage() {
           const activeSession = {
             ...currentStudent,
             ...(data.student || {}),
-            pin_code: data.student?.pin_code || currentStudent.pin_code,
+            pin_code: data.student?.pin_code || data.pin_code || currentStudent.pin_code || "",
             status: "active",
             is_pin_used: true
           };
@@ -1575,6 +1576,62 @@ export default function SystemPage() {
             </p>
           </div>
 
+          {/* خانة إدخال الرقم السري المباشر (في حال رغبة الطالب أو استلامه من المنسق) */}
+          <div style={{
+            background: "rgba(15, 23, 42, 0.6)",
+            border: "1px solid #334155",
+            borderRadius: "12px",
+            padding: "14px",
+            marginBottom: "16px",
+            textAlign: "right"
+          }}>
+            <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <KeyRound size={15} />
+              <span>أو أدخل الرقم السري (PIN) للفتح الفوري:</span>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <input
+                type="text"
+                placeholder="أدخل الرقم السري..."
+                value={enteredPin}
+                onChange={(e) => setEnteredPin(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleVerifyPinSubmit()}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  background: "#0d131f",
+                  border: "1.5px solid #3b82f6",
+                  borderRadius: "8px",
+                  color: "#fff",
+                  fontSize: "14px",
+                  fontWeight: "bold",
+                  textAlign: "center",
+                  boxSizing: "border-box",
+                  margin: 0
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleVerifyPinSubmit}
+                disabled={loading || !enteredPin.trim()}
+                style={{
+                  padding: "10px 16px",
+                  background: (!enteredPin.trim() || loading) ? "#334155" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: (!enteredPin.trim() || loading) ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0
+                }}
+              >
+                تفعيل الآن 🔓
+              </button>
+            </div>
+          </div>
+
           {/* زر الفحص والتحديث اليدوي الفوري */}
           <button
             onClick={async () => {
@@ -1587,7 +1644,7 @@ export default function SystemPage() {
                   const activeSession = {
                     ...currentStudent,
                     ...(data.student || {}),
-                    pin_code: data.student?.pin_code || currentStudent.pin_code,
+                    pin_code: data.student?.pin_code || data.pin_code || currentStudent.pin_code || "",
                     status: "active",
                     is_pin_used: true
                   };

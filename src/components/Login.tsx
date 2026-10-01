@@ -34,8 +34,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
     setAppVersion(localStorage.getItem('appVersion') || "1.7");
   }, []);
 
-  // Main role mode switcher: Faculty vs Student
-  const [roleMode, setRoleMode] = useState<"faculty" | "student">("faculty");
+  // Main role mode switcher: Student vs Faculty (Students first)
+  const [roleMode, setRoleMode] = useState<"student" | "faculty">("student");
 
   // ==========================================
   // FACULTY LOGIN STATE
@@ -440,7 +440,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </div>
 
-        {/* Top Segmented Role Switcher: Faculty vs Student */}
+        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) */}
         <div style={{
           display: "flex",
           background: "rgba(255, 255, 255, 0.08)",
@@ -449,30 +449,6 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
           marginBottom: "18px",
           border: "1px solid rgba(255, 255, 255, 0.12)"
         }}>
-          <button
-            type="button"
-            onClick={() => { setRoleMode("faculty"); setError(""); }}
-            style={{
-              flex: 1,
-              padding: "10px 8px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              background: roleMode === "faculty" ? "linear-gradient(135deg, #10b981, #059669)" : "transparent",
-              color: roleMode === "faculty" ? "#ffffff" : "#94a3b8",
-              border: "none",
-              borderRadius: "10px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              boxShadow: roleMode === "faculty" ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
-              transition: "all 0.2s ease"
-            }}
-          >
-            <span>👨‍🏫</span>
-            <span>عضو هيئة تدريس</span>
-          </button>
           <button
             type="button"
             onClick={() => { setRoleMode("student"); setError(""); setStudentError(""); }}
@@ -495,7 +471,31 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             }}
           >
             <span>🎓</span>
-            <span>طالب</span>
+            <span>بوابة الطلاب</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setRoleMode("faculty"); setError(""); }}
+            style={{
+              flex: 1,
+              padding: "10px 8px",
+              fontSize: "14px",
+              fontWeight: "bold",
+              background: roleMode === "faculty" ? "linear-gradient(135deg, #10b981, #059669)" : "transparent",
+              color: roleMode === "faculty" ? "#ffffff" : "#94a3b8",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              boxShadow: roleMode === "faculty" ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
+              transition: "all 0.2s ease"
+            }}
+          >
+            <span>👨‍🏫</span>
+            <span>أعضاء هيئة التدريس</span>
           </button>
         </div>
 

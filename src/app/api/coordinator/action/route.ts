@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
+import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter, generatePinCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 
 export const dynamic = 'force-dynamic';
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
           })
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .or(filter)
           .select('*');
         if (res.data && res.data.length > 0) {
           updatedAccount = res.data[0];
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
               status: 'active',
               is_pin_used: true,
             })
-            .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+            .or(filter)
             .select('*');
           if (res.data && res.data.length > 0) {
             updatedAccount = res.data[0];
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
         const { data: st } = await supabaseAdmin
           .from('students')
           .select('id, student_code, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .or(filter)
           .maybeSingle();
 
         if (st) {
@@ -150,6 +150,7 @@ export async function POST(request: Request) {
           const merged = {
             ...curr,
             student_code: st.student_code,
+            pin_code: curr.pin_code || updatedAccount?.pin_code || generatePinCode(),
             status: 'active',
             is_pin_used: true,
             id_card_verified: true,
@@ -166,6 +167,7 @@ export async function POST(request: Request) {
           else {
             updatedAccount.activated_by = coordName;
             updatedAccount.activated_at = nowIso;
+            if (!updatedAccount.pin_code) updatedAccount.pin_code = merged.pin_code;
           }
         }
       } catch (e) {}

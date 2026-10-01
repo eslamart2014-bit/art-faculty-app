@@ -1,1 +1,1 @@
-fix: remove idle status text, increase fps to 15 on iOS, update version to 3.6.48
+fix: unify login screen for root and student-portal, put students first, fix coordinator activation and PIN auto-login v3.6.49

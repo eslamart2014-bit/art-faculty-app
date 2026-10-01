@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
-    // التحقق الأمني: التحقق من الرقم السري إذا كان الحساب مفعلاً
+    // التحقق الأمني: جلب بيانات الحساب المعتمد
     let accountData: any = null;
     if (student.telegram_browser_id) {
       try {
@@ -80,13 +80,30 @@ export async function GET(request: Request) {
       } catch (e) {}
     }
 
-    const expectedPin = accountData?.pin_code;
-    const isActivated = accountData?.is_pin_used || accountData?.status === 'active';
+    if (!accountData) {
+      try {
+        const { data: acc } = await supabaseAdmin
+          .from('student_accounts')
+          .select('*')
+          .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+        accountData = acc;
+      } catch (e) {}
+    }
 
-    if (!isImpersonate && isActivated && expectedPin) {
-      if (!pin || pin !== expectedPin) {
+    if (!accountData) {
+      accountData = localStore.getAccount(cleanCode) || localStore.getAccount(code);
+    }
+
+    const expectedPin = (accountData?.pin_code || '').trim();
+    const isActivated = Boolean(accountData?.is_pin_used || accountData?.status === 'active' || accountData?.activated_by);
+
+    if (!isImpersonate && isActivated && expectedPin && pin) {
+      const cleanInputPin = pin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+      const cleanExpectedPin = expectedPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+      if (cleanInputPin !== cleanExpectedPin) {
         return NextResponse.json(
-          { error: 'غير مصرح: يجب تسجيل الدخول بالرقم السري للوصول إلى لوحة بيانات الطالب.' },
+          { error: 'غير مصرح: الرقم السري غير مطابق للرقم المعتمد بحساب الطالب.' },
           { status: 401 }
         );
       }

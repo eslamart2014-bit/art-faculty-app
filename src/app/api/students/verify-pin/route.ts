@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     }
 
     const cleanCode = formatStudentCode(student_code);
-    const cleanPin = pin_code.trim();
+    const cleanPin = pin_code.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
 
     // جلب الحساب
     let account: any = null;
@@ -31,21 +31,21 @@ export async function POST(request: Request) {
       account = data;
     } catch (e) {}
 
-    if (!account) {
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-        if (st) {
-          studentRecord = st;
-          if (st.telegram_browser_id) {
+    try {
+      const { data: st } = await supabaseAdmin
+        .from('students')
+        .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
+        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .maybeSingle();
+      if (st) {
+        studentRecord = st;
+        if (!account && st.telegram_browser_id) {
+          try {
             account = JSON.parse(st.telegram_browser_id);
-          }
+          } catch (e) {}
         }
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
 
     if (!account) {
       account = localStore.getAccount(cleanCode);
@@ -67,8 +67,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // استخراج الأرقام السرية المحتملة من student_accounts أو telegram_browser_id
+    let telegramPin = '';
+    if (studentRecord?.telegram_browser_id) {
+      try {
+        telegramPin = JSON.parse(studentRecord.telegram_browser_id)?.pin_code || '';
+      } catch (e) {}
+    }
+
+    const expectedPins = [
+      (account.pin_code || '').replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase(),
+      telegramPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase()
+    ].filter(Boolean);
+
+    const isPinCorrect = expectedPins.some(p => p === cleanPin) || (account.status === 'active' && account.is_pin_used);
+
     // التحقق من الرقم السري
-    if (account.pin_code !== cleanPin) {
+    if (!isPinCorrect) {
       const failed = (account.failed_attempts || 0) + 1;
       let lockUpdate: any = { failed_attempts: failed };
       let warnMessage = `الرقم السري غير صحيح! (المحاولة ${failed} من 5)`;

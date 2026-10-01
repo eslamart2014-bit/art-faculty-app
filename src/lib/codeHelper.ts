@@ -114,25 +114,9 @@ export function extractStudentCode(decodedText: string): string {
   return formatStudentCode(raw);
 }
 
-// توليد رقم سري عشوائي ومعقد مكون من 8 خانات (أرقام وحروف ورموز)
+// توليد رقم سري من 6 أرقام سهل القراءة والكتابة على الهاتف (بدون رموز معقدة تسبب أخطاء)
 export function generatePinCode(): string {
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
-  const numbers = '23456789';
-  const symbols = '!@#$%&*';
-
-  let pin = '';
-  // ضمان وجود حرف كبير، حرف صغير، رقم، ورمز
-  pin += letters.charAt(Math.floor(Math.random() * letters.length));
-  pin += numbers.charAt(Math.floor(Math.random() * numbers.length));
-  pin += symbols.charAt(Math.floor(Math.random() * symbols.length));
-
-  const allChars = letters + numbers + symbols;
-  for (let i = pin.length; i < 8; i++) {
-    pin += allChars.charAt(Math.floor(Math.random() * allChars.length));
-  }
-
-  // خلط الحروف عشوائياً
-  return pin.split('').sort(() => Math.random() - 0.5).join('');
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 // توحيد مسمى الفرقة الدراسية ليتطابق مع قاعدة البيانات والمقررات (الاولي، الثانية، الثالثة، الرابعة)
