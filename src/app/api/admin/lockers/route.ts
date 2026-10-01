@@ -216,6 +216,28 @@ export async function POST(request: Request) {
       return NextResponse.json(res);
     }
 
+    // 11.5 تعديل بيانات حجز قائم
+    if (action === 'update_booking') {
+      const { bookingId, lockerCode, cohort, phone, studentNames, studentCodes, notes, status } = body;
+      if (!bookingId) {
+        return NextResponse.json({ error: 'يرجى تحديد معرف الحجز المراد تعديله' }, { status: 400 });
+      }
+      const res = await lockerStore.updateBookingDetails({
+        bookingId,
+        lockerCode,
+        cohort,
+        phone,
+        studentNames: Array.isArray(studentNames) ? studentNames : [],
+        studentCodes: Array.isArray(studentCodes) ? studentCodes : [],
+        notes,
+        status
+      });
+      if (!res.success) {
+        return NextResponse.json({ error: res.message }, { status: 400 });
+      }
+      return NextResponse.json(res);
+    }
+
     // 12. معاينة تفاعلية لبيانات الشيت قبل التسكين
     if (action === 'preview_data') {
       const { rawData } = body;

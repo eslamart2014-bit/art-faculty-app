@@ -120,6 +120,10 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (partners.length !== 3) {
+      setModalError("يشترط إضافة 3 زملاء بالتمام والكمال ليكتمل عدد المجموعة (4 طلاب للدولاب الواحد)");
+      return;
+    }
     if (!phone || phone.trim().length < 9) {
       setModalError("يرجى إدخال رقم هاتف صحيح للتواصل");
       return;
@@ -711,12 +715,24 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                     <label style={{ color: "#cbd5e1", fontSize: "13px", fontWeight: "bold" }}>
-                      الزملاء المشتركون ({partners.length + 1} من 4):
+                      الزملاء المشتركون ({partners.length + 1} من 4 طلاب):
                     </label>
-                    <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                      سعة الدولاب: 4 طلاب (أو شخصين حسب التوفر)
+                    <span style={{ fontSize: "12px", color: partners.length === 3 ? "#34d399" : "#f59e0b", fontWeight: "bold" }}>
+                      {partners.length === 3 ? "✅ العدد مكتمل (4 طلاب)" : `متبقي ${3 - partners.length} زملاء`}
                     </span>
                   </div>
+
+                  {partners.length < 3 && (
+                    <div style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid #f59e0b", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "#fbbf24", marginBottom: "8px" }}>
+                      ⚠️ يشترط حجز الدولاب لـ <strong>4 طلاب</strong> بالتمام والكمال. يرجى إضافة <strong>{3 - partners.length}</strong> زملاء بالبحث أدناه لتفعيل زر التسكين.
+                    </div>
+                  )}
+
+                  {partners.length === 3 && (
+                    <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "#34d399", marginBottom: "8px" }}>
+                      ✅ اكتمل عدد المجموعة بالكامل (4 طلاب). أدخل رقم الهاتف للتأكيد.
+                    </div>
+                  )}
 
                   {partners.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "10px" }}>
@@ -839,18 +855,18 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                   <button
                     type="submit"
-                    disabled={submitting}
+                    disabled={submitting || partners.length !== 3}
                     style={{
                       flex: 1,
-                      background: "linear-gradient(135deg, #10b981, #059669)",
-                      color: "#fff",
+                      background: partners.length === 3 ? "linear-gradient(135deg, #10b981, #059669)" : "#334155",
+                      color: partners.length === 3 ? "#fff" : "#94a3b8",
                       border: "none",
                       padding: "14px",
                       borderRadius: "12px",
                       fontWeight: "bold",
                       fontSize: "15px",
-                      cursor: submitting ? "not-allowed" : "pointer",
-                      opacity: submitting ? 0.7 : 1,
+                      cursor: (submitting || partners.length !== 3) ? "not-allowed" : "pointer",
+                      opacity: (submitting || partners.length !== 3) ? 0.7 : 1,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -862,7 +878,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                     ) : (
                       <>
                         <CheckCircle2 size={18} />
-                        <span>تأكيد طلب التسكين</span>
+                        <span>{partners.length === 3 ? "تأكيد طلب التسكين (4 طلاب)" : `يلزم 4 طلاب (متبقي ${3 - partners.length})`}</span>
                       </>
                     )}
                   </button>

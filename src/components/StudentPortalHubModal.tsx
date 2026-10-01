@@ -1145,6 +1145,39 @@ export default function StudentPortalHubModal({
                     {/* أزرار العمليات الإدارية المباشرة (كل التحكم في مكان واحد) */}
                     <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
                       
+                      {/* زر الدخول لحساب الطالب (وضع الإدارة) */}
+                      <button
+                        type="button"
+                        className="btn-compact"
+                        onClick={() => {
+                          const code = inspectedAccount.student?.student_code;
+                          if (code) {
+                            window.open(`/system?impersonate=${encodeURIComponent(code)}`, '_blank');
+                          }
+                        }}
+                        style={{
+                          width: "100%",
+                          margin: 0,
+                          background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                          border: "1.5px solid #38bdf8",
+                          color: "#fff",
+                          padding: "12px",
+                          borderRadius: "10px",
+                          fontSize: "13px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          gridColumn: "1 / -1",
+                          boxShadow: "0 3px 12px rgba(2, 132, 199, 0.3)"
+                        }}
+                      >
+                        <span style={{ fontSize: "16px" }}>👑</span>
+                        <span>الدخول لحساب الطالب مباشرة (وضع الإدارة)</span>
+                      </button>
+
                       {/* زر تعليق أو فك تعليق الحساب */}
                       {inspectedAccount.account?.status === 'suspended' ? (
                         <button
@@ -2049,6 +2082,17 @@ export default function StudentPortalHubModal({
                             {st.activated_by || "غير معتمد بعد"}
                           </span>
                         </div>
+
+                        <button
+                          type="button"
+                          className="btn-compact"
+                          onClick={() => window.open(`/system?impersonate=${encodeURIComponent(st.student_code)}`, '_blank')}
+                          style={{ background: "#0284c7", border: "1px solid #38bdf8", color: "#fff", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", margin: 0, display: "inline-flex", alignItems: "center", gap: "3px" }}
+                          title={`دخول كطالب (${st.full_name})`}
+                        >
+                          <span>👑</span>
+                          <span>دخول</span>
+                        </button>
 
                         <button
                           type="button"

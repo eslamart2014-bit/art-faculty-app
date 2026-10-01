@@ -1,1 +1,5 @@
-fix: reset failed_attempts and locked_until on PIN reset and activation, add regenerate PIN in coordinator portal v3.6.50
+v3.6.51: Enforce 4 students per locker, admin edit booking, and student impersonation
+
+- Enforce strictly 4 students per locker booking (applicant + 3 partners) in StudentLockerTab UI and validation, backend API, and lockerStore.
+- Added admin capability to edit existing locker bookings (locker code, cohort, phone, 4 students with autocomplete, notes, status) in lockerStore, API route, and LockerAdminTab UI modal.
+- Added admin impersonation button to directly access student accounts in StudentPortalHubModal, admin-portal, and locker booking cards.

@@ -925,6 +925,14 @@ export const lockerStore = {
   }> {
     const db = readLocalDB();
 
+    if (!params.student_names || params.student_names.length !== 4) {
+      return {
+        success: false,
+        isWaitlist: false,
+        message: 'يشترط حجز الدولاب لـ 4 طلاب بالتمام والكمال (مقدم الطلب + 3 زملاء)'
+      };
+    }
+
     // التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل
     for (let i = 0; i < params.student_names.length; i++) {
       const name = params.student_names[i];
@@ -1050,6 +1058,148 @@ export const lockerStore = {
 
     await persistDB(db);
     return true;
+  },
+
+  // 9.5 تعديل بيانات حجز قائم من لوحة الإدارة
+  async updateBookingDetails(params: {
+    bookingId: string;
+    lockerCode?: string;
+    cohort?: string;
+    phone?: string;
+    studentNames: string[];
+    studentCodes?: string[];
+    notes?: string;
+    status?: 'pending' | 'confirmed' | 'rejected';
+  }): Promise<{ success: boolean; message: string; booking?: LockerBooking }> {
+    const db = readLocalDB();
+    const booking = db.bookings.find(b => b.id === params.bookingId);
+    if (!booking) {
+      return { success: false, message: 'تعذر العثور على الحجز المطلوب تعديله' };
+    }
+
+    const oldLockerCode = booking.locker_code.toUpperCase();
+    const newLockerCode = (params.lockerCode || booking.locker_code).trim().toUpperCase();
+
+    // إذا تغير كود الدولاب:
+    if (newLockerCode && newLockerCode !== oldLockerCode) {
+      // 1. فك ارتباط الدولاب القديم
+      const oldLocker = db.lockers.find(l => l.locker_code.toUpperCase() === oldLockerCode);
+      if (oldLocker && oldLocker.current_booking_id === booking.id) {
+        oldLocker.status = 'empty';
+        oldLocker.current_booking_id = null;
+        oldLocker.updated_at = new Date().toISOString();
+      }
+
+      // 2. البحث عن الدولاب الجديد أو إنشاؤه
+      let newLocker = db.lockers.find(l => l.locker_code.toUpperCase() === newLockerCode);
+      if (!newLocker) {
+        const match = newLockerCode.match(/^([A-Za-z])\s*(\d+)$/);
+        const letter = match ? match[1].toUpperCase() : 'A';
+        const number = match ? parseInt(match[2], 10) : 1;
+        newLocker = {
+          id: `L_${newLockerCode}`,
+          locker_code: newLockerCode,
+          letter,
+          number,
+          capacity: 4,
+          is_enabled: true,
+          is_admin_reserved: false,
+          status: 'empty',
+          current_booking_id: null
+        };
+        db.lockers.push(newLocker);
+      } else {
+        // إذا كان الدولاب الجديد مرتبطاً بحجز آخر مختلف
+        if (newLocker.current_booking_id && newLocker.current_booking_id !== booking.id) {
+          const prevBooking = db.bookings.find(b => b.id === newLocker!.current_booking_id);
+          if (prevBooking) {
+            prevBooking.status = 'rejected';
+            prevBooking.notes = `تم استبدال الحجز لنقل الحجز ${booking.id} لهذا الدولاب`;
+          }
+        }
+      }
+
+      const targetStatus = params.status || booking.status || 'confirmed';
+      newLocker.status = targetStatus === 'rejected' ? 'empty' : targetStatus;
+      if (targetStatus === 'rejected') {
+        newLocker.current_booking_id = null;
+      } else {
+        newLocker.current_booking_id = booking.id;
+      }
+      newLocker.updated_at = new Date().toISOString();
+      booking.locker_code = newLockerCode;
+    } else {
+      // نفس الدولاب، نحدث حالته إذا تغيرت حالة الحجز
+      const currLocker = db.lockers.find(l => l.locker_code.toUpperCase() === oldLockerCode);
+      if (currLocker) {
+        if (params.status) {
+          currLocker.status = params.status === 'rejected' ? 'empty' : params.status;
+          if (params.status === 'rejected') {
+            currLocker.current_booking_id = null;
+          }
+        }
+        currLocker.updated_at = new Date().toISOString();
+      }
+    }
+
+    if (params.cohort) {
+      booking.cohort = params.cohort;
+    }
+    if (params.phone !== undefined) {
+      booking.representative_phone = params.phone.trim();
+    }
+    if (params.studentNames && Array.isArray(params.studentNames)) {
+      const validNames = params.studentNames.map(n => String(n || '').trim()).filter(Boolean);
+      booking.student_names = validNames;
+      
+      const codes = [...(params.studentCodes || [])];
+      while (codes.length < validNames.length) codes.push('');
+      booking.student_codes = codes.slice(0, validNames.length);
+
+      // محاولة مطابقة أكواد الطلاب الناقصة
+      try {
+        for (let i = 0; i < validNames.length; i++) {
+          if (!booking.student_codes[i] || !booking.student_codes[i].trim()) {
+            const sName = validNames[i];
+            const firstWord = sName.split(' ')[0];
+            const { data: stRows } = await supabaseAdmin
+              .from('students')
+              .select('student_code, full_name')
+              .ilike('full_name', `%${firstWord}%`)
+              .limit(20);
+
+            if (stRows && stRows.length > 0) {
+              const matched = stRows.find((s: any) => isArabicNameMatch(s.full_name, sName));
+              if (matched) {
+                booking.student_codes[i] = matched.student_code;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[LockerStore] updateBookingDetails auto-resolve error:', e);
+      }
+    }
+
+    if (params.status) {
+      booking.status = params.status;
+      if (params.status === 'confirmed' && !booking.confirmed_at) {
+        booking.confirmed_at = new Date().toISOString();
+        booking.confirmed_by = 'إدارة الكلية';
+      }
+    }
+
+    if (params.notes !== undefined) {
+      booking.notes = params.notes;
+    }
+
+    await persistDB(db);
+
+    return {
+      success: true,
+      message: `تم تحديث بيانات الحجز للدولاب ${booking.locker_code} بنجاح وحفظه سحابياً`,
+      booking
+    };
   },
 
   // 10. إخلاء دولاب بالكامل (Admin Vacate)

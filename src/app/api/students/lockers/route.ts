@@ -95,9 +95,9 @@ export async function POST(request: Request) {
         preferred_letter
       } = body;
 
-      if (!cohort || !representative_phone || !student_names || student_names.length === 0) {
+      if (!cohort || !representative_phone || !student_names || student_names.length !== 4) {
         return NextResponse.json({
-          error: 'البيانات غير مكتملة (الفرقة، رقم الهاتف، وأسماء الطلاب مطلوبة)'
+          error: 'يشترط تسجيل 4 طلاب بالتمام والكمال للدولاب الواحد (مقدم الطلب + 3 زملاء)'
         }, { status: 400 });
       }
 

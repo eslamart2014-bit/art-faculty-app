@@ -192,12 +192,13 @@ export default function AdminPortalPage() {
             {studentData.isRegistered && (
               <div style={{ display: "flex", gap: "8px", marginTop: "14px", borderTop: "1px solid #1e293b", paddingTop: "12px" }}>
                 <button 
-                  onClick={() => setImpersonateModal(true)}
+                  onClick={() => window.open(`/system?impersonate=${encodeURIComponent(studentData.student.student_code)}`, '_blank')}
                   className="btn-secondary"
-                  style={{ flex: 1, fontSize: "12px", padding: "8px" }}
+                  style={{ flex: 1, fontSize: "12px", padding: "8px", background: "rgba(56, 189, 248, 0.15)", borderColor: "#0284c7", color: "#38bdf8", fontWeight: "bold" }}
+                  title="الدخول الفعلي لحساب الطالب بوضع الإدارة الكامل"
                 >
                   <Eye size={15} color="#38bdf8" />
-                  <span>تصفح الحساب كطالب</span>
+                  <span>👑 دخول لحساب الطالب</span>
                 </button>
 
                 {studentData.account?.status === 'suspended' ? (

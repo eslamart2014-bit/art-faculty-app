@@ -21,7 +21,9 @@ import {
   Sliders,
   Check,
   X,
-  Plus
+  Plus,
+  Edit3,
+  ExternalLink
 } from "lucide-react";
 import { printLockerReceipt } from "@/lib/lockerReceipt";
 
@@ -53,6 +55,19 @@ export default function LockerAdminTab() {
   const [activeSearchIdx, setActiveSearchIdx] = useState<number | null>(null);
   const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
   const [isSearchingStudents, setIsSearchingStudents] = useState<boolean>(false);
+
+  // نافذة تعديل بيانات الحجز كأدمن
+  const [editingBooking, setEditingBooking] = useState<any | null>(null);
+  const [editLockerCode, setEditLockerCode] = useState<string>("");
+  const [editCohort, setEditCohort] = useState<string>("الفرقة الرابعة");
+  const [editPhone, setEditPhone] = useState<string>("");
+  const [editNames, setEditNames] = useState<string[]>(["", "", "", ""]);
+  const [editCodes, setEditCodes] = useState<string[]>(["", "", "", ""]);
+  const [editStatus, setEditStatus] = useState<"pending" | "confirmed">("confirmed");
+  const [editNotes, setEditNotes] = useState<string>("");
+  const [editActiveSearchIdx, setEditActiveSearchIdx] = useState<number | null>(null);
+  const [editStudentSuggestions, setEditStudentSuggestions] = useState<any[]>([]);
+  const [isSearchingEditStudents, setIsSearchingEditStudents] = useState<boolean>(false);
 
   // إعداد وضبط أعداد ونطاقات الدواليب
   const [inventoryRanges, setInventoryRanges] = useState<{ [key: string]: number }>({ A: 40, B: 40, C: 40, D: 40 });
@@ -403,6 +418,128 @@ export default function LockerAdminTab() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  // فتح نافذة تعديل بيانات الحجز
+  const openEditBooking = (bk: any) => {
+    setEditingBooking(bk);
+    setEditLockerCode(bk.locker_code || "");
+    setEditCohort(bk.cohort || "الفرقة الرابعة");
+    setEditPhone(bk.representative_phone || "");
+    
+    const names = [...(bk.student_names || [])];
+    const codes = [...(bk.student_codes || [])];
+    while (names.length < 4) names.push("");
+    while (codes.length < 4) codes.push("");
+    setEditNames(names.slice(0, 4));
+    setEditCodes(codes.slice(0, 4));
+    
+    setEditStatus(bk.status === "confirmed" ? "confirmed" : "pending");
+    setEditNotes(bk.notes || "");
+    setEditActiveSearchIdx(null);
+    setEditStudentSuggestions([]);
+  };
+
+  // البحث الذكي أثناء تعديل أسماء الطلاب في الحجز
+  const handleEditStudentSearchInput = async (idx: number, query: string) => {
+    const updatedNames = [...editNames];
+    updatedNames[idx] = query;
+    setEditNames(updatedNames);
+
+    const updatedCodes = [...editCodes];
+    updatedCodes[idx] = "";
+    setEditCodes(updatedCodes);
+
+    if (!query || query.trim().length < 2) {
+      setEditStudentSuggestions([]);
+      setEditActiveSearchIdx(null);
+      return;
+    }
+
+    setEditActiveSearchIdx(idx);
+    setIsSearchingEditStudents(true);
+    try {
+      const res = await fetch(`/api/students/search?q=${encodeURIComponent(query.trim())}&level=${encodeURIComponent(editCohort)}`);
+      const json = await res.json();
+      if (json.students && json.students.length > 0) {
+        setEditStudentSuggestions(json.students);
+      } else {
+        setEditStudentSuggestions([]);
+      }
+    } catch {
+      setEditStudentSuggestions([]);
+    } finally {
+      setIsSearchingEditStudents(false);
+    }
+  };
+
+  const handleSelectEditStudent = (idx: number, student: any) => {
+    const updatedNames = [...editNames];
+    updatedNames[idx] = student.full_name;
+    setEditNames(updatedNames);
+
+    const updatedCodes = [...editCodes];
+    updatedCodes[idx] = student.student_code;
+    setEditCodes(updatedCodes);
+
+    setEditActiveSearchIdx(null);
+    setEditStudentSuggestions([]);
+  };
+
+  // حفظ التعديلات على الحجز
+  const handleUpdateBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBooking) return;
+    const names = editNames.map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) {
+      alert("يرجى إدخال اسم طالب واحد على الأقل.");
+      return;
+    }
+    if (!editLockerCode.trim()) {
+      alert("يرجى تحديد كود الدولاب.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_booking',
+          bookingId: editingBooking.id,
+          lockerCode: editLockerCode.trim(),
+          cohort: editCohort,
+          phone: editPhone.trim(),
+          studentNames: names,
+          studentCodes: editCodes.slice(0, names.length),
+          status: editStatus,
+          notes: editNotes.trim()
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message);
+        setEditingBooking(null);
+        if (selectedLocker) setSelectedLocker(null);
+        fetchData();
+      } else {
+        showToast(json.error || "فشل حفظ التعديلات");
+      }
+    } catch (e) {
+      showToast("خطأ بالاتصال");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // دخول كأدمن لحساب الطالب مباشرة
+  const handleImpersonateStudent = (studentCode: string) => {
+    if (!studentCode) {
+      alert("لا يوجد كود مسجل لهذا الطالب");
+      return;
+    }
+    window.open(`/system?impersonate=${encodeURIComponent(studentCode)}`, '_blank');
   };
 
   // تعديل سعة الدولاب
@@ -811,17 +948,31 @@ export default function LockerAdminTab() {
 
                     <div style={{ background: "#0f172a", borderRadius: "8px", padding: "10px", marginBottom: "14px" }}>
                       <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "4px" }}>الطلاب المسجلون:</div>
-                      {bk.student_names.map((name: string, i: number) => (
-                        <div key={i} style={{ fontSize: "13px", color: "#f1f5f9", display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                          <span>{i + 1}. {name}</span>
-                          {bk.student_codes && bk.student_codes[i] && (
-                            <span style={{ color: "#64748b", direction: "ltr" }}>#{bk.student_codes[i]}</span>
-                          )}
-                        </div>
-                      ))}
+                      {bk.student_names.map((name: string, i: number) => {
+                        const code = bk.student_codes?.[i];
+                        return (
+                          <div key={i} style={{ fontSize: "13px", color: "#f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+                            <span>{i + 1}. {name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {code && <span style={{ color: "#64748b", direction: "ltr", fontSize: "11px" }}>#{code}</span>}
+                              {code && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleImpersonateStudent(code)}
+                                  style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid #0284c7", color: "#38bdf8", padding: "2px 6px", borderRadius: "5px", fontSize: "10px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "2px" }}
+                                  title={`دخول كطالب (${name})`}
+                                >
+                                  <span>👑</span>
+                                  <span>دخول</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "6px" }}>
                       <button
                         onClick={() => handleConfirmBooking(bk.id)}
                         disabled={actionLoading}
@@ -830,19 +981,40 @@ export default function LockerAdminTab() {
                           background: "#10b981",
                           color: "#fff",
                           border: "none",
-                          padding: "8px 12px",
+                          padding: "8px 10px",
                           borderRadius: "8px",
                           fontWeight: "bold",
-                          fontSize: "13px",
+                          fontSize: "12px",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: "6px"
+                          gap: "4px"
                         }}
                       >
-                        <Check size={16} />
-                        <span>اعتماد الحجز</span>
+                        <Check size={15} />
+                        <span>اعتماد</span>
+                      </button>
+
+                      <button
+                        onClick={() => openEditBooking(bk)}
+                        style={{
+                          background: "#0284c7",
+                          color: "#fff",
+                          border: "none",
+                          padding: "8px 10px",
+                          borderRadius: "8px",
+                          fontWeight: "bold",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        title="تعديل الحجز"
+                      >
+                        <Edit3 size={15} />
+                        <span>تعديل</span>
                       </button>
 
                       <button
@@ -858,13 +1030,13 @@ export default function LockerAdminTab() {
                           background: "#2563eb",
                           color: "#fff",
                           border: "none",
-                          padding: "8px 12px",
+                          padding: "8px 10px",
                           borderRadius: "8px",
                           cursor: "pointer"
                         }}
                         title="طباعة الاستمارة"
                       >
-                        <Printer size={16} />
+                        <Printer size={15} />
                       </button>
 
                       <button
@@ -965,6 +1137,14 @@ export default function LockerAdminTab() {
                   </div>
 
                   <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => openEditBooking(b)}
+                      style={{ background: "#0284c7", color: "#fff", border: "none", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: "bold" }}
+                      title="تعديل الحجز"
+                    >
+                      <Edit3 size={15} />
+                      <span>تعديل</span>
+                    </button>
                     <button
                       onClick={() => printLockerReceipt({
                         bookingId: b.id,
@@ -1261,19 +1441,38 @@ export default function LockerAdminTab() {
                   الطلاب المسكنون:
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {selectedBooking.student_names.map((name: string, i: number) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1e293b", padding: "8px 10px", borderRadius: "8px", fontSize: "13px" }}>
-                      <span style={{ color: "#f1f5f9" }}>{i + 1}. {name}</span>
-                      <button
-                        onClick={() => handleRemoveStudent(selectedBooking.id, name)}
-                        style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "12px" }}
-                        title="إقصاء هذا الطالب فقط"
-                      >
-                        <UserMinus size={14} />
-                        <span>إقصاء</span>
-                      </button>
-                    </div>
-                  ))}
+                  {selectedBooking.student_names.map((name: string, i: number) => {
+                    const code = selectedBooking.student_codes?.[i];
+                    return (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#1e293b", padding: "8px 10px", borderRadius: "8px", fontSize: "13px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#f1f5f9" }}>{i + 1}. {name}</span>
+                          {code && <span style={{ color: "#64748b", direction: "ltr", fontSize: "11px" }}>#{code}</span>}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          {code && (
+                            <button
+                              type="button"
+                              onClick={() => handleImpersonateStudent(code)}
+                              style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid #0284c7", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}
+                              title={`دخول كطالب (${name})`}
+                            >
+                              <span>👑</span>
+                              <span>دخول للحساب</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoveStudent(selectedBooking.id, name)}
+                            style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "12px" }}
+                            title="إقصاء هذا الطالب فقط"
+                          >
+                            <UserMinus size={14} />
+                            <span>إقصاء</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
@@ -1285,6 +1484,14 @@ export default function LockerAdminTab() {
                       اعتماد الحجز
                     </button>
                   )}
+                  <button
+                    onClick={() => openEditBooking(selectedBooking)}
+                    style={{ background: "#0284c7", color: "#fff", border: "none", padding: "10px 14px", borderRadius: "10px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", fontSize: "13px" }}
+                    title="تعديل بيانات الحجز"
+                  >
+                    <Edit3 size={16} />
+                    <span>تعديل</span>
+                  </button>
                   <button
                     onClick={() => printLockerReceipt({
                       bookingId: selectedBooking.id,
@@ -1829,6 +2036,329 @@ export default function LockerAdminTab() {
                 <button
                   type="button"
                   onClick={() => setManualAssignLocker(null)}
+                  style={{
+                    background: "#334155",
+                    color: "#cbd5e1",
+                    border: "none",
+                    padding: "12px 18px",
+                    borderRadius: "10px",
+                    cursor: "pointer"
+                  }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة تعديل بيانات الحجز كأدمن */}
+      {editingBooking && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 10004,
+          padding: "16px"
+        }}>
+          <div style={{
+            background: "#18202f",
+            border: "1.5px solid #38bdf8",
+            borderRadius: "20px",
+            width: "100%",
+            maxWidth: "520px",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "24px",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.8)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "1px solid #334155", paddingBottom: "12px" }}>
+              <div style={{ fontSize: "18px", fontWeight: "900", color: "#38bdf8", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Edit3 size={20} />
+                <span>تعديل بيانات الحجز (دولاب {editingBooking.locker_code})</span>
+              </div>
+              <button
+                onClick={() => setEditingBooking(null)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                title="إغلاق"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateBookingSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>رمز الدولاب:</label>
+                  <input
+                    type="text"
+                    required
+                    value={editLockerCode}
+                    onChange={(e) => setEditLockerCode(e.target.value.toUpperCase())}
+                    style={{
+                      width: "100%",
+                      background: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: "#38bdf8",
+                      fontWeight: "bold",
+                      outline: "none",
+                      textAlign: "center",
+                      fontSize: "15px"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>حالة الحجز:</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    style={{
+                      width: "100%",
+                      background: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: editStatus === "confirmed" ? "#34d399" : "#f59e0b",
+                      fontWeight: "bold",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="confirmed">معتمد ومؤكد ✅</option>
+                    <option value="pending">معلق بانتظار الاعتماد ⏳</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>الفرقة الدراسية:</label>
+                  <select
+                    value={editCohort}
+                    onChange={(e) => setEditCohort(e.target.value)}
+                    style={{
+                      width: "100%",
+                      background: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: "#fff",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="الفرقة الرابعة">الفرقة الرابعة</option>
+                    <option value="الفرقة الثالثة">الفرقة الثالثة</option>
+                    <option value="الفرقة الثانية">الفرقة الثانية</option>
+                    <option value="الفرقة الأولى">الفرقة الأولى</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>هاتف ممثل الدولاب:</label>
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="01xxxxxxxxx"
+                    style={{
+                      width: "100%",
+                      background: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      padding: "10px",
+                      color: "#fff",
+                      outline: "none",
+                      textAlign: "right"
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* أسماء وأكواد الطلاب */}
+              <div>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "6px" }}>
+                  الطلاب المسكنون (حتى 4 طلاب) - اكتب للاقتراح الذكي:
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {editNames.map((name, idx) => (
+                    <div key={idx} style={{ position: "relative" }}>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                        <span style={{ fontSize: "12px", color: "#64748b", width: "16px" }}>{idx + 1}.</span>
+                        <input
+                          type="text"
+                          placeholder={`اسم الطالب (${idx + 1})`}
+                          value={name}
+                          onChange={(e) => handleEditStudentSearchInput(idx, e.target.value)}
+                          style={{
+                            flex: 2,
+                            background: "#0f172a",
+                            border: editCodes[idx] ? "1.5px solid #10b981" : "1px solid #334155",
+                            borderRadius: "8px",
+                            padding: "8px 10px",
+                            color: "#fff",
+                            outline: "none",
+                            fontSize: "13px"
+                          }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="الكود"
+                          value={editCodes[idx] || ""}
+                          onChange={(e) => {
+                            const newCodes = [...editCodes];
+                            newCodes[idx] = e.target.value.trim();
+                            setEditCodes(newCodes);
+                          }}
+                          style={{
+                            width: "85px",
+                            background: "#0f172a",
+                            border: "1px solid #334155",
+                            borderRadius: "8px",
+                            padding: "8px 6px",
+                            color: "#38bdf8",
+                            fontSize: "12px",
+                            textAlign: "center",
+                            outline: "none",
+                            fontFamily: "monospace"
+                          }}
+                        />
+                        {editCodes[idx] && (
+                          <button
+                            type="button"
+                            onClick={() => handleImpersonateStudent(editCodes[idx])}
+                            style={{
+                              background: "rgba(56, 189, 248, 0.15)",
+                              border: "1px solid #0284c7",
+                              color: "#38bdf8",
+                              padding: "6px 8px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "2px"
+                            }}
+                            title={`دخول كطالب (${name})`}
+                          >
+                            <span>👑</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* قائمة الاقتراحات الذكية */}
+                      {editActiveSearchIdx === idx && (
+                        <div style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          zIndex: 10020,
+                          background: "#1e293b",
+                          border: "1px solid #38bdf8",
+                          borderRadius: "10px",
+                          marginTop: "4px",
+                          maxHeight: "180px",
+                          overflowY: "auto",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.7)"
+                        }}>
+                          {isSearchingEditStudents ? (
+                            <div style={{ padding: "10px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              جاري البحث...
+                            </div>
+                          ) : editStudentSuggestions.length > 0 ? (
+                            editStudentSuggestions.map((st: any) => (
+                              <div
+                                key={st.id || st.student_code}
+                                onClick={() => handleSelectEditStudent(idx, st)}
+                                style={{
+                                  padding: "9px 12px",
+                                  cursor: "pointer",
+                                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center"
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#334155")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                              >
+                                <div>
+                                  <div style={{ color: "#fff", fontSize: "13px", fontWeight: "bold" }}>{st.full_name}</div>
+                                  <div style={{ color: "#94a3b8", fontSize: "11px" }}>{st.academic_year || editCohort}</div>
+                                </div>
+                                <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>
+                                  #{st.student_code}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ padding: "8px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              لا توجد نتائج مطابقة
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>ملاحظات الإدارة:</label>
+                <input
+                  type="text"
+                  placeholder="ملاحظات اختيارية..."
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  style={{
+                    width: "100%",
+                    background: "#0f172a",
+                    border: "1px solid #334155",
+                    borderRadius: "8px",
+                    padding: "10px",
+                    color: "#fff",
+                    outline: "none",
+                    fontSize: "13px"
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  style={{
+                    flex: 1,
+                    background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                    color: "#fff",
+                    border: "none",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <Check size={18} />
+                  <span>حفظ التعديلات سحابياً 💾</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingBooking(null)}
                   style={{
                     background: "#334155",
                     color: "#cbd5e1",
