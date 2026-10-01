@@ -25,6 +25,8 @@ import {
   Calendar,
   Clock,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Filter,
   Camera
 } from "lucide-react";
@@ -108,6 +110,7 @@ export default function StudentPortalHubModal({
   const [registeredStudentsList, setRegisteredStudentsList] = useState<any[]>([]);
   const [loadingRegisteredList, setLoadingRegisteredList] = useState(false);
   const [accountListFilter, setAccountListFilter] = useState("");
+  const [expandedStudentCode, setExpandedStudentCode] = useState<string | null>(null);
 
   // Tab: Account Management (إدارة وبحث الحسابات)
   const [searchAccountCode, setSearchAccountCode] = useState("");
@@ -207,6 +210,7 @@ export default function StudentPortalHubModal({
   // جلب قائمة الحسابات المسجلة للنافذة التفاعلية
   const openRegisteredAccountsModal = async () => {
     setIsAccountsModalOpen(true);
+    setExpandedStudentCode(null);
     setAccountListFilter("");
     setLoadingRegisteredList(true);
     try {
@@ -219,6 +223,30 @@ export default function StudentPortalHubModal({
       console.error("Error fetching registered students list:", e);
     } finally {
       setLoadingRegisteredList(false);
+    }
+  };
+
+  // تفعيل واعتماد مباشر لحساب الطالب من داخل قائمة الحسابات
+  const handleDirectActivateFromList = async (studentCode: string) => {
+    try {
+      const res = await fetch("/api/admin/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "activate_account",
+          student_code: studentCode,
+          extra: { coordinator_name: user?.full_name || "إدارة المنظومة" }
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✓ تم اعتماد وتفعيل حساب الطالب بنجاح!");
+        setRegisteredStudentsList(prev => prev.map(s => s.student_code === studentCode ? { ...s, status: 'active', activated_by: user?.full_name || "إدارة المنظومة" } : s));
+      } else {
+        alert(data.error || "فشل تفعيل الحساب");
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
     }
   };
 
@@ -1959,12 +1987,13 @@ export default function StudentPortalHubModal({
               border: "1.5px solid #2a374f",
               borderRadius: "16px",
               width: "100%",
-              maxWidth: "680px",
+              maxWidth: "760px",
               maxHeight: "85vh",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
+              boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+              boxSizing: "border-box"
             }}
           >
             {/* Header */}
@@ -2000,7 +2029,7 @@ export default function StudentPortalHubModal({
               </div>
             </div>
 
-            {/* شريط البحث الفوري */}
+            {/* شريط البحث الفوري والإرشاد */}
             <div style={{ padding: "12px 18px", background: "#0d131f", borderBottom: "1px solid #1e293b" }}>
               <div style={{ position: "relative" }}>
                 <input
@@ -2008,10 +2037,14 @@ export default function StudentPortalHubModal({
                   placeholder="ابحث بالاسم أو كود الطالب للفلترة الفورية..."
                   value={accountListFilter}
                   onChange={(e) => setAccountListFilter(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", paddingRight: "36px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "8px", color: "#fff", fontSize: "13px" }}
+                  style={{ width: "100%", padding: "10px 14px", paddingRight: "36px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "8px", color: "#fff", fontSize: "13px", boxSizing: "border-box" }}
                   autoFocus
                 />
                 <Search size={16} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b" }} />
+              </div>
+              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "flex", alignItems: "center", gap: "5px" }}>
+                <span>💡</span>
+                <span>اضغط على اسم أي طالب لعرض تفاصيل حسابه وأزرار التحكم بالداخل</span>
               </div>
             </div>
 
@@ -2023,104 +2056,251 @@ export default function StudentPortalHubModal({
                 <div style={{ textAlign: "center", color: "#64748b", padding: "40px" }}>لا توجد حسابات مطابقة للبحث</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {filteredAccountsList.map((st, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        background: "#0d131f",
-                        border: "1px solid #1e293b",
-                        borderRadius: "10px",
-                        padding: "12px 14px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: "8px"
-                      }}
-                    >
-                      {/* الاسم والكود فقط */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ background: "rgba(59, 130, 246, 0.15)", color: "#38bdf8", padding: "4px 8px", borderRadius: "6px", fontFamily: "monospace", fontWeight: "bold", fontSize: "13px" }}>
-                          {formatStudentCode(st.student_code)}
-                        </span>
-                        <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
-                          {st.full_name}
-                        </span>
-                      </div>
+                  {filteredAccountsList.map((st, idx) => {
+                    const isExpanded = expandedStudentCode === st.student_code;
+                    const isSuspended = st.status === 'suspended';
+                    const isActive = st.status === 'active' || !!st.activated_by;
+                    const isPending = !isSuspended && !isActive;
 
-                      {/* تاريخ التسجيل وآخر زيارة */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "11px", color: "#94a3b8" }}>
-                        <div title="تاريخ التسجيل على البوابة">
-                          <span style={{ color: "#64748b" }}>سجّل في: </span>
-                          <span style={{ color: "#cbd5e1" }}>
-                            {st.created_at 
-                              ? new Date(st.created_at).toLocaleDateString("ar-EG") 
-                              : (st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "مسجل")}
-                          </span>
-                        </div>
-
-                        <div title="آخر مرة زار الحساب">
-                          <span style={{ color: "#64748b" }}>آخر زيارة: </span>
-                          <span style={{ color: st.last_login_at ? "#34d399" : "#64748b", fontWeight: st.last_login_at ? "bold" : "normal" }}>
-                            {st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "لم يسجل دخول"}
-                          </span>
-                        </div>
-
-                        <div title="حالة اعتماد الحساب">
-                          <span style={{ color: "#64748b" }}>الحالة: </span>
-                          <span style={{ 
-                            color: st.status === 'suspended' ? "#f87171" : (st.activated_by || st.status === 'active') ? "#34d399" : "#f59e0b", 
-                            fontWeight: "bold" 
-                          }}>
-                            {st.status === 'suspended' ? "معلق 🔒" : (st.activated_by || st.status === 'active') ? "مفعل ✅" : "قيد الاعتماد ⏳"}
-                          </span>
-                        </div>
-
-                        <div title="المنسق الذي قام باعتماد وتفعيل الحساب">
-                          <span style={{ color: "#64748b" }}>المنسق: </span>
-                          <span style={{ color: st.activated_by ? "#34d399" : "#f59e0b", fontWeight: "bold" }}>
-                            {st.activated_by || "غير معتمد بعد"}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="btn-compact"
-                          onClick={() => window.open(`/system?impersonate=${encodeURIComponent(st.student_code)}`, '_blank')}
-                          style={{ background: "#0284c7", border: "1px solid #38bdf8", color: "#fff", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", margin: 0, display: "inline-flex", alignItems: "center", gap: "3px" }}
-                          title={`دخول كطالب (${st.full_name})`}
-                        >
-                          <span>👑</span>
-                          <span>دخول</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn-compact"
-                          onClick={() => {
-                            setIsAccountsModalOpen(false);
-                            setActiveTab("accounts");
-                            setSearchAccountCode(st.student_code);
-                            handleInspectAccount(st.student_code);
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          background: isExpanded ? "#111827" : "#0d131f",
+                          border: isExpanded ? "1px solid #3b82f6" : "1px solid #1e293b",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {/* سطر الطالب: الاسم والكود والحالة دائماً ظاهرة */}
+                        <div
+                          onClick={() => setExpandedStudentCode(isExpanded ? null : st.student_code)}
+                          style={{
+                            padding: "11px 14px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            cursor: "pointer",
+                            userSelect: "none",
+                            background: isExpanded ? "rgba(59, 130, 246, 0.08)" : "transparent"
                           }}
-                          style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", margin: 0 }}
                         >
-                          إدارة
-                        </button>
+                          {/* الكود والاسم والحالة جنب بعض */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+                            <span style={{
+                              background: "rgba(59, 130, 246, 0.15)",
+                              color: "#38bdf8",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              fontFamily: "monospace",
+                              fontWeight: "bold",
+                              fontSize: "12px",
+                              flexShrink: 0
+                            }}>
+                              {formatStudentCode(st.student_code)}
+                            </span>
 
-                        <button
-                          type="button"
-                          className="btn-compact"
-                          onClick={() => handleDeleteAccountDirect(st.student_code, st.full_name)}
-                          style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "5px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold", display: "inline-flex", alignItems: "center", gap: "4px", margin: 0 }}
-                          title="حذف حساب الطالب نهائياً من البوابة"
-                        >
-                          <Trash2 size={12} />
-                          <span>حذف</span>
-                        </button>
+                            <span style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", wordBreak: "break-word" }}>
+                              {st.full_name}
+                            </span>
+
+                            {/* الحالة تفضل ظاهرة جنب الاسم كما طلب المستخدم تماماً */}
+                            <span style={{
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              padding: "2px 8px",
+                              borderRadius: "6px",
+                              background: isSuspended 
+                                ? "rgba(239, 68, 68, 0.15)" 
+                                : isActive 
+                                  ? "rgba(16, 185, 129, 0.15)" 
+                                  : "rgba(245, 158, 11, 0.15)",
+                              color: isSuspended ? "#f87171" : isActive ? "#34d399" : "#f59e0b",
+                              border: `1px solid ${isSuspended ? "rgba(239, 68, 68, 0.3)" : isActive ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)"}`,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              flexShrink: 0
+                            }}>
+                              {isSuspended ? "معلق 🔒" : isActive ? "مفعل ✅" : "قيد الاعتماد ⏳"}
+                            </span>
+                          </div>
+
+                          {/* مؤشر الفتح والطي */}
+                          <div style={{ color: isExpanded ? "#38bdf8" : "#64748b", display: "flex", alignItems: "center", marginRight: "8px", flexShrink: 0 }}>
+                            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                          </div>
+                        </div>
+
+                        {/* عند النقر: تظهر البيانات وأزرار التحكم منسقة بالداخل بدون أي خروج */}
+                        {isExpanded && (
+                          <div style={{
+                            padding: "12px 14px",
+                            background: "#080d17",
+                            borderTop: "1px solid #1e293b",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "10px"
+                          }}>
+                            {/* تفاصيل الحساب */}
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                              gap: "8px",
+                              fontSize: "12px"
+                            }}>
+                              <div style={{ background: "#0d131f", padding: "8px 10px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                                <div style={{ color: "#64748b", fontSize: "11px", marginBottom: "2px" }}>تاريخ التسجيل:</div>
+                                <div style={{ color: "#cbd5e1", fontWeight: "bold" }}>
+                                  {st.created_at ? new Date(st.created_at).toLocaleDateString("ar-EG") : "مسجل"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#0d131f", padding: "8px 10px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                                <div style={{ color: "#64748b", fontSize: "11px", marginBottom: "2px" }}>آخر زيارة / دخول:</div>
+                                <div style={{ color: st.last_login_at ? "#34d399" : "#64748b", fontWeight: "bold" }}>
+                                  {st.last_login_at ? new Date(st.last_login_at).toLocaleDateString("ar-EG") : "لم يسجل دخول بعد"}
+                                </div>
+                              </div>
+
+                              <div style={{ background: "#0d131f", padding: "8px 10px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                                <div style={{ color: "#64748b", fontSize: "11px", marginBottom: "2px" }}>المنسق المعتمد:</div>
+                                <div style={{ color: st.activated_by ? "#38bdf8" : "#f59e0b", fontWeight: "bold" }}>
+                                  {st.activated_by || "غير معتمد بعد"}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* أزرار التحكم منسقة بالكامل داخل الشاشة بدون خروج */}
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                              gap: "8px",
+                              marginTop: "2px"
+                            }}>
+                              {/* زر اعتماد الحساب لو قيد الاعتماد */}
+                              {isPending && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDirectActivateFromList(st.student_code);
+                                  }}
+                                  style={{
+                                    background: "rgba(16, 185, 129, 0.2)",
+                                    border: "1px solid #10b981",
+                                    color: "#34d399",
+                                    padding: "8px 12px",
+                                    borderRadius: "8px",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: "bold",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "6px",
+                                    margin: 0
+                                  }}
+                                  title="اعتماد وتفعيل حساب الطالب فوراً"
+                                >
+                                  <UserCheck size={14} />
+                                  <span>اعتماد وتفعيل ✅</span>
+                                </button>
+                              )}
+
+                              {/* زر الدخول كطالب */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`/system?impersonate=${encodeURIComponent(st.student_code)}`, '_blank');
+                                }}
+                                style={{
+                                  background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                                  border: "1px solid #38bdf8",
+                                  color: "#fff",
+                                  padding: "8px 12px",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "6px",
+                                  margin: 0
+                                }}
+                                title={`دخول كطالب (${st.full_name})`}
+                              >
+                                <span>👑</span>
+                                <span>دخول كطالب</span>
+                              </button>
+
+                              {/* زر إدارة الحساب */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsAccountsModalOpen(false);
+                                  setActiveTab("accounts");
+                                  setSearchAccountCode(st.student_code);
+                                  handleInspectAccount(st.student_code);
+                                }}
+                                style={{
+                                  background: "#1e293b",
+                                  border: "1px solid #3b82f6",
+                                  color: "#38bdf8",
+                                  padding: "8px 12px",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "6px",
+                                  margin: 0
+                                }}
+                                title="فتح لوحة التحكم الكاملة بحساب الطالب"
+                              >
+                                <span>⚙️</span>
+                                <span>إدارة الحساب</span>
+                              </button>
+
+                              {/* زر حذف الحساب */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteAccountDirect(st.student_code, st.full_name);
+                                }}
+                                style={{
+                                  background: "rgba(239, 68, 68, 0.15)",
+                                  border: "1px solid #ef4444",
+                                  color: "#f87171",
+                                  padding: "8px 12px",
+                                  borderRadius: "8px",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "bold",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: "6px",
+                                  margin: 0
+                                }}
+                                title="حذف حساب الطالب نهائياً من البوابة"
+                              >
+                                <Trash2 size={13} />
+                                <span>حذف الحساب</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
