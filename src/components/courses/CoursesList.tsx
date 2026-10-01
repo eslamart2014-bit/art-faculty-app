@@ -3,11 +3,26 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Camera, MoreVertical } from "lucide-react";
 
 interface CoursesListProps {
   user: any;
   refreshTrigger: number;
 }
+
+const formatCourseDate = (dateStr?: string) => {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    return `${day}/${m}/${y}`;
+  } catch {
+    return "";
+  }
+};
 
 export default function CoursesList({ user, refreshTrigger }: CoursesListProps) {
   const router = useRouter();
@@ -326,42 +341,94 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
           }}
           style={{ 
             background: "var(--surface)", 
-            padding: "15px", 
+            padding: "11px 14px", 
             borderRadius: "12px", 
             border: "1px solid var(--border)", 
-            borderRight: "6px solid var(--primary)", 
+            borderRight: "5px solid var(--primary)", 
             display: "flex", 
             justifyContent: "space-between", 
             alignItems: "center",
+            gap: "10px",
             cursor: "pointer",
-            transition: "transform 0.2s",
-            position: "relative"
+            transition: "all 0.2s ease",
+            position: "relative",
+            boxSizing: "border-box"
           }}
         >
-          <div>
-            <h3 style={{ margin: "0 0 5px 0", color: "#fff", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              {course.name}
-              {course.created_at && (
-                <span style={{ fontSize: "10px", background: "#333", padding: "2px 6px", borderRadius: "10px", color: "#aaa", fontWeight: "normal" }}>
-                  {new Date(course.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </span>
-              )}
+          <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+            {/* السطر الأول: اسم المقرر + شارة المشاركة الذكية */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0, color: "#fff", fontSize: "15px", fontWeight: "bold", wordBreak: "break-word" }}>
+                {course.name}
+              </h3>
               {course.shared_with && course.shared_with.length > 0 && (
-                <span style={{ fontSize: "10px", background: "#4CAF50", padding: "2px 6px", borderRadius: "10px", color: "#fff", fontWeight: "normal" }}>
-                  🤝 مشترك مع {
+                <span 
+                  title={`مقرر مشترك مع: ${
                     course.teacher_id === user.id 
-                    ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join(" و ")
-                    : profilesMap[course.teacher_id] || "الزميل"
-                  }
+                    ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join("، ")
+                    : (profilesMap[course.teacher_id] || "الزميل")
+                  }`}
+                  style={{ 
+                    fontSize: "11px", 
+                    background: "rgba(16, 185, 129, 0.15)", 
+                    border: "1px solid rgba(16, 185, 129, 0.35)", 
+                    color: "#34d399", 
+                    padding: "2px 7px", 
+                    borderRadius: "6px", 
+                    fontWeight: "500",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    maxWidth: "200px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  <span>🤝</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    مشترك: {
+                      course.teacher_id === user.id 
+                      ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join("، ")
+                      : (profilesMap[course.teacher_id] || "الزميل")
+                    }
+                  </span>
                 </span>
               )}
-            </h3>
-            <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-              الفرقة {course.academic_year} • {course.course_type === "lectures" ? "محاضرات" : `سكاشن: ${course.sections.join(", ")}`}
+            </div>
+
+            {/* السطر الثاني: الفرقة والسكاشن + تاريخ التسجيل الصغير بالأرقام */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.4 }}>
+              <span>الفرقة {course.academic_year}</span>
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span>{course.course_type === "lectures" ? "محاضرات" : `سكاشن: ${Array.isArray(course.sections) ? course.sections.join(", ") : course.sections || "عام"}`}</span>
+              {course.created_at && (
+                <>
+                  <span style={{ opacity: 0.4 }}>•</span>
+                  <span 
+                    title="تاريخ إنشاء المقرر"
+                    style={{ 
+                      fontSize: "10.5px", 
+                      color: "#94a3b8", 
+                      background: "rgba(255, 255, 255, 0.05)", 
+                      padding: "1px 6px", 
+                      borderRadius: "4px", 
+                      fontFamily: "monospace", 
+                      direction: "ltr",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "3px"
+                    }}
+                  >
+                    <span>📅</span>
+                    <span>{formatCourseDate(course.created_at)}</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
           
-          <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
             
             {course.custom_week_names?.__pinned_attendance && (
               <span 
@@ -369,19 +436,44 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                   e.stopPropagation();
                   router.push(`/course/${course.id}/attendance?mode=camera`);
                 }}
-                style={{ fontSize: "22px", cursor: "pointer", background: "rgba(76, 175, 80, 0.15)", padding: "5px 10px", borderRadius: "8px", border: "1px solid rgba(76, 175, 80, 0.4)", display: "flex", alignItems: "center", justifyContent: "center" }}
-                title="تسجيل الحضور السريع"
+                style={{ 
+                  width: "34px", 
+                  height: "34px", 
+                  cursor: "pointer", 
+                  background: "rgba(16, 185, 129, 0.15)", 
+                  border: "1px solid rgba(16, 185, 129, 0.4)", 
+                  borderRadius: "8px", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  color: "#34d399",
+                  transition: "all 0.15s ease",
+                  flexShrink: 0
+                }}
+                title="تسجيل الحضور السريع بالكاميرا"
               >
-                📷
+                <Camera size={17} />
               </span>
             )}
             
             <div style={{ position: "relative" }}>
               <span 
                 onClick={(e) => handleMenuClick(e, course.id)}
-                style={{ fontSize: "24px", color: "var(--text-muted)", cursor: "pointer", padding: "0 10px", position: "relative", zIndex: activeMenuId === course.id ? 101 : 1 }}
+                style={{ 
+                  width: "30px", 
+                  height: "34px", 
+                  color: "var(--text-muted)", 
+                  cursor: "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center",
+                  position: "relative", 
+                  zIndex: activeMenuId === course.id ? 101 : 1,
+                  borderRadius: "6px"
+                }}
+                title="خيارات المقرر"
               >
-                ⋮
+                <MoreVertical size={18} />
               </span>
               
               {activeMenuId === course.id && (
