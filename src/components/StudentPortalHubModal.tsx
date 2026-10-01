@@ -1370,6 +1370,9 @@ export default function StudentPortalHubModal({
                         <div>
                           <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{dev.phoneModel || "هاتف ذكي"}</div>
                           <div style={{ color: "#64748b", fontSize: "11px" }}>معرف الجهاز: {dev.deviceId}</div>
+                          {dev.suspicionReason && (
+                            <div style={{ color: "#fbbf24", fontSize: "11px", marginTop: "2px" }}>⚠️ {dev.suspicionReason}</div>
+                          )}
                         </div>
                       </div>
                       <span style={{ background: "#7f1d1d", color: "#fecaca", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
@@ -1687,6 +1690,11 @@ export default function StudentPortalHubModal({
                             <span style={{ color: "#94a3b8", fontSize: "11px" }}>
                               ({dev.primaryStudent?.academic_year} - سكشن {dev.primaryStudent?.section})
                             </span>
+                            {dev.suspicionReason && (
+                              <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.4)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px" }}>
+                                🚨 {dev.suspicionReason}
+                              </span>
+                            )}
                           </div>
 
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>

@@ -104,7 +104,14 @@ export async function GET() {
       });
     });
 
-    // فلترة الأجهزة التي فُتح عليها أكثر من حساب طالب (2 فأكثر = شبهة احتيال)
+    // فلترة الأجهزة المشتركة بضوابط الشك الذكية:
+    // الجهاز يُعتبر مشبوهاً إذا:
+    //   - سُجّل عليه 5 حسابات طلاب أو أكثر (في أي وقت)، أو
+    //   - سُجّل عليه 3 حسابات أو أكثر ضمن نافذة 72 ساعة
+    const SUSPICIOUS_MIN_TOTAL = 5;
+    const SUSPICIOUS_MIN_WINDOW = 3;
+    const SUSPICIOUS_WINDOW_MS = 72 * 60 * 60 * 1000; // 72 ساعة
+
     const fraudDevices: any[] = [];
     const cleanDevices: any[] = [];
 
@@ -120,9 +127,40 @@ export async function GET() {
         }
       }
 
-      if (val.accounts.length > 1) {
+      const count = val.accounts.length;
+
+      // ✅ تطبيق ضوابط الشك الذكية
+      let isSuspicious = false;
+      let suspicionReason = '';
+
+      // الحالة 1: 5 حسابات أو أكثر في أي وقت
+      if (count >= SUSPICIOUS_MIN_TOTAL) {
+        isSuspicious = true;
+        suspicionReason = `${count} حسابات مسجلة على نفس الجهاز`;
+      }
+
+      // الحالة 2: 3 حسابات أو أكثر خلال 72 ساعة
+      if (!isSuspicious && count >= SUSPICIOUS_MIN_WINDOW) {
+        for (let i = 0; i <= val.accounts.length - SUSPICIOUS_MIN_WINDOW; i++) {
+          const windowStart = new Date(val.accounts[i].firstSeen || 0).getTime();
+          const windowEnd = windowStart + SUSPICIOUS_WINDOW_MS;
+          let countInWindow = 0;
+          for (const acc of val.accounts) {
+            const t = new Date(acc.firstSeen || 0).getTime();
+            if (t >= windowStart && t <= windowEnd) countInWindow++;
+          }
+          if (countInWindow >= SUSPICIOUS_MIN_WINDOW) {
+            isSuspicious = true;
+            suspicionReason = `${countInWindow} حسابات خلال 72 ساعة`;
+            break;
+          }
+        }
+      }
+
+      if (isSuspicious) {
         fraudDevices.push({
           ...val,
+          suspicionReason,
           primaryAccount: val.accounts[0],
           secondaryAccounts: val.accounts.slice(1)
         });

@@ -62,13 +62,31 @@ export async function GET(request: Request) {
     const qrDownloadedStudentCodes = new Set<string>();
     let totalQrDownloads = 0;
 
+    // ضوابط الشك الذكي:
+    // الجهاز يُعتبر مشبوهاً إذا:
+    //   - بحث عن 3 طلاب مختلفين أو أكثر خلال 72 ساعة (3 أيام)، أو
+    //   - بحث عن 5 طلاب مختلفين أو أكثر في أي وقت
+    // الاستثناءات: السجلات الصادرة من المنسق/الأدمن (is_admin أو actor_role) لا تُحسب
+    const SUSPICIOUS_MIN_STUDENTS_SHORT = 3;   // حد الخطر قصير المدى (72 ساعة)
+    const SUSPICIOUS_WINDOW_HOURS = 72;         // نافذة الوقت بالساعات
+    const SUSPICIOUS_MIN_STUDENTS_TOTAL = 5;   // حد الخطر الإجمالي (أي وقت)
+
     logs.forEach(log => {
+      // استثناء سجلات الأدمن والمنسقين — هم يتصفحون حسابات متعددة بشكل طبيعي
+      const isAdminAction = !!(
+        log.details?.is_admin ||
+        log.details?.actor_role === 'admin' ||
+        log.details?.actor_role === 'coordinator' ||
+        log.details?.impersonated_by ||
+        log.details?.source === 'admin_portal' ||
+        log.details?.source === 'coordinator_portal'
+      );
+
       // التحقق الصارم من أن معرّف الجهاز حقيقي ومميز (مثل dev_XXXXX)
-      // نمنع تماماً التجميع بالـ User-Agent العام لتفادي دمج هواتف الطلاب المختلفة التي تشترك بنفس النظام
       const rawDevId = log.device_id;
-      const isValidDevId = rawDevId && 
-        rawDevId !== 'unknown_device' && 
-        rawDevId !== 'server' && 
+      const isValidDevId = rawDevId &&
+        rawDevId !== 'unknown_device' &&
+        rawDevId !== 'server' &&
         rawDevId !== 'unknown' &&
         !rawDevId.startsWith('ua_') &&
         rawDevId.length >= 8;
@@ -85,51 +103,52 @@ export async function GET(request: Request) {
         if (sCode) qrDownloadedStudentCodes.add(sCode);
       }
 
-      if (devId && sCode) {
-        if (!deviceTrackingMap.has(devId)) {
-          deviceTrackingMap.set(devId, {
-            deviceId: devId,
-            userAgent: log.user_agent || '',
-            lastSeen: log.created_at,
-            studentsMap: new Map<string, DeviceStudentInfo>()
-          });
-        }
-        const devEntry = deviceTrackingMap.get(devId)!;
-        if (!devEntry.userAgent && log.user_agent) devEntry.userAgent = log.user_agent;
-        if (new Date(log.created_at).getTime() > new Date(devEntry.lastSeen).getTime()) {
-          devEntry.lastSeen = log.created_at;
-        }
+      // لا نتتبع سجلات الأدمن أو السجلات بدون معرّف جهاز صالح أو كود طالب
+      if (isAdminAction || !devId || !sCode) return;
 
-        const logTime = log.created_at;
-        if (!devEntry.studentsMap.has(sCode)) {
-          devEntry.studentsMap.set(sCode, {
-            student_code: sCode,
-            student_name: sName || 'طالب غير محدد',
-            academic_year: log.details?.academic_year || 'غير محدد',
-            section: log.details?.section || 'عام',
-            firstSeenAt: logTime,
-            lastSeenAt: logTime,
-            count: 1
-          });
-        } else {
-          const st = devEntry.studentsMap.get(sCode)!;
-          if (new Date(logTime).getTime() < new Date(st.firstSeenAt).getTime()) {
-            st.firstSeenAt = logTime;
-          }
-          if (new Date(logTime).getTime() > new Date(st.lastSeenAt).getTime()) {
-            st.lastSeenAt = logTime;
-          }
-          if (sName && (!st.student_name || st.student_name === 'طالب غير محدد')) {
-            st.student_name = sName;
-          }
-          if (log.details?.academic_year && st.academic_year === 'غير محدد') {
-            st.academic_year = log.details.academic_year;
-          }
-          if (log.details?.section && st.section === 'عام') {
-            st.section = log.details.section;
-          }
-          st.count++;
+      if (!deviceTrackingMap.has(devId)) {
+        deviceTrackingMap.set(devId, {
+          deviceId: devId,
+          userAgent: log.user_agent || '',
+          lastSeen: log.created_at,
+          studentsMap: new Map<string, DeviceStudentInfo>()
+        });
+      }
+      const devEntry = deviceTrackingMap.get(devId)!;
+      if (!devEntry.userAgent && log.user_agent) devEntry.userAgent = log.user_agent;
+      if (new Date(log.created_at).getTime() > new Date(devEntry.lastSeen).getTime()) {
+        devEntry.lastSeen = log.created_at;
+      }
+
+      const logTime = log.created_at;
+      if (!devEntry.studentsMap.has(sCode)) {
+        devEntry.studentsMap.set(sCode, {
+          student_code: sCode,
+          student_name: sName || 'طالب غير محدد',
+          academic_year: log.details?.academic_year || 'غير محدد',
+          section: log.details?.section || 'عام',
+          firstSeenAt: logTime,
+          lastSeenAt: logTime,
+          count: 1
+        });
+      } else {
+        const st = devEntry.studentsMap.get(sCode)!;
+        if (new Date(logTime).getTime() < new Date(st.firstSeenAt).getTime()) {
+          st.firstSeenAt = logTime;
         }
+        if (new Date(logTime).getTime() > new Date(st.lastSeenAt).getTime()) {
+          st.lastSeenAt = logTime;
+        }
+        if (sName && (!st.student_name || st.student_name === 'طالب غير محدد')) {
+          st.student_name = sName;
+        }
+        if (log.details?.academic_year && st.academic_year === 'غير محدد') {
+          st.academic_year = log.details.academic_year;
+        }
+        if (log.details?.section && st.section === 'عام') {
+          st.section = log.details.section;
+        }
+        st.count++;
       }
     });
 
@@ -143,45 +162,74 @@ export async function GET(request: Request) {
 
     deviceTrackingMap.forEach((entry, devId) => {
       const studentsList = Array.from(entry.studentsMap.values());
-      // إذا كان الجهاز قد استعلم عن أكثر من طالب (2 فأكثر)
-      if (studentsList.length > 1) {
-        // ترتيب تصاعدي زمني: الأسبق تاريخاً وظهوراً هو صاحب الهاتف الذي بحث عن الباقين
-        studentsList.sort((a, b) => new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime());
 
-        const primaryStudent = studentsList[0];
-        const otherStudents = studentsList.slice(1);
+      if (studentsList.length < 2) return; // جهاز واحد = لا شبهة
 
-        devicePrimaryMap.set(devId, {
-          primaryStudent,
-          otherStudents,
-          studentsList
-        });
+      // ترتيب تصاعدي زمني
+      studentsList.sort((a, b) => new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime());
 
-        suspiciousDevices.push({
-          deviceId: devId,
-          studentCount: studentsList.length,
-          primaryStudent: {
-            student_code: primaryStudent.student_code,
-            student_name: primaryStudent.student_name,
-            academic_year: primaryStudent.academic_year,
-            section: primaryStudent.section,
-            firstSeenAt: primaryStudent.firstSeenAt,
-            searchCount: primaryStudent.count
-          },
-          otherStudents: otherStudents.map(s => ({
-            student_code: s.student_code,
-            student_name: s.student_name,
-            academic_year: s.academic_year,
-            section: s.section,
-            firstSeenAt: s.firstSeenAt,
-            searchCount: s.count
-          })),
-          studentCodes: studentsList.map(s => s.student_code),
-          studentNames: studentsList.map(s => s.student_name),
-          lastSeen: entry.lastSeen,
-          userAgent: entry.userAgent
-        });
+      // ✅ تطبيق ضوابط الشك الذكية:
+      // الحالة 1: 5 طلاب أو أكثر في أي وقت = مشبوه بالتأكيد
+      const isSuspiciousTotal = studentsList.length >= SUSPICIOUS_MIN_STUDENTS_TOTAL;
+
+      // الحالة 2: 3 طلاب أو أكثر خلال 72 ساعة متتالية
+      let isSuspiciousShortWindow = false;
+      if (!isSuspiciousTotal && studentsList.length >= SUSPICIOUS_MIN_STUDENTS_SHORT) {
+        const windowMs = SUSPICIOUS_WINDOW_HOURS * 60 * 60 * 1000;
+        // فحص: هل يوجد 3 طلاب أو أكثر ضمن نافذة 72 ساعة؟
+        for (let i = 0; i <= studentsList.length - SUSPICIOUS_MIN_STUDENTS_SHORT; i++) {
+          const windowStart = new Date(studentsList[i].firstSeenAt).getTime();
+          const windowEnd = windowStart + windowMs;
+          let countInWindow = 0;
+          for (const st of studentsList) {
+            const t = new Date(st.firstSeenAt).getTime();
+            if (t >= windowStart && t <= windowEnd) countInWindow++;
+          }
+          if (countInWindow >= SUSPICIOUS_MIN_STUDENTS_SHORT) {
+            isSuspiciousShortWindow = true;
+            break;
+          }
+        }
       }
+
+      if (!isSuspiciousTotal && !isSuspiciousShortWindow) return; // لا شبهة كافية
+
+      const primaryStudent = studentsList[0];
+      const otherStudents = studentsList.slice(1);
+
+      devicePrimaryMap.set(devId, {
+        primaryStudent,
+        otherStudents,
+        studentsList
+      });
+
+      suspiciousDevices.push({
+        deviceId: devId,
+        studentCount: studentsList.length,
+        suspicionReason: isSuspiciousTotal
+          ? `بحث عن ${studentsList.length} طلاب مختلفين`
+          : `بحث عن ${SUSPICIOUS_MIN_STUDENTS_SHORT}+ طلاب خلال ${SUSPICIOUS_WINDOW_HOURS} ساعة`,
+        primaryStudent: {
+          student_code: primaryStudent.student_code,
+          student_name: primaryStudent.student_name,
+          academic_year: primaryStudent.academic_year,
+          section: primaryStudent.section,
+          firstSeenAt: primaryStudent.firstSeenAt,
+          searchCount: primaryStudent.count
+        },
+        otherStudents: otherStudents.map(s => ({
+          student_code: s.student_code,
+          student_name: s.student_name,
+          academic_year: s.academic_year,
+          section: s.section,
+          firstSeenAt: s.firstSeenAt,
+          searchCount: s.count
+        })),
+        studentCodes: studentsList.map(s => s.student_code),
+        studentNames: studentsList.map(s => s.student_name),
+        lastSeen: entry.lastSeen,
+        userAgent: entry.userAgent
+      });
     });
 
     // ترتيب الأجهزة المشبوهة بالأعلى عدداً
