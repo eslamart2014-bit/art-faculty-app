@@ -62,17 +62,12 @@ export async function GET(request: Request) {
     const qrDownloadedStudentCodes = new Set<string>();
     let totalQrDownloads = 0;
 
-    // ضوابط الشك الذكي:
-    // الجهاز يُعتبر مشبوهاً إذا:
-    //   - بحث عن 3 طلاب مختلفين أو أكثر خلال 72 ساعة (3 أيام)، أو
-    //   - بحث عن 5 طلاب مختلفين أو أكثر في أي وقت
-    // الاستثناءات: السجلات الصادرة من المنسق/الأدمن (is_admin أو actor_role) لا تُحسب
-    const SUSPICIOUS_MIN_STUDENTS_SHORT = 3;   // حد الخطر قصير المدى (72 ساعة)
-    const SUSPICIOUS_WINDOW_HOURS = 72;         // نافذة الوقت بالساعات
-    const SUSPICIOUS_MIN_STUDENTS_TOTAL = 5;   // حد الخطر الإجمالي (أي وقت)
+    // الجهاز يُعتبر مشبوهاً إذا بحث عن طالبين مختلفين أو أكثر بنفس الـ deviceId الفريد
+    // (الـ deviceId مخزّن في localStorage — فريد لكل جهاز/متصفح)
+    // الاستثناء: سجلات الأدمن/المنسق لا تُحسب لأنهم يبحثون عن طلاب متعددين بشكل طبيعي
 
     logs.forEach(log => {
-      // استثناء سجلات الأدمن والمنسقين — هم يتصفحون حسابات متعددة بشكل طبيعي
+      // استثناء سجلات الأدمن والمنسقين
       const isAdminAction = !!(
         log.details?.is_admin ||
         log.details?.actor_role === 'admin' ||
@@ -82,7 +77,8 @@ export async function GET(request: Request) {
         log.details?.source === 'coordinator_portal'
       );
 
-      // التحقق الصارم من أن معرّف الجهاز حقيقي ومميز (مثل dev_XXXXX)
+      // نقبل فقط الـ deviceId الحقيقي المُولَّد من localStorage (يبدأ بـ dev_ وطوله ≥ 8)
+      // نرفض تماماً أي fallback بالـ User-Agent أو القيم المجهولة
       const rawDevId = log.device_id;
       const isValidDevId = rawDevId &&
         rawDevId !== 'unknown_device' &&
@@ -152,7 +148,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 3. بناء قائمة الأجهزة المشبوهة وتحديد صاحب الجهاز الأصلي (الباحث الأول زمنياً)
+    // 3. بناء قائمة الأجهزة المشبوهة: أي جهاز بحث عن طالبين مختلفين أو أكثر = مشبوه
     const suspiciousDevices: any[] = [];
     const devicePrimaryMap = new Map<string, {
       primaryStudent: DeviceStudentInfo;
@@ -163,36 +159,11 @@ export async function GET(request: Request) {
     deviceTrackingMap.forEach((entry, devId) => {
       const studentsList = Array.from(entry.studentsMap.values());
 
-      if (studentsList.length < 2) return; // جهاز واحد = لا شبهة
+      // جهاز بحث عن طالب واحد فقط = طبيعي
+      if (studentsList.length < 2) return;
 
-      // ترتيب تصاعدي زمني
+      // ترتيب تصاعدي زمني: الأسبق = صاحب الهاتف
       studentsList.sort((a, b) => new Date(a.firstSeenAt).getTime() - new Date(b.firstSeenAt).getTime());
-
-      // ✅ تطبيق ضوابط الشك الذكية:
-      // الحالة 1: 5 طلاب أو أكثر في أي وقت = مشبوه بالتأكيد
-      const isSuspiciousTotal = studentsList.length >= SUSPICIOUS_MIN_STUDENTS_TOTAL;
-
-      // الحالة 2: 3 طلاب أو أكثر خلال 72 ساعة متتالية
-      let isSuspiciousShortWindow = false;
-      if (!isSuspiciousTotal && studentsList.length >= SUSPICIOUS_MIN_STUDENTS_SHORT) {
-        const windowMs = SUSPICIOUS_WINDOW_HOURS * 60 * 60 * 1000;
-        // فحص: هل يوجد 3 طلاب أو أكثر ضمن نافذة 72 ساعة؟
-        for (let i = 0; i <= studentsList.length - SUSPICIOUS_MIN_STUDENTS_SHORT; i++) {
-          const windowStart = new Date(studentsList[i].firstSeenAt).getTime();
-          const windowEnd = windowStart + windowMs;
-          let countInWindow = 0;
-          for (const st of studentsList) {
-            const t = new Date(st.firstSeenAt).getTime();
-            if (t >= windowStart && t <= windowEnd) countInWindow++;
-          }
-          if (countInWindow >= SUSPICIOUS_MIN_STUDENTS_SHORT) {
-            isSuspiciousShortWindow = true;
-            break;
-          }
-        }
-      }
-
-      if (!isSuspiciousTotal && !isSuspiciousShortWindow) return; // لا شبهة كافية
 
       const primaryStudent = studentsList[0];
       const otherStudents = studentsList.slice(1);
@@ -206,9 +177,7 @@ export async function GET(request: Request) {
       suspiciousDevices.push({
         deviceId: devId,
         studentCount: studentsList.length,
-        suspicionReason: isSuspiciousTotal
-          ? `بحث عن ${studentsList.length} طلاب مختلفين`
-          : `بحث عن ${SUSPICIOUS_MIN_STUDENTS_SHORT}+ طلاب خلال ${SUSPICIOUS_WINDOW_HOURS} ساعة`,
+        suspicionReason: `بحث عن ${studentsList.length} طلاب مختلفين من نفس الجهاز`,
         primaryStudent: {
           student_code: primaryStudent.student_code,
           student_name: primaryStudent.student_name,
