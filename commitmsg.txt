@@ -1,1 +1,1 @@
-fix: unify login screen for root and student-portal, put students first, fix coordinator activation and PIN auto-login v3.6.49
+fix: reset failed_attempts and locked_until on PIN reset and activation, add regenerate PIN in coordinator portal v3.6.50

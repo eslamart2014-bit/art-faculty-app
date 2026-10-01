@@ -452,54 +452,71 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'تم تصفير أعمال ومشاريع الطالب بنجاح، ويمكنه الآن تصويرها ورفعها من جديد.' });
     }
 
-    // 3. إعادة توليد رقم سري جديد
+    // 3. إعادة توليد رقم سري جديد وفك قفل الحساب فوراً
     if (action === 'reset_pin') {
       const newPin = generatePinCode();
+      const variants = getStudentCodeVariants(cleanCode || student_code);
+      const filter = buildStudentCodeFilter(variants);
 
       try {
         await supabaseAdmin
           .from('student_accounts')
           .update({
             pin_code: newPin,
-            is_pin_used: false,
+            failed_attempts: 0,
+            locked_until: null,
+            status: 'active',
+            is_pin_used: true,
             pin_issued_by: 'إدارة النظام (إعادة تعيين)',
             pin_issued_at: new Date().toISOString(),
           })
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+          .or(filter);
       } catch (e) {}
 
       try {
         const { data: st } = await supabaseAdmin
           .from('students')
-          .select('id, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .select('id, student_code, telegram_browser_id')
+          .or(filter)
           .maybeSingle();
 
-        if (st && st.telegram_browser_id) {
-          try {
-            const parsed = JSON.parse(st.telegram_browser_id);
-            parsed.pin_code = newPin;
-            parsed.is_pin_used = false;
-            parsed.pin_issued_by = 'إدارة النظام (إعادة تعيين)';
-            parsed.pin_issued_at = new Date().toISOString();
-            await supabaseAdmin
-              .from('students')
-              .update({ telegram_browser_id: JSON.stringify(parsed) })
-              .eq('id', st.id);
-          } catch (e) {}
+        if (st) {
+          let parsed: any = {};
+          try { parsed = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
+          parsed.pin_code = newPin;
+          parsed.failed_attempts = 0;
+          parsed.locked_until = null;
+          parsed.status = 'active';
+          parsed.is_pin_used = true;
+          parsed.pin_issued_by = 'إدارة النظام (إعادة تعيين)';
+          parsed.pin_issued_at = new Date().toISOString();
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(parsed) })
+            .eq('id', st.id);
         }
       } catch (e) {}
 
       try {
-        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
-        if (localAcc) {
-          localAcc.pin_code = newPin;
-          localAcc.is_pin_used = false;
-          localStore.upsertAccount(localAcc);
+        for (const v of variants) {
+          const localAcc = localStore.getAccount(v);
+          if (localAcc) {
+            localAcc.pin_code = newPin;
+            localAcc.failed_attempts = 0;
+            localAcc.locked_until = null;
+            localAcc.status = 'active';
+            localAcc.is_pin_used = true;
+            localStore.upsertAccount(localAcc);
+          }
         }
       } catch (e) {}
 
-      return NextResponse.json({ success: true, message: `تم إعادة تعيين الرقم السري بنجاح: ${newPin}`, newPin });
+      return NextResponse.json({
+        success: true,
+        message: `تم إعادة توليد الرقم السري بنجاح وفك قفل الحساب: ${newPin}`,
+        newPin,
+        pin_code: newPin
+      });
     }
 
     // 4. حذف وتصفير حساب الطالب من البوابة بالكامل

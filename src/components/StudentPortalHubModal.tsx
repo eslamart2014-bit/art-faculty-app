@@ -379,7 +379,21 @@ export default function StudentPortalHubModal({
       const data = await res.json();
       if (res.ok) {
         setActionMessage(data.message || "تم تنفيذ الإجراء بنجاح");
-        setTimeout(() => setActionMessage(""), 4000);
+        setTimeout(() => setActionMessage(""), 5000);
+        if (data.newPin) {
+          setShowInspectedPin(true);
+          setInspectedAccount((prev: any) => prev ? {
+            ...prev,
+            account: {
+              ...prev.account,
+              pin_code: data.newPin,
+              status: 'active',
+              is_pin_used: true,
+              locked_until: null,
+              failed_attempts: 0
+            }
+          } : prev);
+        }
         handleInspectAccount(cleanCode);
       } else {
         alert(data.error || "فشلت العملية");

@@ -217,6 +217,47 @@ export default function CoordinatorPortalPage() {
     }
   };
 
+  // 4. إعادة توليد رقم سري جديد وفك القفل فوراً
+  const handleRegeneratePin = async () => {
+    if (!searchResult?.student?.student_code) return;
+    if (!confirm("هل تريد إعادة توليد رقم سري جديد (6 أرقام) لهذا الطالب وفك قفل حسابه فوراً؟")) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/coordinator/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reset_pin",
+          student_code: searchResult.student.student_code,
+          coordinator_name: coordinatorName || "منسق النظام",
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ " + (data.message || `تم توليد الرقم السري الجديد: ${data.newPin}`));
+        setSearchResult((prev: any) => ({
+          ...prev,
+          account: {
+            ...prev.account,
+            pin_code: data.newPin || data.pin_code,
+            locked_until: null,
+            failed_attempts: 0,
+            status: 'active'
+          }
+        }));
+        setShowPin(true);
+      } else {
+        alert(data.error || "تعذر إعادة التوليد");
+      }
+    } catch (e: any) {
+      alert("خطأ: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getPortalUrl = () => {
     if (typeof window !== "undefined") {
       return `${window.location.origin}/student-portal`;
@@ -573,8 +614,35 @@ export default function CoordinatorPortalPage() {
                     </button>
                   </div>
                 </div>
-
               </div>
+
+              {/* زر إعادة توليد رقم سري وفك القفل للمنسق */}
+              <button
+                type="button"
+                onClick={handleRegeneratePin}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1px solid #f59e0b",
+                  color: "#fbbf24",
+                  padding: "10px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  marginBottom: "14px",
+                  boxSizing: "border-box",
+                  margin: "0 0 14px 0"
+                }}
+              >
+                <KeyRound size={15} />
+                <span>🔄 إعادة توليد رقم سري جديد (6 أرقام) وفك القفل</span>
+              </button>
 
               {/* معاينة صورة بطاقة الهوية */}
               <div style={{ marginBottom: "16px" }}>
@@ -741,10 +809,36 @@ export default function CoordinatorPortalPage() {
                     style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "4px 8px", width: "auto", borderRadius: "6px", fontSize: "11px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", margin: 0 }}
                   >
                     {showPin ? <EyeOff size={13} /> : <Eye size={13} />}
-                    <span>{showPin ? "إخفاء" : "إظهار"}</span>
                   </button>
                 </div>
               </div>
+
+              {/* زر إعادة توليد رقم سري وفك القفل للمنسق */}
+              <button
+                type="button"
+                onClick={handleRegeneratePin}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1px solid #f59e0b",
+                  color: "#fbbf24",
+                  padding: "11px",
+                  borderRadius: "10px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  boxSizing: "border-box",
+                  margin: "0 0 14px 0"
+                }}
+              >
+                <KeyRound size={15} />
+                <span>🔄 إعادة توليد رقم سري جديد (6 أرقام) وفك القفل فوراً</span>
+              </button>
 
               {/* صورة البطاقة المحفوظة إن وجدت */}
               {searchResult.account?.id_card_url && (

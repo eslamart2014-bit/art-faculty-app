@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 2. تفعيل حساب الطالب بواسطة المنسق
+    // 2. تفعيل حساب الطالب بواسطة المنسق وفك أي قفل مؤقت
     if (action === 'activate_student') {
       const nowIso = new Date().toISOString();
       const coordName = coordinator_name || 'منسق النظام';
@@ -114,6 +114,8 @@ export async function POST(request: Request) {
             activated_at: nowIso,
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
           })
           .or(filter)
           .select('*');
@@ -127,6 +129,8 @@ export async function POST(request: Request) {
             .update({
               status: 'active',
               is_pin_used: true,
+              failed_attempts: 0,
+              locked_until: null,
             })
             .or(filter)
             .select('*');
@@ -158,6 +162,8 @@ export async function POST(request: Request) {
             activated_at: nowIso,
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
           };
           await supabaseAdmin
             .from('students')
@@ -168,6 +174,8 @@ export async function POST(request: Request) {
             updatedAccount.activated_by = coordName;
             updatedAccount.activated_at = nowIso;
             if (!updatedAccount.pin_code) updatedAccount.pin_code = merged.pin_code;
+            updatedAccount.locked_until = null;
+            updatedAccount.failed_attempts = 0;
           }
         }
       } catch (e) {}
@@ -179,6 +187,8 @@ export async function POST(request: Request) {
         localAcc.is_pin_used = true;
         localAcc.activated_by = coordName;
         localAcc.activated_at = nowIso;
+        localAcc.failed_attempts = 0;
+        localAcc.locked_until = null;
         localStore.upsertAccount(localAcc);
       }
 
@@ -193,8 +203,97 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: 'تم اعتماد وتفعيل حساب الطالب بنجاح! يمكن للطالب الآن استخدام المنظومة فوراً.',
+        message: 'تم اعتماد وتفعيل حساب الطالب بنجاح وفك أي قفل مؤقت! يمكن للطالب استخدام المنظومة فوراً.',
         account: updatedAccount,
+      });
+    }
+
+    // 2.5 إعادة توليد رقم سري جديد وفك القفل بواسطة المنسق
+    if (action === 'reset_pin' || action === 'regenerate_pin') {
+      const nowIso = new Date().toISOString();
+      const coordName = coordinator_name || 'منسق النظام';
+      const newPin = generatePinCode();
+
+      let updatedAccount: any = null;
+      try {
+        const res = await supabaseAdmin
+          .from('student_accounts')
+          .update({
+            pin_code: newPin,
+            status: 'active',
+            is_pin_used: true,
+            id_card_verified: true,
+            activated_by: coordName,
+            activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
+          })
+          .or(filter)
+          .select('*');
+        if (res.data && res.data.length > 0) {
+          updatedAccount = res.data[0];
+        }
+      } catch (e) {}
+
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, student_code, telegram_browser_id')
+          .or(filter)
+          .maybeSingle();
+
+        if (st) {
+          let curr: any = {};
+          try { curr = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
+          const merged = {
+            ...curr,
+            student_code: st.student_code,
+            pin_code: newPin,
+            status: 'active',
+            is_pin_used: true,
+            id_card_verified: true,
+            activated_by: coordName,
+            activated_at: nowIso,
+            pin_issued_by: coordName,
+            pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
+          };
+          await supabaseAdmin
+            .from('students')
+            .update({ telegram_browser_id: JSON.stringify(merged) })
+            .eq('id', st.id);
+          if (!updatedAccount) updatedAccount = merged;
+          else {
+            updatedAccount.pin_code = newPin;
+            updatedAccount.locked_until = null;
+            updatedAccount.failed_attempts = 0;
+          }
+        }
+      } catch (e) {}
+
+      try {
+        for (const v of variants) {
+          const localAcc = localStore.getAccount(v);
+          if (localAcc) {
+            localAcc.pin_code = newPin;
+            localAcc.failed_attempts = 0;
+            localAcc.locked_until = null;
+            localAcc.status = 'active';
+            localAcc.is_pin_used = true;
+            localStore.upsertAccount(localAcc);
+          }
+        }
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: `تم توليد رقم سري جديد وفك قفل الحساب فوراً: ${newPin}`,
+        newPin,
+        pin_code: newPin,
+        account: updatedAccount
       });
     }
 

@@ -80,6 +80,19 @@ export default function AdminPortalPage() {
       const data = await res.json();
       if (res.ok) {
         alert(data.message);
+        if (data.newPin) {
+          setStudentData((prev: any) => prev ? {
+            ...prev,
+            account: {
+              ...prev.account,
+              pin_code: data.newPin,
+              status: 'active',
+              is_pin_used: true,
+              locked_until: null,
+              failed_attempts: 0
+            }
+          } : prev);
+        }
         handleSearch(cleanCode);
       } else {
         alert(data.error || "فشلت العملية");
