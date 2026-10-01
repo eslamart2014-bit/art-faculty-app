@@ -970,7 +970,6 @@ export default function InstructorPage() {
                     }
                   }}
                   onClose={() => setIsCameraOpen(false)}
-                  title="ماسح بطاقة الطالب"
                   height="260px"
                   compact={true}
                 />

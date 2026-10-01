@@ -1321,7 +1321,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                 </button>
               </>
             ) : (
-              <div style={{ background: "#05070c", borderRadius: "14px", overflow: "hidden", position: "relative", height: "260px", marginBottom: "15px" }}>
+              <div style={{ background: "#05070c", borderRadius: "14px", position: "relative", padding: "8px", marginBottom: "15px" }}>
                 <QRScanner 
                   onScan={(result) => { 
                     if(result) { 
@@ -1330,8 +1330,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                     } 
                   }} 
                   onClose={() => setMakeupCameraActive(false)}
-                  height="260px"
-                  title="مسح كود الطالب للتخلفات"
+                  height="220px"
                 />
               </div>
             )}
@@ -1355,15 +1354,14 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             <button onClick={closeCameraScanner} className="modal-close-btn" title="إغلاق">✕</button>
           </div>
           
-          <div style={{ background: "#05070c", position: "relative", height: "300px", flexShrink: 0, overflow: "hidden" }}>
+          <div style={{ background: "#05070c", position: "relative", padding: "10px 14px", flexShrink: 0 }}>
             <QRScanner 
               onScan={(result) => { if (result) handleCameraScan(result); }}
               isBusy={isProcessingScanRef.current || scannerStatus !== 'idle'}
               status={scannerStatus}
               statusText={scannerStatusText}
-              height="300px"
+              height="240px"
               onClose={closeCameraScanner}
-              title="توجيه الكاميرا نحو باركود الطالب"
             />
           </div>
 

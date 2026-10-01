@@ -452,7 +452,6 @@ export default function CoordinatorPortalPage() {
               onClose={stopScanner}
               height="240px"
               compact={true}
-              title="ماسح كود الطالب"
             />
           </div>
         )}

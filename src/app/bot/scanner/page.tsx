@@ -55,7 +55,6 @@ function ScannerContent() {
       <div style={{ width: "92%", maxWidth: "380px", borderRadius: "20px", overflow: "hidden" }}>
         <QRScanner 
           onScan={handleScan} 
-          title="مسح بطاقة الطالب"
           height="320px"
         />
       </div>

@@ -1498,15 +1498,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
             {/* CAMERA SECTION - ONLY SHOW WHEN NOT GRADING */}
             {!activeScannedStudent && (
-              <div style={{ background: "#05070c", borderRadius: "14px", overflow: "hidden", position: "relative", height: "280px", flexShrink: 0, marginBottom: "8px" }}>
+              <div style={{ background: "#05070c", borderRadius: "14px", position: "relative", padding: "8px", flexShrink: 0, marginBottom: "8px" }}>
                 <QRScanner 
                   onScan={(result) => { if (result) handleScannerScan(result); }}
                   isBusy={isProcessingScanRef.current || !!activeScannedStudent || scannerStatus !== 'idle'}
                   status={scannerStatus}
                   statusText={scannerStatusText}
-                  height="280px"
+                  height="240px"
                   onClose={cancelScanner}
-                  title="ماسح بطاقة الطالب للتقييم"
                 />
               </div>
             )}

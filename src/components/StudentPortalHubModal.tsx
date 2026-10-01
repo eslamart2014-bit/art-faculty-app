@@ -962,7 +962,6 @@ export default function StudentPortalHubModal({
                       }
                     }}
                     onClose={() => setIsScanningQr(false)}
-                    title="مسح كود الطالب بالكاميرا"
                     height="240px"
                     compact={true}
                   />

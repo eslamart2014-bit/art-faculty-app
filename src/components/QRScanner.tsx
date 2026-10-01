@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { RefreshCw, X, Search } from "lucide-react";
+import { X, Search } from "lucide-react";
 import { extractStudentCode } from "@/lib/scannerHelper";
 
 // فحص موثوق لأجهزة آبل (آيفون، آيباد) للتعامل الدقيق مع محرك سفاري
@@ -57,7 +57,7 @@ export default function QRScanner({
   // UI States
   const [internalStatus, setInternalStatus] = useState<"idle" | "success" | "error">("idle");
   const [internalStatusText, setInternalStatusText] = useState("");
-  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const facingMode = "environment";
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Manual input state
@@ -259,11 +259,6 @@ export default function QRScanner({
     };
   }, [facingMode, handleDecoded, isIOS]);
 
-  // Flip Camera
-  const flipCamera = () => {
-    setFacingMode(prev => (prev === "environment" ? "user" : "environment"));
-  };
-
   // Visual reticle styling based on status
   const borderColor = currentStatus === "success" 
     ? "#10b981" 
@@ -326,69 +321,49 @@ export default function QRScanner({
         )}
 
         {/* Top HUD Controls */}
-        <div
-          style={{
-            position: "absolute",
-            top: "10px",
-            left: "12px",
-            right: "12px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            zIndex: 25,
-            pointerEvents: "auto"
-          }}
-        >
-          {/* Flip Camera */}
-          <button
-            type="button"
-            onClick={flipCamera}
-            title="تبديل الكاميرا (أمامية / خلفية)"
+        {(onClose || (title && !title.includes("بطاقة") && !title.includes("ماسح بطاقة"))) && (
+          <div
             style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              background: "rgba(15, 23, 42, 0.75)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              color: "#38bdf8",
+              position: "absolute",
+              top: "10px",
+              left: "12px",
+              right: "12px",
               display: "flex",
+              justifyContent: (title && !title.includes("بطاقة") && !title.includes("ماسح بطاقة")) ? "space-between" : "flex-end",
               alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "all 0.2s"
+              zIndex: 25,
+              pointerEvents: "auto"
             }}
           >
-            <RefreshCw size={17} />
-          </button>
+            {title && !title.includes("بطاقة") && !title.includes("ماسح بطاقة") && (
+              <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "8px", backdropFilter: "blur(4px)" }}>
+                {title}
+              </span>
+            )}
 
-          {title && (
-            <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "8px", backdropFilter: "blur(4px)" }}>
-              {title}
-            </span>
-          )}
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              title="إغلاق الكاميرا"
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "10px",
-                background: "rgba(239, 68, 68, 0.8)",
-                border: "none",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer"
-              }}
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                title="إغلاق الكاميرا"
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: "rgba(239, 68, 68, 0.8)",
+                  border: "none",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer"
+                }}
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Target Reticle */}
         <div
@@ -468,11 +443,14 @@ export default function QRScanner({
           display: "flex",
           gap: "8px",
           alignItems: "center",
-          background: "rgba(15, 23, 42, 0.06)",
-          border: "1px solid rgba(56, 189, 248, 0.25)",
+          background: "#0f172a",
+          border: "1px solid rgba(56, 189, 248, 0.4)",
           borderRadius: "12px",
-          padding: "8px 10px",
-          direction: "rtl"
+          padding: "8px 12px",
+          direction: "rtl",
+          boxSizing: "border-box",
+          width: "100%",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
         }}
       >
         <input
@@ -482,7 +460,7 @@ export default function QRScanner({
           value={manualCode}
           onChange={e => setManualCode(e.target.value)}
           onKeyDown={handleManualKeyDown}
-          placeholder="أدخل الكود يدوياً..."
+          placeholder="أدخل كود الطالب يدوياً ثم اضغط بحث..."
           disabled={isBusy}
           style={{
             flex: 1,
@@ -491,7 +469,7 @@ export default function QRScanner({
             background: "transparent",
             fontSize: "14px",
             fontWeight: "bold",
-            color: "#1e293b",
+            color: "#ffffff",
             direction: "rtl",
             textAlign: "right",
             minWidth: 0
@@ -506,13 +484,13 @@ export default function QRScanner({
             display: "flex",
             alignItems: "center",
             gap: "5px",
-            padding: "6px 14px",
+            padding: "7px 16px",
             borderRadius: "8px",
             background: isBusy || !manualCode.trim()
-              ? "rgba(148, 163, 184, 0.4)"
-              : "rgba(56, 189, 248, 0.9)",
+              ? "rgba(148, 163, 184, 0.25)"
+              : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
             border: "none",
-            color: "#fff",
+            color: isBusy || !manualCode.trim() ? "#64748b" : "#fff",
             fontSize: "13px",
             fontWeight: "bold",
             cursor: isBusy || !manualCode.trim() ? "not-allowed" : "pointer",
@@ -522,7 +500,7 @@ export default function QRScanner({
           }}
         >
           <Search size={15} />
-          بحث
+          <span>بحث</span>
         </button>
       </div>
     </div>

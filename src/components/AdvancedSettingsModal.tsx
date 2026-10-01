@@ -615,7 +615,6 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
                     }} 
                     onClose={() => setIsScanning(false)}
                     height="280px"
-                    title="ماسح بطاقة الطالب"
                   />
                 </div>
               )}
