@@ -23,7 +23,8 @@ import {
   X,
   Plus,
   Edit3,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert
 } from "lucide-react";
 import { printLockerReceipt } from "@/lib/lockerReceipt";
 
@@ -75,6 +76,11 @@ export default function LockerAdminTab() {
 
   // مطابقة وربط الأكواد مع قاعدة بيانات الطلاب سحابياً
   const [reconcilingStudents, setReconcilingStudents] = useState<boolean>(false);
+
+  // فحص وتصفية الطلاب المكررين
+  const [duplicateStudents, setDuplicateStudents] = useState<any[] | null>(null);
+  const [isScanningDuplicates, setIsScanningDuplicates] = useState<boolean>(false);
+  const [isResolvingDuplicates, setIsResolvingDuplicates] = useState<boolean>(false);
 
   // Clear Cohort State
   const [cohortToClear, setCohortToClear] = useState<string>("الفرقة الرابعة");
@@ -318,6 +324,54 @@ export default function LockerAdminTab() {
       showToast("خطأ في الاتصال أثناء مطابقة بيانات الطلاب");
     } finally {
       setReconcilingStudents(false);
+    }
+  };
+
+  // فحص الطلاب المكررين في الدواليب
+  const handleScanDuplicates = async () => {
+    setIsScanningDuplicates(true);
+    try {
+      const res = await fetch('/api/admin/lockers?action=duplicates');
+      const json = await res.json();
+      if (json.success) {
+        setDuplicateStudents(json.duplicates || []);
+        if ((json.duplicates || []).length === 0) {
+          showToast("✅ ممتاز! لا يوجد أي طالب مكرر في الدواليب");
+        } else {
+          showToast(`⚠️ تم العثور على ${json.duplicates.length} طالب مكرر`);
+        }
+      } else {
+        showToast(json.message || "فشل فحص الطلاب المكررين");
+      }
+    } catch (e) {
+      showToast("خطأ في الاتصال أثناء فحص التكرارات");
+    } finally {
+      setIsScanningDuplicates(false);
+    }
+  };
+
+  // تصفية وحل تكرارات الطلاب تلقائياً
+  const handleResolveDuplicates = async () => {
+    if (!confirm("هل أنت متأكد من تصفية وحذف التكرارات تلقائياً؟ سيتم الإبقاء على الحجز المؤكد أو الأسبق وإزالة الحجز المكرر فوراً.")) return;
+    setIsResolvingDuplicates(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'resolve_duplicates' })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || "تمت تصفية التكرارات بنجاح");
+        await handleScanDuplicates();
+        await fetchData();
+      } else {
+        showToast(json.message || "فشلت عملية تصفية التكرارات");
+      }
+    } catch (e) {
+      showToast("خطأ في الاتصال أثناء تصفية التكرارات");
+    } finally {
+      setIsResolvingDuplicates(false);
     }
   };
 
@@ -1277,6 +1331,112 @@ export default function LockerAdminTab() {
                 <span>{reconcilingStudents ? "جاري المطابقة والربط..." : "بدء مطابقة وتحديث الأكواد 🔄"}</span>
               </button>
             </div>
+          </div>
+
+          {/* أداة فحص وتصفية الطلاب المكررين في الدواليب */}
+          <div style={{ background: "#18202f", border: "1px solid #f59e0b", borderRadius: "16px", padding: "22px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+              <div style={{ maxWidth: "600px" }}>
+                <h4 style={{ color: "#fbbf24", margin: "0 0 6px 0", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <ShieldAlert size={20} />
+                  <span>فحص ومنع تكرار الطلاب في الدواليب 🔍🛡️</span>
+                </h4>
+                <p style={{ color: "#94a3b8", fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
+                  فحص شامل لجميع كشوف وحجوزات الدواليب لضمان عدم تكرار اسم أو كود أي طالب في أكثر من دولاب، مع إمكانية التصفية التلقائية بضغطة زر.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  onClick={handleScanDuplicates}
+                  disabled={isScanningDuplicates || isResolvingDuplicates}
+                  style={{
+                    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                    color: "#fff",
+                    border: "none",
+                    padding: "12px 20px",
+                    borderRadius: "12px",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    cursor: (isScanningDuplicates || isResolvingDuplicates) ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    boxShadow: "0 4px 15px rgba(245, 158, 11, 0.25)"
+                  }}
+                >
+                  <Search size={18} className={isScanningDuplicates ? "animate-spin" : ""} />
+                  <span>{isScanningDuplicates ? "جاري الفحص..." : "فحص التكرارات الآن 🔎"}</span>
+                </button>
+
+                {duplicateStudents && duplicateStudents.length > 0 && (
+                  <button
+                    onClick={handleResolveDuplicates}
+                    disabled={isResolvingDuplicates}
+                    style={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "12px 20px",
+                      borderRadius: "12px",
+                      fontWeight: "bold",
+                      fontSize: "14px",
+                      cursor: isResolvingDuplicates ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      boxShadow: "0 4px 15px rgba(16, 185, 129, 0.25)"
+                    }}
+                  >
+                    <CheckCircle2 size={18} className={isResolvingDuplicates ? "animate-spin" : ""} />
+                    <span>{isResolvingDuplicates ? "جاري التصفية..." : "تصفية وحذف التكرارات تلقائياً 🧹"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* عرض نتائج فحص التكرارات */}
+            {duplicateStudents !== null && (
+              <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #334155" }}>
+                {duplicateStudents.length === 0 ? (
+                  <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981", borderRadius: "10px", padding: "12px 16px", color: "#34d399", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <CheckCircle2 size={18} />
+                    <span>ممتاز! لم يتم العثور على أي تكرار، جميع الطلاب مسكنين في دواليب فريدة 100%.</span>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <span style={{ color: "#f87171", fontWeight: "bold", fontSize: "14px" }}>
+                        ⚠️ تم رصد {duplicateStudents.length} طلاب مسجلين بأكثر من دولاب:
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto" }}>
+                      {duplicateStudents.map((dup, idx) => (
+                        <div key={idx} style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "10px", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontWeight: "bold", color: "#fff", fontSize: "14px" }}>{dup.studentName || dup.student_name}</span>
+                              {(dup.studentCode || dup.student_code) && (
+                                <span style={{ background: "#1e293b", color: "#38bdf8", padding: "2px 8px", borderRadius: "6px", fontSize: "12px", direction: "ltr" }}>
+                                  #{dup.studentCode || dup.student_code}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>
+                              مسجل في الدواليب:{" "}
+                              {(dup.occurrences || dup.bookings || []).map((b: any, bIdx: number) => (
+                                <span key={b.bookingId || b.booking_id || bIdx} style={{ background: b.status === "confirmed" ? "#065f46" : "#78350f", color: "#fff", padding: "2px 6px", borderRadius: "4px", margin: "0 4px", fontSize: "11px" }}>
+                                  دولاب {b.lockerCode || b.locker_code} ({b.status === "confirmed" ? "مؤكد" : "معلق"})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* أداة تفريغ دفعة كاملة */}

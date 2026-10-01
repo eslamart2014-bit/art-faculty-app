@@ -87,6 +87,14 @@ export async function GET(request: Request) {
       });
     }
 
+    if (action === 'duplicates') {
+      const dupData = lockerStore.getDuplicateStudents();
+      return NextResponse.json({
+        success: true,
+        ...dupData
+      });
+    }
+
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطأ في جلب بيانات الدواليب' }, { status: 500 });
@@ -290,6 +298,12 @@ export async function POST(request: Request) {
     // 16. مطابقة وربط الأكواد مع قاعدة بيانات الطلاب
     if (action === 'reconcile_students') {
       const res = await lockerStore.reconcileWithStudentsDB();
+      return NextResponse.json(res);
+    }
+
+    // 17. تصفية وحذف الطلاب المكررين في الدواليب تلقائياً
+    if (action === 'resolve_duplicates') {
+      const res = await lockerStore.resolveDuplicateStudents();
       return NextResponse.json(res);
     }
 

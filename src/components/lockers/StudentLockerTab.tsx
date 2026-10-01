@@ -83,6 +83,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
     setIsSearching(true);
     try {
       const excludeCodes = [student.student_code, ...partners.map(p => p.code)];
+      const excludeNames = [student.full_name, ...partners.map(p => p.name)];
       const res = await fetch('/api/students/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,7 +91,8 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           action: 'search_peers',
           cohort: student.academic_year,
           query: q.trim(),
-          excludeCodes
+          excludeCodes,
+          excludeNames
         })
       });
       const json = await res.json();
@@ -109,6 +111,16 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       alert("الحد الأقصى للزملاء هو 3 طلاب (المجموع 4 طلاب مع مقدم الطلب)");
       return;
     }
+    // منع إضافة الطالب لنفسه
+    if (peer.student_code === student.student_code || peer.full_name === student.full_name) {
+      alert("لا يمكنك إضافة نفسك كزميل، أنت مقدم الطلب بالفعل!");
+      return;
+    }
+    // منع تكرار نفس الزميل
+    if (partners.some(p => p.code === peer.student_code || p.name === peer.full_name)) {
+      alert("هذا الزميل مضاف بالفعل في قائمة هذا الطلب!");
+      return;
+    }
     setPartners([...partners, { name: peer.full_name, code: peer.student_code }]);
     setSearchQuery("");
     setSearchResults([]);
@@ -124,8 +136,9 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       setModalError("يشترط إضافة 3 زملاء بالتمام والكمال ليكتمل عدد المجموعة (4 طلاب للدولاب الواحد)");
       return;
     }
-    if (!phone || phone.trim().length < 9) {
-      setModalError("يرجى إدخال رقم هاتف صحيح للتواصل");
+    const cleanPh = phone.trim().replace(/\D/g, '');
+    if (!cleanPh || cleanPh.length < 10) {
+      setModalError("يرجى إدخال رقم هاتف صحيح للتواصل (11 رقماً)");
       return;
     }
 
@@ -825,10 +838,10 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 {/* رقم هاتف ممثل الدولاب */}
                 <div>
                   <label style={{ display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "6px", fontWeight: "bold" }}>
-                    رقم موبايل ممثل الدولاب للتواصل:
+                    رقم موبايل ممثل الدولاب للتواصل (إجباري):
                   </label>
-                  <div style={{ display: "flex", alignItems: "center", background: "#0f172a", border: "1px solid #334155", borderRadius: "10px", padding: "2px 10px" }}>
-                    <Phone size={16} color="#94a3b8" />
+                  <div style={{ display: "flex", alignItems: "center", background: "#0f172a", border: `1px solid ${phone.length > 0 && phone.trim().replace(/\D/g, '').length < 10 ? '#ef4444' : '#334155'}`, borderRadius: "10px", padding: "2px 10px" }}>
+                    <Phone size={16} color={phone.trim().replace(/\D/g, '').length >= 10 ? "#10b981" : "#94a3b8"} />
                     <input
                       type="tel"
                       required
@@ -848,58 +861,79 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                       }}
                     />
                   </div>
+                  {phone.length > 0 && phone.trim().replace(/\D/g, '').length < 10 && (
+                    <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
+                      * يرجى إدخال رقم هاتف صحيح (11 رقماً) للتواصل والتنسيق
+                    </span>
+                  )}
                 </div>
-
 
                 {/* زر الإرسال */}
-                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                  <button
-                    type="submit"
-                    disabled={submitting || partners.length !== 3}
-                    style={{
-                      flex: 1,
-                      background: partners.length === 3 ? "linear-gradient(135deg, #10b981, #059669)" : "#334155",
-                      color: partners.length === 3 ? "#fff" : "#94a3b8",
-                      border: "none",
-                      padding: "14px",
-                      borderRadius: "12px",
-                      fontWeight: "bold",
-                      fontSize: "15px",
-                      cursor: (submitting || partners.length !== 3) ? "not-allowed" : "pointer",
-                      opacity: (submitting || partners.length !== 3) ? 0.7 : 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px"
-                    }}
-                  >
-                    {submitting ? (
-                      <span>جاري إتمام الحجز...</span>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={18} />
-                        <span>{partners.length === 3 ? "تأكيد طلب التسكين (4 طلاب)" : `يلزم 4 طلاب (متبقي ${3 - partners.length})`}</span>
-                      </>
-                    )}
-                  </button>
+                {(() => {
+                  const cleanPhone = phone.trim().replace(/\D/g, '');
+                  const isPhoneValid = cleanPhone.length >= 10;
+                  const isPartnersComplete = partners.length === 3;
+                  const isFormComplete = isPartnersComplete && isPhoneValid;
 
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    style={{
-                      background: "#334155",
-                      color: "#cbd5e1",
-                      border: "none",
-                      padding: "14px 20px",
-                      borderRadius: "12px",
-                      fontWeight: "bold",
-                      fontSize: "14px",
-                      cursor: "pointer"
-                    }}
-                  >
-                    إلغاء
-                  </button>
-                </div>
+                  let buttonText = "تأكيد طلب التسكين (4 طلاب مكتملين) ✅";
+                  if (!isPartnersComplete) {
+                    buttonText = `يلزم 4 طلاب للدولاب (متبقي ${3 - partners.length} زملاء)`;
+                  } else if (!isPhoneValid) {
+                    buttonText = "يرجى إدخال رقم هاتف للتواصل 📱";
+                  }
+
+                  return (
+                    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                      <button
+                        type="submit"
+                        disabled={submitting || !isFormComplete}
+                        style={{
+                          flex: 1,
+                          background: isFormComplete ? "linear-gradient(135deg, #10b981, #059669)" : "#1e293b",
+                          color: isFormComplete ? "#fff" : "#64748b",
+                          border: isFormComplete ? "none" : "1px dashed #334155",
+                          padding: "14px",
+                          borderRadius: "12px",
+                          fontWeight: "bold",
+                          fontSize: "14px",
+                          cursor: (submitting || !isFormComplete) ? "not-allowed" : "pointer",
+                          opacity: (submitting || !isFormComplete) ? 0.75 : 1,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "8px",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        {submitting ? (
+                          <span>جاري إتمام الحجز...</span>
+                        ) : (
+                          <>
+                            <CheckCircle2 size={18} color={isFormComplete ? "#fff" : "#64748b"} />
+                            <span>{buttonText}</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowModal(false)}
+                        style={{
+                          background: "#334155",
+                          color: "#cbd5e1",
+                          border: "none",
+                          padding: "14px 20px",
+                          borderRadius: "12px",
+                          fontWeight: "bold",
+                          fontSize: "14px",
+                          cursor: "pointer"
+                        }}
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  );
+                })()}
 
               </form>
             )}

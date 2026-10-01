@@ -201,35 +201,67 @@ export function normalizeLockerCode(raw: string): { code: string; letter: string
 export function cleanArabicText(str: string): string {
   if (!str) return '';
   return String(str)
+    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
     .replace(/[أإآٱ]/g, 'ا')
     .replace(/[ة]/g, 'ه')
     .replace(/[ى]/g, 'ي')
     .replace(/عبد\s+/g, 'عبد')
-    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
-    .replace(/[-_.,/\\()]/g, ' ')
+    .replace(/منه\s+الله/g, 'منةالله')
+    .replace(/منة\s+الله/g, 'منةالله')
+    .replace(/نور\s+الدين/g, 'نورالدين')
+    .replace(/سيف\s+الدين/g, 'سيفالدين')
+    .replace(/حسام\s+الدين/g, 'حسامالدين')
+    .replace(/علاء\s+الدين/g, 'علاءالدين')
+    .replace(/[-_.,/\\()#*]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 }
 
-// خوارزمية مطابقة الأسماء العربية الذكية بنسبة دقة فائقة (97%+)
+// خوارزمية مطابقة الأسماء العربية الذكية بدون خلط بين الطلاب
 export function isArabicNameMatch(name1: string, name2: string): boolean {
   const n1 = cleanArabicText(name1);
   const n2 = cleanArabicText(name2);
   if (!n1 || !n2) return false;
   if (n1 === n2) return true;
-  if (n1.includes(n2) || n2.includes(n1)) return true;
 
   const w1 = n1.split(' ').filter(Boolean);
   const w2 = n2.split(' ').filter(Boolean);
-  // مطابقة الاسمين الأول والثاني على الأقل
-  if (w1.length >= 2 && w2.length >= 2 && w1[0] === w2[0] && w1[1] === w2[1]) {
-    // إذا كان هناك اسم ثالث، نتحقق منه
-    if (w1.length >= 3 && w2.length >= 3) {
-      return w1[2] === w2[2];
+  if (w1.length === 0 || w2.length === 0) return false;
+
+  // إذا كان أحد الاسمين مطابقاً للآخر تماماً
+  if (w1.join(' ') === w2.join(' ')) return true;
+
+  const minWords = Math.min(w1.length, w2.length);
+
+  // إذا كان كلاهما 3 كلمات على الأقل
+  if (minWords >= 3) {
+    let matchAllMin = true;
+    for (let i = 0; i < minWords; i++) {
+      if (w1[i] !== w2[i]) {
+        matchAllMin = false;
+        break;
+      }
     }
-    return true;
+    // إذا تطابقت كل الكلمات حتى طول الاسم الأقصر (مثلاً ثلاثي متطابق مع بداية رباعي)
+    if (matchAllMin) return true;
+
+    // إذا كان كلاهما 4 كلمات أو أكثر واختلف الاسم الأخير، فهما ليسا نفس الشخص
+    if (w1.length >= 4 && w2.length >= 4) {
+      return w1[0] === w2[0] && w1[1] === w2[1] && w1[2] === w2[2] && w1[3] === w2[3];
+    }
+
+    // إذا كان كلاهما 3 كلمات: يجب تطابق الكلمات الثلاث تماماً
+    if (w1.length === 3 && w2.length === 3) {
+      return w1[0] === w2[0] && w1[1] === w2[1] && w1[2] === w2[2];
+    }
   }
+
+  // إذا كان كلاهما كلمتين فقط
+  if (w1.length === 2 && w2.length === 2) {
+    return w1[0] === w2[0] && w1[1] === w2[1];
+  }
+
   return false;
 }
 
@@ -933,17 +965,44 @@ export const lockerStore = {
       };
     }
 
-    // التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل
+    // 1. التحقق من عدم تكرار أي طالب داخل نفس الطلب
+    const cleanCodes = (params.student_codes || [])
+      .map(c => String(c || '').trim().replace(/^#/, '').replace(/^0+/, ''))
+      .filter(Boolean);
+    if (new Set(cleanCodes).size !== cleanCodes.length) {
+      return {
+        success: false,
+        isWaitlist: false,
+        message: 'يوجد كود طالب مكرر أكثر من مرة في نفس الطلب!'
+      };
+    }
+
+    for (let i = 0; i < params.student_names.length; i++) {
+      for (let j = i + 1; j < params.student_names.length; j++) {
+        if (isArabicNameMatch(params.student_names[i], params.student_names[j])) {
+          return {
+            success: false,
+            isWaitlist: false,
+            message: `اسم الطالب (${params.student_names[i]}) مكرر في نفس الطلب!`
+          };
+        }
+      }
+    }
+
+    // 2. التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل في أي حجز سابق أو قائمة انتظار
     for (let i = 0; i < params.student_names.length; i++) {
       const name = params.student_names[i];
       const code = params.student_codes?.[i] || '';
       const check = this.getStudentLockerStatus({ code, name });
       if (check.status !== 'none') {
         const studentName = name || code;
+        const lockerInfo = check.booking 
+          ? `في دولاب (${check.booking.locker_code}) بحالة ${check.booking.status === 'confirmed' ? 'معتمد' : 'معلق'}` 
+          : 'في قائمة الانتظار';
         return {
           success: false,
           isWaitlist: false,
-          message: `الطالب (${studentName}) مسجل بالفعل مسبقاً في النظام!`
+          message: `عذراً، الطالب (${studentName}) مسجل بالفعل مسبقاً ${lockerInfo} ولا يمكن تكراره!`
         };
       }
     }
@@ -1700,6 +1759,9 @@ export const lockerStore = {
       });
     }
 
+    // تتبع الطلاب المسكنين لمنع تكرار أي طالب في أكثر من دولاب عبر الأوراق المختلفة
+    const seenStudentNames = new Set<string>();
+
     for (let i = 0; i < mergedRows.length; i++) {
       const r = mergedRows[i];
       const norm = normalizeLockerCode(r.locker_code);
@@ -1740,8 +1802,23 @@ export const lockerStore = {
         continue;
       }
 
-      // تنقية أسماء الطلاب الصالحة
-      const validNames = (r.student_names || []).map((n: any) => String(n || '').trim()).filter((n: string) => n.length > 1 && !n.includes('إدارة'));
+      // تنقية أسماء الطلاب واستبعاد المكررين مسبقاً
+      const rawNames = (r.student_names || []).map((n: any) => String(n || '').trim()).filter((n: string) => n.length > 1 && !n.includes('إدارة'));
+      const validNames: string[] = [];
+      const validCodes: string[] = [];
+
+      for (let sIdx = 0; sIdx < rawNames.length; sIdx++) {
+        const sName = rawNames[sIdx];
+        const sClean = cleanArabicText(sName);
+        if (seenStudentNames.has(sClean)) {
+          continue; // تخطي الطالب المكرر
+        }
+        seenStudentNames.add(sClean);
+        validNames.push(sName);
+        if (r.student_codes && r.student_codes[sIdx]) {
+          validCodes.push(r.student_codes[sIdx]);
+        }
+      }
 
       // إذا لم يكن هناك أي أسماء للطلاب، لا ننشئ حجوزات وهمية فارغة
       if (validNames.length === 0) {
@@ -1770,7 +1847,7 @@ export const lockerStore = {
         cohort: r.cohort || 'الفرقة الرابعة',
         representative_phone: r.phone || '',
         student_names: validNames.slice(0, 4),
-        student_codes: r.student_codes || [],
+        student_codes: validCodes,
         status: bookingStatus,
         created_at: new Date().toISOString(),
         confirmed_at: bookingStatus === 'confirmed' ? new Date().toISOString() : undefined,
@@ -2400,6 +2477,148 @@ export const lockerStore = {
       disabled,
       waitlistCount,
       occupancyRate: total > 0 ? Math.round(((confirmed + pending) / total) * 100) : 0
+    };
+  },
+
+  // 24. كشف الطلاب المكررين عبر كافة الحجوزات النشطة
+  getDuplicateStudents(): {
+    totalDuplicates: number;
+    duplicates: Array<{
+      key: string;
+      studentName: string;
+      studentCode: string;
+      occurrences: Array<{
+        lockerCode: string;
+        bookingId: string;
+        cohort: string;
+        status: string;
+      }>;
+    }>;
+  } {
+    const db = readLocalDB();
+    const studentMap = new Map<string, Array<{
+      name: string;
+      code: string;
+      lockerCode: string;
+      bookingId: string;
+      cohort: string;
+      status: string;
+    }>>();
+
+    const activeBookings = db.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+
+    for (const b of activeBookings) {
+      for (let i = 0; i < (b.student_names || []).length; i++) {
+        const name = (b.student_names[i] || '').trim();
+        const code = (b.student_codes && b.student_codes[i] ? String(b.student_codes[i]).trim() : '');
+        if (!name && !code) continue;
+
+        // مفتاح تمييز الطالب
+        const key = code ? `code:${code.replace(/^#/, '').replace(/^0+/, '')}` : `name:${cleanArabicText(name)}`;
+        if (!studentMap.has(key)) {
+          studentMap.set(key, []);
+        }
+        studentMap.get(key)!.push({
+          name,
+          code,
+          lockerCode: b.locker_code,
+          bookingId: b.id,
+          cohort: b.cohort,
+          status: b.status
+        });
+      }
+    }
+
+    const duplicates: any[] = [];
+    for (const [key, list] of studentMap.entries()) {
+      if (list.length > 1) {
+        duplicates.push({
+          key,
+          studentName: list[0].name,
+          studentCode: list.find(x => x.code)?.code || '',
+          occurrences: list.map(x => ({
+            lockerCode: x.lockerCode,
+            bookingId: x.bookingId,
+            cohort: x.cohort,
+            status: x.status
+          }))
+        });
+      }
+    }
+
+    return {
+      totalDuplicates: duplicates.length,
+      duplicates
+    };
+  },
+
+  // 25. تصفية وحذف التكرارات تلقائياً (إبقاء أول حجز معتمد وإزالة التكرار من الدواليب الأخرى)
+  async resolveDuplicateStudents(): Promise<{
+    success: boolean;
+    resolvedCount: number;
+    cleanedLockersCount: number;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    const dupInfo = this.getDuplicateStudents();
+    if (dupInfo.totalDuplicates === 0) {
+      return { success: true, resolvedCount: 0, cleanedLockersCount: 0, message: 'لا توجد أي تكرارات، جميع الدواليب مفلترة بنجاح ✅' };
+    }
+
+    let resolvedCount = 0;
+    const cleanedLockers = new Set<string>();
+
+    for (const dup of dupInfo.duplicates) {
+      // إبقاء أول ظهور (خاصة المؤكد أولاً) وإزالة الطالب من باقي الظهورات
+      const sortedOccurrences = [...dup.occurrences].sort((a, b) => {
+        if (a.status === 'confirmed' && b.status !== 'confirmed') return -1;
+        if (b.status === 'confirmed' && a.status !== 'confirmed') return 1;
+        return a.bookingId.localeCompare(b.bookingId);
+      });
+
+      const secondaryOccurrences = sortedOccurrences.slice(1);
+
+      for (const sec of secondaryOccurrences) {
+        const targetBooking = db.bookings.find(b => b.id === sec.bookingId);
+        if (!targetBooking) continue;
+
+        // إزالة الطالب من الحجز الثانوي
+        const removeIdx = targetBooking.student_names.findIndex(n => 
+          isArabicNameMatch(n, dup.studentName) || 
+          (dup.studentCode && targetBooking.student_codes && targetBooking.student_codes[targetBooking.student_names.indexOf(n)]?.replace(/^0+/, '') === dup.studentCode.replace(/^0+/, ''))
+        );
+
+        if (removeIdx !== -1) {
+          targetBooking.student_names.splice(removeIdx, 1);
+          if (targetBooking.student_codes && targetBooking.student_codes.length > removeIdx) {
+            targetBooking.student_codes.splice(removeIdx, 1);
+          }
+
+          cleanedLockers.add(sec.lockerCode);
+          resolvedCount++;
+
+          // إذا أصبح الحجز فارغاً بدون طلاب، يتم إلغاؤه وإخلاء الدولاب
+          if (targetBooking.student_names.length === 0) {
+            targetBooking.status = 'rejected';
+            targetBooking.notes = 'تم إخلاء الحجز لإزالة تكرار الطالب';
+            const locker = db.lockers.find(l => l.locker_code.toUpperCase() === sec.lockerCode.toUpperCase());
+            if (locker && locker.current_booking_id === targetBooking.id) {
+              locker.status = 'empty';
+              locker.current_booking_id = null;
+              locker.updated_at = new Date().toISOString();
+            }
+          }
+        }
+      }
+    }
+
+    await persistDB(db);
+
+    return {
+      success: true,
+      resolvedCount,
+      cleanedLockersCount: cleanedLockers.size,
+      message: `تمت تصفية ${resolvedCount} حالة تكرار وتحديث ${cleanedLockers.size} دواليب وحفظ التعديلات سحابياً بنجاح! 🧹`
     };
   }
 };
