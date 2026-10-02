@@ -1981,15 +1981,17 @@ export const lockerStore = {
   }> {
     const db = readLocalDB();
     try {
-      // 1. جلب كافة الطلاب من جدول students (دفعتين لتجاوز حد 1000 طالب)
+      // 1. جلب كافة الطلاب النشطين فقط من جدول students (استثناء الخريجين والمؤرشفين is_active = false)
       const { data: b1, error: err1 } = await supabaseAdmin
         .from('students')
-        .select('student_code, full_name, academic_year')
+        .select('student_code, full_name, academic_year, is_active')
+        .eq('is_active', true)
         .range(0, 999);
       
       const { data: b2, error: err2 } = await supabaseAdmin
         .from('students')
-        .select('student_code, full_name, academic_year')
+        .select('student_code, full_name, academic_year, is_active')
+        .eq('is_active', true)
         .range(1000, 2999);
 
       if (err1 && !b1) {
@@ -1997,8 +1999,8 @@ export const lockerStore = {
         return { success: false, matched: 0, totalNames: 0, updatedBookings: 0, message: 'فشل جلب سجلات الطلاب من قاعدة البيانات' };
       }
 
-      const allStudents = [...(b1 || []), ...(b2 || [])];
-      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب من قاعدة البيانات الحالية...`);
+      const allStudents = [...(b1 || []), ...(b2 || [])].filter(s => s.is_active !== false);
+      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب نشط من قاعدة البيانات الحالية...`);
 
       const codeMap = new Map();
       const nameMap = new Map();
