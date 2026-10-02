@@ -18,6 +18,7 @@ export async function GET(request: Request) {
       const waitlist = lockerStore.getWaitlist();
       const bookings = lockerStore.getBookings();
       const ranges = lockerStore.getInventoryRanges();
+      const allocations = lockerStore.getCohortAllocations();
 
       return NextResponse.json({
         success: true,
@@ -25,7 +26,16 @@ export async function GET(request: Request) {
         stats,
         waitlist,
         bookings,
-        ranges
+        ranges,
+        allocations
+      });
+    }
+
+    if (action === 'allocations') {
+      const allocations = lockerStore.getCohortAllocations();
+      return NextResponse.json({
+        success: true,
+        ...allocations
       });
     }
 
@@ -188,6 +198,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'يرجى إرسال بيانات النطاقات بشكل صحيح' }, { status: 400 });
       }
       const res = await lockerStore.updateInventoryRanges(ranges);
+      return NextResponse.json(res);
+    }
+
+    // 9.5. حفظ وتحديث كوتا وتخصيص الدواليب للفرق الدراسية
+    if (action === 'update_quotas') {
+      const { quotas } = body;
+      if (!quotas || typeof quotas !== 'object') {
+        return NextResponse.json({ error: 'يرجى إرسال بيانات التخصيص بشكل صحيح' }, { status: 400 });
+      }
+      const res = await lockerStore.updateCohortQuotas(quotas);
       return NextResponse.json(res);
     }
 

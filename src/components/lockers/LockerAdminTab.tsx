@@ -24,12 +24,14 @@ import {
   Plus,
   Edit3,
   ExternalLink,
-  ShieldAlert
+  ShieldAlert,
+  Target,
+  PieChart
 } from "lucide-react";
 import { printLockerReceipt } from "@/lib/lockerReceipt";
 
 export default function LockerAdminTab() {
-  const [activeSubTab, setActiveSubTab] = useState<"grid" | "pending" | "search" | "tools">("grid");
+  const [activeSubTab, setActiveSubTab] = useState<"grid" | "pending" | "allocation" | "search" | "tools">("grid");
   const [letterFilter, setLetterFilter] = useState<string>("ALL");
   const [lockers, setLockers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -82,6 +84,11 @@ export default function LockerAdminTab() {
   const [isScanningDuplicates, setIsScanningDuplicates] = useState<boolean>(false);
   const [isResolvingDuplicates, setIsResolvingDuplicates] = useState<boolean>(false);
 
+  // إعدادات وتخصيص كوتا الفرق
+  const [allocationsData, setAllocationsData] = useState<any | null>(null);
+  const [cohortQuotasInput, setCohortQuotasInput] = useState<{ [key: string]: number }>({ '1': 0, '2': 0, '3': 0, '4': 0 });
+  const [savingQuotas, setSavingQuotas] = useState<boolean>(false);
+
   // Clear Cohort State
   const [cohortToClear, setCohortToClear] = useState<string>("الفرقة الرابعة");
 
@@ -114,12 +121,46 @@ export default function LockerAdminTab() {
         if (json.ranges) {
           setInventoryRanges(json.ranges);
         }
+        if (json.allocations) {
+          setAllocationsData(json.allocations);
+          const initialQuotas: { [key: string]: number } = {};
+          (json.allocations.allocations || []).forEach((a: any) => {
+            initialQuotas[a.cohortKey] = a.quota || 0;
+          });
+          setCohortQuotasInput(initialQuotas);
+        }
       }
     } catch (err) {
       console.error(err);
       showToast("خطأ في جلب بيانات الدواليب");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // حفظ وتحديث كوتا تخصيص الدواليب للفرق
+  const handleSaveQuotas = async () => {
+    setSavingQuotas(true);
+    try {
+      const res = await fetch('/api/admin/lockers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_quotas', quotas: cohortQuotasInput })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || "تم حفظ وتحديث تخصيص الكوتا بنجاح 💾");
+        if (json.allocations) {
+          setAllocationsData(json.allocations);
+        }
+        fetchData();
+      } else {
+        showToast(json.error || "تعذر حفظ التخصيص");
+      }
+    } catch (e) {
+      showToast("خطأ أثناء حفظ التخصيص");
+    } finally {
+      setSavingQuotas(false);
     }
   };
 
@@ -779,6 +820,7 @@ export default function LockerAdminTab() {
         {[
           { id: "grid", label: "شبكة الدواليب التفاعلية 🗄️" },
           { id: "pending", label: `طلبات الاعتماد والانتظار (${pendingList.length}) ⏳` },
+          { id: "allocation", label: "تخصيص الكوتا للفرق 🎯" },
           { id: "search", label: "البحث الشامل 🔍" },
           { id: "tools", label: "أدوات الإدارة والفرقة ⚙️" },
         ].map((tab) => (
@@ -1150,6 +1192,245 @@ export default function LockerAdminTab() {
         </div>
       )}
 
+      {/* 2.5. تبويب تخصيص كوتا الدواليب للفرق الدراسية (تخصيص الكوتا والأولوية) */}
+      {activeSubTab === "allocation" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          
+          {/* رأس التبويب والبطاقة التعريفية */}
+          <div style={{ background: "#18202f", border: "1px solid #6366f1", borderRadius: "16px", padding: "22px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+              <div style={{ maxWidth: "720px" }}>
+                <h3 style={{ color: "#818cf8", margin: "0 0 8px 0", fontSize: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Target size={22} />
+                  <span>تخصيص وحجز حصص الدواليب للفرق الدراسية (الكوتا والأولوية الحصرية)</span>
+                </h3>
+                <p style={{ color: "#cbd5e1", fontSize: "13px", lineHeight: "1.7", margin: 0 }}>
+                  حدد عدد الدواليب المستهدفة لكل فرقة (مثلاً: الفرقة الرابعة 50 دولاب). يقوم النظام بحساب المسجلين الحاليين تلقائياً (مثلاً 40 دولاب)، ويحجز الفارق (10 دواليب) حصرياً كأولوية لطلاب هذه الفرقة عند تقديمهم من حساباتهم. وعند اكتمال الحصة يتوقف الحجز التلقائي للفرقة مع وضعهم في قائمة الانتظار بأولوية، بينما تستمر الفرق الأخرى في الحجز بشكل طبيعي.
+                </p>
+              </div>
+
+              <button
+                onClick={handleSaveQuotas}
+                disabled={savingQuotas}
+                style={{
+                  background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 28px",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  fontSize: "14px",
+                  cursor: savingQuotas ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 15px rgba(99, 102, 241, 0.35)",
+                  flexShrink: 0
+                }}
+              >
+                <Check size={18} className={savingQuotas ? "animate-spin" : ""} />
+                <span>{savingQuotas ? "جاري حفظ التخصيص..." : "حفظ التخصيص سحابياً 💾"}</span>
+              </button>
+            </div>
+
+            {/* شريط المؤشرات والإحصائيات السريعة للتخصيص */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginTop: "20px" }}>
+              <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "12px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#94a3b8" }}>إجمالي الدواليب الشاغرة</div>
+                <div style={{ fontSize: "22px", fontWeight: "900", color: "#38bdf8", marginTop: "4px" }}>
+                  {allocationsData?.totalEmpty || stats?.empty || 0}
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>دواليب متاحة بالكلية</div>
+              </div>
+
+              <div style={{ background: "#0f172a", border: "1px solid #4f46e5", borderRadius: "12px", padding: "12px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#a5b4fc" }}>حصص محجوزة حصرياً للفرق</div>
+                <div style={{ fontSize: "22px", fontWeight: "900", color: "#818cf8", marginTop: "4px" }}>
+                  {allocationsData?.totalReservedExclusive || 0}
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>محجوزة بأولوية للفرق ذات الكوتا</div>
+              </div>
+
+              <div style={{ background: "#0f172a", border: "1px solid #10b981", borderRadius: "12px", padding: "12px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#6ee7b7" }}>شواغر حرة للعامة</div>
+                <div style={{ fontSize: "22px", fontWeight: "900", color: "#34d399", marginTop: "4px" }}>
+                  {allocationsData?.availableGeneralEmpty || 0}
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>متاحة لكافة الطلاب والفرق</div>
+              </div>
+
+              <div style={{ background: "#0f172a", border: "1px solid #f59e0b", borderRadius: "12px", padding: "12px 16px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: "#fcd34d" }}>إجمالي الكوتا المخصصة</div>
+                <div style={{ fontSize: "22px", fontWeight: "900", color: "#fbbf24", marginTop: "4px" }}>
+                  {allocationsData?.totalQuotas || 0}
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "2px" }}>مجموع حصص الفرق المستهدفة</div>
+              </div>
+            </div>
+          </div>
+
+          {/* شبكة بطاقات الفرق الدراسية الأربعة */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+            {(allocationsData?.allocations || [
+              { cohortKey: '1', cohortName: 'الفرقة الأولى', quota: 0, bookedLockers: 0, remainingQuota: 0, isQuotaFull: false },
+              { cohortKey: '2', cohortName: 'الفرقة الثانية', quota: 0, bookedLockers: 0, remainingQuota: 0, isQuotaFull: false },
+              { cohortKey: '3', cohortName: 'الفرقة الثالثة', quota: 0, bookedLockers: 0, remainingQuota: 0, isQuotaFull: false },
+              { cohortKey: '4', cohortName: 'الفرقة الرابعة', quota: 0, bookedLockers: 0, remainingQuota: 0, isQuotaFull: false },
+            ]).map((alloc: any) => {
+              const currentInputQuota = cohortQuotasInput[alloc.cohortKey] !== undefined ? cohortQuotasInput[alloc.cohortKey] : (alloc.quota || 0);
+              const booked = alloc.bookedLockers || 0;
+              const remaining = currentInputQuota > 0 ? Math.max(0, currentInputQuota - booked) : 0;
+              const isFull = currentInputQuota > 0 && booked >= currentInputQuota;
+              const percent = currentInputQuota > 0 ? Math.min(100, Math.round((booked / currentInputQuota) * 100)) : 0;
+
+              return (
+                <div
+                  key={alloc.cohortKey}
+                  style={{
+                    background: "#18202f",
+                    border: isFull ? "1px solid #ef4444" : (currentInputQuota > 0 ? "1px solid #6366f1" : "1px solid #334155"),
+                    borderRadius: "16px",
+                    padding: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                    boxShadow: currentInputQuota > 0 ? "0 4px 20px rgba(99, 102, 241, 0.1)" : "none"
+                  }}
+                >
+                  {/* رأس بطاقة الفرقة */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff" }}>
+                        {alloc.cohortName}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
+                        حجوزات نشطة: {booked} دولاب
+                      </div>
+                    </div>
+
+                    <div>
+                      {currentInputQuota === 0 ? (
+                        <span style={{ background: "rgba(148, 163, 184, 0.15)", color: "#94a3b8", border: "1px solid #475569", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                          مفتوح بدون كوتا 🌐
+                        </span>
+                      ) : isFull ? (
+                        <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid #ef4444", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                          اكتملت الكوتا (انتظار) 🔒
+                        </span>
+                      ) : (
+                        <span style={{ background: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "1px solid #10b981", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                          حصة نشطة ومحجوزة ✅
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* حقل إدخال الكوتا المستهدفة */}
+                  <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "14px" }}>
+                    <label style={{ display: "block", color: "#818cf8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
+                      العدد المخصص للفرقة (الكوتا المستهدفة):
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="500"
+                        placeholder="0 = مفتوح بدون حد"
+                        value={currentInputQuota}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setCohortQuotasInput({ ...cohortQuotasInput, [alloc.cohortKey]: val });
+                        }}
+                        style={{
+                          flex: 1,
+                          background: "#1e293b",
+                          border: "1px solid #475569",
+                          color: "#fff",
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          fontSize: "16px",
+                          fontWeight: "bold",
+                          textAlign: "center",
+                          outline: "none"
+                        }}
+                      />
+                      <span style={{ fontSize: "13px", color: "#94a3b8" }}>دولاب</span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px" }}>
+                      ضع (0) إذا كنت تريد فتح الحجز لهذه الفرقة بدون كوتا محددة.
+                    </div>
+                  </div>
+
+                  {/* إحصائيات الحصة المحجوزة ونسبة الإشغال */}
+                  {currentInputQuota > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                        <span style={{ color: "#94a3b8" }}>المحجوز الفعلي حالياً:</span>
+                        <span style={{ color: "#fff", fontWeight: "bold" }}>{booked} من {currentInputQuota}</span>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                        <span style={{ color: "#34d399", fontWeight: "bold" }}>الحصة المتبقية المحجوزة للفرقة:</span>
+                        <span style={{ color: "#34d399", fontWeight: "bold", fontSize: "14px" }}>
+                          {remaining} دولاب {remaining > 0 ? "🎯" : "🔒"}
+                        </span>
+                      </div>
+
+                      {/* شريط التقدم */}
+                      <div style={{ width: "100%", height: "8px", background: "#0f172a", borderRadius: "4px", overflow: "hidden", marginTop: "4px" }}>
+                        <div
+                          style={{
+                            width: `${percent}%`,
+                            height: "100%",
+                            background: isFull ? "#ef4444" : "linear-gradient(90deg, #6366f1, #38bdf8)",
+                            borderRadius: "4px",
+                            transition: "width 0.3s ease"
+                          }}
+                        />
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#64748b", textAlign: "left", direction: "ltr" }}>
+                        {percent}% إشغال
+                      </div>
+                    </div>
+                  )}
+
+                  {/* رسالة توضيحية لحالة الطالب في هذه الفرقة */}
+                  <div style={{ background: "#0f172a", borderRadius: "10px", padding: "10px 12px", fontSize: "12px", lineHeight: "1.5", color: "#cbd5e1", border: "1px dashed #334155" }}>
+                    {currentInputQuota === 0 ? (
+                      <span>🌐 أي طالب من هذه الفرقة يحجز مباشرة من الدواليب العامة الشاغرة ما دامت متوفرة.</span>
+                    ) : remaining > 0 ? (
+                      <span style={{ color: "#34d399" }}>
+                        ✅ متبقي ({remaining}) دواليب محجوزة كأولوية لـ {alloc.cohortName}. أي طالب يتقدم من حسابه سيحصل فوراً على دولاب من هذه الحصة!
+                      </span>
+                    ) : (
+                      <span style={{ color: "#f87171" }}>
+                        🔒 تم الوصول للحد الأقصى ({currentInputQuota} دولاب). أي طلب جديد لـ {alloc.cohortName} سيتم حفظه في قائمة الانتظار بأولوية فورية، مع استمرار باقي الفرق في الحجز بشكل طبيعي.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* بطاقة سيناريو عملي توضيحي */}
+          <div style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.25)", borderRadius: "16px", padding: "20px" }}>
+            <h4 style={{ color: "#818cf8", margin: "0 0 10px 0", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>💡</span>
+              <span>مثال توضيحي على آلية عمل التخصيص والأولوية التلقائية:</span>
+            </h4>
+            <div style={{ color: "#cbd5e1", fontSize: "13px", lineHeight: "1.8" }}>
+              • إذا خصصت للفرقة الرابعة <strong>50 دولاب</strong>، وكان عدد المتسجلين من الرابعة حالياً <strong>40 دولاب</strong>:<br />
+              • يقوم النظام فوراً بحجز <strong>10 دواليب حصرياً</strong> لصالح الفرقة الرابعة.<br />
+              • عندما يفتح أي طالب من الرابعة حسابه الشخصي ويقدم على دولاب، يأخذ فوراً من الـ 10 المحجوزين لفرقته.<br />
+              • لا يمكن لأي طالب من فرقة أخرى الاستيلاء على هذه الـ 10 دواليب إذا كانت هي الشواغر المتبقية.<br />
+              • وبمجرد اكتمال الـ 50 دولاب للرابعة، يتم إيقاف الحجز التلقائي لهم وتحويلهم لقائمة الانتظار بأولوية، بينما تظل باقي الفرق تحجز وتعمل بشكل طبيعي تماماً!
+            </div>
+          </div>
+
+        </div>
+      )}
+
       {/* 3. تبويب البحث الشامل */}
       {activeSubTab === "search" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -1230,6 +1511,39 @@ export default function LockerAdminTab() {
       {activeSubTab === "tools" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           
+          {/* بطاقة الوصول السريع لتخصيص كوتا الفرق */}
+          <div style={{ background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(79, 70, 229, 0.05) 100%)", border: "1px solid #6366f1", borderRadius: "16px", padding: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <h4 style={{ color: "#818cf8", margin: "0 0 6px 0", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Target size={20} />
+                <span>تخصيص كوتا الدواليب للفرق الدراسية والأولوية الحصرية 🎯</span>
+              </h4>
+              <p style={{ color: "#cbd5e1", fontSize: "13px", margin: 0, lineHeight: "1.6" }}>
+                خصص أعداد دواليب محددة لكل فرقة (مثلاً: رابعة 50 دولاب) ليقوم النظام بحجز الشواغر أوتوماتيكياً كأولوية لطلاب الفرقة وإيقاف الحجز عند اكتمال الحصة.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveSubTab("allocation")}
+              style={{
+                background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                color: "#fff",
+                border: "none",
+                padding: "10px 22px",
+                borderRadius: "10px",
+                fontWeight: "bold",
+                fontSize: "13px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                boxShadow: "0 4px 14px rgba(99, 102, 241, 0.3)"
+              }}
+            >
+              <Target size={16} />
+              <span>فتح شاشة التخصيص والكوتا 🎯</span>
+            </button>
+          </div>
+
           {/* أداة ضبط أعداد ونطاقات دواليب الأقسام */}
           <div style={{ background: "#18202f", border: "1px solid #38bdf8", borderRadius: "16px", padding: "22px" }}>
             <h4 style={{ color: "#38bdf8", margin: "0 0 8px 0", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>

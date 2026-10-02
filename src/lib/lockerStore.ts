@@ -44,11 +44,28 @@ export interface LockerWaitlistEntry {
   priority?: number;
 }
 
+export interface CohortAllocationInfo {
+  cohortKey: string;      // '1' | '2' | '3' | '4'
+  cohortName: string;     // 'الفرقة الأولى' | 'الفرقة الثانية' | 'الفرقة الثالثة' | 'الفرقة الرابعة'
+  quota: number;          // العدد المخصص (0 = غير محدد)
+  bookedLockers: number;  // عدد الدواليب المحجوزة حالياً (confirmed + pending)
+  remainingQuota: number; // المتبقي المحجوز حصرياً للفرقة
+  isQuotaFull: boolean;   // هل استنفذت الفرقة حصتها
+}
+
+export const STANDARD_COHORTS = [
+  { key: '1', name: 'الفرقة الأولى' },
+  { key: '2', name: 'الفرقة الثانية' },
+  { key: '3', name: 'الفرقة الثالثة' },
+  { key: '4', name: 'الفرقة الرابعة' },
+];
+
 export interface LockerSettings {
   google_sheet_url: string;
   supervisor_name: string;
   default_capacity: number;
   auto_waitlist: boolean;
+  cohort_quotas?: { [cohortKey: string]: number }; // تخصيص كوتا الدواليب لكل فرقة دراسية
 }
 
 export interface ParsedPreviewRow {
@@ -1007,12 +1024,76 @@ export const lockerStore = {
       }
     }
 
-    // البحث عن جميع الدواليب الشاغرة المتاحة واختيار دولاب عشوائي
+    // البحث عن جميع الدواليب الشاغرة المتاحة
     const emptyLockers = db.lockers.filter(l => 
       l.status === 'empty' && 
       l.is_enabled === true && 
       !l.is_admin_reserved
     );
+
+    // 3. التحقق من كوتا وتخصيص الفرقة الدراسية لمقدم الطلب (نظام التخصيص والأولوية الذكي)
+    const studentCohortKey = normalizeCohortName(params.cohort);
+    const allocationState = this.getCohortAllocations();
+    const myCohortAlloc = allocationState.allocations.find(a => a.cohortKey === studentCohortKey);
+    
+    // أ) هل فرقة الطالب محدد لها كوتا واستنفذت حصتها بالفعل؟ (مثلاً: رابعة مخصص 50 ومسجل 50)
+    if (myCohortAlloc && myCohortAlloc.quota > 0 && myCohortAlloc.isQuotaFull) {
+      // إيقاف الحجز التلقائي المباشر لهذه الفرقة وتحويلها لقائمة الانتظار بأولوية، بينما تستمر الفرق الأخرى في الحجز عادي
+      const waitEntry: LockerWaitlistEntry = {
+        id: `W_${Date.now()}`,
+        cohort: params.cohort,
+        representative_phone: params.representative_phone,
+        student_names: params.student_names,
+        student_codes: params.student_codes,
+        created_at: new Date().toISOString(),
+        status: 'waiting',
+        priority: 1 // أولوية قصوى لأن كوتا الفرقة اكتملت
+      };
+
+      db.waitlist.push(waitEntry);
+      await persistDB(db);
+
+      return {
+        success: true,
+        isWaitlist: true,
+        waitlist: waitEntry,
+        message: `تم استنفاد كوتا الدواليب المخصصة لـ (${params.cohort}) البالغة (${myCohortAlloc.quota} دولاب)! تم تسجيل طلبكم في قائمة الانتظار بأولوية فورية عند إخلاء أو توفر أي دواليب.`
+      };
+    }
+
+    // ب) هل الدواليب الشاغرة كافية بعد خصم الحصص المحجوزة حصرياً للفرق الأخرى؟
+    // نحسب كم دولاب محجوز حصرياً للفرق الأخرى (غير فرقة مقدم الطلب)
+    let reservedForOtherCohorts = 0;
+    for (const alloc of allocationState.allocations) {
+      if (alloc.cohortKey !== studentCohortKey && alloc.quota > 0) {
+        reservedForOtherCohorts += alloc.remainingQuota;
+      }
+    }
+
+    // إذا كانت فرقة مقدم الطلب ليس لها كوتا خاصة، وكان رصيد الشواغر لا يغطي سوى حصص الفرق الأخرى المحجوزة:
+    const isSpecialQuotaCohort = myCohortAlloc && myCohortAlloc.quota > 0 && !myCohortAlloc.isQuotaFull;
+    if (!isSpecialQuotaCohort && (emptyLockers.length - reservedForOtherCohorts) <= 0) {
+      const waitEntry: LockerWaitlistEntry = {
+        id: `W_${Date.now()}`,
+        cohort: params.cohort,
+        representative_phone: params.representative_phone,
+        student_names: params.student_names,
+        student_codes: params.student_codes,
+        created_at: new Date().toISOString(),
+        status: 'waiting',
+        priority: db.waitlist.filter(w => w.status === 'waiting').length + 1
+      };
+
+      db.waitlist.push(waitEntry);
+      await persistDB(db);
+
+      return {
+        success: true,
+        isWaitlist: true,
+        waitlist: waitEntry,
+        message: 'عذراً، الدواليب الشاغرة حالياً محجوزة كحصص مخصصة لفرق دراسية أخرى ذات كوتا معتمدة. تم حفظ طلبكم في قائمة الانتظار بأولوية فورية.'
+      };
+    }
 
     let availableLocker: LockerItem | undefined;
     if (emptyLockers.length > 0) {
@@ -1021,7 +1102,7 @@ export const lockerStore = {
       availableLocker = emptyLockers[randomIndex];
     }
 
-    // إذا لم تتوفر دواليب شاغرة -> تحويل تلقائي لقائمة الانتظار!
+    // إذا لم تتوفر دواليب شاغرة مطلقا -> تحويل تلقائي لقائمة الانتظار!
     if (!availableLocker) {
       const waitEntry: LockerWaitlistEntry = {
         id: `W_${Date.now()}`,
@@ -2619,6 +2700,102 @@ export const lockerStore = {
       resolvedCount,
       cleanedLockersCount: cleanedLockers.size,
       message: `تمت تصفية ${resolvedCount} حالة تكرار وتحديث ${cleanedLockers.size} دواليب وحفظ التعديلات سحابياً بنجاح! 🧹`
+    };
+  },
+
+  // 25. حساب وتلخيص تخصيص كوتا الدواليب للفرق الدراسية
+  getCohortAllocations(): {
+    allocations: CohortAllocationInfo[];
+    totalQuotas: number;
+    totalReservedExclusive: number;
+    availableGeneralEmpty: number;
+    totalEmpty: number;
+  } {
+    const db = readLocalDB();
+    const quotas = db.settings?.cohort_quotas || {};
+
+    // عدد الدواليب الشاغرة الكلية في الكلية
+    const totalEmpty = db.lockers.filter(l => l.status === 'empty' && l.is_enabled && !l.is_admin_reserved).length;
+
+    // حساب عدد الحجوزات النشطة (confirmed + pending) لكل فرقة دراسية
+    const activeBookings = db.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+    const bookedCountByCohortKey: { [key: string]: number } = { '1': 0, '2': 0, '3': 0, '4': 0 };
+
+    for (const b of activeBookings) {
+      const k = normalizeCohortName(b.cohort);
+      if (bookedCountByCohortKey[k] !== undefined) {
+        bookedCountByCohortKey[k]++;
+      } else {
+        bookedCountByCohortKey[k] = (bookedCountByCohortKey[k] || 0) + 1;
+      }
+    }
+
+    let totalQuotas = 0;
+    let totalReservedExclusive = 0;
+
+    const allocations: CohortAllocationInfo[] = STANDARD_COHORTS.map(sc => {
+      const rawQuota = quotas[sc.key] !== undefined ? quotas[sc.key] : quotas[sc.name];
+      const quota = Math.max(0, parseInt(String(rawQuota || 0), 10));
+      const booked = bookedCountByCohortKey[sc.key] || 0;
+      const remaining = quota > 0 ? Math.max(0, quota - booked) : 0;
+      const isFull = quota > 0 && booked >= quota;
+
+      if (quota > 0) {
+        totalQuotas += quota;
+        totalReservedExclusive += remaining;
+      }
+
+      return {
+        cohortKey: sc.key,
+        cohortName: sc.name,
+        quota,
+        bookedLockers: booked,
+        remainingQuota: remaining,
+        isQuotaFull: isFull
+      };
+    });
+
+    // الدواليب الشاغرة المتاحة للفرق العامة (غير المحجوزة كحصص حصرية متبقية لفرق أخرى)
+    const availableGeneralEmpty = Math.max(0, totalEmpty - totalReservedExclusive);
+
+    return {
+      allocations,
+      totalQuotas,
+      totalReservedExclusive,
+      availableGeneralEmpty,
+      totalEmpty
+    };
+  },
+
+  // 26. تحديث وحفظ تخصيص كوتا الفرق
+  async updateCohortQuotas(newQuotas: { [cohortKey: string]: number }): Promise<{
+    success: boolean;
+    allocations: any;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    if (!db.settings) {
+      db.settings = {
+        google_sheet_url: '',
+        supervisor_name: 'م/ إسلام عبداللطيف',
+        default_capacity: 4,
+        auto_waitlist: true
+      };
+    }
+
+    const cleanQuotas: { [key: string]: number } = {};
+    for (const [k, v] of Object.entries(newQuotas || {})) {
+      const normKey = normalizeCohortName(k) || k;
+      cleanQuotas[normKey] = Math.max(0, parseInt(String(v || 0), 10));
+    }
+
+    db.settings.cohort_quotas = cleanQuotas;
+    await persistDB(db);
+
+    return {
+      success: true,
+      allocations: this.getCohortAllocations(),
+      message: 'تم حفظ وتحديث تخصيص كوتا الدواليب للفرق بنجاح سحابياً ومحلياً 💾'
     };
   }
 };
