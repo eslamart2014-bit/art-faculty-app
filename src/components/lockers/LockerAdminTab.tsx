@@ -1304,12 +1304,16 @@ export default function LockerAdminTab() {
                         {alloc.cohortName}
                       </div>
                       <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>
-                        حجوزات نشطة: {booked} دولاب
+                        دواليب محجوزة: <strong style={{ color: "#38bdf8" }}>{booked} دولاب</strong> ({booked * 4} طالباً)
                       </div>
                     </div>
 
                     <div>
-                      {currentInputQuota === 0 ? (
+                      {alloc.cohortKey === '1' && booked === 0 ? (
+                        <span style={{ background: "rgba(148, 163, 184, 0.15)", color: "#94a3b8", border: "1px solid #475569", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                          لا توجد حجوزات (0 طلاب) ⚪
+                        </span>
+                      ) : currentInputQuota === 0 ? (
                         <span style={{ background: "rgba(148, 163, 184, 0.15)", color: "#94a3b8", border: "1px solid #475569", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
                           مفتوح بدون كوتا 🌐
                         </span>
@@ -1328,7 +1332,7 @@ export default function LockerAdminTab() {
                   {/* حقل إدخال الكوتا المستهدفة */}
                   <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "12px", padding: "14px" }}>
                     <label style={{ display: "block", color: "#818cf8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
-                      العدد المخصص للفرقة (الكوتا المستهدفة):
+                      الكوتا المستهدفة للفرقة (عدد الدواليب):
                     </label>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <input
@@ -1354,10 +1358,10 @@ export default function LockerAdminTab() {
                           outline: "none"
                         }}
                       />
-                      <span style={{ fontSize: "13px", color: "#94a3b8" }}>دولاب</span>
+                      <span style={{ fontSize: "13px", color: "#94a3b8" }}>دولاب ({currentInputQuota * 4} طالب)</span>
                     </div>
                     <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px" }}>
-                      ضع (0) إذا كنت تريد فتح الحجز لهذه الفرقة بدون كوتا محددة.
+                      ضع (0) لفتح الحجز التلقائي للفرقة بدون سقف محدد. كل دولاب = 4 طلاب.
                     </div>
                   </div>
 
@@ -1365,8 +1369,8 @@ export default function LockerAdminTab() {
                   {currentInputQuota > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                        <span style={{ color: "#94a3b8" }}>المحجوز الفعلي حالياً:</span>
-                        <span style={{ color: "#fff", fontWeight: "bold" }}>{booked} من {currentInputQuota}</span>
+                        <span style={{ color: "#94a3b8" }}>الدواليب المحجوزة حالياً:</span>
+                        <span style={{ color: "#fff", fontWeight: "bold" }}>{booked} دولاب ({booked * 4} طالب) من {currentInputQuota}</span>
                       </div>
 
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
