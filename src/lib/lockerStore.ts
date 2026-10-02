@@ -1990,7 +1990,7 @@ export const lockerStore = {
       const { data: b2, error: err2 } = await supabaseAdmin
         .from('students')
         .select('student_code, full_name, academic_year')
-        .range(1000, 2499);
+        .range(1000, 2999);
 
       if (err1 && !b1) {
         console.error('[LockerStore] فشل جلب الطلاب للمطابقة:', err1);
@@ -1998,7 +1998,19 @@ export const lockerStore = {
       }
 
       const allStudents = [...(b1 || []), ...(b2 || [])];
-      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب من قاعدة البيانات...`);
+      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب من قاعدة البيانات الحالية...`);
+
+      const codeMap = new Map();
+      const nameMap = new Map();
+
+      allStudents.forEach(s => {
+        if (s.student_code) {
+          codeMap.set(String(s.student_code).trim().replace(/^#/, '').replace(/^0+/, ''), s);
+        }
+        if (s.full_name) {
+          nameMap.set(s.full_name.trim(), s);
+        }
+      });
 
       let matchedCount = 0;
       let totalNames = 0;
@@ -2010,27 +2022,53 @@ export const lockerStore = {
           booking.student_codes = [];
         }
 
+        let detectedCohort = null;
+
         for (let i = 0; i < (booking.student_names || []).length; i++) {
           totalNames++;
           const name = booking.student_names[i];
           if (!name) continue;
 
-          // إذا كان الكود موجود بالفعل وصحيح، نحافظ عليه ونعده كمطابق
+          // إذا كان الكود موجود وصحيح
           if (booking.student_codes[i] && booking.student_codes[i].trim() !== '') {
             matchedCount++;
+            const cleanC = String(booking.student_codes[i]).trim().replace(/^#/, '').replace(/^0+/, '');
+            const foundByCode = codeMap.get(cleanC);
+            if (foundByCode && foundByCode.academic_year && !detectedCohort) {
+              detectedCohort = foundByCode.academic_year;
+            }
             continue;
           }
 
           // البحث عن الطالب في جدول الطلاب باستخدام خوارزمية المطابقة الذكية
-          const found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          let found = nameMap.get(name.trim());
+          if (!found) {
+            found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          }
+
           if (found && found.student_code) {
             booking.student_codes[i] = found.student_code;
             matchedCount++;
             bookingChanged = true;
+            if (found.academic_year && !detectedCohort) {
+              detectedCohort = found.academic_year;
+            }
           } else {
             if (!booking.student_codes[i]) {
               booking.student_codes[i] = '';
             }
+          }
+        }
+
+        // تحديث وتصحيح الفرقة الدراسية للحجز بناءً على قاعدة البيانات الحالية بعد ترحيل الدفع
+        if (detectedCohort) {
+          let normalized = detectedCohort.trim();
+          if (!normalized.startsWith('الفرقة')) {
+            normalized = `الفرقة ${normalized}`;
+          }
+          if (booking.cohort !== normalized) {
+            booking.cohort = normalized;
+            bookingChanged = true;
           }
         }
 
