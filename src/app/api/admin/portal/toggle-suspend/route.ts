@@ -18,9 +18,15 @@ export async function POST(request: Request) {
 
     // 1. Update in student_accounts
     try {
+      const updatePayload: any = { status: newStatus };
+      // عند إلغاء التعليق، نُصفِّر أيضاً القفل المؤقت وعداد المحاولات الخاطئة
+      if (newStatus === 'active') {
+        updatePayload.failed_attempts = 0;
+        updatePayload.locked_until = null;
+      }
       await supabaseAdmin
         .from('student_accounts')
-        .update({ status: newStatus })
+        .update(updatePayload)
         .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
     } catch (e) {}
 
@@ -36,6 +42,10 @@ export async function POST(request: Request) {
         try {
           const parsed = JSON.parse(st.telegram_browser_id);
           parsed.status = newStatus;
+          if (newStatus === 'active') {
+            parsed.failed_attempts = 0;
+            parsed.locked_until = null;
+          }
           await supabaseAdmin
             .from('students')
             .update({ telegram_browser_id: JSON.stringify(parsed) })

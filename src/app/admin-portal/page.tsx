@@ -19,7 +19,8 @@ import {
   Lock,
   Unlock,
   Layers,
-  Fingerprint
+  Fingerprint,
+  LogOut
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 
@@ -470,6 +471,22 @@ export default function AdminPortalPage() {
                       >
                         <RotateCcw size={14} />
                         <span>توليد جديد</span>
+                      </button>
+                    </div>
+
+                    {/* تسجيل الخروج من جميع الأجهزة (فك القيد) */}
+                    <div style={{ background: "#0d131f", padding: "14px", borderRadius: "10px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ color: "#f59e0b", fontWeight: "bold", fontSize: "13px" }}>تسجيل الخروج من جميع الأجهزة</div>
+                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>يفك ارتباط الجهاز الحالي ويلغي القفل الزمني ليتمكن الطالب من الدخول فوراً</div>
+                      </div>
+                      <button 
+                        onClick={() => handleAdminAction('logout_all_devices')}
+                        className="btn-secondary"
+                        style={{ fontSize: "12px", padding: "8px 14px", color: "#f59e0b", borderColor: "#f59e0b" }}
+                      >
+                        <LogOut size={14} />
+                        <span>تسجيل الخروج</span>
                       </button>
                     </div>
 

@@ -123,6 +123,8 @@ export async function GET(request: Request) {
         pin_code: existingAccount.pin_code || undefined,
         isAlreadyActive: true,
         message: 'هذا الحساب مسجل ومفعل بالفعل.',
+      }, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' }
       });
     }
 

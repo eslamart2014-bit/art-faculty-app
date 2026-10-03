@@ -398,14 +398,26 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. تسجيل الخروج من جميع الأجهزة (فك القيد)
-    if (action === 'logout_all_devices') {
+    // 5. تسجيل الخروج من جميع الأجهزة (فك القيد) وإلغاء القفل المؤقت
+    const normalizedAction = (action || '').toString().trim().toLowerCase();
+    if (
+      normalizedAction === 'logout_all_devices' ||
+      normalizedAction === 'logout_all' ||
+      normalizedAction === 'unbind_device' ||
+      normalizedAction === 'force_logout' ||
+      normalizedAction === 'logout'
+    ) {
       const coordName = coordinator_name || 'منسق النظام';
 
       try {
         await supabaseAdmin
           .from('student_accounts')
-          .update({ devices: [], bound_device_id: null })
+          .update({
+            devices: [],
+            bound_device_id: null,
+            failed_attempts: 0,
+            locked_until: null,
+          })
           .eq('student_code', cleanCode);
       } catch (e) {}
 
@@ -421,6 +433,8 @@ export async function POST(request: Request) {
           try { curr = JSON.parse(st.telegram_browser_id); } catch(e){}
           curr.devices = [];
           curr.bound_device_id = null;
+          curr.failed_attempts = 0;
+          curr.locked_until = null;
           await supabaseAdmin
             .from('students')
             .update({ telegram_browser_id: JSON.stringify(curr) })
@@ -438,7 +452,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: 'تم تسجيل الخروج من جميع الأجهزة بنجاح. يمكن للطالب الدخول من جهاز جديد الآن.',
+        message: 'تم تسجيل الخروج من جميع الأجهزة وفك القيد بنجاح. يمكن للطالب الدخول من جهاز جديد الآن.',
       });
     }
 

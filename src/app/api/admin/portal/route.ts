@@ -306,13 +306,15 @@ export async function POST(request: Request) {
             activated_at: nowIso,
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
           })
           .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
       } catch (e) {
         try {
           await supabaseAdmin
             .from('student_accounts')
-            .update({ status: 'active', is_pin_used: true })
+            .update({ status: 'active', is_pin_used: true, failed_attempts: 0, locked_until: null })
             .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
         } catch (e2) {}
       }
@@ -337,6 +339,8 @@ export async function POST(request: Request) {
             activated_at: nowIso,
             pin_issued_by: coordName,
             pin_issued_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
           };
           await supabaseAdmin
             .from('students')
@@ -352,6 +356,8 @@ export async function POST(request: Request) {
           localAcc.is_pin_used = true;
           localAcc.activated_by = coordName;
           localAcc.activated_at = nowIso;
+          localAcc.failed_attempts = 0;
+          localAcc.locked_until = null;
           localStore.upsertAccount(localAcc);
         }
       } catch (e) {}
@@ -585,6 +591,81 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         message: `تم حذف حساب الطالب (${student.full_name}) من البوابة بنجاح! أصبح الحساب غير مسجل ويمكن للطالب التسجيل من جديد.`
+      });
+    }
+
+    // 5. تسجيل الخروج من جميع الأجهزة وفك ارتباط الجهاز المقيّد وإلغاء أي قفل مؤقت
+    const normalizedAction = (action || '').toString().trim().toLowerCase();
+    if (
+      normalizedAction === 'logout_all_devices' ||
+      normalizedAction === 'logout_all' ||
+      normalizedAction === 'unbind_device' ||
+      normalizedAction === 'force_logout' ||
+      normalizedAction === 'logout'
+    ) {
+      const nowIso = new Date().toISOString();
+
+      // تصفير سجل الأجهزة وفك ارتباط الجهاز وإلغاء القفل الزمني وتصفير المحاولات في student_accounts
+      try {
+        await supabaseAdmin
+          .from('student_accounts')
+          .update({
+            devices: [],
+            bound_device_id: null,
+            last_login_at: nowIso,
+            failed_attempts: 0,
+            locked_until: null,
+          })
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+      } catch (e) {}
+
+      // تحديث في students.telegram_browser_id
+      try {
+        const { data: st } = await supabaseAdmin
+          .from('students')
+          .select('id, telegram_browser_id')
+          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .maybeSingle();
+
+        if (st && st.telegram_browser_id) {
+          try {
+            const parsed = JSON.parse(st.telegram_browser_id);
+            parsed.devices = [];
+            parsed.bound_device_id = null;
+            parsed.failed_attempts = 0;
+            parsed.locked_until = null;
+            await supabaseAdmin
+              .from('students')
+              .update({ telegram_browser_id: JSON.stringify(parsed) })
+              .eq('id', st.id);
+          } catch (e) {}
+        }
+      } catch (e) {}
+
+      // تحديث في المخزن المحلي
+      try {
+        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
+        if (localAcc) {
+          localAcc.devices = [];
+          localAcc.bound_device_id = null;
+          localAcc.failed_attempts = 0;
+          localAcc.locked_until = null;
+          localStore.upsertAccount(localAcc);
+        }
+      } catch (e) {}
+
+      // تسجيل العملية في سجل الأمان
+      try {
+        await supabaseAdmin.from('portal_audit_logs').insert({
+          student_code: cleanCode,
+          action: 'logout_all_devices',
+          details: { timestamp: nowIso },
+        });
+      } catch (e) {}
+
+      return NextResponse.json({
+        success: true,
+        message: 'تم تسجيل الخروج من جميع الأجهزة وفك ارتباط الجهاز المقيّد وإلغاء القفل المؤقت بنجاح 🔓 يمكن للطالب الآن الدخول من أي جهاز جديد.'
       });
     }
 

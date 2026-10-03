@@ -115,6 +115,8 @@ export async function POST(request: Request) {
           is_pin_used: true,
           status: 'active',
           last_login_at: new Date().toISOString(),
+          failed_attempts: 0,
+          locked_until: null,
         })
         .eq('id', account.id)
         .select('*')
