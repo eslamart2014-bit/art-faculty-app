@@ -79,7 +79,7 @@ export default function SystemPage() {
   const [pwaHintVisible, setPwaHintVisible] = useState(false);
 
   // Student registration lookup status (already active / pending / new)
-  const [lookupStatus, setLookupStatus] = useState<{ isAlreadyActive?: boolean; isPending?: boolean; message?: string } | null>(null);
+  const [lookupStatus, setLookupStatus] = useState<{ isAlreadyActive?: boolean; isPending?: boolean; message?: string; pin_code?: string; student?: any } | null>(null);
 
   // Impersonation mode (Admin browsing as student)
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -99,6 +99,7 @@ export default function SystemPage() {
 
   // PIN Verification State
   const [enteredPin, setEnteredPin] = useState("");
+  const [showManualPinBox, setShowManualPinBox] = useState(false);
 
   // Active Tab in Student Dashboard
   const [activeTab, setActiveTab] = useState<"attendance" | "evaluation" | "warnings" | "complaints" | "lockers">("evaluation");
@@ -537,6 +538,67 @@ export default function SystemPage() {
       }
     }
 
+    // 1. الأولوية القصوى: فحص الجلسة المحفوظة مسبقاً على هذا الموبايل/المتصفح
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("fania_student_session") : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.student_code) {
+          setCurrentStudent(parsed);
+
+          // تنظيف أي بارامترات في الرابط مثل ?mode=register حتى لا تعلق الصفحة في وضع التسجيل
+          if (typeof window !== "undefined" && window.location.search) {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("fania_pending_reg_code");
+            sessionStorage.removeItem("fania_prefetched_student");
+          }
+
+          // فحص فوري لحالة الحساب من الخادم للتأكد هل تم الاعتماد
+          const devInfo = getOrCreateDeviceInfo();
+          fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.isAlreadyActive) {
+                // الحساب معتمد! تحديث الجلسة والدخول المباشر فوراً دون أي كلمة سر
+                const activeSession = {
+                  ...parsed,
+                  ...(data.student || {}),
+                  pin_code: data.student?.pin_code || data.pin_code || parsed.pin_code || "",
+                  status: "active",
+                  is_pin_used: true
+                };
+                localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                setCurrentStudent(activeSession);
+                setAccountStatus("active");
+                setSuccessMsg("🎉 تم اعتماد وتفعيل حسابك بنجاح! مرحباً بك في منظومة فنية.");
+                loadDashboard(parsed.student_code, activeSession.pin_code);
+              } else if (data.isPending) {
+                setAccountStatus("pending");
+              } else if (data.isNew) {
+                localStorage.removeItem("fania_student_session");
+                setCurrentStudent(null);
+                setAccountStatus(null);
+                setAuthMode("register");
+                setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك.");
+              }
+            })
+            .catch(() => {
+              const isAct = parsed.is_pin_used || parsed.status === "active";
+              setAccountStatus(isAct ? "active" : "pending");
+              if (isAct) {
+                loadDashboard(parsed.student_code, parsed.pin_code);
+              }
+            });
+
+          fetchCoordinators(parsed.student_code);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. إذا لم تكن هناك جلسة سابقة، نتحقق من رابط التسجيل أو كود الطالب الوارد
     const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     const incomingCode = searchParams?.get("code") || (typeof window !== "undefined" ? localStorage.getItem("fania_pending_reg_code") : null);
     const incomingMode = searchParams?.get("mode");
@@ -560,51 +622,6 @@ export default function SystemPage() {
           sessionStorage.removeItem("fania_prefetched_student");
         }
       }
-    } else {
-      try {
-        const saved = localStorage.getItem("fania_student_session");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.student_code) {
-            setCurrentStudent(parsed);
-            const isAct = parsed.is_pin_used || parsed.status === "active";
-            setAccountStatus(isAct ? "active" : "pending");
-            if (isAct) {
-              loadDashboard(parsed.student_code, parsed.pin_code);
-            } else {
-              // فحص فوري لحالة اعتماد المنسق عند فتح المتصفح لأول مرة
-              const devInfo = getOrCreateDeviceInfo();
-              fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
-                .then(r => r.json())
-                .then(data => {
-                  if (data.isAlreadyActive) {
-                    const activeSession = {
-                      ...parsed,
-                      ...(data.student || {}),
-                      pin_code: data.student?.pin_code || data.pin_code || parsed.pin_code || "",
-                      status: "active",
-                      is_pin_used: true
-                    };
-                    localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                    setCurrentStudent(activeSession);
-                    setAccountStatus("active");
-                    setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
-                    loadDashboard(parsed.student_code, activeSession.pin_code);
-                  } else if (data.isNew) {
-                    localStorage.removeItem("fania_student_session");
-                    setCurrentStudent(null);
-                    setAccountStatus(null);
-                    setAuthMode("register");
-                    setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
-                  }
-                })
-                .catch(e => console.error("Initial lookup check failed:", e));
-            }
-            fetchCoordinators(parsed.student_code);
-            return;
-          }
-        }
-      } catch (e) {}
     }
 
     fetchCoordinators();
@@ -1310,6 +1327,11 @@ export default function SystemPage() {
         setAccountStatus("pending");
         fetchCoordinators(data.student.student_code);
         localStorage.setItem("fania_student_session", JSON.stringify(pendingSession));
+        if (typeof window !== "undefined") {
+          window.history.replaceState({}, '', window.location.pathname);
+          localStorage.removeItem("fania_pending_reg_code");
+          sessionStorage.removeItem("fania_prefetched_student");
+        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "حدث خطأ في الاتصال");
@@ -1576,63 +1598,7 @@ export default function SystemPage() {
             </p>
           </div>
 
-          {/* خانة إدخال الرقم السري المباشر (في حال رغبة الطالب أو استلامه من المنسق) */}
-          <div style={{
-            background: "rgba(15, 23, 42, 0.6)",
-            border: "1px solid #334155",
-            borderRadius: "12px",
-            padding: "14px",
-            marginBottom: "16px",
-            textAlign: "right"
-          }}>
-            <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <KeyRound size={15} />
-              <span>أو أدخل الرقم السري (PIN) للفتح الفوري:</span>
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input
-                type="text"
-                placeholder="أدخل الرقم السري..."
-                value={enteredPin}
-                onChange={(e) => setEnteredPin(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleVerifyPinSubmit()}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  background: "#0d131f",
-                  border: "1.5px solid #3b82f6",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  fontSize: "14px",
-                  fontWeight: "bold",
-                  textAlign: "center",
-                  boxSizing: "border-box",
-                  margin: 0
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleVerifyPinSubmit}
-                disabled={loading || !enteredPin.trim()}
-                style={{
-                  padding: "10px 16px",
-                  background: (!enteredPin.trim() || loading) ? "#334155" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: "bold",
-                  cursor: (!enteredPin.trim() || loading) ? "not-allowed" : "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0
-                }}
-              >
-                تفعيل الآن 🔓
-              </button>
-            </div>
-          </div>
-
-          {/* زر الفحص والتحديث اليدوي الفوري */}
+          {/* زر الفحص والتحديث اليدوي الفوري المباشر */}
           <button
             onClick={async () => {
               setLoading(true);
@@ -1651,7 +1617,10 @@ export default function SystemPage() {
                   localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
                   setCurrentStudent(activeSession);
                   setAccountStatus("active");
-                  setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
+                  if (typeof window !== "undefined") {
+                    window.history.replaceState({}, '', window.location.pathname);
+                  }
+                  setSuccessMsg("🎉 تم تفعيل واعتماد حسابك بنجاح! مرحباً بك في منظومة فنية.");
                   loadDashboard(currentStudent.student_code, activeSession.pin_code);
                 } else if (data.isNew) {
                   localStorage.removeItem("fania_student_session");
@@ -1660,7 +1629,7 @@ export default function SystemPage() {
                   setAuthMode("register");
                   setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
                 } else {
-                  alert("الحساب ما زال بانتظار اعتماد المنسق. يرجى التوجه للمنسق الموضح أعلاه لتأكيد هويتك وتفعيل الحساب.");
+                  alert("الحساب ما زال بانتظار اعتماد المنسق. بمجرد أن يضغط المنسق على اعتماد الحساب من لوحته، اضغط هذا الزر مجدداً أو سيتم الدخول تلقائياً.");
                 }
               } catch(e) {
                 alert("تعذر التحقق من حالة الاتصال حالياً.");
@@ -1671,23 +1640,92 @@ export default function SystemPage() {
             disabled={loading}
             style={{
               width: "100%",
-              padding: "12px",
-              background: "#1e293b",
-              border: "1px solid #334155",
-              color: "#cbd5e1",
+              padding: "13px",
+              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              border: "none",
+              color: "#fff",
               borderRadius: "10px",
               fontWeight: "bold",
-              fontSize: "13px",
-              cursor: "pointer",
+              fontSize: "14px",
+              cursor: loading ? "not-allowed" : "pointer",
+              marginBottom: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "8px"
+              gap: "8px",
+              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)"
             }}
           >
-            <RotateCw size={15} className={loading ? "animate-spin" : ""} />
-            <span>تحديث حالة الاعتماد الآن 🔄</span>
+            <RotateCw size={16} className={loading ? "animate-spin" : ""} />
+            <span>تحديث حالة الاعتماد الآن (دخول فوري) 🔄</span>
           </button>
+
+          {/* خيار منسدل اختياري لإدخال الرقم السري إن كان مستلماً يدوياً من المنسق */}
+          <div style={{ textAlign: "center", marginBottom: "16px" }}>
+            {!showManualPinBox ? (
+              <button
+                type="button"
+                onClick={() => setShowManualPinBox(true)}
+                style={{ background: "transparent", border: "none", color: "#64748b", fontSize: "11px", textDecoration: "underline", cursor: "pointer" }}
+              >
+                هل استلمت رمز PIN ورقياً من المنسق يدوياً؟ اضغط هنا
+              </button>
+            ) : (
+              <div style={{
+                background: "rgba(15, 23, 42, 0.6)",
+                border: "1px solid #334155",
+                borderRadius: "12px",
+                padding: "14px",
+                textAlign: "right"
+              }}>
+                <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <KeyRound size={15} />
+                  <span>إدخال رمز PIN الممنوح لك من المنسق:</span>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    placeholder="رمز PIN..."
+                    value={enteredPin}
+                    onChange={(e) => setEnteredPin(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleVerifyPinSubmit()}
+                    style={{
+                      flex: 1,
+                      padding: "10px 12px",
+                      background: "#0d131f",
+                      border: "1.5px solid #3b82f6",
+                      borderRadius: "8px",
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      textAlign: "center",
+                      boxSizing: "border-box",
+                      margin: 0
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyPinSubmit}
+                    disabled={loading || !enteredPin.trim()}
+                    style={{
+                      padding: "10px 16px",
+                      background: (!enteredPin.trim() || loading) ? "#334155" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: "bold",
+                      cursor: (!enteredPin.trim() || loading) ? "not-allowed" : "pointer",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0
+                    }}
+                  >
+                    تفعيل الآن 🔓
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ textAlign: "center", color: "#64748b", fontSize: "11px", marginBottom: "10px" }}>
@@ -3888,19 +3926,43 @@ export default function SystemPage() {
                 </div>
               )}
               {lookupStatus?.isAlreadyActive && (
-                <div style={{ background: "rgba(234, 179, 8, 0.15)", border: "1px solid #eab308", color: "#fef08a", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⚠️ هذا الطالب مسجل ومفعل بالفعل على المنظومة!</div>
-                  <div style={{ fontSize: "11px", color: "#fef9c3", marginBottom: "8px" }}>لا داعي لإعادة التسجيل، يمكنك الانتقال لتسجيل الدخول مباشرة.</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("login");
-                      setErrorMsg("");
-                    }}
-                    style={{ background: "#eab308", color: "#000", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
-                  >
-                    الانتقال لتسجيل الدخول مباشرة 🔐
-                  </button>
+                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "4px" }}>🎉 حسابك مسجل ومفعل بالفعل على المنظومة!</div>
+                  <div style={{ fontSize: "11px", color: "#a7f3d0", marginBottom: "10px" }}>تم اعتماد وتفعيل حسابك بنجاح. يمكنك الدخول للوحة تحكمك ومقرراتك فوراً.</div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeSession = {
+                          ...(matchedStudent || {}),
+                          pin_code: lookupStatus?.pin_code || (matchedStudent as any)?.pin_code || "",
+                          status: "active",
+                          is_pin_used: true
+                        };
+                        localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                        setCurrentStudent(activeSession);
+                        setAccountStatus("active");
+                        if (typeof window !== "undefined") {
+                          window.history.replaceState({}, '', window.location.pathname);
+                        }
+                        loadDashboard(activeSession.student_code, activeSession.pin_code);
+                      }}
+                      style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", border: "none", borderRadius: "8px", padding: "9px 16px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    >
+                      <span>🚀</span>
+                      <span>الدخول إلى لوحة التحكم فوراً</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode("login");
+                        setErrorMsg("");
+                      }}
+                      style={{ background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", cursor: "pointer" }}
+                    >
+                      تسجيل الدخول برقم سري 🔐
+                    </button>
+                  </div>
                 </div>
               )}
               {lookupStatus?.isPending && (

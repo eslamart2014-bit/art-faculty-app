@@ -95,15 +95,24 @@ export async function GET(request: Request) {
       accountData = localStore.getAccount(cleanCode) || localStore.getAccount(code);
     }
 
+    // التحقق من تعليق الحساب
+    if (accountData?.status === 'suspended') {
+      return NextResponse.json(
+        { error: 'تم تعليق هذا الحساب مؤقتاً من قِبل إدارة المنظومة. يرجى مراجعة إدارة الكلية.' },
+        { status: 403 }
+      );
+    }
+
     const expectedPin = (accountData?.pin_code || '').trim();
     const isActivated = Boolean(accountData?.is_pin_used || accountData?.status === 'active' || accountData?.activated_by);
 
-    if (!isImpersonate && isActivated && expectedPin && pin) {
+    // إذا لم يكن الحساب معتمداً بعد من الإدارة، يُطلب التحقق بالرقم السري
+    if (!isImpersonate && !isActivated && expectedPin && pin) {
       const cleanInputPin = pin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
       const cleanExpectedPin = expectedPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
       if (cleanInputPin !== cleanExpectedPin) {
         return NextResponse.json(
-          { error: 'غير مصرح: الرقم السري غير مطابق للرقم المعتمد بحساب الطالب.' },
+          { error: 'غير مصرح: الحساب بانتظار اعتماد المنسق أو إدخال الرقم السري الصحيح.' },
           { status: 401 }
         );
       }
@@ -116,6 +125,8 @@ export async function GET(request: Request) {
       student_code: student.student_code,
       academic_year: student.academic_year,
       section: student.section,
+      pin_code: expectedPin || undefined,
+      status: isActivated ? 'active' : (accountData?.status || 'pending'),
     };
 
     // 2. جلب الحضور، التقييمات، التسليمات، والمقررات بالتوازي الفوري (Promise.all) لتسريع الاستجابة
