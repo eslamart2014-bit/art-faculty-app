@@ -3616,12 +3616,17 @@ export default function SystemPage() {
           capture="environment" 
           ref={idFileInputRef} 
           style={{ display: "none" }} 
-          onChange={(e) => {
+          onChange={async (e) => {
             const f = e.target.files?.[0];
             if (f) {
-              const r = new FileReader();
-              r.onload = (ev) => setIdCardPhoto(ev.target?.result as string);
-              r.readAsDataURL(f);
+              try {
+                const comp = await compressImageToWebP(f, 1000, 0.75);
+                setIdCardPhoto(comp.dataUrl);
+              } catch {
+                const r = new FileReader();
+                r.onload = (ev) => setIdCardPhoto(ev.target?.result as string);
+                r.readAsDataURL(f);
+              }
             }
           }}
         />
@@ -4048,10 +4053,15 @@ export default function SystemPage() {
           <div style={{ padding: "16px", background: "#000", textAlign: "center" }}>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const photo = captureVideoFrame();
                 if (photo) {
-                  setIdCardPhoto(photo);
+                  try {
+                    const comp = await compressImageToWebP(photo, 1000, 0.75);
+                    setIdCardPhoto(comp.dataUrl);
+                  } catch {
+                    setIdCardPhoto(photo);
+                  }
                   stopCamera();
                   setShowIdCamera(false);
                 }
@@ -4181,12 +4191,17 @@ export default function SystemPage() {
       )}
 
       {/* عناصر input و canvas مخفية للكاميرا */}
-      <input type="file" accept="image/*" capture="environment" ref={idFileInputRef} style={{ display: "none" }} onChange={(e) => {
+      <input type="file" accept="image/*" capture="environment" ref={idFileInputRef} style={{ display: "none" }} onChange={async (e) => {
         const f = e.target.files?.[0];
         if (f) {
-          const r = new FileReader();
-          r.onload = (ev) => setIdCardPhoto(ev.target?.result as string);
-          r.readAsDataURL(f);
+          try {
+            const comp = await compressImageToWebP(f, 1000, 0.75);
+            setIdCardPhoto(comp.dataUrl);
+          } catch {
+            const r = new FileReader();
+            r.onload = (ev) => setIdCardPhoto(ev.target?.result as string);
+            r.readAsDataURL(f);
+          }
         }
       }} />
     </div>
