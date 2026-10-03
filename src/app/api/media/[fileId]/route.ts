@@ -7,9 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ fileId: string }> }
 ) {
   const { fileId } = await params;
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.TELEGRAM_BOT_TOKEN || '8940498495:AAHW-9wI1PtFDxRHIneQZnrCiQdP5w80gRk';
 
-  if (!token || !fileId) {
+  if (!fileId) {
     return new NextResponse('Media not available', { status: 404 });
   }
 

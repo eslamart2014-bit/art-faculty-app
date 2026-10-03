@@ -15,8 +15,8 @@ export async function uploadImageToStorage(
   chatId?: string,
   storagePath?: string
 ): Promise<UploadResult> {
-  const token = botToken || process.env.TELEGRAM_BOT_TOKEN;
-  const targetChatId = chatId || process.env.TELEGRAM_MEDIA_CHAT_ID;
+  const token = botToken || process.env.TELEGRAM_BOT_TOKEN || '8940498495:AAHW-9wI1PtFDxRHIneQZnrCiQdP5w80gRk';
+  const targetChatId = chatId || process.env.TELEGRAM_MEDIA_CHAT_ID || '7822224849';
 
   // 1. إذا توفر توكن التيليجرام والشات آي دي: رفع إلى تيليجرام صامت
   if (token && targetChatId) {
