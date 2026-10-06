@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { X, Search } from "lucide-react";
 import { extractStudentCode } from "@/lib/scannerHelper";
+import { initScannerAudio } from "@/lib/audioHelper";
 
 // فحص موثوق لأجهزة آبل (آيفون، آيباد) للتعامل الدقيق مع محرك سفاري
 const checkIsIOS = () => {
@@ -122,6 +123,8 @@ export default function QRScanner({
   // Scanner lifecycle
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    initScannerAudio();
 
     let isDestroyed = false;
     let isStarting = true;

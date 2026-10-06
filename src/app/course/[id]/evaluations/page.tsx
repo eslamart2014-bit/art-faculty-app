@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
+import { playScanClickSound } from "@/lib/audioHelper";
 
 
 
@@ -560,7 +561,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     return Array.from({ length: safeMax + 1 }, (_, i) => i);
   };
 
-  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); };
+  const vibrateSuccess = () => { 
+    playScanClickSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); 
+  };
   const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
   const vibrateHeavyError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); };
   const vibrateError = vibrateHeavyError;

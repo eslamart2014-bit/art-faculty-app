@@ -9,6 +9,7 @@ import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
+import { playScanClickSound, initScannerAudio } from "@/lib/audioHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -175,6 +176,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     return false;
   });
   const [scannedStudents, setScannedStudents] = useState<any[]>([]);
+  const [latestScannedStudentId, setLatestScannedStudentId] = useState<string | null>(null);
+  const scannedListRef = useRef<HTMLDivElement>(null);
   const [savingBatch, setSavingBatch] = useState(false);
 
   const [showMakeupModal, setShowMakeupModal] = useState(false);
@@ -610,9 +613,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
 
 
-  // --- CAMERA LOGIC: Exact requested haptic patterns ---
-  // 1. First-time valid scan: single vibration (100ms)
-  const vibrateSuccess = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); };
+  // --- CAMERA LOGIC: Exact requested haptic patterns & tactile audio ---
+  // 1. First-time valid scan: single vibration (100ms) with tactile click sound
+  const vibrateSuccess = () => { 
+    playScanClickSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); 
+  };
   // 2. Duplicate scan: two rapid vibrations
   const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
   // 3. Heavy error vibration (wrong code / different cohort / invalid)
@@ -659,7 +665,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             alreadyAdded = true;
             return prev;
           }
-          return [...prev, student];
+          // وضع أحدث طالب تم رصده في بداية القائمة بالأعلى
+          return [student, ...prev];
         });
 
         if (alreadyAdded) {
@@ -667,9 +674,17 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           setScannerStatusText(`طالب مكرر مسجل بالفعل: ${student.full_name} ⚠️`);
           vibrateDuplicate();
         } else {
+          setLatestScannedStudentId(student.id);
           setScannerStatus('success');
           setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
           vibrateSuccess();
+
+          // التمرير التلقائي السلس لأعلى القائمة لضمان رؤية الطالب فوراً بدون سكرول
+          setTimeout(() => {
+            if (scannedListRef.current) {
+              scannedListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          }, 40);
         }
       } else {
         setScannerStatus('error');
@@ -690,6 +705,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
 
   const startCameraScanner = () => {
+    initScannerAudio();
     setShowCameraScanner(true);
   };
 
@@ -700,6 +716,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     }
     setShowCameraScanner(false);
     setScannedStudents([]);
+    setLatestScannedStudentId(null);
     if (searchParams.get("mode") === "camera") {
       router.push("/");
     }
@@ -1372,7 +1389,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             </button>
           </div>
 
-          <div style={{ flexGrow: 1, overflowY: "auto", background: "#1e1e1e", padding: "10px", direction: "rtl" }}>
+          <div ref={scannedListRef} style={{ flexGrow: 1, overflowY: "auto", background: "#1e1e1e", padding: "10px", direction: "rtl" }}>
             {scannedStudents.length === 0 ? (
               <div style={{ textAlign: "center", color: "#666", marginTop: "30px" }}>الطلاب الممسوحين سيظهرون هنا...</div>
             ) : (
@@ -1385,17 +1402,48 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   </tr>
                 </thead>
                 <tbody>
-                  {scannedStudents.map(s => (
-                    <tr key={s.id} style={{ background: "#222" }}>
-                      <td style={{ padding: "10px", border: "1px solid #444", color: "#fff", textAlign: "right" }}>
-                        {s.full_name} <br/><span style={{ fontSize: "10px", color: "#aaa" }}>{s.student_code}</span>
-                      </td>
-                      <td style={{ padding: "10px", border: "1px solid #444", color: "#4CAF50", fontWeight: "bold" }}>{s.section}</td>
-                      <td style={{ padding: "10px", border: "1px solid #444" }}>
-                        <button onClick={() => setScannedStudents(prev => prev.filter(x => x.id !== s.id))} style={{ background: "transparent", border: "none", color: "#f44336", fontSize: "16px", fontWeight: "bold" }}>✕</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {scannedStudents.map((s, idx) => {
+                    const isLatest = s.id === latestScannedStudentId;
+                    return (
+                      <tr 
+                        key={s.id} 
+                        className={isLatest ? "latest-scanned-row" : ""}
+                        style={{ 
+                          background: isLatest ? "rgba(76, 175, 80, 0.28)" : (idx % 2 === 0 ? "#222" : "#1a1a1a"),
+                          transition: "background-color 0.3s ease"
+                        }}
+                      >
+                        <td style={{ padding: "10px", border: "1px solid #444", color: "#fff", textAlign: "right" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "4px" }}>
+                            <span style={{ fontWeight: isLatest ? "bold" : "normal", color: isLatest ? "#81C784" : "#fff" }}>
+                              {s.full_name}
+                            </span>
+                            {isLatest && (
+                              <span style={{ 
+                                background: "#4CAF50", 
+                                color: "#000", 
+                                fontSize: "10px", 
+                                padding: "2px 7px", 
+                                borderRadius: "10px", 
+                                fontWeight: "bold",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                boxShadow: "0 0 10px rgba(76, 175, 80, 0.75)"
+                              }}>
+                                ✨ أحدث رصد
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: "11px", color: isLatest ? "#c8e6c9" : "#aaa" }}>{s.student_code}</span>
+                        </td>
+                        <td style={{ padding: "10px", border: "1px solid #444", color: "#4CAF50", fontWeight: "bold" }}>{s.section}</td>
+                        <td style={{ padding: "10px", border: "1px solid #444" }}>
+                          <button onClick={() => setScannedStudents(prev => prev.filter(x => x.id !== s.id))} style={{ background: "transparent", border: "none", color: "#f44336", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>✕</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

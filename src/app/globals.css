@@ -400,3 +400,24 @@ button:active, [role="button"]:active, .clickable:active {
   box-shadow: none !important;
 }
 
+/* Scan attendance latest item flash & pulse animation */
+@keyframes latestScanFlash {
+  0% {
+    background-color: rgba(76, 175, 80, 0.45);
+    box-shadow: inset 0 0 16px rgba(76, 175, 80, 0.6);
+  }
+  50% {
+    background-color: rgba(76, 175, 80, 0.16);
+    box-shadow: inset 0 0 5px rgba(76, 175, 80, 0.25);
+  }
+  100% {
+    background-color: rgba(76, 175, 80, 0.45);
+    box-shadow: inset 0 0 16px rgba(76, 175, 80, 0.6);
+  }
+}
+
+.latest-scanned-row {
+  animation: latestScanFlash 1.4s ease-in-out infinite alternate !important;
+  border-right: 4px solid #4CAF50 !important;
+}
+
