@@ -134,7 +134,8 @@ export async function GET(request: Request) {
       { data: attendanceRecords },
       { data: teacherEvals },
       { data: subData },
-      { data: allCoursesData }
+      { data: allCoursesData },
+      { data: sysSettings }
     ] = await Promise.all([
       supabaseAdmin
         .from('attendance')
@@ -151,8 +152,33 @@ export async function GET(request: Request) {
         .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`),
       supabaseAdmin
         .from('courses')
-        .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id')
+        .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id'),
+      supabaseAdmin
+        .from('system_settings')
+        .select('term1_start, term2_start, term1_end, term2_end')
+        .eq('id', 1)
+        .maybeSingle()
     ]);
+
+    let currentWeekNumber = 1;
+    if (sysSettings) {
+      const today = new Date();
+      // Ensure we only use date part for accurate diffs
+      today.setHours(0, 0, 0, 0);
+      const parseDateOnly = (dStr: string) => {
+        const parts = dStr.split('-');
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 0, 0, 0);
+      };
+      const t1s = sysSettings.term1_start ? parseDateOnly(sysSettings.term1_start) : null;
+      const t2s = sysSettings.term2_start ? parseDateOnly(sysSettings.term2_start) : null;
+      const t2e = sysSettings.term2_end ? parseDateOnly(sysSettings.term2_end) : null;
+
+      if (t2s && today >= t2s && (!t2e || today <= t2e)) {
+        currentWeekNumber = Math.floor((today.getTime() - t2s.getTime()) / (1000 * 60 * 60 * 24) / 7) + 1;
+      } else if (t1s && today >= t1s) {
+        currentWeekNumber = Math.floor((today.getTime() - t1s.getTime()) / (1000 * 60 * 60 * 24) / 7) + 1;
+      }
+    }
 
     // معالجة أعمال ومشاريع الطالب المرفوعة عبر البوابة
     let studentSubmissions: any[] = [];
@@ -267,7 +293,7 @@ export async function GET(request: Request) {
       const attended = records.filter((r: any) => r.status === 'حاضر').length;
       const excused = records.filter((r: any) => r.status === 'إذن' || r.status === 'عذر' || r.status === 'غياب بعذر').length;
       
-      const total = courseDatesMap.get(course.id)?.size || 0;
+      const total = currentWeekNumber;
       let absent = total - attended - excused;
       if (absent < 0) absent = 0;
       
