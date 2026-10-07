@@ -3840,9 +3840,9 @@ export default function SystemPage() {
             }}>
               <QRCode 
                 id="student-qr-code"
-                value={currentStudent.student_code} 
+                value={`كود الطالب: ${formatStudentCode(currentStudent.student_code)}\nاسم الطالب: ${currentStudent.full_name}`} 
                 size={220} 
-                level="M"
+                level="H"
               />
             </div>
 
