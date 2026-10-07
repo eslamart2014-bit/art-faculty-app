@@ -196,7 +196,13 @@ export async function GET(request: Request) {
     }
 
     // استبعاد أي مقرر مؤرشف نهائياً
-    const allCourses = (allCoursesData || []).filter((c: any) => c.custom_week_names?.__archived !== true);
+    const allCourses = (allCoursesData || []).filter((c: any) => {
+      if (c.custom_week_names?.__archived === true) return false;
+      const hiddenFor = c.custom_week_names?.__hidden_for || [];
+      const activeTeachers = [c.teacher_id, ...(c.shared_with || [])].filter(id => !hiddenFor.includes(id));
+      if (activeTeachers.length === 0) return false;
+      return true;
+    });
     const activeCourseIds = new Set(allCourses.map((c: any) => c.id));
 
     // تصفية سجلات الحضور والتقييمات والتسليمات لتقتصر فقط على المقررات النشطة
