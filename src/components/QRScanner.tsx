@@ -140,48 +140,30 @@ export default function QRScanner({
       containerRef.current.appendChild(div);
     }
 
-    // iOS: Force ZXing (disable BarcodeDetector) — BarcodeDetector in Safari 17/18
-    // returns empty [] on live video frames silently, causing ZXing geometry mismatch.
-    // Android/Desktop: use hardware BarcodeDetector for speed.
+    // Disable BarcodeDetector globally to ensure consistent, stable ZXing fallback.
+    // The native BarcodeDetector API is buggy on iOS 17/18 and causes crashes on some Androids.
     const scanner = new Html5Qrcode(scannerId, {
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       experimentalFeatures: {
-        useBarCodeDetectorIfSupported: !isIOS
+        useBarCodeDetectorIfSupported: false
       },
       verbose: false
     });
     scannerRef.current = scanner;
 
     const startScannerSession = async () => {
-      let cameraIdOrConfig: any;
-      let scanConfig: any;
-
-      if (isIOS) {
-        // ─── iOS CONFIG ───────────────────────────────────────────────────────────
-        // Pass a videoConstraints object directly (NOT a string deviceId).
-        // This avoids aspectRatio distortion that breaks ZXing's 1:1:3:1:1 ratio check.
-        cameraIdOrConfig = {
-          facingMode: facingMode === "environment" ? "environment" : "user"
-        };
-        scanConfig = {
-          fps: 15,
-          qrbox: (viewWidth: number, viewHeight: number) => {
-            const edge = Math.min(viewWidth, viewHeight);
-            return { width: Math.floor(edge * 0.85), height: Math.floor(edge * 0.85) };
-          }
-        };
-      } else {
-        // ─── ANDROID / DESKTOP CONFIG (EXACT UNTOUCHED WORKING CONFIG) ─────────
-        cameraIdOrConfig = { facingMode };
-        scanConfig = {
-          fps: 25,
-          aspectRatio: 1.0,
-          qrbox: (viewWidth: number, viewHeight: number) => {
-            const edge = Math.min(viewWidth, viewHeight);
-            return { width: Math.floor(edge * 0.82), height: Math.floor(edge * 0.82) };
-          }
-        };
-      }
+      // ─── UNIFIED CONFIG FOR ALL DEVICES ──────────────────────────────────────────
+      // 1. Pass constraints object (NOT string) to avoid ratio distortion on iOS
+      // 2. Omit aspectRatio to prevent camera crash on strict Android devices
+      // 3. 15 fps is smooth enough and saves battery
+      let cameraIdOrConfig = { facingMode: facingMode === "environment" ? "environment" : "user" };
+      let scanConfig = {
+        fps: 15,
+        qrbox: (viewWidth: number, viewHeight: number) => {
+          const edge = Math.min(viewWidth, viewHeight);
+          return { width: Math.floor(edge * 0.85), height: Math.floor(edge * 0.85) };
+        }
+      };
 
       if (isDestroyed) return;
 
