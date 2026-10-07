@@ -26,6 +26,8 @@ import {
   ArrowRight,
   Sun,
   RotateCw,
+  QrCode,
+  Download,
   ShieldCheck,
   Check,
   Archive,
@@ -37,6 +39,7 @@ import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
 import { compressImageToWebP } from "@/lib/imageCompressor";
 import StudentLockerTab from "@/components/lockers/StudentLockerTab";
+import QRCode from "react-qr-code";
 
 function formatRemainingTime(deadlineStr?: string | null): { text: string; isExpired: boolean; isUrgent: boolean } {
   if (!deadlineStr) return { text: '', isExpired: false, isUrgent: false };
@@ -84,6 +87,7 @@ export default function SystemPage() {
   // Impersonation mode (Admin browsing as student)
   const [isImpersonating, setIsImpersonating] = useState(false);
   const [impersonatedStudentName, setImpersonatedStudentName] = useState("");
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Registration Form State & Auto Lookup
   const [regCode, setRegCode] = useState("");
@@ -1464,6 +1468,29 @@ export default function SystemPage() {
     }
   };
 
+  const handleDownloadQR = () => {
+    const svg = document.getElementById('student-qr-code');
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width + 40;
+      canvas.height = img.height + 40;
+      ctx.fillStyle = "white"; 
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 20, 20);
+      const pngFile = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `QR_${currentStudent?.student_code}.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
   // Handle Logout
   const handleLogout = () => {
     localStorage.removeItem("fania_student_session");
@@ -1916,6 +1943,27 @@ export default function SystemPage() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button 
+              onClick={() => setShowQRModal(true)} 
+              className="btn-compact"
+              title="عرض رمز QR الخاص بي"
+              style={{ 
+                background: "rgba(16, 185, 129, 0.12)",
+                color: "#10b981",
+                border: "1px solid rgba(16, 185, 129, 0.25)",
+                padding: "6px 11px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "12px",
+                fontWeight: "bold"
+              }}
+            >
+              <QrCode size={13} />
+              <span>QR Code</span>
+            </button>
+
             <button 
               onClick={() => loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin)} 
               className="btn-compact"
@@ -4336,6 +4384,100 @@ export default function SystemPage() {
                 }}
               >
                 المتابعة عبر المتصفح 🌐
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && currentStudent && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.9)",
+          backdropFilter: "blur(5px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999,
+          padding: "20px"
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            background: "#1e293b",
+            borderRadius: "20px",
+            padding: "30px",
+            width: "100%",
+            maxWidth: "350px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+            border: "1px solid rgba(56, 189, 248, 0.3)"
+          }}>
+            <div style={{ marginBottom: "20px", color: "#fff", fontWeight: "bold", fontSize: "16px", textAlign: "center" }}>
+              كارت الـ QR الخاص بك
+            </div>
+
+            <div style={{ 
+              background: "#fff", 
+              padding: "20px", 
+              borderRadius: "16px",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
+            }}>
+              <QRCode 
+                id="student-qr-code"
+                value={currentStudent.student_code} 
+                size={220} 
+                level="M"
+              />
+            </div>
+
+            <div style={{ marginTop: "15px", color: "#94a3b8", fontSize: "14px", fontWeight: "bold" }}>
+              {currentStudent.student_code}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "25px", width: "100%" }}>
+              <button 
+                onClick={handleDownloadQR}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer"
+                }}
+              >
+                <Download size={16} />
+                <span>تحميل الصورة</span>
+              </button>
+              
+              <button 
+                onClick={() => setShowQRModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  color: "#f87171",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer"
+                }}
+              >
+                <X size={16} />
+                <span>إغلاق</span>
               </button>
             </div>
           </div>
