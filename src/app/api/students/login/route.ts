@@ -9,15 +9,15 @@ export async function POST(request: Request) {
   try {
     const { student_code, pin_code, device_info } = await request.json();
 
-    if (!student_code || !pin_code) {
+    if (!student_code) {
       return NextResponse.json(
-        { error: 'يرجى إدخال كود الطالب والرقم السري' },
+        { error: 'يرجى إدخال كود الطالب' },
         { status: 400 }
       );
     }
 
     const cleanCode = formatStudentCode(student_code);
-    const cleanPin = pin_code.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
+    const cleanPin = pin_code ? pin_code.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase() : '';
 
     // جلب الحساب من student_accounts أو telegram_browser_id
     let account: any = null;
@@ -80,6 +80,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const isAccountActive = Boolean(
+      account.status === 'active' ||
+      account.is_pin_used ||
+      account.activated_by ||
+      account.activated_at
+    );
+
+    // إذا لم يتم إدخال رقم سري وكان الحساب غير مفعل بعد
+    if (!cleanPin && !isAccountActive) {
+      return NextResponse.json(
+        { error: 'الحساب بانتظار اعتماد المنسق أو يتطلب إدخال الرقم السري الممنوح لك.' },
+        { status: 400 }
+      );
+    }
+
     // استخراج ومقارنة الأرقام السرية المحتملة
     let telegramPin = '';
     if (studentRecord?.telegram_browser_id) {
@@ -93,7 +108,7 @@ export async function POST(request: Request) {
       telegramPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase()
     ].filter(Boolean);
 
-    const isPinMatch = expectedPins.some(p => p === cleanPin) || (account.status === 'active' && account.is_pin_used);
+    const isPinMatch = isAccountActive || expectedPins.some(p => p === cleanPin);
 
     if (!isPinMatch) {
       const failed = (account.failed_attempts || 0) + 1;

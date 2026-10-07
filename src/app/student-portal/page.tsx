@@ -8,17 +8,13 @@ export default function StudentPortalUnifiedPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // إذا كان الطالب مسجل دخول بالفعل، ينقله مباشرة إلى لوحة تحكمه
+      // إذا كان الطالب مسجل دخول بالفعل أو لديه حساب على هذا الهاتف، ينقله مباشرة إلى لوحة تحكمه
       const studentSession = localStorage.getItem("fania_student_session");
-      if (studentSession) {
-        try {
-          const parsed = JSON.parse(studentSession);
-          if (parsed?.student_code) {
-            setIsRedirecting(true);
-            window.location.replace("/system");
-            return;
-          }
-        } catch (e) {}
+      const studentCode = localStorage.getItem("fania_student_code");
+      if (studentSession || studentCode) {
+        setIsRedirecting(true);
+        window.location.replace("/system");
+        return;
       }
 
       // إذا كان عضو هيئة تدريس مسجل دخول، ينقله إلى لوحة المقررات

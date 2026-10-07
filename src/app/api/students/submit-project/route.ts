@@ -44,8 +44,8 @@ export async function POST(request: Request) {
         const acc = JSON.parse(studentRecord.telegram_browser_id);
         const expectedPin = acc.pin_code;
         const isActivated = acc.is_pin_used || acc.status === 'active';
-        if (isActivated && expectedPin) {
-          if (!pin_code || pin_code.trim() !== expectedPin.trim()) {
+        if (isActivated && expectedPin && pin_code) {
+          if (pin_code.trim() !== expectedPin.trim()) {
             return NextResponse.json(
               { error: 'غير مصرح: الرقم السري غير صحيح أو انتهت جلستك. يرجى تسجيل الدخول مجدداً.' },
               { status: 401 }

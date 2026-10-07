@@ -286,8 +286,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
   // Student PIN Login
   const handleStudentLogin = async () => {
-    if (!studentCode.trim() || !studentPin.trim()) {
-      setStudentError("يرجى إدخال كود الطالب والرقم السري");
+    if (!studentCode.trim()) {
+      setStudentError("يرجى إدخال كود الطالب الجامعي");
       return;
     }
 
@@ -301,7 +301,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_code: formatStudentCode(studentCode),
-          pin_code: studentPin.trim(),
+          pin_code: studentPin.trim() || undefined,
           device_info: dev
         })
       });
@@ -320,6 +320,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       // Login Successful! Store student session and redirect
       if (typeof window !== "undefined") {
         localStorage.setItem("fania_student_session", JSON.stringify(data.student));
+        localStorage.setItem("fania_student_code", data.student.student_code || formatStudentCode(studentCode));
         localStorage.setItem("fania_last_portal", "/system");
         localStorage.setItem("fania_app_mode", "student");
         window.location.href = "/system";
@@ -887,6 +888,12 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   >
                     {showStudentPin ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
+                </div>
+
+                <div style={{ textAlign: "center", marginBottom: "12px", marginTop: "-4px" }}>
+                  <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4" }}>
+                    💡 إذا تم اعتماد حسابك من قِبل المنسق، يمكنك الدخول بكودك مباشرة دون كتابة رقم سري.
+                  </span>
                 </div>
 
                 <button

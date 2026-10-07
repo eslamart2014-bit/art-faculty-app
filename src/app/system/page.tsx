@@ -595,6 +595,31 @@ export default function SystemPage() {
           fetchCoordinators(parsed.student_code);
           return;
         }
+      } else {
+        // فحص ما إذا كان هناك كود طالب مسجل مسبقاً على هذا الجهاز للدخول التلقائي فور الاعتماد
+        const savedCode = typeof window !== "undefined" ? localStorage.getItem("fania_student_code") : null;
+        if (savedCode) {
+          const devInfo = getOrCreateDeviceInfo();
+          fetch(`/api/students/lookup?code=${encodeURIComponent(savedCode)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.isAlreadyActive && !data.device_locked) {
+                const activeSession = {
+                  ...(data.student || {}),
+                  student_code: savedCode,
+                  pin_code: data.student?.pin_code || data.pin_code || "",
+                  status: "active",
+                  is_pin_used: true
+                };
+                localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+                setCurrentStudent(activeSession);
+                setAccountStatus("active");
+                setSuccessMsg("🎉 تم اعتماد حسابك بنجاح! مرحباً بك في منظومة فنية.");
+                loadDashboard(savedCode, activeSession.pin_code);
+              }
+            })
+            .catch(() => {});
+        }
       }
     } catch (e) {}
 
@@ -692,6 +717,7 @@ export default function SystemPage() {
             is_pin_used: true
           };
           localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
+          localStorage.setItem("fania_student_code", currentStudent.student_code);
           setCurrentStudent(activeSession);
           setAccountStatus("active");
           setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
@@ -1327,6 +1353,7 @@ export default function SystemPage() {
         setAccountStatus("pending");
         fetchCoordinators(data.student.student_code);
         localStorage.setItem("fania_student_session", JSON.stringify(pendingSession));
+        localStorage.setItem("fania_student_code", data.student.student_code);
         if (typeof window !== "undefined") {
           window.history.replaceState({}, '', window.location.pathname);
           localStorage.removeItem("fania_pending_reg_code");
@@ -1343,8 +1370,8 @@ export default function SystemPage() {
   // Handle Login Submit
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regCode || !enteredPin) {
-      setErrorMsg("يرجى إدخال كود الطالب والرقم السري الخاص بك");
+    if (!regCode.trim()) {
+      setErrorMsg("يرجى إدخال كود الطالب الجامعي");
       return;
     }
 
@@ -1358,25 +1385,31 @@ export default function SystemPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_code: regCode.trim(),
-          pin_code: enteredPin.trim(),
+          pin_code: enteredPin.trim() || undefined,
           device_info: deviceInfo
         })
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.error || "بيانات الدخول غير صحيحة");
+        if (data.device_locked) {
+          setErrorMsg(data.error || "هذا الحساب مقيّد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد.");
+        } else {
+          setErrorMsg(data.error || "بيانات الدخول غير صحيحة");
+        }
       } else {
         const fullSession = {
           ...data.student,
-          pin_code: enteredPin.trim(),
+          pin_code: data.student?.pin_code || enteredPin.trim() || "",
           status: "active",
           is_pin_used: true
         };
         setCurrentStudent(fullSession);
         setAccountStatus("active");
         localStorage.setItem("fania_student_session", JSON.stringify(fullSession));
-        loadDashboard(data.student.student_code, enteredPin.trim());
+        localStorage.setItem("fania_student_code", data.student.student_code);
+        setSuccessMsg("🎉 تم تسجيل الدخول بنجاح! مرحباً بك في منظومة فنية.");
+        loadDashboard(data.student.student_code, fullSession.pin_code);
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "حدث خطأ في الاتصال");
@@ -1660,67 +1693,119 @@ export default function SystemPage() {
             <span>تحديث حالة الاعتماد الآن (دخول فوري) 🔄</span>
           </button>
 
-          {/* خيار منسدل اختياري لإدخال الرقم السري إن كان مستلماً يدوياً من المنسق */}
+          {/* خيار يدوي لإدخال الرقم السري (PIN) */}
           <div style={{ textAlign: "center", marginBottom: "16px" }}>
             {!showManualPinBox ? (
               <button
                 type="button"
+                className="btn-compact"
                 onClick={() => setShowManualPinBox(true)}
-                style={{ background: "transparent", border: "none", color: "#64748b", fontSize: "11px", textDecoration: "underline", cursor: "pointer" }}
+                style={{
+                  background: "rgba(51, 65, 85, 0.4)",
+                  border: "1px dashed #475569",
+                  borderRadius: "8px",
+                  color: "#94a3b8",
+                  fontSize: "12px",
+                  padding: "8px 14px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  transition: "all 0.2s"
+                }}
               >
-                هل استلمت رمز PIN ورقياً من المنسق يدوياً؟ اضغط هنا
+                <KeyRound size={14} color="#f59e0b" />
+                <span>لديك رمز PIN يدوي من المنسق؟ اضغط هنا لكتابته</span>
               </button>
             ) : (
               <div style={{
-                background: "rgba(15, 23, 42, 0.6)",
-                border: "1px solid #334155",
-                borderRadius: "12px",
-                padding: "14px",
-                textAlign: "right"
+                background: "rgba(15, 23, 42, 0.9)",
+                border: "1.5px solid #3b82f6",
+                borderRadius: "14px",
+                padding: "16px",
+                textAlign: "right",
+                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.4)"
               }}>
-                <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <KeyRound size={15} />
-                  <span>إدخال رمز PIN الممنوح لك من المنسق:</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", borderBottom: "1px solid #1e293b", paddingBottom: "8px" }}>
+                  <div style={{ color: "#38bdf8", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <KeyRound size={16} color="#fbbf24" />
+                    <span>إدخال رمز التفعيل اليدوي (PIN)</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-compact"
+                    onClick={() => { setShowManualPinBox(false); setEnteredPin(""); }}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.08)",
+                      border: "none",
+                      color: "#94a3b8",
+                      fontSize: "11px",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    إلغاء ✕
+                  </button>
                 </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+
+                <p style={{ color: "#94a3b8", fontSize: "11px", margin: "0 0 12px 0", lineHeight: "1.5" }}>
+                  إذا سلمك المنسق رمز PIN ورقياً، أدخله هنا لتفعيل حسابك فوراً:
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   <input
                     type="text"
-                    placeholder="رمز PIN..."
+                    placeholder="رمز PIN المكون من 6 أرقام..."
                     value={enteredPin}
                     onChange={(e) => setEnteredPin(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleVerifyPinSubmit()}
                     style={{
-                      flex: 1,
-                      padding: "10px 12px",
-                      background: "#0d131f",
-                      border: "1.5px solid #3b82f6",
-                      borderRadius: "8px",
-                      color: "#fff",
-                      fontSize: "14px",
+                      width: "100%",
+                      height: "46px",
+                      padding: "0 14px",
+                      background: "#090d16",
+                      border: "1.5px solid #2563eb",
+                      borderRadius: "10px",
+                      color: "#fbbf24",
+                      fontSize: "16px",
                       fontWeight: "bold",
                       textAlign: "center",
+                      letterSpacing: "4px",
                       boxSizing: "border-box",
-                      margin: 0
+                      margin: 0,
+                      outline: "none"
                     }}
                   />
+
                   <button
                     type="button"
+                    className="btn-compact"
                     onClick={handleVerifyPinSubmit}
                     disabled={loading || !enteredPin.trim()}
                     style={{
-                      padding: "10px 16px",
-                      background: (!enteredPin.trim() || loading) ? "#334155" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                      color: "#fff",
+                      width: "100%",
+                      height: "44px",
+                      padding: "0 16px",
+                      background: (!enteredPin.trim() || loading) 
+                        ? "#1e293b" 
+                        : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                      color: (!enteredPin.trim() || loading) ? "#64748b" : "#fff",
                       border: "none",
-                      borderRadius: "8px",
+                      borderRadius: "10px",
                       fontSize: "13px",
                       fontWeight: "bold",
                       cursor: (!enteredPin.trim() || loading) ? "not-allowed" : "pointer",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      boxSizing: "border-box",
+                      margin: 0,
+                      boxShadow: (!enteredPin.trim() || loading) ? "none" : "0 4px 12px rgba(37, 99, 235, 0.3)"
                     }}
                   >
-                    تفعيل الآن 🔓
+                    <span>تفعيل الحساب بالرمز 🔓</span>
                   </button>
                 </div>
               </div>
@@ -3831,6 +3916,11 @@ export default function SystemPage() {
                 >
                   {showLoginPin ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
+              </div>
+              <div style={{ textAlign: "center", marginTop: "8px" }}>
+                <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4", display: "inline-block" }}>
+                  💡 إذا تم اعتماد وتفعيل حسابك من قِبل المنسق، يمكنك الضغط على تسجيل الدخول بكودك مباشرة دون كتابة رقم سري.
+                </span>
               </div>
             </div>
 

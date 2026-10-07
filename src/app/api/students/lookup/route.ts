@@ -112,6 +112,45 @@ export async function GET(request: Request) {
     );
 
     if (isActivated) {
+      // فحص قيد الجهاز (Single Device Lock) لمنع انتحال الحساب من جهاز آخر
+      let boundDeviceId = existingAccount.bound_device_id;
+      if (!boundDeviceId && student.telegram_browser_id) {
+        try {
+          const tbData = JSON.parse(student.telegram_browser_id);
+          if (tbData.bound_device_id) boundDeviceId = tbData.bound_device_id;
+        } catch (e) {}
+      }
+
+      const isLockedToOther = Boolean(
+        boundDeviceId &&
+        deviceId &&
+        deviceId !== 'unknown' &&
+        deviceId !== 'unknown_device' &&
+        boundDeviceId !== deviceId
+      );
+
+      if (isLockedToOther) {
+        return NextResponse.json({
+          success: true,
+          student: safeStudent,
+          isAlreadyActive: false,
+          device_locked: true,
+          message: 'هذا الحساب مقيد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد والسماح بالدخول من هذا الجهاز.',
+        }, {
+          headers: { 'Cache-Control': 'no-store, max-age=0' }
+        });
+      }
+
+      // ربط الجهاز تلقائياً إذا لم يكن مقيداً بعد
+      if (!boundDeviceId && deviceId && deviceId !== 'unknown' && deviceId !== 'unknown_device') {
+        try {
+          await supabaseAdmin
+            .from('student_accounts')
+            .update({ bound_device_id: deviceId })
+            .or(filter);
+        } catch (e) {}
+      }
+
       return NextResponse.json({
         success: true,
         student: {
