@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter, generatePinCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
+import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,43 +102,21 @@ export async function POST(request: Request) {
       const nowIso = new Date().toISOString();
       const coordName = coordinator_name || 'منسق النظام';
 
-      // تحديث student_accounts
+      // تحديث student_accounts (آمن ضد الأعمدة غير الموجودة في قاعدة البيانات)
       let updatedAccount: any = null;
-      try {
-        const res = await supabaseAdmin
-          .from('student_accounts')
-          .update({
-            status: 'active',
-            is_pin_used: true,
-            id_card_verified: true,
-            activated_by: coordName,
-            activated_at: nowIso,
-            pin_issued_by: coordName,
-            pin_issued_at: nowIso,
-            failed_attempts: 0,
-            locked_until: null,
-          })
-          .or(filter)
-          .select('*');
-        if (res.data && res.data.length > 0) {
-          updatedAccount = res.data[0];
-        }
-      } catch (e) {
-        try {
-          const res = await supabaseAdmin
-            .from('student_accounts')
-            .update({
-              status: 'active',
-              is_pin_used: true,
-              failed_attempts: 0,
-              locked_until: null,
-            })
-            .or(filter)
-            .select('*');
-          if (res.data && res.data.length > 0) {
-            updatedAccount = res.data[0];
-          }
-        } catch (e2) {}
+      const accUpd = await safeUpdateStudentAccounts((q) => q.or(filter), {
+        status: 'active',
+        is_pin_used: true,
+        id_card_verified: true,
+        activated_by: coordName,
+        activated_at: nowIso,
+        pin_issued_by: coordName,
+        pin_issued_at: nowIso,
+        failed_attempts: 0,
+        locked_until: null,
+      });
+      if (accUpd.data && accUpd.data.length > 0) {
+        updatedAccount = accUpd.data[0];
       }
 
       // تحديث students.telegram_browser_id
@@ -215,27 +194,21 @@ export async function POST(request: Request) {
       const newPin = generatePinCode();
 
       let updatedAccount: any = null;
-      try {
-        const res = await supabaseAdmin
-          .from('student_accounts')
-          .update({
-            pin_code: newPin,
-            status: 'active',
-            is_pin_used: true,
-            id_card_verified: true,
-            activated_by: coordName,
-            activated_at: nowIso,
-            pin_issued_by: coordName,
-            pin_issued_at: nowIso,
-            failed_attempts: 0,
-            locked_until: null,
-          })
-          .or(filter)
-          .select('*');
-        if (res.data && res.data.length > 0) {
-          updatedAccount = res.data[0];
-        }
-      } catch (e) {}
+      const pinUpd = await safeUpdateStudentAccounts((q) => q.or(filter), {
+        pin_code: newPin,
+        status: 'active',
+        is_pin_used: true,
+        id_card_verified: true,
+        activated_by: coordName,
+        activated_at: nowIso,
+        pin_issued_by: coordName,
+        pin_issued_at: nowIso,
+        failed_attempts: 0,
+        locked_until: null,
+      });
+      if (pinUpd.data && pinUpd.data.length > 0) {
+        updatedAccount = pinUpd.data[0];
+      }
 
       try {
         const { data: st } = await supabaseAdmin
@@ -409,17 +382,12 @@ export async function POST(request: Request) {
     ) {
       const coordName = coordinator_name || 'منسق النظام';
 
-      try {
-        await supabaseAdmin
-          .from('student_accounts')
-          .update({
-            devices: [],
-            bound_device_id: null,
-            failed_attempts: 0,
-            locked_until: null,
-          })
-          .eq('student_code', cleanCode);
-      } catch (e) {}
+      await safeUpdateStudentAccounts((q) => q.or(filter), {
+        devices: [],
+        bound_device_id: null,
+        failed_attempts: 0,
+        locked_until: null,
+      });
 
       try {
         const { data: st } = await supabaseAdmin

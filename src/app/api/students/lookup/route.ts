@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
+import { isAccountActivated, parseTelegramBrowserId } from '@/lib/studentAccountHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +79,9 @@ export async function GET(request: Request) {
     } catch (e) {}
 
     // 2. التحقق من حالة حساب الطالب (مفعل، معلق، أو جديد)
-    let existingAccount: any = null;
+    // ملاحظة: نقرأ المصدرين معاً (student_accounts + telegram_browser_id) لأن بعض أعمدة
+    // الاعتماد غير موجودة في جدول student_accounts ويتم حفظها في JSON فقط.
+    let dbAccount: any = null;
     try {
       const { data: acc } = await supabaseAdmin
         .from('student_accounts')
@@ -86,14 +89,14 @@ export async function GET(request: Request) {
         .or(filter)
         .limit(1)
         .maybeSingle();
-      existingAccount = acc;
+      dbAccount = acc;
     } catch (e) {}
 
-    if (!existingAccount && student.telegram_browser_id) {
-      try {
-        existingAccount = JSON.parse(student.telegram_browser_id);
-      } catch (e) {}
-    }
+    const tbAccount: any = parseTelegramBrowserId(student.telegram_browser_id);
+
+    let existingAccount: any = dbAccount || tbAccount
+      ? { ...(tbAccount || {}), ...(dbAccount || {}) }
+      : null;
 
     if (!existingAccount) {
       for (const v of variants) {
@@ -102,34 +105,16 @@ export async function GET(request: Request) {
       }
     }
 
-    const isActivated = Boolean(
-      existingAccount && (
-        existingAccount.status === 'active' ||
-        existingAccount.is_pin_used ||
-        existingAccount.activated_by ||
-        existingAccount.activated_at
-      )
-    );
+    const isActivated = isAccountActivated(dbAccount, tbAccount, !dbAccount && !tbAccount ? existingAccount : null);
 
-    if (isActivated) {
-      // فحص قيد الجهاز (Single Device Lock) لمنع انتحال الحساب من جهاز آخر
-      let boundDeviceId = existingAccount.bound_device_id;
-      if (!boundDeviceId && student.telegram_browser_id) {
-        try {
-          const tbData = JSON.parse(student.telegram_browser_id);
-          if (tbData.bound_device_id) boundDeviceId = tbData.bound_device_id;
-        } catch (e) {}
-      }
+    if (isActivated && existingAccount) {
+      if (!existingAccount.pin_code && tbAccount?.pin_code) existingAccount.pin_code = tbAccount.pin_code;
 
-      const isLockedToOther = Boolean(
-        boundDeviceId &&
-        deviceId &&
-        deviceId !== 'unknown' &&
-        deviceId !== 'unknown_device' &&
-        boundDeviceId !== deviceId
-      );
+      // فحص قيد الجهاز (Single Device Lock) لمنع فتح الحساب من جهاز آخر
+      const boundDeviceId: string | null = tbAccount?.bound_device_id || dbAccount?.bound_device_id || null;
+      const validDevice = Boolean(deviceId && deviceId !== 'unknown' && deviceId !== 'unknown_device');
 
-      if (isLockedToOther) {
+      if (boundDeviceId && validDevice && boundDeviceId !== deviceId) {
         return NextResponse.json({
           success: true,
           student: safeStudent,
@@ -141,14 +126,21 @@ export async function GET(request: Request) {
         });
       }
 
-      // ربط الجهاز تلقائياً إذا لم يكن مقيداً بعد
-      if (!boundDeviceId && deviceId && deviceId !== 'unknown' && deviceId !== 'unknown_device') {
-        try {
-          await supabaseAdmin
-            .from('student_accounts')
-            .update({ bound_device_id: deviceId })
-            .or(filter);
-        } catch (e) {}
+      // ربط الجهاز تلقائياً فقط إذا كان هو نفس الجهاز الذي سجّل منه الطالب
+      if (!boundDeviceId && validDevice) {
+        const knownDevices: any[] = [
+          ...(Array.isArray(tbAccount?.devices) ? tbAccount.devices : []),
+          ...(Array.isArray(dbAccount?.devices) ? dbAccount.devices : []),
+        ];
+        const isRegistrationDevice = knownDevices.some((d: any) => d?.deviceId === deviceId);
+        if (isRegistrationDevice && tbAccount) {
+          try {
+            await supabaseAdmin
+              .from('students')
+              .update({ telegram_browser_id: JSON.stringify({ ...tbAccount, bound_device_id: deviceId }) })
+              .eq('id', student.id);
+          } catch (e) {}
+        }
       }
 
       return NextResponse.json({
@@ -177,6 +169,8 @@ export async function GET(request: Request) {
         pin_code: existingAccount.pin_code || undefined,
         isPending: true,
         message: 'بياناتك مسجلة بالفعل ولكنها بانتظار اعتماد المنسق لتفعيل الحساب.',
+      }, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' }
       });
     }
 

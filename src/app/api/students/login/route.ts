@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
+import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,10 +121,7 @@ export async function POST(request: Request) {
         warnMessage = 'تم قفل الحساب مؤقتاً لمدة 15 دقيقة لتكرار المحاولات الخاطئة!';
       }
 
-      await supabaseAdmin
-        .from('student_accounts')
-        .update(lockUpdate)
-        .eq('id', account.id);
+      await safeUpdateStudentAccounts((q) => q.eq('id', account.id), lockUpdate);
 
       localStore.saveAccount({ ...account, ...lockUpdate });
 
@@ -176,10 +174,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await supabaseAdmin
-      .from('student_accounts')
-      .update(resetSecurity)
-      .eq('id', account.id);
+    await safeUpdateStudentAccounts((q) => q.eq('id', account.id), resetSecurity);
 
     // تحديث سجل الأجهزة
     let updatedDevices = account.devices || [];
@@ -200,13 +195,10 @@ export async function POST(request: Request) {
     }
 
     if (account.id) {
-      await supabaseAdmin
-        .from('student_accounts')
-        .update({
-          devices: updatedDevices,
-          last_login_at: new Date().toISOString(),
-        })
-        .eq('id', account.id);
+      await safeUpdateStudentAccounts((q) => q.eq('id', account.id), {
+        devices: updatedDevices,
+        last_login_at: new Date().toISOString(),
+      });
     }
 
     // تحديث دائم في students.telegram_browser_id
