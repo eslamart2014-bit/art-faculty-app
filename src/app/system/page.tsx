@@ -3803,6 +3803,100 @@ export default function SystemPage() {
         />
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
+      {/* QR Code Modal */}
+      {showQRModal && currentStudent && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.9)",
+          backdropFilter: "blur(5px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999,
+          padding: "20px"
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            background: "#1e293b",
+            borderRadius: "20px",
+            padding: "30px",
+            width: "100%",
+            maxWidth: "350px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+            border: "1px solid rgba(56, 189, 248, 0.3)"
+          }}>
+            <div style={{ marginBottom: "20px", color: "#fff", fontWeight: "bold", fontSize: "16px", textAlign: "center" }}>
+              كارت الـ QR الخاص بك
+            </div>
+
+            <div style={{ 
+              background: "#fff", 
+              padding: "20px", 
+              borderRadius: "16px",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
+            }}>
+              <QRCode 
+                id="student-qr-code"
+                value={currentStudent.student_code} 
+                size={220} 
+                level="M"
+              />
+            </div>
+
+            <div style={{ marginTop: "15px", color: "#94a3b8", fontSize: "14px", fontWeight: "bold" }}>
+              {currentStudent.student_code}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "25px", width: "100%" }}>
+              <button 
+                onClick={handleDownloadQR}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer"
+                }}
+              >
+                <Download size={16} />
+                <span>تحميل الصورة</span>
+              </button>
+              
+              <button 
+                onClick={() => setShowQRModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "rgba(239, 68, 68, 0.15)",
+                  color: "#f87171",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "12px",
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  cursor: "pointer"
+                }}
+              >
+                <X size={16} />
+                <span>إغلاق</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
         <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </footer>
@@ -4384,100 +4478,6 @@ export default function SystemPage() {
                 }}
               >
                 المتابعة عبر المتصفح 🌐
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* QR Code Modal */}
-      {showQRModal && currentStudent && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(15, 23, 42, 0.9)",
-          backdropFilter: "blur(5px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 99999,
-          padding: "20px"
-        }}>
-          <div className="glass-card animate-fade-in" style={{
-            background: "#1e293b",
-            borderRadius: "20px",
-            padding: "30px",
-            width: "100%",
-            maxWidth: "350px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
-            border: "1px solid rgba(56, 189, 248, 0.3)"
-          }}>
-            <div style={{ marginBottom: "20px", color: "#fff", fontWeight: "bold", fontSize: "16px", textAlign: "center" }}>
-              كارت الـ QR الخاص بك
-            </div>
-
-            <div style={{ 
-              background: "#fff", 
-              padding: "20px", 
-              borderRadius: "16px",
-              boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
-            }}>
-              <QRCode 
-                id="student-qr-code"
-                value={currentStudent.student_code} 
-                size={220} 
-                level="M"
-              />
-            </div>
-
-            <div style={{ marginTop: "15px", color: "#94a3b8", fontSize: "14px", fontWeight: "bold" }}>
-              {currentStudent.student_code}
-            </div>
-
-            <div style={{ display: "flex", gap: "10px", marginTop: "25px", width: "100%" }}>
-              <button 
-                onClick={handleDownloadQR}
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "12px",
-                  fontWeight: "bold",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  cursor: "pointer"
-                }}
-              >
-                <Download size={16} />
-                <span>تحميل الصورة</span>
-              </button>
-              
-              <button 
-                onClick={() => setShowQRModal(false)}
-                style={{
-                  flex: 1,
-                  padding: "12px",
-                  background: "rgba(239, 68, 68, 0.15)",
-                  color: "#f87171",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  borderRadius: "12px",
-                  fontWeight: "bold",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  cursor: "pointer"
-                }}
-              >
-                <X size={16} />
-                <span>إغلاق</span>
               </button>
             </div>
           </div>
