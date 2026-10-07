@@ -9,7 +9,7 @@ import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
-import { playScanClickSound, initScannerAudio } from "@/lib/audioHelper";
+import { playScanClickSound, playScanErrorSound, initScannerAudio } from "@/lib/audioHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -539,6 +539,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       vibrateHeavyError();
       setScannerStatus('error');
       setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      await new Promise(r => setTimeout(r, 100));
       alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
@@ -548,6 +549,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     setScannerStatus('error');
     setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section}) ❌`);
     
+    await new Promise(r => setTimeout(r, 100));
     const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
@@ -622,7 +624,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   // 2. Duplicate scan: two rapid vibrations
   const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
   // 3. Heavy error vibration (wrong code / different cohort / invalid)
-  const vibrateHeavyError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); };
+  const vibrateHeavyError = () => { 
+    playScanErrorSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); 
+  };
 
   const handleCameraScan = async (decodedText: string) => {
     if (!decodedText || !showCameraScanner || isProcessingScanRef.current || scannerStatus !== 'idle') return;

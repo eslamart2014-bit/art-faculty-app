@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
-import { playScanClickSound } from "@/lib/audioHelper";
+import { playScanClickSound, playScanErrorSound } from "@/lib/audioHelper";
 
 
 
@@ -566,7 +566,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(100); 
   };
   const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
-  const vibrateHeavyError = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); };
+  const vibrateHeavyError = () => { 
+    playScanErrorSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([250, 70, 250, 70, 400]); 
+  };
   const vibrateError = vibrateHeavyError;
 
   const getAttendanceCount = async (studentId: string) => {
@@ -606,6 +609,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       vibrateHeavyError();
       setScannerStatus('error');
       setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      await new Promise(r => setTimeout(r, 100));
       alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
@@ -615,6 +619,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setScannerStatus('error');
     setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section}) ❌`);
 
+    await new Promise(r => setTimeout(r, 100));
     const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
