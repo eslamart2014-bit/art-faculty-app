@@ -3038,7 +3038,7 @@ export default function SystemPage() {
                             {c.attended}
                           </span>
                           <span style={{ fontSize: "11px", color: "#a7f3d0", marginTop: "2px" }}>
-                            محاضرة
+                            {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
                           </span>
                         </div>
 
@@ -3061,7 +3061,7 @@ export default function SystemPage() {
                             {c.absent}
                           </span>
                           <span style={{ fontSize: "11px", color: "#fca5a5", marginTop: "2px" }}>
-                            {c.excused > 0 ? `(${c.excused} عذر)` : "محاضرة"}
+                            {c.excused > 0 ? `(${c.excused} عذر)` : (c.courseType === 'sections' ? 'سكشن' : 'محاضرة')}
                           </span>
                         </div>
 
@@ -3084,7 +3084,7 @@ export default function SystemPage() {
                             {c.rate}%
                           </span>
                           <span style={{ fontSize: "11px", color: "#93c5fd", marginTop: "2px" }}>
-                            من {c.total || c.totalLectures || (c.records?.length || 0)} محاضرة
+                            من {c.total || c.totalLectures || (c.records?.length || 0)} {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
                           </span>
                         </div>
                       </div>
@@ -3110,7 +3110,7 @@ export default function SystemPage() {
                           gap: "6px"
                         }}
                       >
-                        <span>{isExpanded ? "إخفاء التفاصيل" : "عرض تفاصيل التواريخ والمحاضرات"}</span>
+                        <span>{isExpanded ? "إخفاء التفاصيل" : `عرض تفاصيل التواريخ وال${c.courseType === 'sections' ? 'سكاشن' : 'محاضرات'}`}</span>
                         <span>{isExpanded ? "▲" : "▼"}</span>
                       </button>
 

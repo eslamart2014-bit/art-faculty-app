@@ -210,6 +210,18 @@ export async function GET(request: Request) {
     const safeTeacherEvals = (teacherEvals || []).filter((e: any) => activeCourseIds.has(e.course_id));
     const safeStudentSubmissions = studentSubmissions.filter((s: any) => activeCourseIds.has(s.course_id));
 
+    // جلب جميع تواريخ الحضور للمقررات النشطة لحساب إجمالي الأسابيع الفعلية
+    const { data: allCourseAttendance } = await supabaseAdmin
+      .from('attendance')
+      .select('course_id, date')
+      .in('course_id', Array.from(activeCourseIds));
+
+    const courseDatesMap = new Map<string, Set<string>>();
+    (allCourseAttendance || []).forEach((r: any) => {
+      if (!courseDatesMap.has(r.course_id)) courseDatesMap.set(r.course_id, new Set());
+      courseDatesMap.get(r.course_id)!.add(r.date);
+    });
+
     // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة
     const teacherIds = Array.from(new Set(allCourses.map((c: any) => c.teacher_id).filter(Boolean)));
     let teacherProfilesMap: Record<string, any> = {};
@@ -253,20 +265,26 @@ export async function GET(request: Request) {
     const attendanceByCourse = matchedCourses.map((course: any) => {
       const records = safeAttendanceRecords.filter((r: any) => r.course_id === course.id);
       const attended = records.filter((r: any) => r.status === 'حاضر').length;
-      const absent = records.filter((r: any) => r.status === 'غائب').length;
-      const excused = records.filter((r: any) => r.status === 'إذن' || r.status === 'عذر').length;
-      const total = records.length;
+      const excused = records.filter((r: any) => r.status === 'إذن' || r.status === 'عذر' || r.status === 'غياب بعذر').length;
+      
+      const total = courseDatesMap.get(course.id)?.size || 0;
+      let absent = total - attended - excused;
+      if (absent < 0) absent = 0;
+      
       const rate = total > 0 ? Math.round((attended / total) * 100) : 100;
       
       const warningLimit = course.warning_limit || course.custom_week_names?.warning_limit || 3;
       const hasWarning = absent >= warningLimit;
 
       const sortedRecords = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      const absentDates = sortedRecords.filter((r: any) => r.status === 'غائب').map((r: any) => r.date);
+      const allDates = Array.from(courseDatesMap.get(course.id) || []);
+      const presentDates = new Set(records.map((r: any) => r.date));
+      const absentDates = allDates.filter(d => !presentDates.has(d)).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
       return {
         courseId: course.id,
         courseName: course.name,
+        courseType: course.course_type,
         totalLectures: total,
         attended,
         absent,
