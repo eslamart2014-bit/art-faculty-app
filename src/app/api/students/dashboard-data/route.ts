@@ -265,29 +265,53 @@ export async function GET(request: Request) {
     const normStudentSec = normalizeArabic(student.section || '');
 
     const matchedCourses = allCourses.filter((c: any) => {
-      // المقرر المؤرشف مستبعد تماماً
+      // 1. استبعاد المقرر المؤرشف تماماً
       if (c.custom_week_names?.__archived === true) return false;
 
+      // 2. استبعاد الطالب إذا تم استبعاده صراحة من المقرر
+      if (Array.isArray(c.excluded_students) && c.excluded_students.includes(student.id)) {
+        return false;
+      }
+
+      // 3. فحص ما إذا كان الطالب مسجلاً كطالب تخلفات / مستمع في هذا المقرر
+      const isMakeupStudent = Array.isArray(c.makeup_students) && (
+        c.makeup_students.includes(student.id) || 
+        c.makeup_students.includes(student.student_code)
+      );
+
+      // إذا كان مسجلاً كتخلفات صراحة، يُعرض له المقرر فوراً حتى لو اختلف عن فرقته الأصلية
+      if (isMakeupStudent) {
+        return true;
+      }
+
+      // 4. مطابقة الفرقة الدراسية الأصلية
       const normCourseYear = normalizeArabic(c.academic_year || '');
       const yearMatch =
+        normCourseYear === normStudentYear ||
         normCourseYear.includes(normStudentYear) ||
         normStudentYear.includes(normCourseYear);
       if (!yearMatch) return false;
 
-      if (c.course_type === 'lectures' || !c.sections || c.sections.length === 0) return true;
-      const secMatch = (c.sections || []).some((sec: string) => {
-        const normSec = normalizeArabic(sec);
-        return (
-          normSec === 'عام' ||
-          normSec === normStudentSec ||
-          normSec.includes(normStudentSec) ||
-          normStudentSec.includes(normSec)
-        );
-      });
-      return secMatch;
+      // 5. مطابقة السكشن بدقة تامة (تجنب التداخل بين الأرقام الجزئية مثل 2 و 12)
+      if (c.sections && Array.isArray(c.sections) && c.sections.length > 0) {
+        // فحص وجود استثناء سكشن لهذا الطالب في هذا المقرر
+        const overrideSec = c.student_section_overrides?.[student.id];
+        const effectiveSec = overrideSec ? String(overrideSec).trim() : String(student.section || '').trim();
+        const normEffectiveSec = normalizeArabic(effectiveSec);
+
+        const secMatch = c.sections.some((sec: string) => {
+          const s = String(sec).trim();
+          const normS = normalizeArabic(s);
+          return normS === 'عام' || normS === 'الكل' || normS === 'جميع السكاشن' || normS === normEffectiveSec;
+        });
+
+        if (!secMatch) return false;
+      }
+
+      return true;
     });
 
-    // 6. تجميع الحضور لكل مقرر مع تنسيق التواريخ التفصيلية
+    // 6. تجميع الحضور لكل مقرر مع تنسيق التواريخ التفصيلية وبيانات أستاذ المقرر
     const attendanceByCourse = matchedCourses.map((course: any) => {
       const records = safeAttendanceRecords.filter((r: any) => r.course_id === course.id);
       const attended = records.filter((r: any) => r.status === 'حاضر').length;
@@ -307,10 +331,18 @@ export async function GET(request: Request) {
       const presentDates = new Set(records.map((r: any) => r.date));
       const absentDates = allDates.filter(d => !presentDates.has(d)).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
+      const prof = teacherProfilesMap[course.teacher_id];
+      const instructorName = prof?.full_name || 'عضو هيئة التدريس';
+      const instructorDegree = prof?.degree || prof?.role || 'عضو هيئة تدريس';
+      const instructorTitle = formatInstructorTitle(prof);
+
       return {
         courseId: course.id,
         courseName: course.name,
         courseType: course.course_type,
+        instructorName,
+        instructorDegree,
+        instructorTitle,
         totalLectures: total,
         attended,
         absent,

@@ -34,8 +34,9 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
       return;
     }
     setSaving(true);
-    const updates = { id: user.id, email: user.email, full_name: fullName, degree: degree };
+    const updates = { id: user.id, email: user.email, full_name: fullName.trim(), degree: degree };
     
+    // 1. Try direct Supabase update
     const { error } = await supabase
       .from("profiles")
       .upsert(updates);
@@ -44,7 +45,34 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
       onUpdateProfile(updates);
       onClose();
     } else {
-      alert("حدث خطأ أثناء حفظ البيانات");
+      // 2. If blocked by RLS (e.g. admin editing user or impersonating), fallback to admin API
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token || "";
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: "update_user_degree",
+            userId: user.id,
+            adminId: user.id,
+            degree,
+            fullName: fullName.trim()
+          })
+        });
+        const resData = await res.json();
+        if (resData.success) {
+          onUpdateProfile(updates);
+          onClose();
+        } else {
+          alert("حدث خطأ أثناء حفظ البيانات: " + (resData.error || ""));
+        }
+      } catch (apiErr) {
+        alert("حدث خطأ أثناء حفظ البيانات");
+      }
     }
     setSaving(false);
   };

@@ -35,6 +35,10 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [generatedPasswordData, setGeneratedPasswordData] = useState<{pass: string, email: string} | null>(null);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editDegree, setEditDegree] = useState<string>('م');
+  const [editFullName, setEditFullName] = useState<string>('');
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
 
   const isPrimaryAdmin = adminUser?.role === 'مدير';
   const isAssistant = adminUser?.role === 'مدير مساعد';
@@ -311,6 +315,53 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
     }
     onImpersonate(user);
     onClose();
+  };
+
+  const handleOpenEditUser = (user: any) => {
+    setEditingUser(user);
+    setEditDegree(user.degree || "م");
+    setEditFullName(user.full_name || "");
+    setActiveMenuId(null);
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+    if (!editFullName.trim()) {
+      alert("يرجى كتابة الاسم بالكامل");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
+
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          action: "update_user_degree", 
+          userId: editingUser.id, 
+          adminId: adminUser.id,
+          degree: editDegree,
+          fullName: editFullName.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("تم تحديث الدرجة العلمية والاسم بنجاح ✅");
+        setEditingUser(null);
+        fetchData();
+      } else {
+        alert("خطأ: " + (data.error || "فشل التحديث"));
+      }
+    } catch (err: any) {
+      alert("حدث خطأ في الاتصال: " + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -782,6 +833,27 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
                         {isAdmin && (
                           <>
+                            <button 
+                              onClick={() => handleOpenEditUser(u)} 
+                              style={{ 
+                                background: "rgba(37, 99, 235, 0.2)", 
+                                color: "#60a5fa", 
+                                border: "1px solid #2563eb", 
+                                padding: "10px", 
+                                borderRadius: "6px", 
+                                cursor: "pointer", 
+                                fontSize: "13px", 
+                                fontWeight: "bold",
+                                gridColumn: "1 / -1",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px"
+                              }}
+                            >
+                              <span>✏️</span> تعديل الدرجة العلمية والاسم
+                            </button>
+
                             <button onClick={() => handleToggleSuspend(u)} style={{ background: "#333", color: u.is_suspended ? "#4CAF50" : "#FF9800", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
                               {u.is_suspended ? "▶️ تفعيل الحساب" : "⏸️ إيقاف مؤقت"}
                             </button>
@@ -838,6 +910,71 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
               onClick={() => setGeneratedPasswordData(null)}
               style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "1px solid #555", borderRadius: "8px", cursor: "pointer" }}
             >إغلاق</button>
+          </div>
+        </div>
+      )}
+
+      {editingUser && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.85)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center"
+        }} onClick={() => setEditingUser(null)}>
+          <div style={{ background: "#1e1e1e", padding: "22px", borderRadius: "14px", width: "90%", maxWidth: "380px", border: "1px solid #444", direction: "rtl", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: "#38bdf8", marginTop: 0, marginBottom: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>✏️</span> تعديل الدرجة العلمية والاسم
+            </h3>
+            
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>البريد الإلكتروني:</label>
+              <input 
+                type="text" 
+                value={editingUser.email} 
+                disabled 
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#64748b", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ fontSize: "12px", color: "#cbd5e1", display: "block", marginBottom: "4px" }}>الدرجة العلمية:</label>
+              <select
+                value={editDegree}
+                onChange={e => setEditDegree(e.target.value)}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
+              >
+                <option value="معيد (م)">معيد (م)</option>
+                <option value="مدرس مساعد (م.م)">مدرس مساعد (م.م)</option>
+                <option value="دكتور (د)">دكتور (د)</option>
+                <option value="أستاذ مساعد (أ.م.د)">أستاذ مساعد (أ.م.د)</option>
+                <option value="أستاذ دكتور (أ.د)">أستاذ دكتور (أ.د)</option>
+                <option value="أستاذ (أ)">أستاذ (أ)</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ fontSize: "12px", color: "#cbd5e1", display: "block", marginBottom: "4px" }}>الاسم بالكامل:</label>
+              <input 
+                type="text" 
+                value={editFullName} 
+                onChange={e => setEditFullName(e.target.value)}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={handleSaveUserEdit}
+                disabled={savingEdit}
+                style={{ flex: 1, padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: savingEdit ? "not-allowed" : "pointer" }}
+              >
+                {savingEdit ? "جاري الحفظ..." : "💾 حفظ التعديلات"}
+              </button>
+              <button
+                onClick={() => setEditingUser(null)}
+                style={{ padding: "12px 18px", background: "transparent", color: "#94a3b8", border: "1px solid #475569", borderRadius: "8px", cursor: "pointer" }}
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       )}

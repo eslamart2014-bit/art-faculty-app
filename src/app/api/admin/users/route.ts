@@ -196,6 +196,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'update_user_degree' || action === 'update_profile') {
+      if (!userId) return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
+
+      const updateData: any = {};
+      if (degree !== undefined) updateData.degree = degree;
+      if (fullName !== undefined) updateData.full_name = fullName.trim();
+      if (newRole !== undefined && profile.role === 'مدير') updateData.role = newRole;
+
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Update auth user metadata in parallel
+      try {
+        const metaUpdates: any = {};
+        if (fullName) metaUpdates.full_name = fullName.trim();
+        if (degree) metaUpdates.degree = degree;
+        if (Object.keys(metaUpdates).length > 0) {
+          await supabaseAdmin.auth.admin.updateUserById(userId, {
+            user_metadata: metaUpdates
+          });
+        }
+      } catch (e) {}
+
+      return NextResponse.json({ success: true, updated: updateData });
+    }
+
     if (action === 'toggle_verify_permission') {
       if (profile.role !== 'مدير') {
         return NextResponse.json({ error: 'صلاحية حصرية للمدير العام فقط' }, { status: 403 });

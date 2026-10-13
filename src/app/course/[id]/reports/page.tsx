@@ -7,6 +7,7 @@ import { generatePrintableHtml } from "@/lib/pdfHelper";
 import { downloadPdf } from "@/lib/downloadPdf";
 import { getTermAndWeekInfo } from "@/lib/termHelper";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
+import { getStudentTag } from "@/lib/studentTagsHelper";
 
 export default function ReportsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -62,6 +63,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   const [weeks, setWeeks] = useState<{ key: string; name: string; subtitle: string; start: Date; end: Date }[]>([]);
   const [instructorName, setInstructorName] = useState<string>("........................");
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [paperSavingMode, setPaperSavingMode] = useState<boolean>(true);
 
   // Tab 2 State
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -265,7 +267,23 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     setLoading(false);
   };
 
-  // --- Report 1: Detailed Attendance (Landscape & Partitioned by Section) ---
+  // Helper: Format Student Name with badges (Teacher eyes only: ⭐ Distinguished / ⚠️ Uncommitted / [تخلفات] Makeup)
+  const formatStudentNameWithBadges = (s: any) => {
+    const tag = getStudentTag(s, course?.teacher_id);
+    const isMakeup = s.section === 'تخلفات' || (!s.section && course?.makeup_students?.includes(s.id)) || (course?.makeup_students && course.makeup_students.includes(s.id));
+    let badgeMarker = '';
+    if (tag === 'distinguished') {
+      badgeMarker = ' <span style="color: #b45309; font-size: 11px;" title="طالب متميز">⭐</span>';
+    } else if (tag === 'uncommitted') {
+      badgeMarker = ' <span style="color: #b91c1c; font-size: 11px;" title="طالب غير ملتزم">⚠️</span>';
+    }
+    if (isMakeup && s.section !== 'تخلفات') {
+      badgeMarker += ' <span style="color: #0284c7; font-size: 9px; font-weight: bold;">[تخلفات]</span>';
+    }
+    return `${s.full_name}${badgeMarker}`;
+  };
+
+  // --- Report 1: Detailed Attendance (Landscape & Partitioned or Compact by Section) ---
   const printDetailedAttendance = async () => {
     const termInfo = await getTermAndWeekInfo();
 
@@ -323,185 +341,416 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       return '';
     };
 
-    let allSectionsHtml = `
-      <style>
-        .att-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 8px;
-          table-layout: fixed;
-          page-break-inside: auto;
-        }
-        .att-table thead {
-          display: table-header-group;
-        }
-        .att-table tr {
-          page-break-inside: avoid;
-          page-break-after: auto;
-        }
-        .att-table th, .att-table td {
-          border: 1px solid #000 !important;
-          padding: 5px 3px;
-          text-align: center;
-          vertical-align: middle;
-          box-sizing: border-box;
-        }
-        .att-table th {
-          background-color: #f1f5f9 !important;
-          font-weight: bold;
-        }
-        .section-sheet {
-          box-sizing: border-box;
-          width: 100%;
-        }
-        @media print {
-          @page {
-            size: landscape;
-            margin: 10mm;
-          }
-          body {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .section-sheet {
-            page-break-after: always;
-            break-after: page;
-          }
-        }
-      </style>
-    `;
+    let allSectionsHtml = '';
 
-    sortedSecKeys.forEach((secKey, secIdx) => {
-      const secStudents = sectionsMap.get(secKey)!;
-      // Sort alphabetically by full name
-      secStudents.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'));
+    if (paperSavingMode) {
+      // ==========================================
+      // وضع توفير الورق الذكي (Compact Continuous Table)
+      // ==========================================
+      const sectionsLabel = sortedSecKeys.map(k => k === 'تخلفات' ? 'تخلفات' : `سكشن ${k}`).join(' ، ');
 
-      const secTitleBadge = secKey === 'تخلفات' ? 'طلاب الباقين للإعادة / التخلفات' : `سكشن (${secKey})`;
+      let tableBodyHtml = '';
+      sortedSecKeys.forEach((secKey) => {
+        const secStudents = sectionsMap.get(secKey)!;
+        secStudents.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'));
+        const secTitleBadge = secKey === 'تخلفات' ? 'طلاب الباقين للإعادة / التخلفات' : `سكشن (${secKey})`;
 
-      let tableRows = '';
-      secStudents.forEach((s, idx) => {
-        let rowHtml = `
-          <tr>
-            <td style="width: 32px; text-align: center; font-weight: bold; font-size: 11px; background-color: #fafafa;">${idx + 1}</td>
-            <td style="width: 180px; text-align: right; font-weight: bold; white-space: nowrap; padding-right: 8px; font-size: 12px; color: #000;">
-              ${s.full_name}
+        // Section header banner row inside the table
+        tableBodyHtml += `
+          <tr class="sec-header-row" style="page-break-after: avoid; page-break-inside: avoid;">
+            <td colspan="${weeks.length + 4}" style="background-color: #0f172a !important; color: #ffffff !important; font-weight: bold; font-size: 11px; padding: 4px 10px; text-align: right; border: 1.5px solid #000 !important;">
+              🔰 ${secTitleBadge} &nbsp;&mdash;&nbsp; إجمالي طلاب السكشن: <b>${secStudents.length} طالب</b>
             </td>
+          </tr>
         `;
 
-        weeks.forEach(w => {
-          // Find attendance for student in this week
-          const studentWeekAtts = attendance.filter(a => {
-            if (String(a.student_id) !== String(s.id)) return false;
-            if (a.date === w.key) return true;
-            if (w.start && w.end && a.date) {
-              const [ay, am, ad] = a.date.split('-').map(Number);
-              const aDate = new Date(ay, am - 1, ad, 12, 0, 0);
-              return aDate >= w.start && aDate <= w.end;
+        secStudents.forEach((s, idx) => {
+          let rowHtml = `
+            <tr style="page-break-inside: avoid;">
+              <td style="width: 28px; text-align: center; font-weight: bold; font-size: 10.5px; background-color: #fafafa !important;">${idx + 1}</td>
+              <td style="text-align: right; font-weight: bold; white-space: nowrap; padding-right: 6px; font-size: 11px; color: #000;">
+                ${formatStudentNameWithBadges(s)}
+              </td>
+          `;
+
+          let presentCount = 0;
+          let excuseCount = 0;
+
+          weeks.forEach(w => {
+            const studentWeekAtts = attendance.filter(a => {
+              if (String(a.student_id) !== String(s.id)) return false;
+              if (a.date === w.key) return true;
+              if (w.start && w.end && a.date) {
+                const [ay, am, ad] = a.date.split('-').map(Number);
+                const aDate = new Date(ay, am - 1, ad, 12, 0, 0);
+                return aDate >= w.start && aDate <= w.end;
+              }
+              return false;
+            });
+
+            const presentAtt = studentWeekAtts.find(a => a.status === 'حاضر');
+            const excuseAtt = studentWeekAtts.find(a => a.status === 'غياب بعذر');
+            const att = presentAtt || excuseAtt || studentWeekAtts[0];
+
+            if (att) {
+              const actualDate = formatActualDate(att);
+              if (att.status === 'غياب بعذر') {
+                excuseCount++;
+                rowHtml += `
+                  <td style="background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #dc3545 !important; padding: 2.5px 1px;">
+                    <div style="font-size: 10px; font-weight: bold; line-height: 1.1;">عذر</div>
+                    <div style="font-size: 8px; line-height: 1.1; margin-top: 1px; max-width: 80px; margin-left: auto; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${att.note || ''}">${att.note || 'غياب بعذر'}</div>
+                    <div style="font-size: 7.5px; opacity: 0.85; margin-top: 1px;">${actualDate}</div>
+                  </td>
+                `;
+              } else {
+                presentCount++;
+                rowHtml += `
+                  <td style="background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #198754 !important; padding: 2.5px 1px;">
+                    <div style="font-size: 10px; font-weight: bold; line-height: 1.1;">${actualDate}</div>
+                    <div style="font-size: 8px; font-weight: 600; color: #155724; margin-top: 1px;">حاضر</div>
+                  </td>
+                `;
+              }
+            } else {
+              rowHtml += `
+                <td style="background-color: #ffffff !important; border: 1px solid #000000 !important; color: #94a3b8; font-size: 11px;">
+                  -
+                </td>
+              `;
             }
-            return false;
           });
 
-          const presentAtt = studentWeekAtts.find(a => a.status === 'حاضر');
-          const excuseAtt = studentWeekAtts.find(a => a.status === 'غياب بعذر');
-          const att = presentAtt || excuseAtt || studentWeekAtts[0];
+          const effectiveWeeks = weeks.length || 1;
+          const rate = Math.round((presentCount / effectiveWeeks) * 100);
 
-          if (att) {
-            const actualDate = formatActualDate(att);
-            if (att.status === 'غياب بعذر') {
-              // Shaded fully red with excuse
-              rowHtml += `
-                <td style="background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #dc3545 !important; padding: 4px 2px;">
-                  <div style="font-size: 11px; font-weight: bold; line-height: 1.2;">عذر</div>
-                  <div style="font-size: 9px; line-height: 1.1; margin-top: 1px; max-width: 90px; margin-left: auto; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${att.note || ''}">${att.note || 'غياب بعذر'}</div>
-                  <div style="font-size: 8px; opacity: 0.85; margin-top: 1px;">${actualDate}</div>
-                </td>
-              `;
+          rowHtml += `
+              <td style="font-weight: bold; font-size: 10.5px; background-color: #f8fafc !important; text-align: center; border: 1px solid #000 !important;">
+                ${presentCount}/${weeks.length}
+              </td>
+              <td style="font-weight: bold; font-size: 10px; text-align: center; border: 1px solid #000 !important; color: ${rate >= 75 ? '#0f5132' : rate >= 50 ? '#856404' : '#842029'} !important; background-color: ${rate >= 75 ? '#d1e7dd' : rate >= 50 ? '#fff3cd' : '#f8d7da'} !important;">
+                ${rate}%
+              </td>
+            </tr>
+          `;
+
+          tableBodyHtml += rowHtml;
+        });
+      });
+
+      allSectionsHtml = `
+        <style>
+          @media print {
+            @page {
+              size: landscape;
+              margin: 7mm 6mm;
+            }
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              background: #fff !important;
+            }
+            .att-table {
+              page-break-inside: auto;
+            }
+            .att-table tr {
+              page-break-inside: avoid;
+              page-break-after: auto;
+            }
+          }
+          .att-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            table-layout: auto;
+            border: 1.5px solid #000 !important;
+          }
+          .att-table thead {
+            display: table-header-group;
+          }
+          .att-table tr {
+            page-break-inside: avoid;
+          }
+          .att-table th, .att-table td {
+            border: 1px solid #000 !important;
+            padding: 2.5px 2px;
+            text-align: center;
+            vertical-align: middle;
+            box-sizing: border-box;
+          }
+          .att-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold;
+            font-size: 10px;
+          }
+        </style>
+
+        <!-- الترويسة الرسمية الموحدة -->
+        <div class="report-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; font-weight: bold; font-size: 12.5px; line-height: 1.4; border-bottom: 2px solid #000; padding-bottom: 6px; padding-top: 2px;">
+          <div style="text-align: right; width: 28%;">
+            جامعة قنا<br/>
+            كلية التربية النوعية<br/>
+            قسم التربية الفنية
+          </div>
+          <div style="text-align: center; width: 44%;">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 2px;">كشف الحضور والغياب التفصيلي</div>
+            <div style="font-size: 12px; color: #222; font-weight: bold;">
+              مقرر: ${course?.name || ''} &nbsp;|&nbsp; الفرقة: ${course?.academic_year || ''}
+            </div>
+            <div style="margin-top: 4px;">
+              <span style="background: #0f172a; color: #ffffff; padding: 2px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block;">
+                السكاشن: ${sectionsLabel}
+              </span>
+            </div>
+          </div>
+          <div style="text-align: left; width: 28%; font-size: 12px; line-height: 1.4;">
+            أستاذ المقرر: <b>${instructorName}</b><br/>
+            ${termInfo ? `<span style="font-size: 10.5px; color: #444;">${termInfo}</span><br/>` : ''}
+            <span style="font-size: 11px; color: #000;">إجمالي الطلاب بالكشف: <b>${targetStudents.length} طالب</b></span>
+          </div>
+        </div>
+
+        <!-- جدول الحضور الشامل الموفر للورق -->
+        <table class="att-table">
+          <thead>
+            <tr>
+              <th style="width: 28px; text-align: center; font-size: 10.5px;">م</th>
+              <th style="min-width: 140px; text-align: right; font-size: 10.5px; padding-right: 6px;">اسم الطالب</th>
+              ${weeks.map(w => `
+                <th style="text-align: center; vertical-align: middle; padding: 3px 2px;">
+                  <div style="font-weight: bold; font-size: 9.5px; white-space: nowrap;">${w.name}</div>
+                  <div style="font-size: 7.5px; font-weight: normal; color: #333; margin-top: 1px; white-space: nowrap;">${w.subtitle}</div>
+                </th>
+              `).join('')}
+              <th style="width: 38px; text-align: center; vertical-align: middle; padding: 3px 2px; font-size: 9.5px;">
+                <div>إجمالي</div><div>الحضور</div>
+              </th>
+              <th style="width: 38px; text-align: center; vertical-align: middle; padding: 3px 2px; font-size: 9.5px;">
+                <div>النسبة</div><div>%</div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableBodyHtml}
+          </tbody>
+        </table>
+
+        <!-- التوقيعات وتذييل التقرير -->
+        <div style="margin-top: 12px; padding-top: 6px; page-break-inside: avoid;">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: bold; padding: 0 30px; margin-bottom: 8px;">
+            <div>توقيع أستاذ المادة: .................................</div>
+            <div>توقيع رئيس القسم: .................................</div>
+            <div>عميد الكلية: .................................</div>
+          </div>
+          <div class="page-footer" style="font-size: 9.5px; text-align: center; color: #555; border-top: 1px dashed #aaa; padding-top: 4px;">
+            تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')} &nbsp;&nbsp;|&nbsp;&nbsp; منظومة قسم التربية الفنية &nbsp;&nbsp;|&nbsp;&nbsp; مبرمج ومطور النظام: <span style="font-size: 10.5px; color: #000; font-weight: bold;">إسلام عبداللطيف</span>
+          </div>
+        </div>
+      `;
+    } else {
+      // ==========================================
+      // وضع الفصل (Per-Section Sheets with Compact Fitting)
+      // ==========================================
+      allSectionsHtml = `
+        <style>
+          @media print {
+            @page {
+              size: landscape;
+              margin: 7mm 6mm;
+            }
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              background: #fff !important;
+            }
+            .section-sheet {
+              page-break-after: always;
+              break-after: page;
+            }
+          }
+          .att-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            table-layout: auto;
+            border: 1.5px solid #000 !important;
+          }
+          .att-table thead {
+            display: table-header-group;
+          }
+          .att-table tr {
+            page-break-inside: avoid;
+          }
+          .att-table th, .att-table td {
+            border: 1px solid #000 !important;
+            padding: 2.5px 2px;
+            text-align: center;
+            vertical-align: middle;
+            box-sizing: border-box;
+          }
+          .att-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold;
+            font-size: 10px;
+          }
+          .section-sheet {
+            box-sizing: border-box;
+            width: 100%;
+          }
+        </style>
+      `;
+
+      sortedSecKeys.forEach((secKey, secIdx) => {
+        const secStudents = sectionsMap.get(secKey)!;
+        secStudents.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar'));
+        const secTitleBadge = secKey === 'تخلفات' ? 'طلاب الباقين للإعادة / التخلفات' : `سكشن (${secKey})`;
+
+        let tableRows = '';
+        secStudents.forEach((s, idx) => {
+          let rowHtml = `
+            <tr style="page-break-inside: avoid;">
+              <td style="width: 28px; text-align: center; font-weight: bold; font-size: 10.5px; background-color: #fafafa !important;">${idx + 1}</td>
+              <td style="text-align: right; font-weight: bold; white-space: nowrap; padding-right: 6px; font-size: 11px; color: #000;">
+                ${formatStudentNameWithBadges(s)}
+              </td>
+          `;
+
+          let presentCount = 0;
+          let excuseCount = 0;
+
+          weeks.forEach(w => {
+            const studentWeekAtts = attendance.filter(a => {
+              if (String(a.student_id) !== String(s.id)) return false;
+              if (a.date === w.key) return true;
+              if (w.start && w.end && a.date) {
+                const [ay, am, ad] = a.date.split('-').map(Number);
+                const aDate = new Date(ay, am - 1, ad, 12, 0, 0);
+                return aDate >= w.start && aDate <= w.end;
+              }
+              return false;
+            });
+
+            const presentAtt = studentWeekAtts.find(a => a.status === 'حاضر');
+            const excuseAtt = studentWeekAtts.find(a => a.status === 'غياب بعذر');
+            const att = presentAtt || excuseAtt || studentWeekAtts[0];
+
+            if (att) {
+              const actualDate = formatActualDate(att);
+              if (att.status === 'غياب بعذر') {
+                excuseCount++;
+                rowHtml += `
+                  <td style="background-color: #f8d7da !important; color: #842029 !important; border: 1px solid #dc3545 !important; padding: 2.5px 1px;">
+                    <div style="font-size: 10px; font-weight: bold; line-height: 1.1;">عذر</div>
+                    <div style="font-size: 8px; line-height: 1.1; margin-top: 1px; max-width: 80px; margin-left: auto; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${att.note || ''}">${att.note || 'غياب بعذر'}</div>
+                    <div style="font-size: 7.5px; opacity: 0.85; margin-top: 1px;">${actualDate}</div>
+                  </td>
+                `;
+              } else {
+                presentCount++;
+                rowHtml += `
+                  <td style="background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #198754 !important; padding: 2.5px 1px;">
+                    <div style="font-size: 10px; font-weight: bold; line-height: 1.1;">${actualDate}</div>
+                    <div style="font-size: 8px; font-weight: 600; color: #155724; margin-top: 1px;">حاضر</div>
+                  </td>
+                `;
+              }
             } else {
-              // Shaded fully green with actual date
               rowHtml += `
-                <td style="background-color: #d1e7dd !important; color: #0f5132 !important; border: 1px solid #198754 !important; padding: 4px 2px;">
-                  <div style="font-size: 11px; font-weight: bold; line-height: 1.2;">${actualDate}</div>
-                  <div style="font-size: 8.5px; font-weight: 600; color: #155724; margin-top: 1px;">حاضر</div>
+                <td style="background-color: #ffffff !important; border: 1px solid #000000 !important; color: #94a3b8; font-size: 11px;">
+                  -
                 </td>
               `;
             }
-          } else {
-            // Absent without excuse - unshaded empty cell with clean dash
-            rowHtml += `
-              <td style="background-color: #ffffff !important; border: 1px solid #000000 !important; color: #ccc;">
-                -
+          });
+
+          const effectiveWeeks = weeks.length || 1;
+          const rate = Math.round((presentCount / effectiveWeeks) * 100);
+
+          rowHtml += `
+              <td style="font-weight: bold; font-size: 10.5px; background-color: #f8fafc !important; text-align: center; border: 1px solid #000 !important;">
+                ${presentCount}/${weeks.length}
               </td>
-            `;
-          }
+              <td style="font-weight: bold; font-size: 10px; text-align: center; border: 1px solid #000 !important; color: ${rate >= 75 ? '#0f5132' : rate >= 50 ? '#856404' : '#842029'} !important; background-color: ${rate >= 75 ? '#d1e7dd' : rate >= 50 ? '#fff3cd' : '#f8d7da'} !important;">
+                ${rate}%
+              </td>
+            </tr>
+          `;
+
+          tableRows += rowHtml;
         });
 
-        rowHtml += `</tr>`;
-        tableRows += rowHtml;
-      });
+        const isLast = secIdx === sortedSecKeys.length - 1;
 
-      const isLast = secIdx === sortedSecKeys.length - 1;
-
-      allSectionsHtml += `
-        <div class="section-sheet" style="${!isLast ? 'page-break-after: always; break-after: page;' : ''}">
-          <!-- الترويسة الرسمية للسكشن -->
-          <div class="report-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; font-weight: bold; font-size: 13.5px; line-height: 1.5; border-bottom: 2px solid #000; padding-bottom: 8px; padding-top: 4px;">
-            <div style="text-align: right; width: 28%;">
-              جامعة قنا<br/>
-              كلية التربية النوعية<br/>
-              قسم التربية الفنية
-            </div>
-            <div style="text-align: center; width: 44%;">
-              <div style="font-size: 19px; font-weight: bold; margin-bottom: 2px;">كشف الحضور والغياب التفصيلي</div>
-              <div style="font-size: 12.5px; color: #222; font-weight: bold;">
-                مقرر: ${course?.name || ''} &nbsp;|&nbsp; الفرقة: ${course?.academic_year || ''}
+        allSectionsHtml += `
+          <div class="section-sheet" style="${!isLast ? 'page-break-after: always; break-after: page;' : ''}">
+            <!-- الترويسة الرسمية للسكشن -->
+            <div class="report-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; font-weight: bold; font-size: 12.5px; line-height: 1.4; border-bottom: 2px solid #000; padding-bottom: 6px; padding-top: 2px;">
+              <div style="text-align: right; width: 28%;">
+                جامعة قنا<br/>
+                كلية التربية النوعية<br/>
+                قسم التربية الفنية
               </div>
-              <div style="margin-top: 5px;">
-                <span style="background: #0f172a; color: #ffffff; padding: 3px 18px; border-radius: 6px; font-size: 14px; font-weight: bold; display: inline-block;">
-                  ${secTitleBadge}
-                </span>
+              <div style="text-align: center; width: 44%;">
+                <div style="font-size: 18px; font-weight: bold; margin-bottom: 2px;">كشف الحضور والغياب التفصيلي</div>
+                <div style="font-size: 12px; color: #222; font-weight: bold;">
+                  مقرر: ${course?.name || ''} &nbsp;|&nbsp; الفرقة: ${course?.academic_year || ''}
+                </div>
+                <div style="margin-top: 4px;">
+                  <span style="background: #0f172a; color: #ffffff; padding: 2px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; display: inline-block;">
+                    ${secTitleBadge}
+                  </span>
+                </div>
+              </div>
+              <div style="text-align: left; width: 28%; font-size: 12px; line-height: 1.4;">
+                أستاذ المقرر: <b>${instructorName}</b><br/>
+                ${termInfo ? `<span style="font-size: 10.5px; color: #444;">${termInfo}</span><br/>` : ''}
+                <span style="font-size: 11px; color: #000;">إجمالي طلاب السكشن: <b>${secStudents.length} طالب</b></span>
               </div>
             </div>
-            <div style="text-align: left; width: 28%; font-size: 13px; line-height: 1.5;">
-              أستاذ المقرر: <b>${instructorName}</b><br/>
-              ${termInfo ? `<span style="font-size: 11px; color: #444;">${termInfo}</span><br/>` : ''}
-              <span style="font-size: 11.5px; color: #000;">إجمالي طلاب السكشن: <b>${secStudents.length} طالب</b></span>
-            </div>
-          </div>
 
-          <!-- جدول الحضور التفصيلي الخاص بالسكشن -->
-          <table class="att-table">
-            <thead>
-              <tr>
-                <th style="width: 32px; text-align: center; font-size: 12px;">م</th>
-                <th style="width: 180px; text-align: right; font-size: 12px; padding-right: 8px;">اسم الطالب</th>
-                ${weeks.map(w => `
-                  <th style="text-align: center; vertical-align: middle; padding: 4px 2px;">
-                    <div style="font-weight: bold; font-size: 11px; white-space: nowrap;">${w.name}</div>
-                    <div style="font-size: 8.5px; font-weight: normal; color: #333; margin-top: 2px; white-space: nowrap;">${w.subtitle}</div>
+            <!-- جدول الحضور التفصيلي الخاص بالسكشن -->
+            <table class="att-table">
+              <thead>
+                <tr>
+                  <th style="width: 28px; text-align: center; font-size: 10.5px;">م</th>
+                  <th style="min-width: 140px; text-align: right; font-size: 10.5px; padding-right: 6px;">اسم الطالب</th>
+                  ${weeks.map(w => `
+                    <th style="text-align: center; vertical-align: middle; padding: 3px 2px;">
+                      <div style="font-weight: bold; font-size: 9.5px; white-space: nowrap;">${w.name}</div>
+                      <div style="font-size: 7.5px; font-weight: normal; color: #333; margin-top: 1px; white-space: nowrap;">${w.subtitle}</div>
+                    </th>
+                  `).join('')}
+                  <th style="width: 38px; text-align: center; vertical-align: middle; padding: 3px 2px; font-size: 9.5px;">
+                    <div>إجمالي</div><div>الحضور</div>
                   </th>
-                `).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRows}
-            </tbody>
-          </table>
+                  <th style="width: 38px; text-align: center; vertical-align: middle; padding: 3px 2px; font-size: 9.5px;">
+                    <div>النسبة</div><div>%</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
 
-          <!-- التوقيعات وتذييل السكشن -->
-          <div style="margin-top: 15px; padding-top: 8px;">
-            <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; padding: 0 30px; margin-bottom: 12px;">
-              <div>توقيع أستاذ المادة: .................................</div>
-              <div>توقيع رئيس القسم: .................................</div>
-              <div>عميد الكلية: .................................</div>
-            </div>
-            <div class="page-footer" style="font-size: 10px; text-align: center; color: #555; border-top: 1px dashed #aaa; padding-top: 4px;">
-              تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')} &nbsp;&nbsp;|&nbsp;&nbsp; منظومة قسم التربية الفنية &nbsp;&nbsp;|&nbsp;&nbsp; مبرمج ومطور النظام: <span style="font-size: 11px; color: #000; font-weight: bold;">إسلام عبداللطيف</span>
+            <!-- التوقيعات وتذييل السكشن -->
+            <div style="margin-top: 12px; padding-top: 6px; page-break-inside: avoid;">
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: bold; padding: 0 30px; margin-bottom: 8px;">
+                <div>توقيع أستاذ المادة: .................................</div>
+                <div>توقيع رئيس القسم: .................................</div>
+                <div>عميد الكلية: .................................</div>
+              </div>
+              <div class="page-footer" style="font-size: 9.5px; text-align: center; color: #555; border-top: 1px dashed #aaa; padding-top: 4px;">
+                تاريخ الاستخراج: ${new Date().toLocaleString('ar-EG')} &nbsp;&nbsp;|&nbsp;&nbsp; منظومة قسم التربية الفنية &nbsp;&nbsp;|&nbsp;&nbsp; مبرمج ومطور النظام: <span style="font-size: 10.5px; color: #000; font-weight: bold;">إسلام عبداللطيف</span>
+              </div>
             </div>
           </div>
-        </div>
-        ${!isLast ? '<div class="html2pdf__page-break" style="page-break-after: always; break-after: page;"></div>' : ''}
-      `;
-    });
+          ${!isLast ? '<div class="html2pdf__page-break" style="page-break-after: always; break-after: page;"></div>' : ''}
+        `;
+      });
+    }
 
     const filename = selectedSections.length === availableSections.length
       ? `${course?.name || 'course'}_attendance_all_sections.pdf`
@@ -537,7 +786,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     
     let tableRows = '';
     unevaluated.forEach((s, i) => {
-      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td><td>لم يقيم</td></tr>`;
+      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${formatStudentNameWithBadges(s)}</td><td>${s.section || 'تخلفات'}</td><td>لم يقيم</td></tr>`;
     });
 
     const tableHtml = `
@@ -557,7 +806,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     let tableRows = '';
     evaluated.forEach((s, i) => {
       const ev = projectEvals.find(e => e.student_id === s.id);
-      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td><td><strong>${ev?.score || 0}</strong> / ${proj?.max_score}</td></tr>`;
+      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${formatStudentNameWithBadges(s)}</td><td>${s.section || 'تخلفات'}</td><td><strong>${ev?.score || 0}</strong> / ${proj?.max_score}</td></tr>`;
     });
 
     const tableHtml = `
@@ -585,7 +834,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     const { completelyUnevaluated } = getAllProjectsStats();
     let tableRows = '';
     completelyUnevaluated.forEach((s, i) => {
-      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td><td>لم يقدم أي مشروع</td></tr>`;
+      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${formatStudentNameWithBadges(s)}</td><td>${s.section || 'تخلفات'}</td><td>لم يقدم أي مشروع</td></tr>`;
     });
     const tableHtml = `<table><thead><tr><th style="width: 50px;">م</th><th>اسم الطالب</th><th style="width: 100px;">السكشن</th><th style="width: 150px;">الحالة</th></tr></thead><tbody>${tableRows}</tbody></table>`;
     await downloadPdf("report.pdf", course?.name || "", "كشف الطلاب المحرومين", "الطلاب الذين لم يقدموا أو يُقيّموا في أي مشروع نهائياً.", tableHtml, instructorName);
@@ -596,7 +845,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     const { evaluatedSomehow } = getAllProjectsStats();
     let tableRows = '';
     evaluatedSomehow.forEach((s, i) => {
-      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td><td>${s.section || 'تخلفات'}</td><td><strong>${s.evalCount}</strong> مشاريع</td></tr>`;
+      tableRows += `<tr><td>${i + 1}</td><td style="text-align: right;">${formatStudentNameWithBadges(s)}</td><td>${s.section || 'تخلفات'}</td><td><strong>${s.evalCount}</strong> مشاريع</td></tr>`;
     });
     const tableHtml = `<table><thead><tr><th style="width: 50px;">م</th><th>اسم الطالب</th><th style="width: 100px;">السكشن</th><th style="width: 150px;">المشاريع المقيمة</th></tr></thead><tbody>${tableRows}</tbody>      </table>
     `;
@@ -612,7 +861,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     
     students.forEach((s, i) => {
       const presences = attendance.filter(a => a.student_id === s.id).length;
-      let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right; white-space: nowrap;">${s.full_name}</td><td><strong>${presences}</strong></td>`;
+      let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right; white-space: nowrap;">${formatStudentNameWithBadges(s)}</td><td><strong>${presences}</strong></td>`;
       
       let totalRawScore = 0;
       sortedProjects.forEach(p => {
@@ -673,7 +922,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       const presences = attendance.filter(a => a.student_id === s.id).length;
       let attendanceScoreRaw = presences * attendancePoints;
       
-      let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right;">${s.full_name}</td>`;
+      let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right;">${formatStudentNameWithBadges(s)}</td>`;
       rowHtml += `<td><strong>${presences}</strong></td>`;
       
       let attScoreStr = attendanceScoreRaw;
@@ -927,6 +1176,70 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
+            {/* Paper Saving & Print Mode Options */}
+            <div style={{ background: "#1e1e1e", padding: "16px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", color: "#e2e8f0", fontSize: "14px", fontWeight: "bold" }}>
+                    📄 خيارات توفير الورق وتخطيط الطباعة:
+                  </label>
+                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                    اختر النمط المناسب لتقليل عدد الأوراق المطبوعة وضمان عدم تقطيع الجداول
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setPaperSavingMode(true)}
+                    style={{
+                      background: paperSavingMode ? "#059669" : "#262626",
+                      color: paperSavingMode ? "#fff" : "#94a3b8",
+                      border: paperSavingMode ? "2px solid #10b981" : "1px solid #444",
+                      padding: "7px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <span>🌱</span> توفير الورق الذكي (مُوصى به)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaperSavingMode(false)}
+                    style={{
+                      background: !paperSavingMode ? "#2563eb" : "#262626",
+                      color: !paperSavingMode ? "#fff" : "#94a3b8",
+                      border: !paperSavingMode ? "2px solid #3b82f6" : "1px solid #444",
+                      padding: "7px 14px",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <span>📑</span> سكشن منفصل لكل ورقة
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: "10px 14px", background: paperSavingMode ? "rgba(16, 185, 129, 0.1)" : "rgba(59, 130, 246, 0.1)", borderRadius: "8px", borderRight: paperSavingMode ? "3px solid #10b981" : "3px solid #3b82f6" }}>
+                <p style={{ margin: 0, fontSize: "12.5px", color: paperSavingMode ? "#6ee7b7" : "#93c5fd", lineHeight: "1.5" }}>
+                  {paperSavingMode
+                    ? "✓ وضع توفير الورق الذكي نشط: يدمج السكاشن المحددة في تدفق مستمر ويضغط المسافات وحجم الخطوط بحيث تتسع الورقة الواحدة حتى 30-35 طالباً، مما يخفض عدد الأوراق المطبوعة لأكثر من النصف ويمنع وجود أوراق شبه فارغة."
+                    : "• وضع الفصل نشط: يطبع كل سكشن في صفحة منفصلة خاصة به مع ترويسته وتوقيعاته المستقلة، مع المحافظة على التنسيق المضغوط لمنع انشطار السكشن الواحد."}
+                </p>
+              </div>
+            </div>
+
             {/* Quick Stats Box */}
             <div style={{ background: "#1e1e1e", padding: "16px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
@@ -939,9 +1252,15 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
                   {students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
                 <span style={{ color: "#aaa" }}>تخطيط الصفحة:</span>
                 <span style={{ color: "#38bdf8", fontWeight: "bold" }}>أفقي بالعرض (Landscape) - A4</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#aaa" }}>نمط استهلاك الورق:</span>
+                <span style={{ color: paperSavingMode ? "#34d399" : "#60a5fa", fontWeight: "bold" }}>
+                  {paperSavingMode ? "🌱 توفير الورق الذكي (مدمج ومكثف)" : "📑 سكشن مستقل لكل ورقة"}
+                </span>
               </div>
             </div>
 

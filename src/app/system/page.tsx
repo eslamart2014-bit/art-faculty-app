@@ -2177,6 +2177,9 @@ export default function SystemPage() {
                           }}
                         >
                           <span>{c.courseName}</span>
+                          {c.instructorTitle && (
+                            <span style={{ fontSize: "10.5px", opacity: 0.8, fontWeight: "normal" }}>({c.instructorTitle})</span>
+                          )}
                           {courseUnread > 0 && (
                             <span style={{
                               background: "#ef4444",
@@ -3050,7 +3053,14 @@ export default function SystemPage() {
                   return (
                     <div key={c.courseId} className="glass-card" style={{ padding: "16px", borderRadius: "14px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                        <span style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>{c.courseName}</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                          <span style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>{c.courseName}</span>
+                          {(c.instructorTitle || c.instructorName) && (
+                            <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "normal" }}>
+                              👨‍🏫 أستاذ المقرر: {c.instructorTitle || c.instructorName}
+                            </span>
+                          )}
+                        </div>
                         <span style={{ 
                           fontSize: "12px", 
                           padding: "4px 10px", 
@@ -3247,6 +3257,11 @@ export default function SystemPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div style={{ color: "#fca5a5", fontWeight: "bold", fontSize: "15px" }}>
                         ⚠️ إنذار غياب رسمي: {w.courseName}
+                        {(w.instructorTitle || w.instructorName) && (
+                          <span style={{ fontSize: "11px", color: "#fecaca", fontWeight: "normal", marginRight: "6px" }}>
+                            ({w.instructorTitle || w.instructorName})
+                          </span>
+                        )}
                       </div>
                       <span style={{ background: "#ef4444", color: "#fff", fontSize: "11px", fontWeight: "bold", padding: "2px 8px", borderRadius: "6px" }}>
                         مستوى الخطر 🚨

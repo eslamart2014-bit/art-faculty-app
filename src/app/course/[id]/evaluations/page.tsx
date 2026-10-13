@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/syncEngine";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
-import { playScanClickSound, playScanErrorSound } from "@/lib/audioHelper";
+import { playScanClickSound, playScanErrorSound, playScanAlreadyEvaluatedSound } from "@/lib/audioHelper";
+import { getStudentTag, setStudentTag } from "@/lib/studentTagsHelper";
 
 
 
@@ -227,6 +228,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [scannedStudents, setScannedStudents] = useState<any[]>([]);
   const [activeScannedStudent, setActiveScannedStudent] = useState<any>(null);
   const [savingBatch, setSavingBatch] = useState(false);
+  const [taggingStudent, setTaggingStudent] = useState<any | null>(null);
 
   // Manual specific states
   const [targetStudent, setTargetStudent] = useState<any>(null);
@@ -728,10 +730,6 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     try {
       const student = await checkStudentLocalOrGlobal(cleanCode);
       if (student) {
-        setScannerStatus('success');
-        setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
-        vibrateSuccess();
-
         const attCount = await getAttendanceCount(student.id);
         
         let { data: ex }: { data: any } = await supabase.from("evaluations")
@@ -757,21 +755,39 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
           }
         }
 
-        const existingScore = (ex && ex.score !== null && ex.score > 0) ? ex.score : null;
+        const existingScore = (ex && ex.score !== null && !isNaN(Number(ex.score)) && Number(ex.score) > 0) ? Number(ex.score) : null;
+        const isAlreadyEvaluated = existingScore !== null;
 
         const studentWithData = {
           student,
           attCount,
           score: existingScore,
           evalRecord: ex,
-          isExisting: !!(ex && ex.score > 0)
+          isExisting: isAlreadyEvaluated
         };
+
+        if (isAlreadyEvaluated) {
+          playScanAlreadyEvaluatedSound();
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([120, 60, 120]);
+          setScannerStatus('success');
+          setScannerStatusText(`⚠️ تم تقييم الطالب مسبقاً (${existingScore} من ${selectedProject?.max_score})`);
+        } else {
+          setScannerStatus('success');
+          setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
+          vibrateSuccess();
+        }
 
         setTimeout(() => {
           setScannerStatus('idle');
           setScannerStatusText("");
           isProcessingScanRef.current = false;
-          if (!ex?.photo_url) {
+          
+          if (isAlreadyEvaluated) {
+            // للطالب المقيّم مسبقاً: فتح شباك الدرجات فوراً مع تظليل درجته السابقة دون إيقافه بتحذير الصورة
+            setActiveScannedStudent(studentWithData);
+            setCameraScoreInput(existingScore.toString());
+            setTimeout(() => document.getElementById("cameraGradeInput")?.focus(), 150);
+          } else if (!ex?.photo_url) {
             setNoPhotoWarning({
               student,
               attCount,
@@ -781,7 +797,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             });
           } else {
             setActiveScannedStudent(studentWithData);
-            setCameraScoreInput(studentWithData.score !== null ? studentWithData.score.toString() : "");
+            setCameraScoreInput("");
             setTimeout(() => document.getElementById("cameraGradeInput")?.focus(), 150);
           }
         }, 500);
@@ -1523,6 +1539,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             {activeScannedStudent && selectedProject && (
               <div style={{ background: "#151e15", border: "2px solid #4CAF50", padding: "14px", borderRadius: "12px", marginTop: "6px", animation: "slideUp 0.2s" }}>
                 
+                {/* تنبيه إذا كان الطالب مقيماً مسبقاً */}
+                {activeScannedStudent.isExisting && (
+                  <div style={{ background: "rgba(255, 152, 0, 0.15)", border: "1px solid #FF9800", color: "#FFB74D", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>⚠️ تم تقييم هذا الطالب مسبقاً بدرجة (<b>{activeScannedStudent.score}</b> من {selectedProject.max_score}).</span>
+                    <span style={{ fontSize: "11px", color: "#fff" }}>اختر درجة جديدة للتعديل</span>
+                  </div>
+                )}
+
                 {/* Student Info Header with Absolute Close Button */}
                 <div style={{ position: "relative", marginBottom: "8px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "6px" }}>
                   <button 
@@ -1558,6 +1582,23 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                       <span style={{ background: "#333", color: "#ddd", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>س: {activeScannedStudent.student.section}</span>
                       <span style={{ background: "#FF9800", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px", fontWeight: "bold" }}>حضور: {activeScannedStudent.attCount}</span>
                       <span style={{ background: "#555", color: "#fff", borderRadius: "5px", padding: "2px 6px", fontSize: "11px" }}>Max: {selectedProject.max_score}</span>
+
+                      {/* تذكيرات وشارات الطالب في التقييم */}
+                      {(activeScannedStudent.student.isMakeup || course?.makeup_students?.includes(activeScannedStudent.student.id) || activeScannedStudent.student.section === "تخلفات") && (
+                        <span style={{ background: "rgba(233, 30, 99, 0.25)", color: "#f43f5e", border: "1px solid #f43f5e", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: "bold" }}>
+                          🔄 طالب تخلفات
+                        </span>
+                      )}
+                      {getStudentTag(activeScannedStudent.student, course?.teacher_id) === "distinguished" && (
+                        <span style={{ background: "rgba(234, 179, 8, 0.25)", color: "#facc15", border: "1px solid #eab308", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: "bold" }}>
+                          ⭐ تذكير: طالب متميز
+                        </span>
+                      )}
+                      {getStudentTag(activeScannedStudent.student, course?.teacher_id) === "uncommitted" && (
+                        <span style={{ background: "rgba(239, 68, 68, 0.25)", color: "#f87171", border: "1px solid #ef4444", borderRadius: "5px", padding: "2px 8px", fontSize: "11px", fontWeight: "bold" }}>
+                          ⚠️ تنبيه: طالب غير ملتزم
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1747,24 +1788,99 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                 </div>
 
                 <div style={{ flexGrow: 1, overflowY: "auto", maxHeight: "200px", display: "flex", flexDirection: "column", gap: "5px" }}>
-                  {scannedStudents.map((s, idx) => (
-                    <div key={idx} style={{ background: "#1e1e1e", border: "1px solid #333", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "12px" }}>{s.student.full_name}</div>
-                        <div style={{ color: "#888", fontSize: "10px" }}>كود: {s.student.student_code} • س: {s.student.section}</div>
+                  {scannedStudents.map((s, idx) => {
+                    const isMakeup = s.student.isMakeup || course?.makeup_students?.includes(s.student.id) || s.student.section === "تخلفات";
+                    const sTag = getStudentTag(s.student, course?.teacher_id);
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => setTaggingStudent(s.student)}
+                        style={{ background: "#1e1e1e", border: "1px solid #333", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+                        title="انقر لتصنيف الطالب (متميز / غير ملتزم)"
+                      >
+                        <div>
+                          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                            <span>{s.student.full_name}</span>
+                            {isMakeup && (
+                              <span style={{ background: "rgba(233, 30, 99, 0.2)", color: "#f43f5e", border: "1px solid rgba(233, 30, 99, 0.4)", fontSize: "9.5px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                🔄 تخلفات
+                              </span>
+                            )}
+                            {sTag === "distinguished" && (
+                              <span style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.4)", fontSize: "9.5px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                ⭐ متميز
+                              </span>
+                            )}
+                            {sTag === "uncommitted" && (
+                              <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", fontSize: "9.5px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                ⚠️ غير ملتزم
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: "#888", fontSize: "10px" }}>كود: {s.student.student_code} • س: {s.student.section}</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ background: "#4CAF50", color: "#000", fontWeight: "bold", padding: "3px 6px", borderRadius: "5px", fontSize: "12px" }}>{s.score ?? 0}</span>
+                          <button onClick={(e) => { e.stopPropagation(); handleRemoveScannedStudent(idx); }} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#f44336", fontSize: "14px", cursor: "pointer", padding: "0 4px" }}>✕</button>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ background: "#4CAF50", color: "#000", fontWeight: "bold", padding: "3px 6px", borderRadius: "5px", fontSize: "12px" }}>{s.score ?? 0}</span>
-                        <button onClick={() => handleRemoveScannedStudent(idx)} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#f44336", fontSize: "14px", cursor: "pointer", padding: "0 4px" }}>✕</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* QUICK STUDENT TAGGING MODAL */}
+      {taggingStudent && (
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 2000, display: "flex", justifyContent: "center", alignItems: "center" }} onClick={() => setTaggingStudent(null)}>
+          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "14px", padding: "20px", textAlign: "center", border: "1px solid #444", direction: "rtl", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: "#38bdf8", marginTop: 0 }}>{taggingStudent.full_name}</h3>
+            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "16px", fontFamily: "monospace" }}>كود: {taggingStudent.student_code}</p>
+
+            <div style={{ fontSize: "12px", color: "#cbd5e1", marginBottom: "10px", fontWeight: "bold" }}>🏷️ تصنيف الطالب (مرئي لك فقط):</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+              <button 
+                onClick={async () => {
+                  await setStudentTag(taggingStudent, 'distinguished', course?.teacher_id);
+                  setTaggingStudent(null);
+                }}
+                style={{ background: getStudentTag(taggingStudent, course?.teacher_id) === 'distinguished' ? "#ca8a04" : "#3b341f", color: "#fef08a", border: "1px solid #eab308", padding: "10px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                ⭐ طالب متميز
+              </button>
+              <button 
+                onClick={async () => {
+                  await setStudentTag(taggingStudent, 'uncommitted', course?.teacher_id);
+                  setTaggingStudent(null);
+                }}
+                style={{ background: getStudentTag(taggingStudent, course?.teacher_id) === 'uncommitted' ? "#b91c1c" : "#3b1f1f", color: "#fca5a5", border: "1px solid #ef4444", padding: "10px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                ⚠️ غير ملتزم
+              </button>
+            </div>
+            {getStudentTag(taggingStudent, course?.teacher_id) && (
+              <button 
+                onClick={async () => {
+                  await setStudentTag(taggingStudent, null, course?.teacher_id);
+                  setTaggingStudent(null);
+                }}
+                style={{ background: "transparent", color: "#94a3b8", border: "1px dashed #64748b", padding: "8px", borderRadius: "6px", fontSize: "11px", width: "100%", cursor: "pointer", marginBottom: "10px" }}
+              >
+                ✖️ إزالة علامة التصنيف
+              </button>
+            )}
+            <button 
+              onClick={() => setTaggingStudent(null)}
+              style={{ background: "#333", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", width: "100%", cursor: "pointer" }}
+            >
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* PROJECT STATS MODAL */}
       {statsProject && (

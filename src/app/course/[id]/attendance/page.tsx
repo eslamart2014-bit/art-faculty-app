@@ -9,7 +9,8 @@ import { getCurrentWeekRange } from "@/lib/dateHelpers";
 const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, loading: () => <div style={{padding: "20px", textAlign: "center"}}>جاري تحميل الكاميرا...</div> });
 
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
-import { playScanClickSound, playScanErrorSound, initScannerAudio } from "@/lib/audioHelper";
+import { playScanClickSound, playScanErrorSound, playScanAlreadyAttendedSound, initScannerAudio } from "@/lib/audioHelper";
+import { getStudentTag, setStudentTag } from "@/lib/studentTagsHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -623,6 +624,11 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   };
   // 2. Duplicate scan: two rapid vibrations
   const vibrateDuplicate = () => { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([70, 40, 70]); };
+  // 2.5. Already attended this week: distinct chime & vibration
+  const vibrateAlreadyAttended = () => { 
+    playScanAlreadyAttendedSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([120, 60, 120]); 
+  };
   // 3. Heavy error vibration (wrong code / different cohort / invalid)
   const vibrateHeavyError = () => { 
     playScanErrorSound();
@@ -647,60 +653,59 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    // Immediate check if student code is already in scannedStudents (Duplicate: 2 rapid vibrations)
-    const codeVariants = getStudentCodeVariants(cleanCode);
-    if (scannedStudents.some(s => codeVariants.includes(s.student_code) || codeVariants.includes(s.id))) {
-      setScannerStatus('error');
-      setScannerStatusText("طالب مكرر مسجل بالفعل في هذه الجلسة ⚠️");
-      vibrateDuplicate();
-      setTimeout(() => {
-        setScannerStatus('idle');
-        setScannerStatusText("");
-        isProcessingScanRef.current = false;
-      }, 800);
-      return;
-    }
-
     try {
       const student = await checkStudentLocalOrGlobal(cleanCode);
       if (student) {
-        let alreadyAdded = false;
-        setScannedStudents(prev => {
-          if (prev.some(s => s.id === student.id || s.student_code === student.student_code)) {
-            alreadyAdded = true;
-            return prev;
-          }
-          // وضع أحدث طالب تم رصده في بداية القائمة بالأعلى
-          return [student, ...prev];
-        });
+        // فحص ما إذا كان الطالب تم تحضيره مسبقاً هذا الأسبوع
+        const isAlreadyInDb = attendance.some(a => String(a.student_id) === String(student.id) && a.status === 'حاضر');
+        const isAlreadySelected = selectedStudentIds.has(student.id);
+        const isAlreadyInSession = scannedStudents.some(s => s.id === student.id || s.student_code === student.student_code);
 
-        if (alreadyAdded) {
+        if (isAlreadyInDb || isAlreadySelected || isAlreadyInSession) {
           setScannerStatus('error');
-          setScannerStatusText(`طالب مكرر مسجل بالفعل: ${student.full_name} ⚠️`);
-          vibrateDuplicate();
-        } else {
-          setLatestScannedStudentId(student.id);
-          setScannerStatus('success');
-          setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
-          vibrateSuccess();
-
-          // التمرير التلقائي السلس لأعلى القائمة لضمان رؤية الطالب فوراً بدون سكرول
+          setScannerStatusText(`⚠️ تم تحضير الطالب هذا الأسبوع مسبقاً (${student.full_name})`);
+          vibrateAlreadyAttended();
           setTimeout(() => {
-            if (scannedListRef.current) {
-              scannedListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          }, 40);
+            setScannerStatus('idle');
+            setScannerStatusText("");
+            isProcessingScanRef.current = false;
+          }, 1200);
+          return;
         }
+
+        // إذا لم يكن مسجلاً، يُضاف لقائمة الحضور فوراً
+        setScannedStudents(prev => [student, ...prev]);
+        setLatestScannedStudentId(student.id);
+        setScannerStatus('success');
+        setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
+        vibrateSuccess();
+
+        // التمرير التلقائي السلس لأعلى القائمة لضمان رؤية الطالب فوراً بدون سكرول
+        setTimeout(() => {
+          if (scannedListRef.current) {
+            scannedListRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }, 50);
+
+        setTimeout(() => {
+          setScannerStatus('idle');
+          setScannerStatusText("");
+          isProcessingScanRef.current = false;
+        }, 800);
       } else {
         setScannerStatus('error');
         setScannerStatusText("طالب غير مسجل في المقرر ❌");
         vibrateHeavyError();
+        setTimeout(() => {
+          setScannerStatus('idle');
+          setScannerStatusText("");
+          isProcessingScanRef.current = false;
+        }, 800);
       }
     } catch (err) {
       setScannerStatus('error');
       setScannerStatusText("خطأ في قراءة بيانات الطالب ❌");
       vibrateHeavyError();
-    } finally {
       setTimeout(() => {
         setScannerStatus('idle');
         setScannerStatusText("");
@@ -1170,10 +1175,22 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                 }}
               >
                 <div>
-                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff", display: "flex", alignItems: "center", gap: "8px" }}>
-                    {student.full_name}
-                    {student.isMakeup && (
-                      <span style={{ background: "#E91E63", color: "white", fontSize: "10px", padding: "2px 6px", borderRadius: "8px" }}>تخلفات</span>
+                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span>{student.full_name}</span>
+                    {(student.isMakeup || course?.makeup_students?.includes(student.id) || student.section === "تخلفات") && (
+                      <span style={{ background: "rgba(233, 30, 99, 0.2)", color: "#f43f5e", border: "1px solid rgba(233, 30, 99, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                        🔄 تخلفات
+                      </span>
+                    )}
+                    {getStudentTag(student, course?.teacher_id) === "distinguished" && (
+                      <span style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                        ⭐ متميز
+                      </span>
+                    )}
+                    {getStudentTag(student, course?.teacher_id) === "uncommitted" && (
+                      <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
+                        ⚠️ غير ملتزم
+                      </span>
                     )}
                   </div>
                   <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : "#888", marginTop: "4px", fontFamily: "monospace" }}>
@@ -1219,7 +1236,48 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(3px)" }}>
           <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #333", direction: "rtl" }}>
             <h3 style={{ color: "var(--primary)", marginTop: 0 }}>{longPressStudent.full_name}</h3>
-            <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "20px", fontFamily: "monospace" }}>كود: {longPressStudent.student_code}</p>
+            <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "12px", fontFamily: "monospace" }}>كود: {longPressStudent.student_code}</p>
+
+            {/* تصنيف وتمييز الطالب */}
+            <div style={{ background: "#262626", padding: "10px", borderRadius: "10px", marginBottom: "14px", border: "1px solid #3a3a3a" }}>
+              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "8px", fontWeight: "bold" }}>🏷️ تصنيف الطالب (مرئي لك فقط):</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "6px" }}>
+                <button 
+                  onClick={async () => {
+                    await setStudentTag(longPressStudent, 'distinguished', course?.teacher_id);
+                    vibrateSuccess();
+                    setLongPressStudent(null);
+                    fetchData();
+                  }}
+                  style={{ background: getStudentTag(longPressStudent, course?.teacher_id) === 'distinguished' ? "#ca8a04" : "#3b341f", color: "#fef08a", border: "1px solid #eab308", padding: "9px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  ⭐ طالب متميز
+                </button>
+                <button 
+                  onClick={async () => {
+                    await setStudentTag(longPressStudent, 'uncommitted', course?.teacher_id);
+                    vibrateHeavyError();
+                    setLongPressStudent(null);
+                    fetchData();
+                  }}
+                  style={{ background: getStudentTag(longPressStudent, course?.teacher_id) === 'uncommitted' ? "#b91c1c" : "#3b1f1f", color: "#fca5a5", border: "1px solid #ef4444", padding: "9px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  ⚠️ غير ملتزم
+                </button>
+              </div>
+              {getStudentTag(longPressStudent, course?.teacher_id) && (
+                <button 
+                  onClick={async () => {
+                    await setStudentTag(longPressStudent, null, course?.teacher_id);
+                    setLongPressStudent(null);
+                    fetchData();
+                  }}
+                  style={{ background: "transparent", color: "#94a3b8", border: "1px dashed #64748b", padding: "6px", borderRadius: "6px", fontSize: "11px", width: "100%", cursor: "pointer" }}
+                >
+                  ✖️ إزالة علامة التصنيف
+                </button>
+              )}
+            </div>
             
             {isExcused ? (
               <button onClick={handleCancelAttendancePast} style={{ background: "#f44336", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
@@ -1409,20 +1467,45 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                 <tbody>
                   {scannedStudents.map((s, idx) => {
                     const isLatest = s.id === latestScannedStudentId;
+                    const isMakeup = s.isMakeup || course?.makeup_students?.includes(s.id) || s.section === "تخلفات";
+                    const sTag = getStudentTag(s, course?.teacher_id);
                     return (
                       <tr 
                         key={s.id} 
                         className={isLatest ? "latest-scanned-row" : ""}
+                        onTouchStart={() => handleTouchStart(s)}
+                        onTouchEnd={handleTouchEnd}
+                        onMouseDown={() => handleTouchStart(s)}
+                        onMouseUp={handleTouchEnd}
                         style={{ 
                           background: isLatest ? "rgba(76, 175, 80, 0.28)" : (idx % 2 === 0 ? "#222" : "#1a1a1a"),
-                          transition: "background-color 0.3s ease"
+                          transition: "background-color 0.3s ease",
+                          cursor: "pointer"
                         }}
+                        title="اضغط ضغطة مطولة لتصنيف الطالب (متميز / غير ملتزم)"
                       >
                         <td style={{ padding: "10px", border: "1px solid #444", color: "#fff", textAlign: "right" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "4px" }}>
-                            <span style={{ fontWeight: isLatest ? "bold" : "normal", color: isLatest ? "#81C784" : "#fff" }}>
-                              {s.full_name}
-                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <span style={{ fontWeight: isLatest ? "bold" : "normal", color: isLatest ? "#81C784" : "#fff" }}>
+                                {s.full_name}
+                              </span>
+                              {isMakeup && (
+                                <span style={{ background: "rgba(233, 30, 99, 0.2)", color: "#f43f5e", border: "1px solid rgba(233, 30, 99, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                  🔄 تخلفات
+                                </span>
+                              )}
+                              {sTag === "distinguished" && (
+                                <span style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                  ⭐ متميز
+                                </span>
+                              )}
+                              {sTag === "uncommitted" && (
+                                <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
+                                  ⚠️ غير ملتزم
+                                </span>
+                              )}
+                            </div>
                             {isLatest && (
                               <span style={{ 
                                 background: "#4CAF50", 
@@ -1444,7 +1527,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                         </td>
                         <td style={{ padding: "10px", border: "1px solid #444", color: "#4CAF50", fontWeight: "bold" }}>{s.section}</td>
                         <td style={{ padding: "10px", border: "1px solid #444" }}>
-                          <button onClick={() => setScannedStudents(prev => prev.filter(x => x.id !== s.id))} style={{ background: "transparent", border: "none", color: "#f44336", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>✕</button>
+                          <button onClick={(e) => { e.stopPropagation(); setScannedStudents(prev => prev.filter(x => x.id !== s.id)); }} style={{ background: "transparent", border: "none", color: "#f44336", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>✕</button>
                         </td>
                       </tr>
                     );
