@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { lockerStore } from '@/lib/lockerStore';
+import { formatInstructorTitle, getDegreePrefix } from '@/lib/academicHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,38 +15,6 @@ function normalizeArabic(str: string = ''): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
-}
-
-function formatInstructorTitle(profile: any): string {
-  if (!profile) return 'أستاذ المقرر';
-  const name = (profile.full_name || '').trim();
-  const degree = (profile.degree || '').trim();
-  const role = (profile.role || '').trim();
-
-  // If already starts with title prefix
-  if (/^(د\/|د\.|أ\.د\/|أ\.د\.|م\/|م\.|م\.م\/|م\.م\.|أ\/)/.test(name)) {
-    return name;
-  }
-
-  const d = degree.toLowerCase().trim();
-  const r = role.toLowerCase().trim();
-
-  let prefix = '';
-  if (d.includes('أستاذ دكتور') || d.includes('ا.د') || d.includes('أ.د')) {
-    prefix = 'أ.د/ ';
-  } else if (d.includes('دكتور') || d === 'د' || d === 'د.' || (r.includes('مدرس') && !r.includes('مساعد')) || r.includes('دكتور')) {
-    prefix = 'د/ ';
-  } else if (d.includes('مدرس مساعد') || d === 'م.م' || d === 'م.م.' || r.includes('مساعد')) {
-    prefix = 'م.م/ ';
-  } else if (d.includes('معيد') || d === 'م' || d === 'م.' || r.includes('معيد') || d.includes('مهندس')) {
-    prefix = 'م/ ';
-  } else if (d.includes('أستاذ') || d.includes('استاذ')) {
-    prefix = 'أ/ ';
-  } else {
-    prefix = 'أ/ ';
-  }
-
-  return `${prefix}${name}`.trim();
 }
 
 export async function GET(request: Request) {
@@ -152,7 +121,7 @@ export async function GET(request: Request) {
         .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`),
       supabaseAdmin
         .from('courses')
-        .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id'),
+        .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id, shared_with, excluded_students, makeup_students, student_section_overrides'),
       supabaseAdmin
         .from('system_settings')
         .select('term1_start, term2_start, term1_end, term2_end')
@@ -248,8 +217,10 @@ export async function GET(request: Request) {
       courseDatesMap.get(r.course_id)!.add(r.date);
     });
 
-    // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة
-    const teacherIds = Array.from(new Set(allCourses.map((c: any) => c.teacher_id).filter(Boolean)));
+    // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة (يشمل المدرسين والمشاركين)
+    const teacherIds = Array.from(new Set(
+      allCourses.flatMap((c: any) => [c.teacher_id, ...(c.shared_with || [])]).filter(Boolean)
+    ));
     let teacherProfilesMap: Record<string, any> = {};
     if (teacherIds.length > 0) {
       const { data: tProfiles } = await supabaseAdmin
@@ -260,6 +231,25 @@ export async function GET(request: Request) {
         teacherProfilesMap[tp.id] = tp;
       });
     }
+
+    const buildCourseInstructorInfo = (c: any) => {
+      const prof = teacherProfilesMap[c.teacher_id];
+      const sharedProfs = (c.shared_with || [])
+        .map((id: string) => teacherProfilesMap[id])
+        .filter(Boolean);
+
+      const instructorName = prof?.full_name || 'عضو هيئة التدريس';
+      const instructorDegree = prof?.degree || 'عضو هيئة تدريس';
+      const primaryTitle = formatInstructorTitle(prof);
+
+      let instructorTitle = primaryTitle;
+      if (sharedProfs.length > 0) {
+        const sharedTitles = sharedProfs.map((sp: any) => formatInstructorTitle(sp)).join(' ، ');
+        instructorTitle = `${primaryTitle} (بمشاركة: ${sharedTitles})`;
+      }
+
+      return { instructorName, instructorDegree, instructorTitle };
+    };
 
     const normStudentYear = normalizeArabic(student.academic_year || '');
     const normStudentSec = normalizeArabic(student.section || '');
@@ -331,10 +321,7 @@ export async function GET(request: Request) {
       const presentDates = new Set(records.map((r: any) => r.date));
       const absentDates = allDates.filter(d => !presentDates.has(d)).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-      const prof = teacherProfilesMap[course.teacher_id];
-      const instructorName = prof?.full_name || 'عضو هيئة التدريس';
-      const instructorDegree = prof?.degree || prof?.role || 'عضو هيئة تدريس';
-      const instructorTitle = formatInstructorTitle(prof);
+      const { instructorName, instructorDegree, instructorTitle } = buildCourseInstructorInfo(course);
 
       return {
         courseId: course.id,
@@ -376,10 +363,7 @@ export async function GET(request: Request) {
       const evals = safeTeacherEvals.filter((e: any) => e.course_id === course.id);
       const subs = safeStudentSubmissions.filter((s: any) => s.course_id === course.id);
 
-      const prof = teacherProfilesMap[course.teacher_id];
-      const instructorName = prof?.full_name || 'عضو هيئة التدريس';
-      const instructorDegree = prof?.degree || prof?.role || 'مدرس المقرر';
-      const instructorTitle = formatInstructorTitle(prof);
+      const { instructorName, instructorDegree, instructorTitle } = buildCourseInstructorInfo(course);
 
       // استخراج المشاريع المعتمدة التي حددها الأستاذ في custom_week_names.__projects__
       const rawAssigned = course.custom_week_names?.__projects__ || [];

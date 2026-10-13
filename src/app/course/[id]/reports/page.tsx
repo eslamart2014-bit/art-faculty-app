@@ -8,6 +8,7 @@ import { downloadPdf } from "@/lib/downloadPdf";
 import { getTermAndWeekInfo } from "@/lib/termHelper";
 import { getCurrentWeekRange } from "@/lib/dateHelpers";
 import { getStudentTag } from "@/lib/studentTagsHelper";
+import { formatInstructorTitle } from "@/lib/academicHelper";
 
 export default function ReportsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -86,17 +87,33 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     if (courseData) setCourse(courseData);
 
     // Fetch Students (including makeup)
-    const { data: studentsData } = await supabase.from("students").select("*").eq("academic_year", courseData?.academic_year);
+    const { data: studentsData } = await supabase
+      .from("students")
+      .select("*")
+      .eq("academic_year", courseData?.academic_year)
+      .eq("is_active", true);
+
     const makeupIds = courseData?.makeup_students || [];
     const { data: makeupData } = makeupIds.length > 0 
-      ? await supabase.from("students").select("*").in("id", makeupIds) 
+      ? await supabase.from("students").select("*").in("id", makeupIds).eq("is_active", true) 
       : { data: [] };
     
     const excluded = courseData?.excluded_students || [];
+    const courseSections = Array.isArray(courseData?.sections) && courseData.sections.length > 0 
+      ? courseData.sections.map((s: string) => String(s).trim()) 
+      : null;
+
     const allStudents = [...(studentsData || []), ...(makeupData || [])]
-      .filter((s: any, index: number, self: any[]) => 
-        !excluded.includes(s.id) && index === self.findIndex((t) => t.id === s.id)
-      )
+      .filter((s: any, index: number, self: any[]) => {
+        if (s.is_active === false) return false;
+        if (excluded.includes(s.id)) return false;
+        if (index !== self.findIndex((t) => t.id === s.id)) return false;
+        if (courseSections && !makeupIds.includes(s.id)) {
+          const sSec = s.section ? String(s.section).trim() : '';
+          if (!courseSections.includes(sSec)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => {
         const secA = parseInt(a.section) || 999;
         const secB = parseInt(b.section) || 999;
@@ -122,10 +139,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     // Fetch Instructor Name from profiles table
     const { data: userData } = await supabase.auth.getUser();
     if (userData?.user) {
-      const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userData.user.id).single();
+      const { data: profile } = await supabase.from("profiles").select("full_name, degree, role").eq("id", userData.user.id).single();
       if (profile && profile.full_name) {
-        const title = profile.degree ? `${profile.degree}/` : '';
-        setInstructorName(`${title}${profile.full_name}`);
+        setInstructorName(formatInstructorTitle(profile));
       } else {
         setInstructorName(userData.user.email || "........................");
       }

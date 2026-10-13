@@ -265,15 +265,32 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
   const fetchStats = async (courseData: any, currentProjects: any[] = projects) => {
     try {
+      let studentsQuery = supabase
+        .from("students")
+        .select("id, section, is_active")
+        .eq("academic_year", courseData.academic_year)
+        .eq("is_active", true);
+
+      if (courseData.sections && Array.isArray(courseData.sections) && courseData.sections.length > 0) {
+        studentsQuery = studentsQuery.in("section", courseData.sections);
+      }
+
       const [studentsRes, evalsRes] = await Promise.all([
-        supabase.from("students").select("id").eq("academic_year", courseData.academic_year),
+        studentsQuery,
         supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id)
       ]);
-      const studentsData = studentsRes.data;
-      const evalsData = evalsRes.data;
+      const studentsData = studentsRes.data || [];
+      const evalsData = evalsRes.data || [];
 
       const excluded = courseData.excluded_students || [];
-      const activeStudents = (studentsData || []).filter((s: any) => !excluded.includes(s.id));
+      const activeStudents = studentsData.filter((s: any) => {
+        if (s.is_active === false) return false;
+        if (excluded.includes(s.id)) return false;
+        if (courseData.sections && Array.isArray(courseData.sections) && courseData.sections.length > 0) {
+          return courseData.sections.includes(String(s.section));
+        }
+        return true;
+      });
       let count = activeStudents.length;
 
       if (courseData.makeup_students && courseData.makeup_students.length > 0) {
@@ -473,20 +490,33 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setLoadingStatsModal(true);
 
     try {
-      const { data: studentsData } = await supabase.from("students").select("*").eq("academic_year", course.academic_year);
-      const excluded = course.excluded_students || [];
-      let eligible = (studentsData || []).filter((s: any) => !excluded.includes(s.id));
+      let studentsQuery = supabase
+        .from("students")
+        .select("*")
+        .eq("academic_year", course.academic_year)
+        .eq("is_active", true);
 
-      if (course.course_type === 'sections' && course.sections && Array.isArray(course.sections)) {
-        eligible = eligible.filter((s: any) => course.sections.includes(s.section));
+      if (course.sections && Array.isArray(course.sections) && course.sections.length > 0) {
+        studentsQuery = studentsQuery.in("section", course.sections);
       }
 
+      const { data: studentsData } = await studentsQuery;
+      const excluded = course.excluded_students || [];
+      let eligible = (studentsData || []).filter((s: any) => {
+        if (s.is_active === false) return false;
+        if (excluded.includes(s.id)) return false;
+        if (course.sections && Array.isArray(course.sections) && course.sections.length > 0) {
+          return course.sections.includes(String(s.section));
+        }
+        return true;
+      });
+
       if (course.makeup_students && course.makeup_students.length > 0) {
-        const { data: makeup } = await supabase.from("students").select("*").in("id", course.makeup_students);
+        const { data: makeup } = await supabase.from("students").select("*").in("id", course.makeup_students).eq("is_active", true);
         if (makeup) {
           const eligibleIds = new Set(eligible.map(s => s.id));
           makeup.forEach(m => {
-            if (!eligibleIds.has(m.id) && !excluded.includes(m.id)) eligible.push(m);
+            if (!eligibleIds.has(m.id) && !excluded.includes(m.id) && m.is_active !== false) eligible.push(m);
           });
         }
       }

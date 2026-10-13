@@ -11,6 +11,7 @@ const QRScanner = dynamic(() => import("@/components/QRScanner"), { ssr: false, 
 import { extractStudentCode, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
 import { playScanClickSound, playScanErrorSound, playScanAlreadyAttendedSound, initScannerAudio } from "@/lib/audioHelper";
 import { getStudentTag, setStudentTag } from "@/lib/studentTagsHelper";
+import { formatInstructorTitle } from "@/lib/academicHelper";
 
 const getWeekRangeFromKey = (key: string) => {
   const start = new Date(key);
@@ -324,10 +325,11 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         const studentsPromise = supabase
           .from("students")
           .select("*")
-          .eq("academic_year", courseData.academic_year);
+          .eq("academic_year", courseData.academic_year)
+          .eq("is_active", true);
 
         const makeupPromise = (courseData.makeup_students && courseData.makeup_students.length > 0)
-          ? supabase.from("students").select("*").in("id", courseData.makeup_students)
+          ? supabase.from("students").select("*").in("id", courseData.makeup_students).eq("is_active", true)
           : Promise.resolve({ data: [] });
 
         const allAttPromise = supabase
@@ -352,20 +354,19 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           userPromise
         ]);
 
-        const loadedStudents = studentsRes.data || [];
+        const loadedStudents = (studentsRes.data || []).filter((s: any) => s.is_active !== false);
         setStudents(loadedStudents);
 
-        const loadedMakeup = makeupRes.data || [];
+        const loadedMakeup = (makeupRes.data || []).filter((s: any) => s.is_active !== false);
         if (courseData.makeup_students && courseData.makeup_students.length > 0) {
           setMakeupStudents(loadedMakeup);
         }
 
         let instName = instructorName;
         if (userRes.data?.user) {
-          const { data: profile } = await supabase.from("profiles").select("full_name, degree").eq("id", userRes.data.user.id).single();
+          const { data: profile } = await supabase.from("profiles").select("full_name, degree, role").eq("id", userRes.data.user.id).single();
           if (profile && profile.full_name) {
-            const title = profile.degree ? `${profile.degree}/` : '';
-            instName = `${title}${profile.full_name}`;
+            instName = formatInstructorTitle(profile);
             setInstructorName(instName);
           }
         }
