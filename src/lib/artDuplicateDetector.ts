@@ -45,7 +45,7 @@ export interface PlagiarismMatch {
   matchReason: string;
 }
 
-export function auditArtworkDuplicates(submissions: StudentSubmissionItem[]): any[] {
+export function auditArtworkDuplicates(submissions: StudentSubmissionItem[], minThreshold: number = 80): any[] {
   const matches: any[] = [];
   const processedPairs = new Set<string>();
 
@@ -90,23 +90,25 @@ export function auditArtworkDuplicates(submissions: StudentSubmissionItem[]): an
               highestSimilarity = 100;
               matchedImgA = imgA.url;
               matchedImgB = imgB.url;
-              reason = 'تطابق تام في رابط وملف الصورة المرفوعة';
+              reason = 'تطابق تام في رابط وملف الصورة المرفوعة (نفس الملف)';
               break;
             }
           }
           if (highestSimilarity === 100) break;
         }
 
-        if (highestSimilarity >= 55) {
-          let confidenceTier: 'confirmed' | 'high_suspicion' | 'possible' = 'possible';
-          let tierLabel = '🔍 تشابه محتمل (55% - 69%)';
+        // عتبة الكشف العلمية الدقيقة: مسافة هامد 12 بت أو أقل (نسبة 80% فأكثر)
+        // أي نسبة أقل من 80% تمثل تباين عشوائي طبيعي بين أي صورتين مستقلتين تماماً
+        if (highestSimilarity >= minThreshold) {
+          let confidenceTier: 'confirmed' | 'high_suspicion' | 'possible' = 'high_suspicion';
+          let tierLabel = `⚠️ اشتباه مرتفع (${Math.max(minThreshold, 80)}% - 89%)`;
 
-          if (highestSimilarity >= 85) {
+          if (highestSimilarity >= 90) {
             confidenceTier = 'confirmed';
-            tierLabel = '🚨 تطابق مؤكد (85% - 100%)';
-          } else if (highestSimilarity >= 70) {
-            confidenceTier = 'high_suspicion';
-            tierLabel = '⚠️ اشتباه مرتفع (70% - 84%)';
+            tierLabel = '🚨 تطابق مؤكد (90% - 100%)';
+          } else if (highestSimilarity < 80) {
+            confidenceTier = 'possible';
+            tierLabel = `🔍 تشابه نسبي (${highestSimilarity}%)`;
           }
 
           const hammingDist = Math.round(64 * (1 - highestSimilarity / 100));

@@ -144,6 +144,7 @@ export default function StudentPortalHubModal({
   // Plagiarism Audit State
   const [plagiarismData, setPlagiarismData] = useState<any>(null);
   const [loadingPlagiarism, setLoadingPlagiarism] = useState(false);
+  const [plagiarismThreshold, setPlagiarismThreshold] = useState<number>(80);
 
   useEffect(() => {
     if (isOpen) {
@@ -463,10 +464,11 @@ export default function StudentPortalHubModal({
     }
   };
 
-  const fetchPlagiarismData = async () => {
+  const fetchPlagiarismData = async (threshOverride?: number) => {
+    const thresh = threshOverride !== undefined ? threshOverride : plagiarismThreshold;
     setLoadingPlagiarism(true);
     try {
-      const res = await fetch("/api/admin/portal/plagiarism-audit");
+      const res = await fetch(`/api/admin/portal/plagiarism-audit?threshold=${thresh}`);
       const data = await res.json();
       if (res.ok) {
         setPlagiarismData(data);
@@ -1489,29 +1491,48 @@ export default function StudentPortalHubModal({
                   <span>كاشف تشابه وتطابق اللوحات الفنية بالذكاء الاصطناعي</span>
                 </h3>
                 <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  فحص تلقائي لبصمات الصور (dHash) لكشف أي محاولات رفع لنفس اللوحة الفنية بين الطلاب.
+                  فحص دقيق لبصمات الصور (dHash) لكشف أي محاولات رفع لنفس اللوحة أو نسخها بين الطلاب.
                 </div>
               </div>
 
-              <button
-                onClick={fetchPlagiarismData}
-                disabled={loadingPlagiarism}
-                style={{
-                  background: "#1e293b",
-                  border: "1px solid #334155",
-                  color: "#fff",
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px"
-                }}
-              >
-                <RefreshCw size={14} className={loadingPlagiarism ? "spin" : ""} />
-                <span>{loadingPlagiarism ? "جاري الفحص..." : "إعادة الفحص الآن"}</span>
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", padding: "4px 8px" }}>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>عتبة الفحص:</span>
+                  <select
+                    value={plagiarismThreshold}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setPlagiarismThreshold(val);
+                      fetchPlagiarismData(val);
+                    }}
+                    style={{ background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
+                  >
+                    <option value={85}>دقة فائقة: تطابق مؤكد (85% فأكثر)</option>
+                    <option value={80}>دقة قياسية: اشتباه قوي (80% فأكثر) - موصى به</option>
+                    <option value={75}>فحص موسع: اشتباه متوسط (75% فأكثر)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => fetchPlagiarismData()}
+                  disabled={loadingPlagiarism}
+                  style={{
+                    background: "#1e293b",
+                    border: "1px solid #334155",
+                    color: "#fff",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <RefreshCw size={14} className={loadingPlagiarism ? "spin" : ""} />
+                  <span>{loadingPlagiarism ? "جاري الفحص..." : "إعادة الفحص الآن"}</span>
+                </button>
+              </div>
             </div>
 
             {loadingPlagiarism ? (
@@ -1694,11 +1715,12 @@ export default function StudentPortalHubModal({
                 })}
               </div>
             ) : (
-              <div style={{ background: "#141b29", border: "1px solid #2a374f", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
-                <CheckCircle2 size={36} color="#10b981" style={{ margin: "0 auto 10px" }} />
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>جميع الأعمال أصلية 100%</div>
-                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
-                  لم يعثر الذكاء الاصطناعي على أي تطابق أو تشابه في بصمات اللوحات بين أي من الطلاب.
+              <div style={{ background: "#141b29", border: "1px solid #10b981", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
+                <CheckCircle2 size={38} color="#10b981" style={{ margin: "0 auto 10px" }} />
+                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px" }}>جميع الأعمال واللوحات أصلية 100% ✅</div>
+                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "8px", maxWidth: "550px", margin: "8px auto 0", lineHeight: "1.6" }}>
+                  لم يعثر محرك الذكاء الاصطناعي على أي شبهة نسخ أو تطابق بين الطلاب (عتبة الفحص الحالية: {plagiarismThreshold}% فأكثر).<br/>
+                  <span style={{ color: "#64748b", fontSize: "11px" }}>💡 علمياً: التباين الطبيعي بين أي صورتين مختلفتين تماماً يتراوح عشوائياً بين 45% و 60%، ولا يُعتبر تطابقاً إلا إذا تجاوز 80%.</span>
                 </div>
               </div>
             )}

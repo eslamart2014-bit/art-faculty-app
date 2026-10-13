@@ -17,8 +17,12 @@ function normalizeImgUrl(url: string | undefined): string {
   return u;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const thresholdParam = searchParams.get('threshold');
+    const threshold = thresholdParam ? Math.max(60, Math.min(100, Number(thresholdParam))) : 80;
+
     let allSubs: any[] = [];
 
     // جلب أسماء المقررات لتزيين تقرير التطابق
@@ -99,10 +103,11 @@ export async function GET() {
     } catch (e) {}
 
     // 2. تحليل التطابق عبر محرك الفحص الذكي للتربية الفنية
-    const duplicates = auditArtworkDuplicates(allSubs);
+    const duplicates = auditArtworkDuplicates(allSubs, threshold);
 
     return NextResponse.json({
       success: true,
+      threshold,
       totalSubmissionsScanned: allSubs.length,
       suspiciousMatchesCount: duplicates.length,
       matches: duplicates,
