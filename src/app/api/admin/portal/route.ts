@@ -183,7 +183,7 @@ export async function GET(request: Request) {
     try {
       const { data: evals } = await supabaseAdmin
         .from('evaluations')
-        .select('id, course_id, project_name, score, photo_url, created_at')
+        .select('id, course_id, project_name, score, photo_url, ai_status, created_at')
         .eq('student_id', student.id);
 
       if (evals && evals.length > 0) {
@@ -193,13 +193,15 @@ export async function GET(request: Request) {
               s.project_name === ev.project_name && s.course_id === ev.course_id
             );
             if (!alreadyInSubs) {
+              const dhashClean = (ev.ai_status || '').replace(/^hash:/i, '').trim();
+              const photoClean = ev.photo_url.startsWith('AgAC') ? `/api/media/${ev.photo_url}` : ev.photo_url;
               studentSubmissions.push({
                 id: ev.id,
                 student_code: student.student_code,
                 student_name: student.full_name,
                 course_id: ev.course_id,
                 project_name: ev.project_name,
-                images: [{ url: ev.photo_url }],
+                images: [{ url: photoClean, dhash: dhashClean }],
                 status: 'evaluated',
                 score: ev.score,
                 max_score: ev.max_score,
@@ -230,31 +232,64 @@ export async function GET(request: Request) {
         );
       }
 
+      // دمج أعمال الطلاب الآخرين في evaluations
+      try {
+        const { data: otherEvals } = await supabaseAdmin
+          .from('evaluations')
+          .select('id, course_id, project_name, photo_url, ai_status, created_at, students(full_name, student_code)')
+          .not('photo_url', 'is', null)
+          .neq('student_id', student.id);
+
+        if (otherEvals && otherEvals.length > 0) {
+          otherEvals.forEach((oEv: any) => {
+            const oCode = oEv.students?.student_code;
+            if (oCode && !otherSubmissions.some((os: any) => os.student_code === oCode && os.project_name === oEv.project_name)) {
+              const oPhotoClean = oEv.photo_url.startsWith('AgAC') ? `/api/media/${oEv.photo_url}` : oEv.photo_url;
+              const oDhashClean = (oEv.ai_status || '').replace(/^hash:/i, '').trim();
+              otherSubmissions.push({
+                id: oEv.id,
+                student_code: oCode,
+                student_name: oEv.students?.full_name || 'طالب',
+                course_id: oEv.course_id,
+                course_name: 'مقرر دراسي',
+                project_name: oEv.project_name,
+                images: [{ url: oPhotoClean, dhash: oDhashClean }],
+                created_at: oEv.created_at || new Date().toISOString(),
+              });
+            }
+          });
+        }
+      } catch (e) {}
+
       if (otherSubmissions && otherSubmissions.length > 0) {
         studentSubmissions.forEach((mySub: any) => {
           const myImages = Array.isArray(mySub.images) ? mySub.images : [];
 
           myImages.forEach((myImg: any, myIdx: number) => {
-            if (!myImg.dhash) return;
+            const myDhash = (myImg.dhash || '').replace(/^hash:/i, '').trim();
+            if (!myDhash) return;
 
             otherSubmissions.forEach((otherSub: any) => {
               const otherImages = Array.isArray(otherSub.images) ? otherSub.images : [];
 
               otherImages.forEach((otherImg: any, otherIdx: number) => {
-                if (!otherImg.dhash) return;
+                const otherDhash = (otherImg.dhash || '').replace(/^hash:/i, '').trim();
+                if (!otherDhash) return;
 
-                const comparison = compareDHashes(myImg.dhash, otherImg.dhash);
+                const comparison = compareDHashes(myDhash, otherDhash);
                 // إذا كانت نسبة التشابه 80% فأكثر، نعتبرها شبهة تطابق أو سرقة عمل
                 if (comparison.similarityPercent >= 80) {
+                  const myCleanUrl = myImg.url && myImg.url.startsWith('AgAC') ? `/api/media/${myImg.url}` : myImg.url;
+                  const otherCleanUrl = otherImg.url && otherImg.url.startsWith('AgAC') ? `/api/media/${otherImg.url}` : otherImg.url;
                   plagiarismMatches.push({
                     myProject: mySub.project_name,
                     myCourse: mySub.course_name,
-                    myImageUrl: myImg.url,
+                    myImageUrl: myCleanUrl,
                     myImageIndex: myIdx + 1,
                     matchedStudentName: otherSub.student_name,
                     matchedStudentCode: otherSub.student_code,
                     matchedProject: otherSub.project_name,
-                    matchedImageUrl: otherImg.url,
+                    matchedImageUrl: otherCleanUrl,
                     matchedImageIndex: otherIdx + 1,
                     similarityPercent: comparison.similarityPercent,
                     hammingDistance: comparison.distance,

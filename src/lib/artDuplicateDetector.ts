@@ -109,15 +109,31 @@ export function auditArtworkDuplicates(submissions: StudentSubmissionItem[]): an
             tierLabel = '⚠️ اشتباه مرتفع (70% - 84%)';
           }
 
+          const hammingDist = Math.round(64 * (1 - highestSimilarity / 100));
+
           matches.push({
             id: 'match_' + (subA.id || i) + '_' + (subB.id || j),
             similarity: highestSimilarity,
             similarityPercent: highestSimilarity,
+            hammingDistance: hammingDist,
             project_name: subA.project_name || subB.project_name || 'مشروع فني',
             reason,
             confidenceTier,
             tierLabel,
             category: groupCategory,
+            // خصائص مباشرة للواجهة وكروت المقارنة
+            image1Url: matchedImgA,
+            image2Url: matchedImgB,
+            student1Name: subA.student_name,
+            student1Code: subA.student_code,
+            student2Name: subB.student_name,
+            student2Code: subB.student_code,
+            course1Name: subA.course_name,
+            course2Name: subB.course_name,
+            project1Name: subA.project_name,
+            project2Name: subB.project_name,
+            submitted1At: subA.created_at,
+            submitted2At: subB.created_at,
             // تنسيق يدعم StudentPortalHubModal
             student_a: {
               name: subA.student_name,

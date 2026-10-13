@@ -177,14 +177,17 @@ export function computeDHashFromCanvas(sourceCanvas: HTMLCanvasElement): string 
 
 // حساب نسبة التطابق بين بصمتين (Hamming Distance)
 export function compareDHashes(hash1: string, hash2: string): { distance: number; similarityPercent: number } {
-  if (!hash1 || !hash2 || hash1.length !== hash2.length) {
+  const h1 = (hash1 || '').replace(/^hash:/i, '').trim();
+  const h2 = (hash2 || '').replace(/^hash:/i, '').trim();
+
+  if (!h1 || !h2 || h1.length !== h2.length) {
     return { distance: 64, similarityPercent: 0 };
   }
 
   let distance = 0;
-  for (let i = 0; i < hash1.length; i++) {
-    const val1 = parseInt(hash1[i], 16);
-    const val2 = parseInt(hash2[i], 16);
+  for (let i = 0; i < h1.length; i++) {
+    const val1 = parseInt(h1[i], 16);
+    const val2 = parseInt(h2[i], 16);
     let xor = val1 ^ val2;
     while (xor > 0) {
       distance += xor & 1;

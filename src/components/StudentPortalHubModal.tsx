@@ -1521,35 +1521,177 @@ export default function StudentPortalHubModal({
               </div>
             ) : plagiarismData?.matches?.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                {plagiarismData.matches.map((m: any, idx: number) => (
-                  <div key={idx} style={{ background: "#141b29", border: "1px solid #ef4444", borderRadius: "14px", padding: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "14px" }}>
-                        ⚠️ تطابق مشبوه بنسبة {m.similarityPercent}%!
-                      </span>
-                      <span style={{ background: "#ef4444", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
-                        مسافة هامد: {m.hammingDistance}
-                      </span>
-                    </div>
+                {plagiarismData.matches.map((m: any, idx: number) => {
+                  const img1 = m.image1Url || m.student_a?.imageUrl || m.studentA?.image_url || "";
+                  const img2 = m.image2Url || m.student_b?.imageUrl || m.studentB?.image_url || "";
+                  const name1 = m.student1Name || m.student_a?.name || m.studentA?.student_name || "طالب";
+                  const code1 = m.student1Code || m.student_a?.code || m.studentA?.student_code || "";
+                  const name2 = m.student2Name || m.student_b?.name || m.studentB?.student_name || "طالب";
+                  const code2 = m.student2Code || m.student_b?.code || m.studentB?.student_code || "";
+                  const projectName = m.project_name || m.project1Name || m.studentA?.project_name || "مشروع فني";
+                  const course1 = m.course1Name || m.student_a?.courseName || m.studentA?.course_name || "";
+                  const course2 = m.course2Name || m.student_b?.courseName || m.studentB?.course_name || "";
+                  const hamming = m.hammingDistance ?? Math.round(64 * (1 - (m.similarityPercent || 0) / 100));
 
-                    {/* مقارنة اللوحتين جنباً إلى جنب */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", textAlign: "center" }}>
-                      <div>
-                        <div style={{ fontSize: "12px", color: "#fff", fontWeight: "bold", marginBottom: "4px" }}>{m.student1Name} (كود: {m.student1Code})</div>
-                        <div style={{ height: "130px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000" }}>
-                          <img src={m.image1Url} alt="عمل الطالب الأول" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  return (
+                    <div key={idx} style={{ background: "#141b29", border: "1px solid #ef4444", borderRadius: "14px", padding: "16px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "14px" }}>
+                            {m.tierLabel || `⚠️ تطابق مشبوه بنسبة ${m.similarityPercent}%!`}
+                          </span>
+                          <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                            {projectName}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ background: "#ef4444", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                            مسافة هامد: {hamming}
+                          </span>
+                          <span style={{ background: "#1e293b", color: "#38bdf8", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                            تشابه {m.similarityPercent}%
+                          </span>
                         </div>
                       </div>
 
-                      <div>
-                        <div style={{ fontSize: "12px", color: "#fff", fontWeight: "bold", marginBottom: "4px" }}>{m.student2Name} (كود: {m.student2Code})</div>
-                        <div style={{ height: "130px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000" }}>
-                          <img src={m.image2Url} alt="عمل الطالب الثاني" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      {/* سبب وتشخيص التطابق */}
+                      {m.reason && (
+                        <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "8px 10px", marginBottom: "12px", fontSize: "11px", color: "#cbd5e1", border: "1px dashed #334155" }}>
+                          💡 <b>تشخيص الـ AI:</b> {m.reason}
+                        </div>
+                      )}
+
+                      {/* مقارنة اللوحتين جنباً إلى جنب مع إمكانية التكبير والمعاينة */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", textAlign: "center" }}>
+                        {/* لوحة الطالب الأول */}
+                        <div style={{ background: "#0f172a", borderRadius: "10px", padding: "10px", border: "1px solid #1e293b" }}>
+                          <div style={{ fontSize: "13px", color: "#fff", fontWeight: "bold", marginBottom: "2px" }}>
+                            {name1} {code1 ? `(كود: ${code1})` : ''}
+                          </div>
+                          {course1 && <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px" }}>{course1}</div>}
+                          
+                          <div 
+                            onClick={() => img1 && setZoomedIdCard(img1)}
+                            title="انقر لتكبير اللوحة"
+                            style={{ 
+                              position: "relative",
+                              height: "160px", 
+                              borderRadius: "8px", 
+                              overflow: "hidden", 
+                              border: "2px solid #ef4444", 
+                              background: "#000",
+                              cursor: img1 ? "zoom-in" : "default" 
+                            }}
+                          >
+                            {img1 ? (
+                              <img 
+                                src={img1} 
+                                alt="عمل الطالب الأول" 
+                                style={{ width: "100%", height: "100%", objectFit: "contain", background: "#0a0a0c" }}
+                                onError={(e: any) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-error');
+                                  if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div className="fallback-error" style={{ 
+                              display: img1 ? "none" : "flex", 
+                              flexDirection: "column",
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              height: "100%", 
+                              color: "#94a3b8", 
+                              fontSize: "12px",
+                              gap: "4px"
+                            }}>
+                              <span>🖼️ تعذر تحميل الصورة</span>
+                              {img1 && <a href={img1} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8", fontSize: "11px" }}>فتح الرابط مباشرة</a>}
+                            </div>
+                            {img1 && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: "4px",
+                                left: "4px",
+                                background: "rgba(0,0,0,0.75)",
+                                color: "#fff",
+                                fontSize: "10px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                pointerEvents: "none"
+                              }}>
+                                🔍 انقر للتكبير
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* لوحة الطالب الثاني */}
+                        <div style={{ background: "#0f172a", borderRadius: "10px", padding: "10px", border: "1px solid #1e293b" }}>
+                          <div style={{ fontSize: "13px", color: "#fff", fontWeight: "bold", marginBottom: "2px" }}>
+                            {name2} {code2 ? `(كود: ${code2})` : ''}
+                          </div>
+                          {course2 && <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px" }}>{course2}</div>}
+                          
+                          <div 
+                            onClick={() => img2 && setZoomedIdCard(img2)}
+                            title="انقر لتكبير اللوحة"
+                            style={{ 
+                              position: "relative",
+                              height: "160px", 
+                              borderRadius: "8px", 
+                              overflow: "hidden", 
+                              border: "2px solid #ef4444", 
+                              background: "#000",
+                              cursor: img2 ? "zoom-in" : "default" 
+                            }}
+                          >
+                            {img2 ? (
+                              <img 
+                                src={img2} 
+                                alt="عمل الطالب الثاني" 
+                                style={{ width: "100%", height: "100%", objectFit: "contain", background: "#0a0a0c" }}
+                                onError={(e: any) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.parentElement?.querySelector('.fallback-error');
+                                  if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div className="fallback-error" style={{ 
+                              display: img2 ? "none" : "flex", 
+                              flexDirection: "column",
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              height: "100%", 
+                              color: "#94a3b8", 
+                              fontSize: "12px",
+                              gap: "4px"
+                            }}>
+                              <span>🖼️ تعذر تحميل الصورة</span>
+                              {img2 && <a href={img2} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8", fontSize: "11px" }}>فتح الرابط مباشرة</a>}
+                            </div>
+                            {img2 && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: "4px",
+                                left: "4px",
+                                background: "rgba(0,0,0,0.75)",
+                                color: "#fff",
+                                fontSize: "10px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                pointerEvents: "none"
+                              }}>
+                                🔍 انقر للتكبير
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div style={{ background: "#141b29", border: "1px solid #2a374f", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
@@ -2368,7 +2510,7 @@ export default function StudentPortalHubModal({
         </div>
       )}
 
-      {/* تكبير صورة البطاقة في إدارة الحسابات */}
+      {/* تكبير صورة اللوحة / البطاقة في شاشة كاملة */}
       {zoomedIdCard && (
         <div 
           onClick={() => setZoomedIdCard(null)}
@@ -2376,15 +2518,23 @@ export default function StudentPortalHubModal({
             position: "fixed",
             inset: 0,
             zIndex: 999999,
-            background: "rgba(0, 0, 0, 0.9)",
+            background: "rgba(0, 0, 0, 0.92)",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             padding: "16px",
             cursor: "zoom-out"
           }}
         >
-          <img src={zoomedIdCard} alt="بطاقة مكبرة" style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #38bdf8" }} />
+          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "#ef4444", padding: "6px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,0,0,0.5)" }}>
+            ✕ إغلاق المعاينة
+          </div>
+          <img 
+            src={zoomedIdCard} 
+            alt="معاينة مكبرة" 
+            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #38bdf8", objectFit: "contain", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" }} 
+          />
         </div>
       )}
 

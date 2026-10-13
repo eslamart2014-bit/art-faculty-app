@@ -33,6 +33,7 @@ export default function AdminPortalPage() {
   // Modal / Sub-view State
   const [activeTab, setActiveTab] = useState<"info" | "audit" | "security" | "plagiarism" | "actions">("info");
   const [impersonateModal, setImpersonateModal] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   const handleSearch = async (codeOverride?: string) => {
     const code = codeOverride || searchCode;
@@ -388,19 +389,67 @@ export default function AdminPortalPage() {
                             </span>
                           </div>
 
-                          {/* مقارنة اللوحتين جنباً إلى جنب */}
+                          {/* مقارنة اللوحتين جنباً إلى جنب مع إمكانية التكبير */}
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", textAlign: "center" }}>
-                            <div>
+                            <div style={{ background: "#0f172a", borderRadius: "10px", padding: "8px", border: "1px solid #1e293b" }}>
                               <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>لوحة هذا الطالب ({m.myProject})</div>
-                              <div style={{ height: "120px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444" }}>
-                                <img src={m.myImageUrl} alt="عمل الطالب" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              <div 
+                                onClick={() => m.myImageUrl && setZoomedImage(m.myImageUrl)}
+                                title="انقر لتكبير اللوحة"
+                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000", cursor: m.myImageUrl ? "zoom-in" : "default" }}
+                              >
+                                {m.myImageUrl ? (
+                                  <img 
+                                    src={m.myImageUrl} 
+                                    alt="عمل الطالب" 
+                                    style={{ width: "100%", height: "100%", objectFit: "contain", background: "#0a0a0c" }} 
+                                    onError={(e: any) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fb = e.currentTarget.parentElement?.querySelector('.admin-img-fallback');
+                                      if (fb) (fb as HTMLElement).style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <div className="admin-img-fallback" style={{ display: m.myImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: "11px", gap: "4px" }}>
+                                  <span>🖼️ تعذر تحميل الصورة</span>
+                                  {m.myImageUrl && <a href={m.myImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8" }}>فتح الرابط</a>}
+                                </div>
+                                {m.myImageUrl && (
+                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", pointerEvents: "none" }}>
+                                    🔍 تكبير
+                                  </div>
+                                )}
                               </div>
                             </div>
 
-                            <div>
+                            <div style={{ background: "#0f172a", borderRadius: "10px", padding: "8px", border: "1px solid #1e293b" }}>
                               <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>لوحة الطالب: {m.matchedStudentName}</div>
-                              <div style={{ height: "120px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444" }}>
-                                <img src={m.matchedImageUrl} alt="عمل زميله" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              <div 
+                                onClick={() => m.matchedImageUrl && setZoomedImage(m.matchedImageUrl)}
+                                title="انقر لتكبير اللوحة"
+                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000", cursor: m.matchedImageUrl ? "zoom-in" : "default" }}
+                              >
+                                {m.matchedImageUrl ? (
+                                  <img 
+                                    src={m.matchedImageUrl} 
+                                    alt="عمل زميله" 
+                                    style={{ width: "100%", height: "100%", objectFit: "contain", background: "#0a0a0c" }} 
+                                    onError={(e: any) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const fb = e.currentTarget.parentElement?.querySelector('.admin-img-fallback');
+                                      if (fb) (fb as HTMLElement).style.display = 'flex';
+                                    }}
+                                  />
+                                ) : null}
+                                <div className="admin-img-fallback" style={{ display: m.matchedImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: "11px", gap: "4px" }}>
+                                  <span>🖼️ تعذر تحميل الصورة</span>
+                                  {m.matchedImageUrl && <a href={m.matchedImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8" }}>فتح الرابط</a>}
+                                </div>
+                                {m.matchedImageUrl && (
+                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", pointerEvents: "none" }}>
+                                    🔍 تكبير
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -549,6 +598,34 @@ export default function AdminPortalPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* تكبير اللوحة الفنية في شاشة كاملة */}
+      {zoomedImage && (
+        <div 
+          onClick={() => setZoomedImage(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 999999,
+            background: "rgba(0, 0, 0, 0.92)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+            cursor: "zoom-out"
+          }}
+        >
+          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "#ef4444", padding: "4px 12px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>
+            ✕ إغلاق المعاينة
+          </div>
+          <img 
+            src={zoomedImage} 
+            alt="لوحة فنية مكبرة" 
+            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #ef4444", objectFit: "contain", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" }} 
+          />
         </div>
       )}
 
