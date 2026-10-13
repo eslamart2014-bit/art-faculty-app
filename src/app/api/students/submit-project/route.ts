@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { uploadImageToStorage } from '@/lib/telegramStorage';
 import { localStore } from '@/lib/localFallbackStore';
+import { checkAndNotifyPlagiarism } from '@/lib/plagiarismNotifier';
 
 export const dynamic = 'force-dynamic';
 
@@ -288,6 +289,24 @@ export async function POST(request: Request) {
         },
       });
     } catch (e) {}
+
+    // 6. تشغيل محرك الذكاء الاصطناعي لكشف تشابه اللوحات الفنية وإرسال إشعار التليجرام بالصورتين في الخلفية
+    checkAndNotifyPlagiarism(
+      {
+        id: newSub?.id,
+        student_code,
+        student_name: studentFullName,
+        course_id,
+        course_name,
+        project_name,
+        images: processedImages,
+        created_at: newSub?.created_at || new Date().toISOString(),
+      },
+      supabaseAdmin,
+      80
+    ).catch(err => {
+      console.warn('Background AI plagiarism detection warning:', err);
+    });
 
     return NextResponse.json({
       success: true,

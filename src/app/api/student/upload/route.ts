@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkAndNotifyPlagiarism } from "@/lib/plagiarismNotifier";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -181,36 +182,27 @@ export async function POST(request: Request) {
       sendTelegramMessage(botToken, currentStudent.telegram_id, studentMsg);
     }
 
-    // 8. Silent Security Alert to Admin if Similarity >= 90%
-    if (maxSimilarity >= 90 && botToken && matchedStudentInfo) {
-      // Fetch all admins
-      const { data: admins } = await supabase
-        .from("profiles")
-        .select("telegram_id")
-        .eq("role", "مدير")
-        .not("telegram_id", "is", null);
-
-      const alertMsg = `🚨 <b>تنبيه أمني عاجل: كشف تشابه لوحات فنية بنسبة (${maxSimilarity}%)!</b>\n\n` +
-        `📚 <b>المقرر:</b> ${course?.name || "المقرر"}\n` +
-        `📝 <b>المشروع:</b> ${projectName}\n\n` +
-        `👨‍🎓 <b>الطالب الأول (صاحب العمل الأسبق):</b>\n` +
-        `• <b>الاسم:</b> ${(matchedStudentInfo.student as any)?.full_name || "غير محدد"}\n` +
-        `• <b>الكود:</b> ${(matchedStudentInfo.student as any)?.student_code || "---"}\n` +
-        `• <b>تاريخ الرفع:</b> ${matchedStudentInfo.uploadTime}\n\n` +
-        `👨‍🎓 <b>الطالب الثاني (رفع عملاً مشابهاً):</b>\n` +
-        `• <b>الاسم:</b> ${currentStudent?.full_name || "غير محدد"}\n` +
-        `• <b>الكود:</b> ${currentStudent?.student_code || "---"}\n` +
-        `• <b>تاريخ الرفع:</b> ${new Date().toLocaleString("ar-EG")}\n\n` +
-        `⚠️ <i>تم تسجيل الحالة تلقائياً ويمكنك مراجعة العملين من لوحة الإدارة.</i>`;
-
-      if (admins) {
-        for (const admin of admins) {
-          if (admin.telegram_id) {
-            sendTelegramMessage(botToken, admin.telegram_id, alertMsg);
-          }
-        }
-      }
-    }
+    // 8. تشغيل محرك كشف التطابق بالذكاء الاصطناعي وإرسال الصورتين والتفاصيل لبوت التليجرام في الخلفية
+    checkAndNotifyPlagiarism(
+      {
+        student_code: currentStudent.student_code,
+        student_name: currentStudent.full_name,
+        course_id: crsId,
+        course_name: course?.name,
+        project_name: projectName,
+        images: [
+          {
+            url: photoUrl,
+            dhash: imageHash || "",
+          },
+        ],
+        created_at: new Date().toISOString(),
+      },
+      supabase,
+      80
+    ).catch(err => {
+      console.warn("Background AI plagiarism detection warning:", err);
+    });
 
     return NextResponse.json({ success: true, photoUrl });
   } catch (err: any) {

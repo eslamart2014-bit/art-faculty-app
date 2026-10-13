@@ -145,6 +145,8 @@ export default function StudentPortalHubModal({
   const [plagiarismData, setPlagiarismData] = useState<any>(null);
   const [loadingPlagiarism, setLoadingPlagiarism] = useState(false);
   const [plagiarismThreshold, setPlagiarismThreshold] = useState<number>(80);
+  const [sendingTelegramMatchId, setSendingTelegramMatchId] = useState<string | null>(null);
+  const [telegramSentMatches, setTelegramSentMatches] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -479,6 +481,49 @@ export default function StudentPortalHubModal({
       alert("خطأ في الاتصال بالخادم");
     } finally {
       setLoadingPlagiarism(false);
+    }
+  };
+
+  const handleSendTelegramPlagiarismAlert = async (m: any, matchId: string) => {
+    try {
+      setSendingTelegramMatchId(matchId);
+      const res = await fetch("/api/admin/portal/notify-plagiarism", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student1: {
+            name: m.student1Name || m.student_a?.name || m.studentA?.student_name || "طالب",
+            code: m.student1Code || m.student_a?.code || m.studentA?.student_code || "",
+            course: m.course1Name || m.student_a?.courseName || m.studentA?.course_name || "",
+            project: m.project_name || m.project1Name || "مشروع فني",
+            imageUrl: m.image1Url || m.student_a?.imageUrl || m.studentA?.image_url || "",
+            submittedAt: m.submitted1At || m.studentA?.submitted_at,
+          },
+          student2: {
+            name: m.student2Name || m.student_b?.name || m.studentB?.student_name || "طالب",
+            code: m.student2Code || m.student_b?.code || m.studentB?.student_code || "",
+            course: m.course2Name || m.student_b?.courseName || m.studentB?.course_name || "",
+            project: m.project_name || m.project2Name || "مشروع فني",
+            imageUrl: m.image2Url || m.student_b?.imageUrl || m.studentB?.image_url || "",
+            submittedAt: m.submitted2At || m.studentB?.submitted_at,
+          },
+          similarity: m.similarityPercent || m.similarity || 80,
+          hammingDistance: m.hammingDistance,
+          reason: m.reason,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setTelegramSentMatches(prev => ({ ...prev, [matchId]: true }));
+        alert("✅ تم إرسال الإشعار بالصورتين وكامل التفاصيل لبوت التليجرام بنجاح!");
+      } else {
+        alert("⚠️ خطأ في الإرسال: " + (data.error || "تعذر إرسال التنبيه"));
+      }
+    } catch (err: any) {
+      alert("❌ خطأ: " + err.message);
+    } finally {
+      setSendingTelegramMatchId(null);
     }
   };
 
@@ -1709,6 +1754,48 @@ export default function StudentPortalHubModal({
                             )}
                           </div>
                         </div>
+                      </div>
+
+                      {/* شريط الإجراءات: إرسال إشعار التليجرام بالصورتين */}
+                      <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #334155", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ fontSize: "11px", color: "#94a3b8", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>🤖 مراقبة التطابق: يعمل النظام في الخلفية ويرسل تنبيهات تلقائية.</span>
+                        </div>
+                        <button
+                          onClick={() => handleSendTelegramPlagiarismAlert(m, m.id || `match_${idx}`)}
+                          disabled={sendingTelegramMatchId === (m.id || `match_${idx}`)}
+                          style={{
+                            background: telegramSentMatches[m.id || `match_${idx}`] ? "#065f46" : "#2563eb",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "8px 14px",
+                            fontSize: "12px",
+                            fontWeight: "bold",
+                            cursor: sendingTelegramMatchId === (m.id || `match_${idx}`) ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+                            transition: "all 0.2s ease"
+                          }}
+                        >
+                          {sendingTelegramMatchId === (m.id || `match_${idx}`) ? (
+                            <>
+                              <RefreshCw size={14} className="spin" />
+                              <span>جاري إرسال الصورتين للتليجرام...</span>
+                            </>
+                          ) : telegramSentMatches[m.id || `match_${idx}`] ? (
+                            <>
+                              <CheckCircle2 size={14} color="#34d399" />
+                              <span>تم إرسال الصورتين لبوت التليجرام بنجاح ✓</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>📲 إرسال إشعار التليجرام الآن (مع الصورتين)</span>
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
                   );
