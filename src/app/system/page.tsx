@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { 
   UserCheck, 
+  User,
   LogIn, 
   Camera, 
   RefreshCw, 
@@ -1905,68 +1906,112 @@ export default function SystemPage() {
           </div>
         )}
 
-        {/* شريط أعلى به اسم الطالب والفرقة وزر خروج مدمج لا يطغى على المساحة */}
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center", 
-          gap: "10px",
-          padding: "10px 14px", 
-          background: "#141b29", 
-          borderRadius: "14px", 
-          border: "1px solid #2a374f", 
-          marginBottom: "12px" 
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
-            <div style={{ 
-              width: "36px", 
-              height: "36px", 
-              minWidth: "36px", 
-              borderRadius: "10px", 
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center", 
-              color: "#fff", 
-              fontWeight: "bold", 
-              fontSize: "15px"
-            }}>
-              {currentStudent.full_name?.charAt(0) || "ط"}
+        {/* شريط أعلى منظم: دائرة الحساب، اسم الطالب وكوده بوضوح، وأزرار التحكم الثلاثة */}
+        <div className="student-top-bar">
+          {/* قسم بيانات وهوية الطالب ودائرة الحساب */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+            {/* الدائرة المخصصة للحساب والصورة الشخصية */}
+            <div 
+              style={{ 
+                width: "46px", 
+                height: "46px", 
+                minWidth: "46px", 
+                borderRadius: "50%", 
+                background: "linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%)", 
+                border: "2px solid rgba(56, 189, 248, 0.45)",
+                boxShadow: "0 2px 10px rgba(0, 0, 0, 0.35)",
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                color: "#fff", 
+                fontWeight: "bold", 
+                fontSize: "17px",
+                overflow: "hidden",
+                position: "relative",
+                flexShrink: 0
+              }}
+              title="الحساب الشخصي"
+            >
+              {currentStudent?.avatar_url || currentStudent?.photo_url ? (
+                <img 
+                  src={currentStudent.avatar_url || currentStudent.photo_url} 
+                  alt={currentStudent.full_name || "صورة الطالب"} 
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} 
+                />
+              ) : (
+                <span>{currentStudent.full_name?.trim()?.charAt(0) || <User size={20} />}</span>
+              )}
             </div>
+
+            {/* الاسم الكامل والكود والفرقة بتنظيم واضح ومريح للقراءة */}
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div 
+                style={{ 
+                  color: "#ffffff", 
+                  fontWeight: "bold", 
+                  fontSize: "14.5px", 
+                  lineHeight: "1.3",
+                  letterSpacing: "-0.2px",
+                  wordBreak: "break-word"
+                }}
+                title={currentStudent.full_name}
+              >
                 {currentStudent.full_name}
               </div>
-              <div style={{ color: "#38bdf8", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                <span>كود: {formatStudentCode(currentStudent.student_code)}</span>
-                <span style={{ opacity: 0.4 }}>•</span>
-                <span style={{ color: "#94a3b8" }}>{currentStudent.academic_year}</span>
+              <div style={{ 
+                color: "#38bdf8", 
+                fontSize: "11.5px", 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "6px", 
+                flexWrap: "wrap",
+                marginTop: "3px",
+                lineHeight: "1.2"
+              }}>
+                <span style={{ fontWeight: "700" }}>كود: {formatStudentCode(currentStudent.student_code)}</span>
+                {currentStudent.academic_year && (
+                  <>
+                    <span style={{ opacity: 0.35 }}>•</span>
+                    <span style={{ color: "#94a3b8" }}>{currentStudent.academic_year}</span>
+                  </>
+                )}
+                {currentStudent.section && (
+                  <>
+                    <span style={{ opacity: 0.35 }}>•</span>
+                    <span style={{ color: "#cbd5e1" }}>سكشن {currentStudent.section}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          {/* مجموعة أزرار التحكم الثلاثة: رمز QR، تحديث، خروج */}
+          <div className="student-actions-group">
+            {/* زر رمز QR */}
             <button 
               onClick={() => setShowQRModal(true)} 
               className="btn-compact"
-              title="عرض رمز QR الخاص بي"
+              title="عرض رمز QR الذكي الخاص بي"
               style={{ 
                 background: "rgba(16, 185, 129, 0.12)",
                 color: "#10b981",
-                border: "1px solid rgba(16, 185, 129, 0.25)",
-                padding: "6px 11px",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                borderRadius: "10px",
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: "5px",
                 fontSize: "12px",
-                fontWeight: "bold"
+                fontWeight: "bold",
+                transition: "all 0.15s ease"
               }}
             >
-              <QrCode size={13} />
-              <span>QR Code</span>
+              <QrCode size={14} />
+              <span>رمز QR</span>
             </button>
 
+            {/* زر التحديث */}
             <button 
               onClick={() => loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin)} 
               className="btn-compact"
@@ -1975,37 +2020,43 @@ export default function SystemPage() {
               style={{ 
                 background: "rgba(56, 189, 248, 0.12)",
                 color: "#38bdf8",
-                border: "1px solid rgba(56, 189, 248, 0.25)",
-                padding: "6px 11px",
+                border: "1px solid rgba(56, 189, 248, 0.3)",
+                borderRadius: "10px",
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: "5px",
                 fontSize: "12px",
-                fontWeight: "bold"
+                fontWeight: "bold",
+                transition: "all 0.15s ease"
               }}
             >
-              <RotateCw size={13} className={loading ? "animate-spin" : ""} />
+              <RotateCw size={14} className={loading ? "animate-spin" : ""} />
               <span>تحديث</span>
             </button>
 
+            {/* زر الخروج */}
             <button 
               onClick={handleLogout} 
               className="btn-compact"
-              title="تسجيل الخروج"
+              title="تسجيل الخروج من الحساب"
               style={{ 
                 background: "rgba(239, 68, 68, 0.12)",
                 color: "#f87171",
-                border: "1px solid rgba(239, 68, 68, 0.25)",
-                padding: "6px 12px",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "10px",
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "4px",
-                fontSize: "12px"
+                justifyContent: "center",
+                gap: "5px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                transition: "all 0.15s ease"
               }}
             >
-              <LogOut size={13} />
+              <LogOut size={14} />
               <span>خروج</span>
             </button>
           </div>
