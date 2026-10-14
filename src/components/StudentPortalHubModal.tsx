@@ -29,7 +29,12 @@ import {
   ChevronUp,
   Filter,
   Camera,
-  LogOut
+  LogOut,
+  Settings,
+  EyeOff as EyeOffIcon,
+  Eye as EyeOnIcon,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
@@ -95,10 +100,18 @@ export default function StudentPortalHubModal({
   user,
   onOpenIdentityModal
 }: StudentPortalHubModalProps) {
-  // Tabs: overview, accounts, search_logs, fraud, plagiarism
-  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "search_logs" | "fraud" | "plagiarism">("overview");
+  // Tabs: overview, accounts, search_logs, fraud, plagiarism, advanced_settings
+  const [activeTab, setActiveTab] = useState<"overview" | "accounts" | "search_logs" | "fraud" | "plagiarism" | "advanced_settings">("overview");
 
-  // General Portal Stats
+  // Advanced Portal Settings
+  const [portalSettings, setPortalSettings] = useState<{
+    hide_warnings_tab: boolean;
+  }>({ hide_warnings_tab: false });
+  const [loadingPortalSettings, setLoadingPortalSettings] = useState(false);
+  const [savingPortalSettings, setSavingPortalSettings] = useState(false);
+  const [portalSettingsMsg, setPortalSettingsMsg] = useState("");
+
+
   const [copiedLink, setCopiedLink] = useState(false);
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -154,6 +167,7 @@ export default function StudentPortalHubModal({
       fetchPortalStats();
       fetchCoordinatorStats();
       fetchSearchLogs();
+      fetchPortalSettings();
     }
   }, [isOpen]);
 
@@ -167,7 +181,84 @@ export default function StudentPortalHubModal({
     if (isOpen && activeTab === "plagiarism" && !plagiarismData && !loadingPlagiarism) {
       fetchPlagiarismData();
     }
+    if (isOpen && activeTab === "advanced_settings") {
+      fetchPortalSettings();
+    }
   }, [isOpen, activeTab]);
+
+  // ─── Portal Settings Helpers ──────────────────────────────────────────────
+  const fetchPortalSettings = async () => {
+    setLoadingPortalSettings(true);
+    try {
+      const res = await fetch("/api/admin/portal/settings?_t=" + Date.now());
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.settings) {
+          setPortalSettings(json.settings);
+          return;
+        }
+      }
+      // Fallback
+      const { data } = await supabase
+        .from("system_settings")
+        .select("telegram_config")
+        .eq("id", 1)
+        .maybeSingle();
+      if (data?.telegram_config) {
+        setPortalSettings({
+          hide_warnings_tab: !!data.telegram_config.hide_warnings_tab,
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching portal settings:", e);
+    } finally {
+      setLoadingPortalSettings(false);
+    }
+  };
+
+  const savePortalSettings = async (newSettings: typeof portalSettings) => {
+    setSavingPortalSettings(true);
+    setPortalSettingsMsg("");
+    try {
+      const res = await fetch("/api/admin/portal/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSettings),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json?.error || "فشل حفظ الإعدادات");
+      }
+
+      setPortalSettings(newSettings);
+      setPortalSettingsMsg("✅ تم حفظ الإعدادات بنجاح");
+    } catch (e: any) {
+      // Fallback direct supabase
+      try {
+        const { data: current } = await supabase
+          .from("system_settings")
+          .select("telegram_config")
+          .eq("id", 1)
+          .maybeSingle();
+        const merged = { ...(current?.telegram_config || {}), ...newSettings };
+        const { error } = await supabase
+          .from("system_settings")
+          .update({ telegram_config: merged })
+          .eq("id", 1);
+        if (error) throw error;
+        setPortalSettings(newSettings);
+        setPortalSettingsMsg("✅ تم حفظ الإعدادات بنجاح");
+      } catch (fallbackErr: any) {
+        setPortalSettingsMsg("❌ خطأ في الحفظ: " + (fallbackErr?.message || e?.message || "حاول مجدداً"));
+      }
+    } finally {
+      setSavingPortalSettings(false);
+      setTimeout(() => setPortalSettingsMsg(""), 4000);
+    }
+  };
+
+
 
   const fetchSearchLogs = async () => {
     setLoadingSearchLogs(true);
@@ -641,7 +732,8 @@ export default function StudentPortalHubModal({
           { id: "accounts", label: "إدارة وبحث الحسابات 👤", color: "#10b981" },
           { id: "search_logs", label: "سجلات البحث 🔍", color: "#8b5cf6" },
           { id: "fraud", label: "رادار الأجهزة المشتركة 🚨", color: "#ef4444" },
-          { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" }
+          { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" },
+          { id: "advanced_settings", label: "إعدادات متقدمة ⚙️", color: "#64748b" }
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -1815,9 +1907,131 @@ export default function StudentPortalHubModal({
         )}
 
         {/* ========================================================= */}
+        {/* التبويب: الإعدادات المتقدمة */}
+        {/* ========================================================= */}
+        {activeTab === "advanced_settings" && (
+          <div className="animate-fade-in">
+            <div style={{ marginBottom: "20px" }}>
+              <h3 style={{ margin: 0, color: "#94a3b8", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Settings size={18} color="#64748b" />
+                إعدادات متقدمة لبوابة الطلاب
+              </h3>
+              <div style={{ color: "#64748b", fontSize: "12px", marginTop: "4px" }}>
+                تحكم في تجربة الطالب داخل البوابة — التغييرات تُطبَّق فوراً على جميع الطلاب
+              </div>
+            </div>
+
+            {loadingPortalSettings ? (
+              <div style={{ textAlign: "center", color: "#64748b", padding: "40px" }}>
+                <RefreshCw size={24} style={{ animation: "spin 1s linear infinite" }} />
+                <div style={{ marginTop: "8px" }}>جارٍ تحميل الإعدادات...</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+                {/* ── إعداد: إخفاء تاب الإنذارات ─────────────────── */}
+                <div style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: `1px solid ${portalSettings.hide_warnings_tab ? "#ef4444" : "rgba(255,255,255,0.08)"}`,
+                  borderRadius: "14px",
+                  padding: "18px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  flexWrap: "wrap",
+                  transition: "border-color 0.3s ease"
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: "bold", color: "#e2e8f0", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      {portalSettings.hide_warnings_tab
+                        ? <EyeOff size={16} color="#ef4444" />
+                        : <Eye size={16} color="#10b981" />
+                      }
+                      تاب الإنذارات في بوابة الطالب
+                    </div>
+                    <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px", lineHeight: "1.6" }}>
+                      {portalSettings.hide_warnings_tab
+                        ? "🔴 الإنذارات محجوبة حالياً — لن يرى الطلاب تاب الإنذارات في بوابتهم"
+                        : "🟢 الإنذارات ظاهرة حالياً — الطلاب يمكنهم رؤية تاب الإنذارات"}
+                    </div>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <button
+                    onClick={() => {
+                      const next = { ...portalSettings, hide_warnings_tab: !portalSettings.hide_warnings_tab };
+                      savePortalSettings(next);
+                    }}
+                    disabled={savingPortalSettings}
+                    style={{
+                      background: portalSettings.hide_warnings_tab ? "#ef444433" : "#10b98133",
+                      border: `1px solid ${portalSettings.hide_warnings_tab ? "#ef4444" : "#10b981"}`,
+                      borderRadius: "10px",
+                      padding: "10px 20px",
+                      color: portalSettings.hide_warnings_tab ? "#ef4444" : "#10b981",
+                      fontWeight: "bold",
+                      fontSize: "13px",
+                      cursor: savingPortalSettings ? "wait" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.2s ease",
+                      minWidth: "130px",
+                      justifyContent: "center"
+                    }}
+                  >
+                    {savingPortalSettings ? (
+                      <><RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> جارٍ الحفظ...</>
+                    ) : portalSettings.hide_warnings_tab ? (
+                      <><Eye size={14} /> إظهار التاب</>
+                    ) : (
+                      <><EyeOff size={14} /> إخفاء التاب</>
+                    )}
+                  </button>
+                </div>
+
+                {/* رسالة النجاح/الخطأ */}
+                {portalSettingsMsg && (
+                  <div style={{
+                    padding: "10px 16px",
+                    borderRadius: "10px",
+                    background: portalSettingsMsg.startsWith("✅") ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                    border: `1px solid ${portalSettingsMsg.startsWith("✅") ? "#10b981" : "#ef4444"}`,
+                    color: portalSettingsMsg.startsWith("✅") ? "#10b981" : "#ef4444",
+                    fontSize: "13px",
+                    fontWeight: "bold",
+                    textAlign: "center"
+                  }}>
+                    {portalSettingsMsg}
+                  </div>
+                )}
+
+                {/* ملاحظة */}
+                <div style={{
+                  background: "rgba(99,102,241,0.08)",
+                  border: "1px solid rgba(99,102,241,0.2)",
+                  borderRadius: "10px",
+                  padding: "12px 16px",
+                  color: "#94a3b8",
+                  fontSize: "12px",
+                  lineHeight: "1.7"
+                }}>
+                  <strong style={{ color: "#a5b4fc" }}>💡 ملاحظة:</strong> إخفاء التاب لا يحذف بيانات الإنذارات، بل يُخفيه فقط عن واجهة الطالب.
+                  يمكنك إعادة إظهاره في أي وقت دون أي فقدان للبيانات.
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
         {/* التبويب: سجلات البحث وسحب الكيو ار كود (الميزة الجديدة) */}
         {/* ========================================================= */}
         {activeTab === "search_logs" && (
+
           <div className="animate-fade-in">
             {/* Header & Refresh */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>

@@ -836,6 +836,9 @@ export default function SystemPage() {
         }
       } else {
         setDashboardData(data);
+        if (data?.hide_warnings_tab && activeTab === "warnings") {
+          setActiveTab("evaluation");
+        }
         // تزامن فوري لكائن المقرر المختار لتحديث الأعمال والمشاريع تلقائياً
         if (data.projects) {
           setSelectedCourseForEval((prevCourse: any) => {
@@ -2012,7 +2015,7 @@ export default function SystemPage() {
         <div 
           style={{ 
             display: "grid", 
-            gridTemplateColumns: "repeat(5, 1fr)", 
+            gridTemplateColumns: `repeat(${dashboardData?.hide_warnings_tab ? 4 : 5}, 1fr)`, 
             gap: "4px", 
             marginBottom: "14px",
             width: "100%"
@@ -2021,7 +2024,7 @@ export default function SystemPage() {
           {[
             { id: "evaluation", label: "المشاريع 🎨", color: "#10b981", badge: unreadProjectsCount },
             { id: "attendance", label: "الحضور 📅", color: "#38bdf8", badge: unreadAttendanceCount },
-            { id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: unreadWarningsCount },
+            ...(!dashboardData?.hide_warnings_tab ? [{ id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: unreadWarningsCount }] : []),
             { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7", badge: unreadLockersCount },
             { id: "complaints", label: "الشكاوى 📬", color: "#f59e0b", badge: unreadComplaintsCount }
           ].map(tab => {
@@ -3232,7 +3235,7 @@ export default function SystemPage() {
         {/* ========================================================= */}
         {/* TAB 3: WARNINGS (الإنذارات وتجاوز نسب الغياب) */}
         {/* ========================================================= */}
-        {activeTab === "warnings" && (
+        {activeTab === "warnings" && !dashboardData?.hide_warnings_tab && (
           <div className="animate-fade-in">
             <h3 style={{ fontSize: "15px", color: "#f87171", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
               <AlertTriangle size={18} />

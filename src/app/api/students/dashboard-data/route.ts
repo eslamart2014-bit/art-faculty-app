@@ -124,7 +124,7 @@ export async function GET(request: Request) {
         .select('id, name, academic_year, sections, course_type, custom_week_names, teacher_id, shared_with, excluded_students, makeup_students, student_section_overrides'),
       supabaseAdmin
         .from('system_settings')
-        .select('term1_start, term2_start, term1_end, term2_end')
+        .select('term1_start, term2_start, term1_end, term2_end, telegram_config')
         .eq('id', 1)
         .maybeSingle()
     ]);
@@ -500,6 +500,7 @@ export async function GET(request: Request) {
       complaints: enrichedComplaints,
       warnings: attendanceByCourse.filter((c: any) => c.hasWarning),
       locker: studentLocker,
+      hide_warnings_tab: !!(sysSettings as any)?.telegram_config?.hide_warnings_tab,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
