@@ -6,6 +6,14 @@ import { getLocalCache, setLocalCache } from "@/lib/syncEngine";
 export async function preloadFacultyData(userId: string) {
   if (typeof window === "undefined" || !navigator.onLine || !userId) return;
 
+  // Respect Data Saver / slow connections – skip heavy background preloading
+  const conn = (navigator as any).connection;
+  const isSlow = conn && (conn.saveData === true || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g');
+  if (isSlow) {
+    console.log('[Preload] Skipping background preload: slow/metered connection detected');
+    return;
+  }
+
   try {
     // 1. Preload system settings in background
     supabase
@@ -50,63 +58,66 @@ export async function preloadFacultyData(userId: string) {
       new Set(activeCourses.map((c) => c.academic_year).filter(Boolean))
     );
 
-    for (const year of academicYears) {
-      const { data: students } = await supabase
-        .from("students")
-        .select("id, full_name, student_code, academic_year, section")
-        .eq("academic_year", year)
-        .eq("is_active", true);
-
-      if (students && students.length > 0) {
-        setLocalCache(`cached_students_${year}`, students);
-      }
-    }
+    await Promise.all(
+      academicYears.map(async (year) => {
+        const { data: students } = await supabase
+          .from('students')
+          .select('id, full_name, student_code, academic_year, section')
+          .eq('academic_year', year)
+          .eq('is_active', true);
+        if (students && students.length > 0) {
+          setLocalCache(`cached_students_${year}`, students);
+        }
+      })
+    );
 
     // 5. Pre-warm attendance & evaluations local cache for each course
-    for (const course of activeCourses) {
-      const attKey = `cache_attendance_${course.id}`;
-      const existingAtt = getLocalCache(attKey);
+    await Promise.all(
+      activeCourses.map(async (course) => {
+        const attKey = `cache_attendance_${course.id}`;
+        const existingAtt = getLocalCache(attKey);
 
-      const yearStudents = getLocalCache(`cached_students_${course.academic_year}`) || [];
-      let courseStudents = yearStudents;
-      if (course.course_type === "sections" && Array.isArray(course.sections) && course.sections.length > 0) {
-        courseStudents = yearStudents.filter((s: any) => course.sections.includes(s.section));
-      }
-
-      if (!existingAtt) {
-        setLocalCache(attKey, {
-          course,
-          students: courseStudents,
-          makeupStudents: [],
-          attendance: [],
-          totalWeeksCount: 15
-        });
-      } else if (!existingAtt.course) {
-        existingAtt.course = course;
-        if (!existingAtt.students || existingAtt.students.length === 0) {
-          existingAtt.students = courseStudents;
+        const yearStudents = getLocalCache(`cached_students_${course.academic_year}`) || [];
+        let courseStudents = yearStudents;
+        if (course.course_type === "sections" && Array.isArray(course.sections) && course.sections.length > 0) {
+          courseStudents = yearStudents.filter((s: any) => course.sections.includes(s.section));
         }
-        setLocalCache(attKey, existingAtt);
-      }
 
-      const evalKey = `cache_evaluations_${course.id}`;
-      const existingEval = getLocalCache(evalKey);
-      if (!existingEval) {
-        const projects = (
-          (course.custom_week_names as any)?.__projects__ || []
-        ).filter((p: any) => !p.is_archived);
+        if (!existingAtt) {
+          setLocalCache(attKey, {
+            course,
+            students: courseStudents,
+            makeupStudents: [],
+            attendance: [],
+            totalWeeksCount: 15
+          });
+        } else if (!existingAtt.course) {
+          existingAtt.course = course;
+          if (!existingAtt.students || existingAtt.students.length === 0) {
+            existingAtt.students = courseStudents;
+          }
+          setLocalCache(attKey, existingAtt);
+        }
 
-        setLocalCache(evalKey, {
-          course,
-          projects,
-          totalCourseStudents: courseStudents.length,
-          projectStats: {}
-        });
-      } else if (!existingEval.course) {
-        existingEval.course = course;
-        setLocalCache(evalKey, existingEval);
-      }
-    }
+        const evalKey = `cache_evaluations_${course.id}`;
+        const existingEval = getLocalCache(evalKey);
+        if (!existingEval) {
+          const projects = (
+            (course.custom_week_names as any)?.__projects__ || []
+          ).filter((p: any) => !p.is_archived);
+
+          setLocalCache(evalKey, {
+            course,
+            projects,
+            totalCourseStudents: courseStudents.length,
+            projectStats: {}
+          });
+        } else if (!existingEval.course) {
+          existingEval.course = course;
+          setLocalCache(evalKey, existingEval);
+        }
+      })
+    );
   } catch (e) {
     // Non-blocking background worker
     console.warn("Preload worker completed with notice:", e);

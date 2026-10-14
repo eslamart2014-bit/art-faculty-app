@@ -1,11 +1,14 @@
-// Service Worker v3.6.30 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.30';
+// Service Worker v3.6.79 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.79';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
 const CORE_ASSETS = [
   '/',
   '/system',
+  '/student-portal',
+  '/coordinator',
+  '/instructor',
   '/manifest.json',
   '/manifest-student.json',
   '/icon-192.png'
@@ -13,7 +16,7 @@ const CORE_ASSETS = [
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3.6.30...');
+  console.log('[SW] Installing v3.6.79...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
@@ -26,7 +29,7 @@ self.addEventListener('install', event => {
 
 // Activate: delete old caches and claim all clients immediately
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating v2.1, clearing all old caches...');
+  console.log('[SW] Activating v3.6.79, clearing all old caches...');
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
@@ -52,7 +55,27 @@ self.addEventListener('fetch', event => {
   // Skip non-GET requests
   if (req.method !== 'GET') return;
 
-  // Skip Supabase API and /api/ backend calls (they are handled client-side via syncEngine)
+  // Cache immutable /api/media/* responses (Telegram file_id images - content-addressable, never expire)
+  if (url.pathname.startsWith('/api/media/')) {
+    event.respondWith(
+      caches.open(STATIC_CACHE).then(async cache => {
+        const cached = await cache.match(req);
+        if (cached) return cached;
+        try {
+          const res = await fetch(req);
+          if (res && res.status === 200) {
+            cache.put(req, res.clone());
+          }
+          return res;
+        } catch (e) {
+          return cached || new Response('Image not available offline', { status: 503 });
+        }
+      })
+    );
+    return;
+  }
+
+  // Skip other /api/ backend calls and Supabase (handled client-side via syncEngine)
   if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co')) {
     return;
   }

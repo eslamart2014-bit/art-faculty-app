@@ -82,205 +82,223 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   const fetchData = async () => {
     if (!initialCourse && !course) setLoading(true);
 
-    // Fetch Course
-    const { data: courseData } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
-    if (courseData) setCourse(courseData);
-
-    // Fetch Students (including makeup)
-    const { data: studentsData } = await supabase
-      .from("students")
-      .select("*")
-      .eq("academic_year", courseData?.academic_year)
-      .eq("is_active", true);
-
-    const makeupIds = courseData?.makeup_students || [];
-    const { data: makeupData } = makeupIds.length > 0 
-      ? await supabase.from("students").select("*").in("id", makeupIds).eq("is_active", true) 
-      : { data: [] };
-    
-    const excluded = courseData?.excluded_students || [];
-    const courseSections = Array.isArray(courseData?.sections) && courseData.sections.length > 0 
-      ? courseData.sections.map((s: string) => String(s).trim()) 
-      : null;
-
-    const allStudents = [...(studentsData || []), ...(makeupData || [])]
-      .filter((s: any, index: number, self: any[]) => {
-        if (s.is_active === false) return false;
-        if (excluded.includes(s.id)) return false;
-        if (index !== self.findIndex((t) => t.id === s.id)) return false;
-        if (courseSections && !makeupIds.includes(s.id)) {
-          const sSec = s.section ? String(s.section).trim() : '';
-          if (!courseSections.includes(sSec)) return false;
+    // Fast cache load for instant render while network loads
+    if (typeof window !== 'undefined' && !students.length) {
+      try {
+        const attCacheStr = localStorage.getItem(`cache_attendance_${resolvedParams.id}`);
+        if (attCacheStr) {
+          const attCached = JSON.parse(attCacheStr);
+          if (attCached?.students?.length > 0) setStudents(attCached.students);
+          if (attCached?.course) setCourse(attCached.course);
         }
-        return true;
-      })
-      .sort((a, b) => {
-        const secA = parseInt(a.section) || 999;
-        const secB = parseInt(b.section) || 999;
-        if (secA !== secB) return secA - secB;
-        return a.full_name.localeCompare(b.full_name, 'ar');
-      });
-    
-    setStudents(allStudents);
-
-    // Initialize selected sections with all available sections by default
-    const uniqueSecs = Array.from(
-      new Set(allStudents.map((s: any) => s.section ? String(s.section).trim() : 'تخلفات'))
-    ).sort((a: any, b: any) => {
-      const numA = parseInt(a, 10);
-      const numB = parseInt(b, 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      if (!isNaN(numA)) return -1;
-      if (!isNaN(numB)) return 1;
-      return a.localeCompare(b, 'ar');
-    }) as string[];
-    setSelectedSections(uniqueSecs);
-
-    // Fetch Instructor Name from profiles table
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user) {
-      const { data: profile } = await supabase.from("profiles").select("full_name, degree, role").eq("id", userData.user.id).single();
-      if (profile && profile.full_name) {
-        setInstructorName(formatInstructorTitle(profile));
-      } else {
-        setInstructorName(userData.user.email || "........................");
-      }
+      } catch(e) {}
     }
 
-    // Fetch Attendance
-    const { data: attData } = await supabase.from("attendance").select("*").eq("course_id", resolvedParams.id);
-    setAttendance(attData || []);
+    try {
+      const [courseRes, userRes, attRes, evalRes, systemTermsRes] = await Promise.all([
+        supabase.from('courses').select('*').eq('id', resolvedParams.id).single(),
+        supabase.auth.getUser(),
+        supabase.from('attendance').select('student_id, date, status, course_id, id').eq('course_id', resolvedParams.id),
+        supabase.from('evaluations').select('*').eq('course_id', resolvedParams.id),
+        supabase.from('system_settings').select('term1_start, term2_start, term1_end, term2_end').eq('id', 1).maybeSingle(),
+      ]);
+      const courseData = courseRes.data;
+      if (courseData) setCourse(courseData);
 
-    // Fetch Projects (saved in courseData.custom_week_names.__projects__)
-    const projData = courseData?.custom_week_names?.__projects__ || [];
-    setProjects(projData);
+      const [studentsRes, makeupRes, profileRes] = await Promise.all([
+        courseData
+          ? supabase.from('students').select('id, full_name, student_code, academic_year, section, is_active').eq('academic_year', courseData.academic_year).eq('is_active', true)
+          : Promise.resolve({ data: [] }),
+        courseData?.makeup_students?.length > 0
+          ? supabase.from('students').select('id, full_name, student_code, academic_year, section, is_active').in('id', courseData.makeup_students).eq('is_active', true)
+          : Promise.resolve({ data: [] }),
+        userRes.data?.user
+          ? supabase.from('profiles').select('full_name, degree, role').eq('id', userRes.data.user.id).single()
+          : Promise.resolve({ data: null }),
+      ]);
 
-    // Fetch Evaluations
-    const { data: evalData } = await supabase.from("evaluations").select("*").eq("course_id", resolvedParams.id);
-    setEvaluations(evalData || []);
+      const makeupIds = courseData?.makeup_students || [];
+      const excluded = courseData?.excluded_students || [];
+      const courseSections = Array.isArray(courseData?.sections) && courseData.sections.length > 0 
+        ? courseData.sections.map((s: string) => String(s).trim()) 
+        : null;
 
-    // Generate Weeks List based on official term start date from system_settings
-    if (courseData) {
-      const { data: systemTerms } = await supabase
-        .from("system_settings")
-        .select("term1_start, term2_start, term1_end, term2_end")
-        .eq("id", 1)
-        .maybeSingle();
-
-      const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"];
-      
-      let termStartDateStr: string | null = null;
-      const courseCreatedAt = courseData.created_at ? new Date(courseData.created_at) : new Date();
-
-      if (systemTerms) {
-        const t2s = systemTerms.term2_start;
-        const t1s = systemTerms.term1_start;
-        if (t2s && (courseCreatedAt >= new Date(t2s + "T00:00:00") || new Date() >= new Date(t2s + "T00:00:00"))) {
-          termStartDateStr = t2s;
-        } else if (t1s) {
-          termStartDateStr = t1s;
-        }
-      }
-
-      let startRefDate: Date;
-      if (termStartDateStr) {
-        const [y, m, d] = termStartDateStr.split('-').map(Number);
-        startRefDate = new Date(y, m - 1, d, 0, 0, 0);
-      } else {
-        startRefDate = courseData.created_at ? new Date(courseData.created_at) : new Date();
-      }
-
-      const dayOfWeek = startRefDate.getDay();
-      const daysToSubtract = (dayOfWeek + 1) % 7; 
-      const termStart = new Date(startRefDate);
-      termStart.setDate(startRefDate.getDate() - daysToSubtract);
-      termStart.setHours(0,0,0,0);
-
-      const { startOfWeek: currentWeekStart } = getCurrentWeekRange();
-
-      let maxAttDate = new Date(currentWeekStart);
-      (attData || []).forEach((a: any) => {
-        if (a.date) {
-          const [ay, am, ad] = a.date.split('-').map(Number);
-          const d = new Date(ay, am - 1, ad);
-          const dow = d.getDay();
-          const sub = (dow + 1) % 7;
-          const s = new Date(d);
-          s.setDate(d.getDate() - sub);
-          s.setHours(0, 0, 0, 0);
-          if (s > maxAttDate) maxAttDate = s;
-        }
-      });
-
-      const weeksList = [];
-      let current = new Date(termStart);
-      let index = 0;
-      
-      if (current > maxAttDate) {
-        current = new Date(maxAttDate);
-      }
-
-      while (current <= maxAttDate) {
-        const key = current.toISOString().split('T')[0];
-        const end = new Date(current);
-        end.setDate(current.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        
-        const sDay = current.getDate();
-        const sMonth = current.getMonth() + 1;
-        const eDay = end.getDate();
-        const eMonth = end.getMonth() + 1;
-        const subtitle = sMonth === eMonth
-          ? `من ${sDay} إلى ${eDay} / ${eMonth}`
-          : `من ${sDay}/${sMonth} إلى ${eDay}/${eMonth}`;
-
-        const defaultName = `الأسبوع ${arabicNumbers[index] || (index + 1)}`;
-        const name = courseData.custom_week_names?.[key] || defaultName;
-
-        weeksList.push({
-          key,
-          name,
-          subtitle,
-          start: new Date(current),
-          end: new Date(end)
+      const allStudents = [...(studentsRes.data || []), ...(makeupRes.data || [])]
+        .filter((s: any, index: number, self: any[]) => {
+          if (s.is_active === false) return false;
+          if (excluded.includes(s.id)) return false;
+          if (index !== self.findIndex((t) => t.id === s.id)) return false;
+          if (courseSections && !makeupIds.includes(s.id)) {
+            const sSec = s.section ? String(s.section).trim() : '';
+            if (!courseSections.includes(sSec)) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          const secA = parseInt(a.section) || 999;
+          const secB = parseInt(b.section) || 999;
+          if (secA !== secB) return secA - secB;
+          return a.full_name.localeCompare(b.full_name, 'ar');
         });
+      
+      setStudents(allStudents);
+
+      // Initialize selected sections with all available sections by default
+      const uniqueSecs = Array.from(
+        new Set(allStudents.map((s: any) => s.section ? String(s.section).trim() : 'تخلفات'))
+      ).sort((a: any, b: any) => {
+        const numA = parseInt(a, 10);
+        const numB = parseInt(b, 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        if (!isNaN(numA)) return -1;
+        if (!isNaN(numB)) return 1;
+        return a.localeCompare(b, 'ar');
+      }) as string[];
+      setSelectedSections(uniqueSecs);
+
+      // Instructor Name from profiles table
+      if (userRes.data?.user) {
+        const profile = profileRes.data;
+        if (profile && profile.full_name) {
+          setInstructorName(formatInstructorTitle(profile));
+        } else {
+          setInstructorName(userRes.data.user.email || "........................");
+        }
+      }
+
+      // Attendance
+      const attData = attRes.data;
+      setAttendance(attData || []);
+
+      // Projects
+      const projData = courseData?.custom_week_names?.__projects__ || [];
+      setProjects(projData);
+
+      // Evaluations
+      const evalData = evalRes.data;
+      setEvaluations(evalData || []);
+
+      // Generate Weeks List based on official term start date from system_settings
+      if (courseData) {
+        const systemTerms = systemTermsRes.data;
+
+        const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"];
         
-        current.setDate(current.getDate() + 7);
-        index++;
-      }
+        let termStartDateStr: string | null = null;
+        const courseCreatedAt = courseData.created_at ? new Date(courseData.created_at) : new Date();
 
-      if (weeksList.length === 0) {
-        const key = current.toISOString().split('T')[0];
-        const end = new Date(current);
-        end.setDate(current.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        const sDay = current.getDate();
-        const sMonth = current.getMonth() + 1;
-        const eDay = end.getDate();
-        const eMonth = end.getMonth() + 1;
-        const subtitle = sMonth === eMonth
-          ? `من ${sDay} إلى ${eDay} / ${eMonth}`
-          : `من ${sDay}/${sMonth} إلى ${eDay}/${eMonth}`;
-        weeksList.push({
-          key,
-          name: "الأسبوع الأول",
-          subtitle,
-          start: new Date(current),
-          end: new Date(end)
+        if (systemTerms) {
+          const t2s = systemTerms.term2_start;
+          const t1s = systemTerms.term1_start;
+          if (t2s && (courseCreatedAt >= new Date(t2s + "T00:00:00") || new Date() >= new Date(t2s + "T00:00:00"))) {
+            termStartDateStr = t2s;
+          } else if (t1s) {
+            termStartDateStr = t1s;
+          }
+        }
+
+        let startRefDate: Date;
+        if (termStartDateStr) {
+          const [y, m, d] = termStartDateStr.split('-').map(Number);
+          startRefDate = new Date(y, m - 1, d, 0, 0, 0);
+        } else {
+          startRefDate = courseData.created_at ? new Date(courseData.created_at) : new Date();
+        }
+
+        const dayOfWeek = startRefDate.getDay();
+        const daysToSubtract = (dayOfWeek + 1) % 7; 
+        const termStart = new Date(startRefDate);
+        termStart.setDate(startRefDate.getDate() - daysToSubtract);
+        termStart.setHours(0,0,0,0);
+
+        const { startOfWeek: currentWeekStart } = getCurrentWeekRange();
+
+        let maxAttDate = new Date(currentWeekStart);
+        (attData || []).forEach((a: any) => {
+          if (a.date) {
+            const [ay, am, ad] = a.date.split('-').map(Number);
+            const d = new Date(ay, am - 1, ad);
+            const dow = d.getDay();
+            const sub = (dow + 1) % 7;
+            const s = new Date(d);
+            s.setDate(d.getDate() - sub);
+            s.setHours(0, 0, 0, 0);
+            if (s > maxAttDate) maxAttDate = s;
+          }
         });
+
+        const weeksList = [];
+        let current = new Date(termStart);
+        let index = 0;
+        
+        if (current > maxAttDate) {
+          current = new Date(maxAttDate);
+        }
+
+        while (current <= maxAttDate) {
+          const key = current.toISOString().split('T')[0];
+          const end = new Date(current);
+          end.setDate(current.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+          
+          const sDay = current.getDate();
+          const sMonth = current.getMonth() + 1;
+          const eDay = end.getDate();
+          const eMonth = end.getMonth() + 1;
+          const subtitle = sMonth === eMonth
+            ? `من ${sDay} إلى ${eDay} / ${eMonth}`
+            : `من ${sDay}/${sMonth} إلى ${eDay}/${eMonth}`;
+
+          const defaultName = `الأسبوع ${arabicNumbers[index] || (index + 1)}`;
+          const name = courseData.custom_week_names?.[key] || defaultName;
+
+          weeksList.push({
+            key,
+            name,
+            subtitle,
+            start: new Date(current),
+            end: new Date(end)
+          });
+          
+          current.setDate(current.getDate() + 7);
+          index++;
+        }
+
+        if (weeksList.length === 0) {
+          const key = current.toISOString().split('T')[0];
+          const end = new Date(current);
+          end.setDate(current.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+          const sDay = current.getDate();
+          const sMonth = current.getMonth() + 1;
+          const eDay = end.getDate();
+          const eMonth = end.getMonth() + 1;
+          const subtitle = sMonth === eMonth
+            ? `من ${sDay} إلى ${eDay} / ${eMonth}`
+            : `من ${sDay}/${sMonth} إلى ${eDay}/${eMonth}`;
+          weeksList.push({
+            key,
+            name: "الأسبوع الأول",
+            subtitle,
+            start: new Date(current),
+            end: new Date(end)
+          });
+        }
+
+        setWeeks(weeksList);
       }
 
-      setWeeks(weeksList);
+      // Initialize weights for Grading Engine
+      if (projData) {
+        const initialWeights: any = {};
+        projData.forEach((p: any) => { initialWeights[p.id] = p.max_score; });
+        setProjectWeights(initialWeights);
+      }
+    } catch (err) {
+      console.error("Error fetching reports data:", err);
+    } finally {
+      setLoading(false);
     }
-
-    // Initialize weights for Grading Engine
-    if (projData) {
-      const initialWeights: any = {};
-      projData.forEach((p: any) => { initialWeights[p.id] = p.max_score; });
-      setProjectWeights(initialWeights);
-    }
-
-    setLoading(false);
   };
 
   // Helper: Format Student Name with badges (Teacher eyes only: ⭐ Distinguished / ⚠️ Uncommitted / [تخلفات] Makeup)

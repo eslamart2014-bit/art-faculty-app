@@ -324,12 +324,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         const studentsPromise = supabase
           .from("students")
-          .select("*")
+          .select("id, full_name, student_code, academic_year, section, is_active")
           .eq("academic_year", courseData.academic_year)
           .eq("is_active", true);
 
         const makeupPromise = (courseData.makeup_students && courseData.makeup_students.length > 0)
-          ? supabase.from("students").select("*").in("id", courseData.makeup_students).eq("is_active", true)
+          ? supabase.from("students").select("id, full_name, student_code, academic_year, section, is_active").in("id", courseData.makeup_students).eq("is_active", true)
           : Promise.resolve({ data: [] });
 
         const allAttPromise = supabase
@@ -339,7 +339,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         const currentAttPromise = supabase
           .from("attendance")
-          .select("*")
+          .select("id, student_id, date, status, course_id")
           .eq("course_id", resolvedParams.id)
           .gte("date", wStartStr)
           .lte("date", wEndStr);
