@@ -303,7 +303,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
       const stats: Record<string, number> = {};
       (evalsData || []).forEach((ev: any) => {
-        if (ev.score !== null && ev.score > 0) {
+        if (ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score))) {
           stats[ev.project_name] = (stats[ev.project_name] || 0) + 1;
         }
       });

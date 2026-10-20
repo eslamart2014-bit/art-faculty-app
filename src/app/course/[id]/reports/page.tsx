@@ -807,7 +807,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   // --- Report 2: Single Project ---
   const getSingleProjectStats = () => {
     if (!selectedProjectId) return { evaluated: [], unevaluated: [], projectEvals: [] as any[] };
-    const projectEvals = evaluations.filter(e => e.project_id === selectedProjectId);
+    const proj = projects.find(p => p.id === selectedProjectId);
+    const projectEvals = evaluations.filter(e => 
+      (e.project_id && e.project_id === selectedProjectId) ||
+      (proj && (e.project_name === proj.name || (e.project_name && proj.name && e.project_name.trim() === proj.name.trim())))
+    );
     const evaluated = students.filter(s => projectEvals.some(e => e.student_id === s.id));
     const unevaluated = students.filter(s => !projectEvals.some(e => e.student_id === s.id));
     return { evaluated, unevaluated, projectEvals };
@@ -899,8 +903,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       
       let totalRawScore = 0;
       sortedProjects.forEach(p => {
-        const ev = evaluations.find(e => e.student_id === s.id && e.project_id === p.id);
-        const score = ev ? ev.score : 0;
+        const ev = evaluations.find(e => e.student_id === s.id && (
+          (e.project_id && e.project_id === p.id) ||
+          (e.project_name === p.name || (e.project_name && p.name && e.project_name.trim() === p.name.trim()))
+        ));
+        const score = ev && ev.score !== null && ev.score !== undefined ? ev.score : 0;
         totalRawScore += score;
         rowHtml += `<td>${score}</td>`;
       });
@@ -967,8 +974,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
       let totalProjectsScore = 0;
       sortedProjects.forEach(p => {
-        const ev = evaluations.find(e => e.student_id === s.id && e.project_id === p.id);
-        const rawScore = ev ? ev.score : 0;
+        const ev = evaluations.find(e => e.student_id === s.id && (
+          (e.project_id && e.project_id === p.id) ||
+          (e.project_name === p.name || (e.project_name && p.name && e.project_name.trim() === p.name.trim()))
+        ));
+        const rawScore = ev && ev.score !== null && ev.score !== undefined ? ev.score : 0;
         const maxScore = p.max_score || 1;
         const trueWeight = projectWeights[p.id] !== undefined ? projectWeights[p.id] : maxScore;
         let weightedScore = (rawScore / maxScore) * trueWeight;
