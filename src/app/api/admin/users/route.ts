@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeAcademicDegree } from '@/lib/academicHelper';
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
       const cleanEmail = email.toLowerCase().trim();
       const cleanName = fullName.trim();
-      const userDegree = degree || 'م';
+      const userDegree = normalizeAcademicDegree(degree);
       
       // Generate clean memorable password
       const randomDigits = Math.floor(100000 + Math.random() * 900000);
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
 
       if (profileError) {
         console.error('Error upserting profile:', profileError);
+        return NextResponse.json({ error: 'خطأ في إنشاء ملف المستخدم: ' + profileError.message }, { status: 500 });
       }
 
       // Upsert invitations table as completed
@@ -200,7 +202,7 @@ export async function POST(request: Request) {
       if (!userId) return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
 
       const updateData: any = {};
-      if (degree !== undefined) updateData.degree = degree;
+      if (degree !== undefined) updateData.degree = normalizeAcademicDegree(degree);
       if (fullName !== undefined) updateData.full_name = fullName.trim();
       if (newRole !== undefined && profile.role === 'مدير') updateData.role = newRole;
 
@@ -215,7 +217,7 @@ export async function POST(request: Request) {
       try {
         const metaUpdates: any = {};
         if (fullName) metaUpdates.full_name = fullName.trim();
-        if (degree) metaUpdates.degree = degree;
+        if (degree) metaUpdates.degree = normalizeAcademicDegree(degree);
         if (Object.keys(metaUpdates).length > 0) {
           await supabaseAdmin.auth.admin.updateUserById(userId, {
             user_metadata: metaUpdates

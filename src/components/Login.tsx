@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
+import { normalizeAcademicDegree } from "@/lib/academicHelper";
 
 const LEVELS = [
   "الكل",
@@ -403,8 +404,17 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         .from("profiles")
         .select("*")
         .eq("id", data.user.id)
-        .single();
-      onLogin({ ...data.user, ...profile });
+        .maybeSingle();
+
+      const userMeta = data.user.user_metadata || {};
+      const safeProfile = profile || {
+        id: data.user.id,
+        email: data.user.email,
+        full_name: userMeta.full_name || data.user.email?.split('@')[0] || 'عضو هيئة تدريس',
+        degree: normalizeAcademicDegree(userMeta.degree || 'د'),
+        role: 'عضو هيئة تدريس'
+      };
+      onLogin({ ...data.user, ...safeProfile });
     }
   };
 

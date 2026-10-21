@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Copy, Check } from "lucide-react";
+import { normalizeAcademicDegree } from "@/lib/academicHelper";
 
 interface AdminUsersModalProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
           adminId: adminUser.id,
           email: inviteEmail.trim().toLowerCase(),
           fullName: inviteFullName.trim(),
-          degree: inviteDegree
+          degree: normalizeAcademicDegree(inviteDegree)
         })
       });
 
@@ -319,7 +320,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
   const handleOpenEditUser = (user: any) => {
     setEditingUser(user);
-    setEditDegree(user.degree || "م");
+    setEditDegree(user.degree ? normalizeAcademicDegree(user.degree) : "د");
     setEditFullName(user.full_name || "");
     setActiveMenuId(null);
   };
@@ -345,7 +346,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
           action: "update_user_degree", 
           userId: editingUser.id, 
           adminId: adminUser.id,
-          degree: editDegree,
+          degree: normalizeAcademicDegree(editDegree),
           fullName: editFullName.trim()
         })
       });
@@ -621,11 +622,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                 onChange={e => setInviteDegree(e.target.value)}
                 style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #444", color: "#fff", outline: "none", boxSizing: "border-box" }}
               >
-                <option value="معيد (م)">معيد (م)</option>
-                <option value="مدرس مساعد (م.د)">مدرس مساعد (م.د)</option>
-                <option value="مدرس (د)">مدرس (د)</option>
-                <option value="أستاذ مساعد (أ.م.د)">أستاذ مساعد (أ.م.د)</option>
-                <option value="أستاذ (أ.د)">أستاذ (أ.د)</option>
+                <option value="د">مدرس / دكتور (د)</option>
+                <option value="م">معيد (م)</option>
+                <option value="م.د">مدرس مساعد (م.د)</option>
+                <option value="أ.م.د">أستاذ مساعد (أ.م.د)</option>
+                <option value="أ.د">أستاذ دكتور (أ.د)</option>
               </select>
             </div>
           </div>
@@ -941,12 +942,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                 onChange={e => setEditDegree(e.target.value)}
                 style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
               >
-                <option value="معيد (م)">معيد (م)</option>
-                <option value="مدرس مساعد (م.م)">مدرس مساعد (م.م)</option>
-                <option value="دكتور (د)">دكتور (د)</option>
-                <option value="أستاذ مساعد (أ.م.د)">أستاذ مساعد (أ.م.د)</option>
-                <option value="أستاذ دكتور (أ.د)">أستاذ دكتور (أ.د)</option>
-                <option value="أستاذ (أ)">أستاذ (أ)</option>
+                <option value="د">دكتور / مدرس (د)</option>
+                <option value="م">معيد (م)</option>
+                <option value="م.د">مدرس مساعد (م.د)</option>
+                <option value="أ.م.د">أستاذ مساعد (أ.م.د)</option>
+                <option value="أ.د">أستاذ دكتور (أ.د)</option>
               </select>
             </div>
 

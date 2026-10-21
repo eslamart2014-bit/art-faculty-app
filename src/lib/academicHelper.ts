@@ -79,3 +79,63 @@ export function formatInstructorTitle(profile: any): string {
   const prefix = getDegreePrefix(degree, role);
   return `${prefix}${name}`.trim();
 }
+
+/**
+ * تحويل وتوحيد أي صيغة للدرجة العلمية إلى القيم المعتمدة في قاعدة البيانات
+ * Postgres academic_degree enum: 'د' | 'م' | 'م.د' | 'أ.م.د' | 'أ.د'
+ */
+export function normalizeAcademicDegree(deg?: string | null): 'د' | 'م' | 'م.د' | 'أ.م.د' | 'أ.د' {
+  if (!deg) return 'د';
+  const d = deg.trim();
+  const cleanD = d.replace(/[.\s_\-\/()]/g, '').toLowerCase();
+
+  // 1. أستاذ دكتور (أ.د)
+  if (
+    cleanD === 'أد' || cleanD === 'اد' ||
+    d.includes('أستاذ دكتور') || d.includes('استاذ دكتور') ||
+    d.includes('أ.د') || d.includes('ا.د') ||
+    cleanD === 'أ' || d === 'أستاذ'
+  ) {
+    return 'أ.د';
+  }
+
+  // 2. أستاذ مساعد (أ.م.د)
+  if (
+    cleanD === 'أمد' || cleanD === 'آمد' || cleanD === 'امد' ||
+    d.includes('أستاذ مساعد') || d.includes('استاذ مساعد') ||
+    d.includes('أ.م.د') || d.includes('ا.م.د')
+  ) {
+    return 'أ.م.د';
+  }
+
+  // 3. مدرس مساعد (م.د أو م.م)
+  if (
+    cleanD === 'مم' || d.includes('مساعد') || d === 'م.م' || d === 'م.د'
+  ) {
+    return 'م.د';
+  }
+
+  // 4. مدرس دكتور / دكتور (د)
+  if (
+    cleanD === 'د' || cleanD === 'دكتور' || cleanD === 'مدرس' ||
+    d.includes('دكتور') || d === 'د' || d === 'د.' ||
+    d.includes('مدرس')
+  ) {
+    return 'د';
+  }
+
+  // 5. معيد (م)
+  if (
+    cleanD === 'م' || d === 'م' || d === 'م.' ||
+    d.includes('معيد') || d.includes('مهندس')
+  ) {
+    return 'م';
+  }
+
+  // Exact match
+  if (d === 'د' || d === 'م' || d === 'م.د' || d === 'أ.م.د' || d === 'أ.د') {
+    return d as any;
+  }
+
+  return 'د';
+}

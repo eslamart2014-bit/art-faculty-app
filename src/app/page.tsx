@@ -1,6 +1,7 @@
 "use client";
 
 import { preloadFacultyData } from "@/lib/preloadFacultyData";
+import { normalizeAcademicDegree } from "@/lib/academicHelper";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -105,16 +106,23 @@ export default function Home() {
     }
 
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user).then(profile => {
-          setUser(profile);
-          setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile.role) ? profile : null);
-          setLoading(false);
-        });
-      } else {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      try {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user);
+          if (profile) {
+            setUser(profile);
+            setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile?.role) ? profile : null);
+          }
+        }
+      } catch (err) {
+        console.error("Error initializing session:", err);
+      } finally {
         setLoading(false);
       }
+    }).catch((err) => {
+      console.error("Error getting session:", err);
+      setLoading(false);
     });
 
     // Fire-and-forget background preloader so user never waits on any course/attendance page
@@ -124,23 +132,29 @@ export default function Home() {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session) {
-          const profile = await fetchProfile(session.user);
-          if (profile) {
-            if (profile.is_suspended || (profile.locked_until && new Date(profile.locked_until) > new Date())) {
-              alert("تم إيقاف حسابك أو قفله بواسطة الإدارة.");
-              await supabase.auth.signOut();
-              setUser(null);
-              return;
+        try {
+          if (session?.user) {
+            const profile = await fetchProfile(session.user);
+            if (profile) {
+              if (profile.is_suspended || (profile.locked_until && new Date(profile.locked_until) > new Date())) {
+                alert("تم إيقاف حسابك أو قفله بواسطة الإدارة.");
+                await supabase.auth.signOut();
+                setUser(null);
+                setOriginalAdminUser(null);
+                return;
+              }
+              setUser(profile);
+              setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile?.role) ? profile : null);
             }
-            setUser(profile);
-            setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile.role) ? profile : null);
+          } else {
+            setUser(null);
+            setOriginalAdminUser(null);
           }
-        } else {
-          setUser(null);
-          setOriginalAdminUser(null);
+        } catch (err) {
+          console.error("onAuthStateChange error:", err);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -150,6 +164,8 @@ export default function Home() {
   }, []);
 
   const fetchProfile = async (authUser: any) => {
+    if (!authUser?.id) return null;
+
     try {
       const { data } = await supabase
         .from("profiles")
@@ -184,7 +200,7 @@ export default function Home() {
         return merged;
       }
     } catch (e) {
-      console.log("Offline mode: could not fetch fresh profile");
+      console.log("Offline mode or error: could not fetch fresh profile");
     }
     
     // Offline fallback: use cached profile
@@ -200,7 +216,40 @@ export default function Home() {
       } catch (e) {}
     }
 
-    return authUser;
+    // Fallback profile if profile row was missing in DB (Self-heal)
+    const userMeta = authUser.user_metadata || {};
+    const fallbackProfile = {
+      id: authUser.id,
+      email: authUser.email,
+      full_name: userMeta.full_name || authUser.email?.split('@')[0] || 'عضو هيئة تدريس',
+      degree: normalizeAcademicDegree(userMeta.degree || 'د'),
+      role: 'عضو هيئة تدريس',
+      can_verify_students: !!userMeta.can_verify_students,
+      is_suspended: false,
+      ...authUser
+    };
+
+    // Attempt to create the missing profile row in the database so it never fails again
+    try {
+      supabase.from('profiles').upsert({
+        id: authUser.id,
+        email: authUser.email,
+        full_name: fallbackProfile.full_name,
+        degree: fallbackProfile.degree,
+        role: 'عضو هيئة تدريس',
+        is_suspended: false
+      }, { onConflict: 'id' }).then();
+    } catch (healErr) {
+      console.error("Self-heal profile insert error:", healErr);
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('cached_profile', JSON.stringify(fallbackProfile));
+      } catch (e) {}
+    }
+
+    return fallbackProfile;
   };
 
   if (isRedirectingToStudent) {
