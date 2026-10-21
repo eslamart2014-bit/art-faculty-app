@@ -306,10 +306,17 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (!course && !currentCourse) setLoading(true);
     
     try {
-      const [courseRes, termsRes] = await Promise.all([
-        supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
-        supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
-      ]);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+      );
+
+      const [courseRes, termsRes] = await Promise.race([
+        Promise.all([
+          supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
+          supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
+        ]),
+        timeoutPromise
+      ]) as any;
       const courseData = courseRes.data;
       if (termsRes.data) {
         setSystemTerms(termsRes.data);
@@ -346,13 +353,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         const userPromise = supabase.auth.getUser();
 
-        const [studentsRes, makeupRes, allAttRes, attRes, userRes] = await Promise.all([
-          studentsPromise,
-          makeupPromise,
-          allAttPromise,
-          currentAttPromise,
-          userPromise
-        ]);
+        const [studentsRes, makeupRes, allAttRes, attRes, userRes] = await Promise.race([
+          Promise.all([
+            studentsPromise,
+            makeupPromise,
+            allAttPromise,
+            currentAttPromise,
+            userPromise
+          ]),
+          timeoutPromise
+        ]) as any;
 
         const loadedStudents = (studentsRes.data || []).filter((s: any) => s.is_active !== false);
         setStudents(loadedStudents);

@@ -248,7 +248,15 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const fetchCourse = async () => {
     if (!course) setLoading(true);
     try {
-      const { data } = await supabase.from("courses").select("*").eq("id", resolvedParams.id).single();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+      );
+
+      const { data } = await Promise.race([
+        supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
+        timeoutPromise
+      ]) as any;
+
       if (data) {
         setCourse(data);
         const customNames = data.custom_week_names || {};
@@ -275,10 +283,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         studentsQuery = studentsQuery.in("section", courseData.sections);
       }
 
-      const [studentsRes, evalsRes] = await Promise.all([
-        studentsQuery,
-        supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id)
-      ]);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+      );
+
+      const [studentsRes, evalsRes] = await Promise.race([
+        Promise.all([
+          studentsQuery,
+          supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id)
+        ]),
+        timeoutPromise
+      ]) as any;
       const studentsData = studentsRes.data || [];
       const evalsData = evalsRes.data || [];
 

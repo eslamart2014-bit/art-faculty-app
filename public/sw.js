@@ -1,5 +1,5 @@
-// Service Worker v3.6.84 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.84';
+// Service Worker v3.6.85 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.85';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -101,13 +101,16 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. Navigation requests (HTML pages)
+  // 2. Navigation requests & Next.js Client-Side Transitions (HTML & RSC)
   // Fast-Network with immediate Cache Fallback (Never hangs on slow/flaky campus signals)
-  if (req.mode === 'navigate') {
+  const isNavigation = req.mode === 'navigate';
+  const isRSC = url.searchParams.has('_rsc') || req.headers.get('RSC') === '1';
+
+  if (isNavigation || isRSC) {
     event.respondWith((async () => {
-      // 1. Try to fetch with a fast 1800ms timeout
+      // 1. Try to fetch with a fast 1500ms timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1800);
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
 
       try {
         const res = await fetch(req, { signal: controller.signal });
@@ -115,7 +118,10 @@ self.addEventListener('fetch', event => {
         if (res && res.status === 200) {
           const cache = await caches.open(DYNAMIC_CACHE);
           cache.put(req, res.clone());
-          // Also save as root fallback if this is home
+          // Also save clean pathname for offline matching
+          if (url.pathname) {
+            cache.put(url.pathname, res.clone());
+          }
           if (url.pathname === '/') {
             const staticCache = await caches.open(STATIC_CACHE);
             staticCache.put('/', res.clone());
@@ -126,15 +132,23 @@ self.addEventListener('fetch', event => {
         clearTimeout(timeoutId);
 
         // OFFLINE / SLOW NETWORK MODE:
-        // A. Try exact requested URL in dynamic cache
+        // A. Try exact requested URL in cache
         const cachedPage = await caches.match(req);
         if (cachedPage) return cachedPage;
 
-        // B. Fallback to App Shell '/'
+        // B. Try matching without query params
+        const cachedClean = await caches.match(url.pathname);
+        if (cachedClean) return cachedClean;
+
+        // C. Fallback to App Shell '/'
         const rootShell = await caches.match('/');
         if (rootShell) return rootShell;
 
-        // C. Standalone beautiful offline fallback page
+        if (isRSC) {
+          return new Response('[]', { headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // D. Standalone beautiful offline fallback page
         return new Response(`
           <!DOCTYPE html>
           <html lang="ar" dir="rtl">

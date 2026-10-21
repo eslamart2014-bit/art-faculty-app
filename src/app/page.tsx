@@ -114,6 +114,14 @@ export default function Home() {
             setUser(profile);
             setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile?.role) ? profile : null);
           }
+        } else if (typeof window !== 'undefined') {
+          // Offline fallback: keep user logged in if cached_profile exists
+          const cached = localStorage.getItem('cached_profile');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setUser(parsed);
+            setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(parsed.role) ? parsed : null);
+          }
         }
       } catch (err) {
         console.error("Error initializing session:", err);
@@ -122,9 +130,18 @@ export default function Home() {
       }
     }).catch((err) => {
       console.error("Error getting session:", err);
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem('cached_profile');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setUser(parsed);
+            setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(parsed.role) ? parsed : null);
+          }
+        } catch(e) {}
+      }
       setLoading(false);
     });
-
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -142,9 +159,11 @@ export default function Home() {
               setUser(profile);
               setOriginalAdminUser(['مدير', 'مدير مساعد'].includes(profile?.role) ? profile : null);
             }
-          } else {
+          } else if (event === 'SIGNED_OUT') {
+            // ONLY explicitly wipe user if user intentionally clicked Sign Out!
             setUser(null);
             setOriginalAdminUser(null);
+            try { localStorage.removeItem('cached_profile'); } catch(e) {}
           }
         } catch (err) {
           console.error("onAuthStateChange error:", err);
@@ -170,11 +189,17 @@ export default function Home() {
     if (!authUser?.id) return null;
 
     try {
-      const { data } = await supabase
+      const fetchPromise = supabase
         .from("profiles")
         .select("*")
         .eq("id", authUser.id)
         .maybeSingle();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 1500)
+      );
+
+      const { data } = await Promise.race([fetchPromise, timeoutPromise]) as any;
         
       if (data) {
         let isCoord = data.can_verify_students;

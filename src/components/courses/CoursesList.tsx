@@ -82,6 +82,59 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [packProgressStep, setPackProgressStep] = useState("");
   const [packProgressPercent, setPackProgressPercent] = useState(0);
   const [showPackSuccessToast, setShowPackSuccessToast] = useState(false);
+  const [autoSyncedBadge, setAutoSyncedBadge] = useState(false);
+
+  // Auto-Sync in background when internet connection returns and is strong
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return;
+
+    let lastAutoSync = 0;
+
+    const triggerAutoSyncIfGood = async () => {
+      if (!navigator.onLine) return;
+      const now = Date.now();
+      if (now - lastAutoSync < 45000) return; // Prevent spamming within 45 seconds
+
+      const conn = (navigator as any).connection;
+      const isStrong = !conn || (conn.effectiveType === '4g' || !conn.saveData);
+
+      if (isStrong) {
+        lastAutoSync = now;
+        try {
+          // 1. Process any pending queue actions (attendance/evaluations recorded while offline)
+          const { processQueue } = await import("@/lib/syncEngine");
+          await processQueue();
+
+          // 2. Quietly update local pack in background
+          const res = await forceDownloadFacultyOfflinePack(user.id);
+          if (res.success) {
+            try {
+              const meta = localStorage.getItem(`cached_offline_pack_meta_${user.id}`);
+              if (meta) setOfflinePackMeta(JSON.parse(meta));
+              const cached = localStorage.getItem(`cached_courses_${user.id}`);
+              if (cached) setCourses(JSON.parse(cached));
+            } catch (e) {}
+
+            setAutoSyncedBadge(true);
+            setTimeout(() => setAutoSyncedBadge(false), 4000);
+          }
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('online', triggerAutoSyncIfGood);
+    const conn = (navigator as any).connection;
+    if (conn && conn.addEventListener) {
+      conn.addEventListener('change', triggerAutoSyncIfGood);
+    }
+
+    return () => {
+      window.removeEventListener('online', triggerAutoSyncIfGood);
+      if (conn && conn.removeEventListener) {
+        conn.removeEventListener('change', triggerAutoSyncIfGood);
+      }
+    };
+  }, [user?.id]);
 
   // Instant Local Cache reload when user changes
   useEffect(() => {
@@ -398,6 +451,27 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+      {/* Auto-Sync Badge when Strong Connection Syncs */}
+      {autoSyncedBadge && (
+        <div style={{
+          background: "rgba(34, 197, 94, 0.15)",
+          border: "1px solid #22c55e",
+          borderRadius: "10px",
+          padding: "8px 12px",
+          fontSize: "12px",
+          color: "#4ade80",
+          fontWeight: "bold",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          direction: "rtl",
+          animation: "fadeIn 0.3s ease"
+        }}>
+          <CheckCircle2 size={16} />
+          <span>⚡ تم التحديث والمزامنة تلقائياً مع استقرار اتصال الإنترنت.</span>
+        </div>
+      )}
+
       {/* Offline Pack Status & One-Click Download Widget */}
       <div style={{
         background: offlinePackMeta ? "rgba(34, 197, 94, 0.08)" : "rgba(37, 99, 235, 0.08)",

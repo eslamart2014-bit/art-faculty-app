@@ -229,6 +229,18 @@ export async function forceDownloadFacultyOfflinePack(
       }
     }
 
+    // 4. تحميل مسبق لواجهات المقررات والصفحات لتعمل أوفلاين 100% حتى من اختصار كروم
+    onProgress?.("جاري تخزين واجهات المقررات محلياً لتعمل بدون نت...", 92);
+    try {
+      await Promise.all(
+        activeCourses.map(async (c) => {
+          fetch(`/course/${c.id}`).catch(() => {});
+          fetch(`/course/${c.id}/attendance`).catch(() => {});
+          fetch(`/course/${c.id}/evaluations`).catch(() => {});
+        })
+      );
+    } catch (e) {}
+
     // حفظ بيانات الحزمة وتوقيتها لعرضها في الواجهة
     const packMeta = {
       timestamp: new Date().toISOString(),
