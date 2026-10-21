@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Camera, MoreVertical } from "lucide-react";
+import { Camera, MoreVertical, Download, CheckCircle2, Zap } from "lucide-react";
+import { forceDownloadFacultyOfflinePack } from "@/lib/preloadFacultyData";
 
 interface CoursesListProps {
   user: any;
@@ -26,8 +27,27 @@ const formatCourseDate = (dateStr?: string) => {
 
 export default function CoursesList({ user, refreshTrigger }: CoursesListProps) {
   const router = useRouter();
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // 0ms Instant Synchronous Cache Initialization (Zero White Screen / Loading Spinners)
+  const [courses, setCourses] = useState<any[]>(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      try {
+        const cached = localStorage.getItem(`cached_courses_${user.id}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      try {
+        const cached = localStorage.getItem(`cached_courses_${user.id}`);
+        if (cached && JSON.parse(cached).length > 0) return false;
+      } catch (e) {}
+    }
+    return true;
+  });
   
   // Menu and Modals state
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -38,9 +58,32 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
   const [colleagueName, setColleagueName] = useState("");
   const [isSharing, setIsSharing] = useState(false);
 
-  const [profilesMap, setProfilesMap] = useState<Record<string, string>>({});
+  const [profilesMap, setProfilesMap] = useState<Record<string, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_profiles_map');
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    return {};
+  });
 
-  // 0ms Instant Local Cache load for offline-first responsiveness
+  // Offline Pack & Instant Mode State
+  const [offlinePackMeta, setOfflinePackMeta] = useState<any>(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      try {
+        const meta = localStorage.getItem(`cached_offline_pack_meta_${user.id}`);
+        if (meta) return JSON.parse(meta);
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [downloadingPack, setDownloadingPack] = useState(false);
+  const [packProgressStep, setPackProgressStep] = useState("");
+  const [packProgressPercent, setPackProgressPercent] = useState(0);
+  const [showPackSuccessToast, setShowPackSuccessToast] = useState(false);
+
+  // Instant Local Cache reload when user changes
   useEffect(() => {
     if (typeof window !== 'undefined' && user?.id) {
       try {
@@ -53,6 +96,8 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         if (cachedProfiles) {
           setProfilesMap(JSON.parse(cachedProfiles));
         }
+        const meta = localStorage.getItem(`cached_offline_pack_meta_${user.id}`);
+        if (meta) setOfflinePackMeta(JSON.parse(meta));
       } catch (e) {}
     }
   }, [user.id]);
@@ -306,6 +351,34 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
     setIsSharing(false);
   };
 
+  const handleDownloadOfflinePack = async () => {
+    if (!user?.id || downloadingPack) return;
+    setDownloadingPack(true);
+    setPackProgressPercent(10);
+    setPackProgressStep("جاري بدء التنزيل...");
+
+    const res = await forceDownloadFacultyOfflinePack(user.id, (step, percent) => {
+      setPackProgressStep(step);
+      setPackProgressPercent(percent);
+    });
+
+    setDownloadingPack(false);
+    if (res.success) {
+      try {
+        const meta = localStorage.getItem(`cached_offline_pack_meta_${user.id}`);
+        if (meta) setOfflinePackMeta(JSON.parse(meta));
+      } catch (e) {}
+      try {
+        const cached = localStorage.getItem(`cached_courses_${user.id}`);
+        if (cached) setCourses(JSON.parse(cached));
+      } catch (e) {}
+      setShowPackSuccessToast(true);
+      setTimeout(() => setShowPackSuccessToast(false), 5000);
+    } else {
+      alert("تعذر استكمال تنزيل الحزمة: " + (res.error || "خطأ في الشبكة"));
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: "center", padding: "20px", color: "var(--text-muted)" }}>
@@ -325,6 +398,114 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+      {/* Offline Pack Status & One-Click Download Widget */}
+      <div style={{
+        background: offlinePackMeta ? "rgba(34, 197, 94, 0.08)" : "rgba(37, 99, 235, 0.08)",
+        border: `1px solid ${offlinePackMeta ? "rgba(34, 197, 94, 0.25)" : "rgba(59, 130, 246, 0.25)"}`,
+        borderRadius: "14px",
+        padding: "12px 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "10px",
+        direction: "rtl"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{
+            width: "36px",
+            height: "36px",
+            borderRadius: "10px",
+            background: offlinePackMeta ? "rgba(34, 197, 94, 0.2)" : "rgba(59, 130, 246, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "18px",
+            color: offlinePackMeta ? "#22c55e" : "#3b82f6"
+          }}>
+            {offlinePackMeta ? <Zap size={20} /> : <Download size={20} />}
+          </div>
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: "bold", color: offlinePackMeta ? "#4ade80" : "#60a5fa" }}>
+              {offlinePackMeta ? "وضع السرعة الفائقة مفعّل (0ms)" : "حفظ المقررات للعمل بدون إنترنت"}
+            </div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
+              {offlinePackMeta 
+                ? `بيانات (${courses.length}) مقررات و (${offlinePackMeta.studentsCount || 0}) طالباً محفوظة محلياً`
+                : "اضغط لتنزيل مقرراتك وطلابك للعمل في قاعات الكلية بدون نت"}
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleDownloadOfflinePack}
+          disabled={downloadingPack}
+          style={{
+            background: offlinePackMeta ? "rgba(255, 255, 255, 0.08)" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+            color: "#fff",
+            border: offlinePackMeta ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            cursor: downloadingPack ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            whiteSpace: "nowrap"
+          }}
+        >
+          {downloadingPack ? "جاري الحفظ..." : (offlinePackMeta ? "تحديث الحزمة 🔄" : "تنزيل الآن 📥")}
+        </button>
+      </div>
+
+      {/* Progress Modal during Download */}
+      {downloadingPack && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0, 0, 0, 0.8)", backdropFilter: "blur(4px)",
+          zIndex: 999999, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "16px", direction: "rtl"
+        }}>
+          <div style={{
+            background: "#181f2c", border: "1px solid #334155", borderRadius: "16px",
+            padding: "24px", maxWidth: "400px", width: "100%", textAlign: "center",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+          }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>⚡</div>
+            <h3 style={{ margin: "0 0 8px 0", color: "#f8fafc", fontSize: "16px" }}>
+              تجهيز حزمة العمل السريع بدون إنترنت
+            </h3>
+            <p style={{ margin: "0 0 16px 0", fontSize: "12px", color: "#94a3b8" }}>
+              {packProgressStep}
+            </p>
+            {/* Progress Bar */}
+            <div style={{ width: "100%", height: "8px", background: "#0f172a", borderRadius: "4px", overflow: "hidden", marginBottom: "10px" }}>
+              <div style={{
+                width: `${packProgressPercent}%`, height: "100%",
+                background: "linear-gradient(90deg, #2563eb, #22c55e)",
+                transition: "width 0.3s ease"
+              }} />
+            </div>
+            <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>
+              {packProgressPercent}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {showPackSuccessToast && (
+        <div style={{
+          position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)",
+          background: "#166534", color: "#fff", padding: "12px 20px", borderRadius: "12px",
+          display: "flex", alignItems: "center", gap: "10px", zIndex: 999999,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.5)", direction: "rtl", fontSize: "13px", fontWeight: "bold"
+        }}>
+          <CheckCircle2 size={18} />
+          <span>تم حفظ كافة بياناتك وطلابك على الهاتف بنجاح! التطبيق جاهز للعمل بدون نت 0ms.</span>
+        </div>
+      )}
+
       {courses.map(course => (
         <div 
           key={course.id} 

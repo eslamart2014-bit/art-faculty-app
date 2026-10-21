@@ -125,10 +125,6 @@ export default function Home() {
       setLoading(false);
     });
 
-    // Fire-and-forget background preloader so user never waits on any course/attendance page
-    if (user?.id) {
-      preloadFacultyData(user.id);
-    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -162,6 +158,13 @@ export default function Home() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  // Fire-and-forget background preloader whenever user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      preloadFacultyData(user.id);
+    }
+  }, [user?.id]);
 
   const fetchProfile = async (authUser: any) => {
     if (!authUser?.id) return null;

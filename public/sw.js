@@ -1,5 +1,5 @@
-// Service Worker v3.6.79 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.79';
+// Service Worker v3.6.84 - Next.js True Offline-First Engine
+const CACHE_VERSION = 'v3.6.84';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -16,7 +16,7 @@ const CORE_ASSETS = [
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing v3.6.79...');
+  console.log('[SW] Installing ' + CACHE_VERSION + '...');
   self.skipWaiting();
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
@@ -29,7 +29,7 @@ self.addEventListener('install', event => {
 
 // Activate: delete old caches and claim all clients immediately
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating v3.6.79, clearing all old caches...');
+  console.log('[SW] Activating ' + CACHE_VERSION + ', clearing all old caches...');
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
@@ -102,10 +102,16 @@ self.addEventListener('fetch', event => {
   }
 
   // 2. Navigation requests (HTML pages)
-  // Network-First with fallback to exact cached page, then fallback to App Shell '/'
+  // Fast-Network with immediate Cache Fallback (Never hangs on slow/flaky campus signals)
   if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).then(async res => {
+    event.respondWith((async () => {
+      // 1. Try to fetch with a fast 1800ms timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1800);
+
+      try {
+        const res = await fetch(req, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res && res.status === 200) {
           const cache = await caches.open(DYNAMIC_CACHE);
           cache.put(req, res.clone());
@@ -116,8 +122,10 @@ self.addEventListener('fetch', event => {
           }
         }
         return res;
-      }).catch(async () => {
-        // OFFLINE MODE:
+      } catch (err) {
+        clearTimeout(timeoutId);
+
+        // OFFLINE / SLOW NETWORK MODE:
         // A. Try exact requested URL in dynamic cache
         const cachedPage = await caches.match(req);
         if (cachedPage) return cachedPage;
@@ -158,8 +166,8 @@ self.addEventListener('fetch', event => {
         `, {
           headers: { 'Content-Type': 'text/html; charset=utf-8' }
         });
-      })
-    );
+      }
+    })());
     return;
   }
 
