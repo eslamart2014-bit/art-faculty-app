@@ -353,7 +353,7 @@ export async function checkAndNotifyPlagiarism(
     }
 
     // 4. تم اكتشاف تشابه مؤكد أو مرتفع! إرسال إشعار فوري للتليجرام
-    const defaultToken = process.env.TELEGRAM_BOT_TOKEN || '8940498495:AAHW-9wI1PtFDxRHIneQZnrCiQdP5w80gRk';
+    const defaultToken = process.env.TELEGRAM_BOT_TOKEN || '';
     let token = defaultToken;
     const targetChatIds = new Set<string>();
 
@@ -469,7 +469,7 @@ export async function sendManualPlagiarismAlert(
   supabase: any
 ): Promise<{ success: boolean; notifiedChats?: string[]; error?: string }> {
   try {
-    const defaultToken = process.env.TELEGRAM_BOT_TOKEN || '8940498495:AAHW-9wI1PtFDxRHIneQZnrCiQdP5w80gRk';
+    const defaultToken = process.env.TELEGRAM_BOT_TOKEN || '';
     let token = defaultToken;
     const targetChatIds = new Set<string>();
     targetChatIds.add('7822224849');

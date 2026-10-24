@@ -9,7 +9,7 @@ import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import GlobalHaptics from "@/components/GlobalHaptics";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 
-const cairo = Cairo({ subsets: ["arabic", "latin"] });
+const cairo = Cairo({ subsets: ["arabic", "latin"], preload: false });
 
 export const metadata: Metadata = {
   title: "نظام التربية الفنية — جامعة قنا",

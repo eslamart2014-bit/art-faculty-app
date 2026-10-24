@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const botToken = sysData?.telegram_config?.token;
+    const botToken = sysData?.telegram_config?.token || process.env.TELEGRAM_BOT_TOKEN;
     const showScoresToStudents = sysData?.telegram_config?.show_project_scores_to_students !== false;
     const showAttendanceToStudents = sysData?.telegram_config?.show_attendance_to_students !== false;
 
