@@ -84,6 +84,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, count: successCount });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('notify_course error:', error);
+    return NextResponse.json({ error: 'تعذر إرسال الإشعارات' }, { status: 500 });
   }
 }

@@ -1,63 +1,74 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
+import { noStoreJson } from '@/lib/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+const LEVEL_FILTERS: Record<string, string> = {
+  'الفرقة الأولى': 'اول',
+  'الفرقة الاولي': 'اول',
+  'الفرقة الأولي': 'اول',
+  'اول': 'اول',
+  'أول': 'اول',
+  'الفرقة الثانية': 'ثاني',
+  'الثانية': 'ثاني',
+  'ثاني': 'ثاني',
+  'الفرقة الثالثة': 'ثالث',
+  'الثالثة': 'ثالث',
+  'ثالث': 'ثالث',
+  'الفرقة الرابعة': 'رابع',
+  'الرابعة': 'رابع',
+  'رابع': 'رابع',
+};
+
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  if (isRateLimited(`student-search:${ip}`, 30, 60_000)) {
+    return noStoreJson({ error: 'عدد محاولات البحث كبير، يرجى المحاولة بعد قليل', students: [] }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
-  const query = (searchParams.get('q') || '').trim();
+  const rawQuery = (searchParams.get('q') || searchParams.get('query') || '').trim();
   const level = (searchParams.get('level') || '').trim();
 
-  // إذا لم يكن هناك استعلام ولا فرقة محددة
-  if (!query && (!level || level === 'الكل')) {
-    return NextResponse.json({ students: [] });
+  const query = rawQuery.replace(/[%_,().*\\:'"]/g, '').replace(/\s+/g, ' ').slice(0, 60);
+  const levelKey = level && level !== 'الكل' ? LEVEL_FILTERS[level] : null;
+
+  if (!query && !levelKey) {
+    return noStoreJson({ students: [] });
+  }
+  if (query && query.length < 2) {
+    return noStoreJson({ students: [] });
   }
 
   try {
     let dbQuery = supabaseAdmin
       .from('students')
-      .select('id, full_name, student_code, academic_year, section');
+      .select('full_name, student_code, academic_year, section')
+      .limit(10);
 
-    // 1. فلترة بالفرقة الدراسية (مطابقة تامة لكافة الفرق الأربعة)
-    if (level && level !== 'الكل') {
-      if (level.includes('أول') || level.includes('اول')) {
-        dbQuery = dbQuery.ilike('academic_year', '%اول%');
-      } else if (level.includes('ثان') || level.includes('تاني')) {
-        dbQuery = dbQuery.ilike('academic_year', '%ثاني%');
-      } else if (level.includes('ثالث') || level.includes('تالت')) {
-        dbQuery = dbQuery.ilike('academic_year', '%ثالث%');
-      } else if (level.includes('رابع')) {
-        dbQuery = dbQuery.ilike('academic_year', '%رابع%');
-      } else {
-        const clean = level.replace('الفرقة ', '').replace('السنة ', '').trim();
-        dbQuery = dbQuery.ilike('academic_year', `%${clean}%`);
-      }
+    if (levelKey) {
+      dbQuery = dbQuery.ilike('academic_year', `%${levelKey}%`);
     }
 
-    // 2. فلترة بالبحث (اسم أو كود)
     if (query) {
       if (/^\d+$/.test(query)) {
-        // بحث برقم الكود
         dbQuery = dbQuery.ilike('student_code', `%${query}%`);
       } else {
-        // بحث باسم الطالب
         dbQuery = dbQuery.ilike('full_name', `%${query}%`);
       }
     }
 
-    const { data, error } = await dbQuery
-      .order('student_code', { ascending: true })
-      .limit(30);
+    const { data, error } = await dbQuery.order('student_code', { ascending: true });
 
     if (error) {
-      console.error('Students search error:', error);
-      return NextResponse.json({ error: error.message, students: [] }, { status: 500 });
+      console.error('Students search error:', error.message);
+      return noStoreJson({ error: 'تعذر تنفيذ البحث', students: [] }, { status: 500 });
     }
 
-    return NextResponse.json({ students: data || [] });
+    return noStoreJson({ students: data || [] });
   } catch (err: any) {
     console.error('Search unexpected error:', err);
-    return NextResponse.json({ error: err.message, students: [] }, { status: 500 });
+    return noStoreJson({ error: 'تعذر تنفيذ البحث', students: [] }, { status: 500 });
   }
 }

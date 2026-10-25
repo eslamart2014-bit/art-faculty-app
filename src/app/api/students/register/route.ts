@@ -1,38 +1,37 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, generatePinCode } from '@/lib/codeHelper';
+import { formatStudentCode, generatePinCode, getStudentCodeVariants } from '@/lib/codeHelper';
 import { uploadImageToStorage } from '@/lib/telegramStorage';
 import { localStore } from '@/lib/localFallbackStore';
+import { noStoreJson } from '@/lib/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+const MAX_ID_IMAGE_BYTES = 8 * 1024 * 1024;
+
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    if (isRateLimited(`student-register:${ip}`, 5, 10 * 60_000)) {
+      return noStoreJson({ error: 'عدد محاولات التسجيل كبير، يرجى المحاولة لاحقاً' }, { status: 429 });
+    }
+
     const body = await request.json();
-    const {
-      student_code,
-      full_name,
-      mobile,
-      id_card_image,
-      device_info,
-    } = body;
+    const student_code = typeof body.student_code === 'string' ? body.student_code.trim() : '';
+    const mobile = typeof body.mobile === 'string' ? body.mobile.trim() : '';
+    const id_card_image = typeof body.id_card_image === 'string' ? body.id_card_image : '';
+    const device_info = body.device_info;
 
-    if (!student_code || !student_code.trim()) {
-      return NextResponse.json(
-        { error: 'يرجى إدخال كود الطالب الجامعي' },
-        { status: 400 }
-      );
+    if (!student_code || !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code)) {
+      return noStoreJson({ error: 'يرجى إدخال كود طالب جامعي صالح' }, { status: 400 });
     }
 
-    if (!mobile || !mobile.trim()) {
-      return NextResponse.json(
-        { error: 'يرجى إدخال رقم الموبايل للتواصل' },
-        { status: 400 }
-      );
+    if (!/^\d{10,15}$/.test(mobile)) {
+      return noStoreJson({ error: 'يرجى إدخال رقم موبايل صحيح للتواصل' }, { status: 400 });
     }
 
-    if (!id_card_image || (!id_card_image.startsWith('data:image') && !id_card_image.startsWith('http'))) {
-      return NextResponse.json(
+    if (!id_card_image.startsWith('data:image') || id_card_image.length > MAX_ID_IMAGE_BYTES) {
+      return noStoreJson(
         { error: 'صورة بطاقة الرقم القومي أو كارنيه الكلية إجبارية لإتمام التسجيل' },
         { status: 400 }
       );
@@ -40,21 +39,19 @@ export async function POST(request: Request) {
 
     const cleanCode = formatStudentCode(student_code);
 
-    // 1. التحقق من وجود الطالب في كشوف الكلية الأصلية
     const { data: studentRecord, error: stErr } = await supabaseAdmin
       .from('students')
       .select('id, full_name, student_code, academic_year, section')
-      .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+      .in('student_code', getStudentCodeVariants(cleanCode))
       .maybeSingle();
 
     if (stErr || !studentRecord) {
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'كود الطالب غير مسجل في منظومة الكلية! يرجى مراجعة شؤون الطلاب.' },
         { status: 404 }
       );
     }
 
-    // 2. التحقق من الحساب في جدول student_accounts أو telegram_browser_id
     let existingAccount: any = null;
     try {
       const { data } = await supabaseAdmin
@@ -75,8 +72,12 @@ export async function POST(request: Request) {
       existingAccount = localStore.getAccount(studentRecord.student_code);
     }
 
+    if (existingAccount?.status === 'suspended') {
+      return noStoreJson({ error: 'هذا الحساب موقوف من قبل إدارة المنظومة' }, { status: 403 });
+    }
+
     if (existingAccount && existingAccount.status === 'active' && existingAccount.is_pin_used) {
-      return NextResponse.json(
+      return noStoreJson(
         {
           error: 'هذا الحساب مسجل ومفعل بالفعل بالرقم السري. يمكنك تسجيل الدخول مباشرة.',
           alreadyActive: true,
@@ -85,9 +86,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. رفع صورة البطاقة عبر محرك التخزين الصامت
     let idCardUrl = existingAccount?.id_card_url || '';
-    if (id_card_image && id_card_image.startsWith('data:image')) {
+    if (id_card_image.startsWith('data:image')) {
       const uploadRes = await uploadImageToStorage(
         id_card_image,
         `بطاقة هوية الطالب: ${studentRecord.full_name} (${studentRecord.student_code})`,
@@ -97,23 +97,22 @@ export async function POST(request: Request) {
       );
       if (uploadRes.success) {
         idCardUrl = uploadRes.url;
+      } else {
+        return noStoreJson({ error: 'تعذر رفع صورة البطاقة. يرجى المحاولة مرة أخرى' }, { status: 502 });
       }
     }
 
-    // 4. توليد الرقم السري (PIN) من 8 خانات إذا لم يكن موجوداً
     const pinCode = existingAccount?.pin_code || generatePinCode();
 
-    // 5. حفظ أو تحديث الحساب
     const deviceRecord = {
-      deviceId: device_info?.deviceId || 'unknown',
-      userAgent: device_info?.userAgent || 'browser',
-      screen: device_info?.screenResolution || '',
+      deviceId: typeof device_info?.deviceId === 'string' ? device_info.deviceId.slice(0, 100) : 'unknown',
+      userAgent: typeof device_info?.userAgent === 'string' ? device_info.userAgent.slice(0, 300) : 'browser',
+      screen: typeof device_info?.screenResolution === 'string' ? device_info.screenResolution.slice(0, 40) : '',
       firstSeen: new Date().toISOString(),
       lastSeen: new Date().toISOString(),
     };
 
-    let updatedDevices = existingAccount?.devices || [];
-    if (!Array.isArray(updatedDevices)) updatedDevices = [];
+    let updatedDevices = Array.isArray(existingAccount?.devices) ? existingAccount.devices : [];
     if (!updatedDevices.some((d: any) => d.deviceId === deviceRecord.deviceId)) {
       updatedDevices.push(deviceRecord);
     }
@@ -124,7 +123,7 @@ export async function POST(request: Request) {
       full_name: studentRecord.full_name,
       academic_year: studentRecord.academic_year,
       section: studentRecord.section || 'عام',
-      mobile: mobile.trim(),
+      mobile,
       id_card_url: idCardUrl,
       pin_code: pinCode,
       is_pin_used: false,
@@ -146,28 +145,17 @@ export async function POST(request: Request) {
       localStore.upsertAccount(payload);
     }
 
-    // حفظ فوري ومستدام في جدول students كحاوية JSON آمنة ومزامنة عبر السحاب
-    try {
-      await supabaseAdmin
-        .from('students')
-        .update({ telegram_browser_id: JSON.stringify(payload) })
-        .eq('id', studentRecord.id);
-    } catch (e) {
-      console.error('Error updating students.telegram_browser_id:', e);
-    }
-
-    // 6. تسجيل النشاط الأمني
     try {
       await supabaseAdmin.from('portal_audit_logs').insert({
         student_code: studentRecord.student_code,
         action: 'register',
-        device_id: device_info?.deviceId,
-        user_agent: device_info?.userAgent,
-        details: { mobile: mobile.trim(), status: 'pending' },
+        device_id: deviceRecord.deviceId,
+        user_agent: deviceRecord.userAgent,
+        details: { status: 'pending' },
       });
     } catch (e) {}
 
-    return NextResponse.json({
+    return noStoreJson({
       success: true,
       status: 'pending',
       student: {
@@ -182,6 +170,6 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error('Registration server error:', err);
-    return NextResponse.json({ error: err.message || 'حدث خطأ في الخادم' }, { status: 500 });
+    return noStoreJson({ error: 'حدث خطأ في الخادم' }, { status: 500 });
   }
 }

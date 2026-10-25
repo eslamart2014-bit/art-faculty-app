@@ -60,6 +60,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('notify_eval error:', error);
+    return NextResponse.json({ error: 'تعذر إرسال الإشعار' }, { status: 500 });
   }
 }

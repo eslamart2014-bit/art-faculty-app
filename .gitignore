@@ -44,3 +44,7 @@ next-env.d.ts
 .lockers_db_backup_*
 scratch/
 
+# local runtime data (contains student PII / PINs)
+.local_portal_db.json
+.lockers_db.json
+

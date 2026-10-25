@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendManualPlagiarismAlert } from '@/lib/plagiarismNotifier';
+import { requireAdmin } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireAdmin(request);
+  if (!guard.ok) return guard.response;
+
   try {
     const body = await request.json();
     const { student1, student2, similarity, hammingDistance, reason } = body;

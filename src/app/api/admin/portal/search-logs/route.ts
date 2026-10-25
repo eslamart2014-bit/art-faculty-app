@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
     // 1. جلب السجلات من Supabase (البحث، سحب الكارت، الاستعلام)
     let logs: any[] = [];

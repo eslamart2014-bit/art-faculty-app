@@ -1,14 +1,33 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireStaff } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireStaff(request);
+  if (!guard.ok) return guard.response;
+
   try {
     const { course_id } = await request.json();
 
-    if (!course_id) {
+    if (typeof course_id !== 'string' || !course_id || course_id.length > 64) {
       return NextResponse.json({ error: 'يرجى تحديد كود المقرر' }, { status: 400 });
+    }
+
+    const { data: course } = await supabaseAdmin
+      .from('courses')
+      .select('teacher_id, shared_with')
+      .eq('id', course_id)
+      .maybeSingle();
+
+    if (!course) {
+      return NextResponse.json({ error: 'المقرر غير موجود' }, { status: 404 });
+    }
+
+    const isShared = Array.isArray(course.shared_with) && course.shared_with.includes(guard.ctx.user.id);
+    if (!guard.ctx.isAdmin && course.teacher_id !== guard.ctx.user.id && !isShared) {
+      return NextResponse.json({ error: 'غير مصرح بحذف مرفقات هذا المقرر' }, { status: 403 });
     }
 
     const filesToRemove: string[] = [];
@@ -55,7 +74,7 @@ export async function POST(request: Request) {
           const studentFolder = item.name;
           const { data: subItems } = await supabaseAdmin.storage.from('artworks').list(`${studentFolder}/${course_id}`, { limit: 50 });
           if (subItems && subItems.length > 0) {
-            subItems.forEach(f => {
+            subItems.forEach((f: any) => {
               filesToRemove.push(`${studentFolder}/${course_id}/${f.name}`);
             });
           }

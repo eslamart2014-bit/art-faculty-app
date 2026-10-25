@@ -310,16 +310,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
       );
 
-      const [courseRes, termsRes] = await Promise.race([
+      const [courseRes, termsData] = await Promise.race([
         Promise.all([
           supabase.from("courses").select("*").eq("id", resolvedParams.id).single(),
-          supabase.from("system_settings").select("term1_start, term2_start, term1_end, term2_end").eq("id", 1).maybeSingle()
+          fetch("/api/public/settings", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
         ]),
         timeoutPromise
       ]) as any;
       const courseData = courseRes.data;
-      if (termsRes.data) {
-        setSystemTerms(termsRes.data);
+      if (termsData) {
+        setSystemTerms(termsData);
       }
 
       if (courseData) {
@@ -408,7 +410,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         // Update local persistent cache for instant offline access
         setLocalCache(`cache_attendance_${resolvedParams.id}`, {
           course: courseData,
-          systemTerms: termsRes.data,
+          systemTerms: termsData,
           students: loadedStudents,
           makeupStudents: loadedMakeup,
           instructorName: instName,

@@ -1,28 +1,34 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-// Use anon key — this is a public endpoint, service role key MUST NOT be used here
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+function clean(value: unknown, max: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > max) return null;
+  return trimmed;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { event_type, academic_year, browser_id, student_name } = body;
+    const eventType = clean(body?.event_type, 64);
+    const academicYear = clean(body?.academic_year, 32);
+    const browserId = clean(body?.browser_id, 128);
+    const studentName = clean(body?.student_name, 120);
 
-    if (!event_type || !academic_year) {
+    if (!eventType || !academicYear) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('portal_analytics')
-      .insert([{ event_type, academic_year, browser_id, student_name }]);
+      .insert([{ event_type: eventType, academic_year: academicYear, browser_id: browserId, student_name: studentName }]);
 
     if (error) throw error;
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    console.error('analytics track error:', err);
+    return NextResponse.json({ error: 'تعذر تسجيل الحدث' }, { status: 500 });
   }
 }

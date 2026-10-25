@@ -1,17 +1,30 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
+import { requireStaff } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireStaff(request);
+  if (!guard.ok) return guard.response;
+
   try {
     const body = await request.json();
-    const { instructor_id, student_code, course_id, project_name } = body;
+    const { student_code, course_id, project_name } = body;
 
-    if (!instructor_id || !student_code || !course_id || !project_name) {
+    if (
+      typeof student_code !== 'string' ||
+      !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code.trim()) ||
+      typeof course_id !== 'string' ||
+      !course_id ||
+      course_id.length > 64 ||
+      typeof project_name !== 'string' ||
+      !project_name.trim() ||
+      project_name.length > 200
+    ) {
       return NextResponse.json(
-        { error: 'بيانات غير مكتملة (يرجى تحديد المعيد، كود الطالب، المقرر، والمشروع)' },
+        { error: 'بيانات غير مكتملة (يرجى تحديد كود الطالب، المقرر، والمشروع)' },
         { status: 400 }
       );
     }
@@ -27,11 +40,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'المقرر غير موجود' }, { status: 404 });
     }
 
-    const effectiveInstructorId = instructor_id || course.teacher_id;
+    const effectiveInstructorId = guard.ctx.user.id;
     const isOwner = course.teacher_id === effectiveInstructorId;
     const isShared = Array.isArray(course.shared_with) && course.shared_with.includes(effectiveInstructorId);
 
-    if (!isOwner && !isShared) {
+    if (!guard.ctx.isAdmin && !isOwner && !isShared) {
       return NextResponse.json(
         { error: 'غير مصرح: هذا المقرر ليس مسنداً إليك، ولا يحق لك تعديل تسليماته.' },
         { status: 403 }

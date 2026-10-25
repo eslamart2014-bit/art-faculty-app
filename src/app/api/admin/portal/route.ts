@@ -3,16 +3,20 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, generatePinCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { compareDHashes } from '@/lib/imageCompressor';
 import { localStore } from '@/lib/localFallbackStore';
+import { requireCoordinator, noStoreJson } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'inspect';
   const code = (searchParams.get('code') || '').trim();
 
-  if (!code) {
-    return NextResponse.json({ error: 'Missing student code' }, { status: 400 });
+  if (!code || !/^[A-Za-z0-9\-_]{1,20}$/.test(code)) {
+    return noStoreJson({ error: 'كود الطالب غير صالح' }, { status: 400 });
   }
 
   const cleanCode = formatStudentCode(code);
@@ -318,12 +322,19 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
     const { action, student_code, extra } = await request.json();
-    if (!student_code) {
-      return NextResponse.json({ error: 'يرجى تحديد كود الطالب' }, { status: 400 });
+    if (typeof student_code !== 'string' || !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code.trim())) {
+      return noStoreJson({ error: 'يرجى تحديد كود طالب صالح' }, { status: 400 });
     }
     const cleanCode = formatStudentCode(student_code);
+
+    if ((action === 'delete_account' || action === 'wipe_account') && !guard.ctx.isAdmin) {
+      return noStoreJson({ error: 'صلاحية حذف الحساب مقصورة على الإدارة' }, { status: 403 });
+    }
 
     // 0. اعتماد وتفعيل الحساب مباشرة
     if (action === 'activate_account') {

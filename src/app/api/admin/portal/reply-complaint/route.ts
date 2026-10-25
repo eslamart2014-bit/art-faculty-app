@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
-    const { complaint_id, reply_text, admin_name } = await request.json();
+    const { complaint_id, reply_text } = await request.json();
+    const admin_name = guard.ctx.profile.full_name || guard.ctx.user.email || 'إدارة الكلية';
 
     if (!complaint_id || !reply_text?.trim()) {
       return NextResponse.json({ error: 'معرف الشكوى ونص الرد مطلوبان' }, { status: 400 });

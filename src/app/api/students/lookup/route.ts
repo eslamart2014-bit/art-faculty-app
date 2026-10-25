@@ -3,16 +3,26 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { isAccountActivated, parseTelegramBrowserId } from '@/lib/studentAccountHelper';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  if (isRateLimited(`student-lookup:${ip}`, 30, 60_000)) {
+    return NextResponse.json({ success: false, message: 'عدد المحاولات كبير، يرجى المحاولة بعد قليل' }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const rawCode = (searchParams.get('code') || '').trim();
   const deviceId = (searchParams.get('deviceId') || searchParams.get('device_id') || '').trim();
 
   if (!rawCode) {
     return NextResponse.json({ success: false, message: 'يرجى إدخال كود الطالب' }, { status: 400 });
+  }
+
+  if (!/^\d{1,10}$/.test(rawCode)) {
+    return NextResponse.json({ success: false, message: 'كود الطالب يجب أن يكون أرقاماً فقط' }, { status: 400 });
   }
 
   const cleanCode = formatStudentCode(rawCode);
@@ -108,8 +118,6 @@ export async function GET(request: Request) {
     const isActivated = isAccountActivated(dbAccount, tbAccount, !dbAccount && !tbAccount ? existingAccount : null);
 
     if (isActivated && existingAccount) {
-      if (!existingAccount.pin_code && tbAccount?.pin_code) existingAccount.pin_code = tbAccount.pin_code;
-
       // فحص قيد الجهاز (Single Device Lock) لمنع فتح الحساب من جهاز آخر
       const boundDeviceId: string | null = tbAccount?.bound_device_id || dbAccount?.bound_device_id || null;
       const validDevice = Boolean(deviceId && deviceId !== 'unknown' && deviceId !== 'unknown_device');
@@ -126,34 +134,16 @@ export async function GET(request: Request) {
         });
       }
 
-      // ربط الجهاز تلقائياً فقط إذا كان هو نفس الجهاز الذي سجّل منه الطالب
-      if (!boundDeviceId && validDevice) {
-        const knownDevices: any[] = [
-          ...(Array.isArray(tbAccount?.devices) ? tbAccount.devices : []),
-          ...(Array.isArray(dbAccount?.devices) ? dbAccount.devices : []),
-        ];
-        const isRegistrationDevice = knownDevices.some((d: any) => d?.deviceId === deviceId);
-        if (isRegistrationDevice && tbAccount) {
-          try {
-            await supabaseAdmin
-              .from('students')
-              .update({ telegram_browser_id: JSON.stringify({ ...tbAccount, bound_device_id: deviceId }) })
-              .eq('id', student.id);
-          } catch (e) {}
-        }
-      }
-
+      // لا يُعاد الـ PIN إطلاقاً. الربط التلقائي للجهاز يتم فقط بعد تسجيل دخول ناجح.
       return NextResponse.json({
         success: true,
         student: {
           ...safeStudent,
-          pin_code: existingAccount.pin_code || undefined,
           status: 'active',
           is_pin_used: true
         },
-        pin_code: existingAccount.pin_code || undefined,
         isAlreadyActive: true,
-        message: 'هذا الحساب مسجل ومفعل بالفعل.',
+        message: 'هذا الحساب مسجل ومفعل بالفعل. يرجى إدخال رقمك السري لتسجيل الدخول.',
       }, {
         headers: { 'Cache-Control': 'no-store, max-age=0' }
       });
@@ -164,11 +154,10 @@ export async function GET(request: Request) {
         success: true,
         student: {
           ...safeStudent,
-          pin_code: existingAccount.pin_code || undefined
+          status: 'pending'
         },
-        pin_code: existingAccount.pin_code || undefined,
         isPending: true,
-        message: 'بياناتك مسجلة بالفعل ولكنها بانتظار اعتماد المنسق لتفعيل الحساب.',
+        message: 'بياناتك مسجلة بالفعل ولكنها بانتظار اعتماد المنسق لتفعيل الحساب. يمكنك استخدام الرقم السري الذي ظهر لك عند التسجيل بعد الاعتماد.',
       }, {
         headers: { 'Cache-Control': 'no-store, max-age=0' }
       });

@@ -747,7 +747,7 @@ export default function CoordinatorPortalPage() {
                   }}
                 >
                   <CheckCircle2 size={19} className={activatingAnim ? "spin" : ""} />
-                  <span>{activatingAnim ? "✓ تم الاعتماد الفوري وتفعيل الحساب بنجاح!" : "⚡ اعتماد فوري ومباشر (بدون رقم سري)"}</span>
+                  <span>{activatingAnim ? "✓ تم الاعتماد الفوري وتفعيل الحساب بنجاح!" : "⚡ اعتماد فوري وتفعيل الحساب"}</span>
                 </button>
 
                 <div style={{
@@ -760,7 +760,7 @@ export default function CoordinatorPortalPage() {
                   textAlign: "center",
                   lineHeight: "1.5"
                 }}>
-                  💡 بمجرد النقر، يتم اعتماد وتفعيل الحساب فورياً؛ ويدخل الطالب تلقائياً وبشكل مباشر على حسابه ومقرراته دون الحاجة لكتابة أي رقم سري.
+                  💡 بمجرد النقر يتم اعتماد وتفعيل الحساب فوراً، ثم يدخل الطالب إلى بوابته باستخدام كوده ورقمه السري.
                 </div>
 
                 <button 

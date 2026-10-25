@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { lockerStore } from '@/lib/lockerStore';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'grid';
   const letter = searchParams.get('letter') || 'ALL';
@@ -112,6 +116,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
     await lockerStore.ensureLoaded();
     const body = await request.json();

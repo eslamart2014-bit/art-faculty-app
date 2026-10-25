@@ -2,12 +2,17 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
 import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, getAcademicYearVariants } from '@/lib/codeHelper';
+import { requireStaff } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const guard = await requireStaff(request);
+  if (!guard.ok) return guard.response;
+
   const { searchParams } = new URL(request.url);
-  const instructorId = searchParams.get('instructor_id');
+  const requestedInstructorId = searchParams.get('instructor_id');
+  const instructorId = guard.ctx.isAdmin ? requestedInstructorId || guard.ctx.user.id : guard.ctx.user.id;
   const courseId = searchParams.get('course_id');
   const projectName = searchParams.get('project_name');
   const searchQuery = (searchParams.get('q') || '').trim();
@@ -45,7 +50,7 @@ export async function GET(request: Request) {
     }
 
     const currentInstructor = (instructors || []).find((i: any) => i.id === instructorId);
-    const isAdmin = currentInstructor?.role === 'مدير';
+    const isAdmin = guard.ctx.isAdmin;
 
     // فلترة المقررات الخاصة بهذا المعيد فقط (المالك أو المشارك معه)، بينما المدير تتاح له كافة المقررات
     // مع استبعاد المقررات المحذوفة أو المؤرشفة تماماً
@@ -100,7 +105,7 @@ export async function GET(request: Request) {
 
       // حصر البحث في الفرق الدراسية المسندة للمعيد ما لم يكن مديراً
       if (!isAdmin && myAcademicYears.length > 0) {
-        const expandedYears = Array.from(new Set(myAcademicYears.flatMap((y: string) => getAcademicYearVariants(y))));
+        const expandedYears = Array.from(new Set((myAcademicYears as string[]).flatMap((y: string) => getAcademicYearVariants(y))));
         stQuery = stQuery.in('academic_year', expandedYears);
       }
 
@@ -269,7 +274,7 @@ export async function GET(request: Request) {
         .select('student_code')
         .in('student_code', studentCodes)
         .eq('is_active', true);
-      const activeCodeSet = new Set((activeStudents || []).map(s => s.student_code));
+      const activeCodeSet = new Set((activeStudents || []).map((s: any) => s.student_code));
       submissions = submissions.filter(s => activeCodeSet.has(s.student_code));
     }
 

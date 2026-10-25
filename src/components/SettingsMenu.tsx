@@ -44,6 +44,9 @@ export default function SettingsMenu({
   if (!isOpen) return null;
 
   const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/session", { method: "DELETE", credentials: "same-origin" });
+    } catch {}
     await supabase.auth.signOut();
     onClose();
   };

@@ -1,130 +1,152 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { lockerStore } from '@/lib/lockerStore';
+import { getStudentCodeVariants } from '@/lib/codeHelper';
+import { getStudentSession, noStoreJson } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
-function normalizeCohort(raw: string): string {
-  if (!raw) return '';
-  const s = raw.replace(/الفرقة\s*/, '').trim();
-  if (s.includes('اول') || s.includes('أول')) return 'الاولي';
-  if (s.includes('ثان')) return 'الثانية';
-  if (s.includes('ثالث')) return 'الثالثة';
-  if (s.includes('رابع')) return 'الرابعة';
-  return s;
+function sanitizeSearchTerm(value: unknown): string {
+  return String(value || '')
+    .replace(/[%_,().*\\:'"]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
 }
 
-// 1. GET: فحص حالة تسكين الطالب
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const code = (searchParams.get('code') || '').trim();
-  const name = (searchParams.get('name') || '').trim();
+async function getSessionStudent(request: Request) {
+  const session = getStudentSession(request);
+  if (!session) return null;
+  const { data } = await supabaseAdmin
+    .from('students')
+    .select('id, student_code, full_name, academic_year')
+    .in('student_code', getStudentCodeVariants(session.code))
+    .maybeSingle();
+  return data || null;
+}
 
-  if (!code && !name) {
-    return NextResponse.json({ error: 'يرجى تقديم كود أو اسم الطالب' }, { status: 400 });
+export async function GET(request: Request) {
+  const student = await getSessionStudent(request);
+  if (!student) {
+    return noStoreJson({ error: 'يجب تسجيل الدخول أولاً' }, { status: 401 });
   }
 
   try {
     await lockerStore.ensureLoaded();
-    const result = lockerStore.getStudentLockerStatus({ code, name });
-    return NextResponse.json({
-      success: true,
-      data: result
+    const result = lockerStore.getStudentLockerStatus({
+      code: student.student_code,
+      name: student.full_name,
     });
+    return noStoreJson({ success: true, data: result });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'حدث خطأ أثناء فحص الدواليب' }, { status: 500 });
+    return noStoreJson({ error: 'حدث خطأ أثناء فحص الدواليب' }, { status: 500 });
   }
 }
 
-// 2. POST: البحث الذكي عن زملاء الدفعة أو تقديم طلب الحجز
 export async function POST(request: Request) {
+  const student = await getSessionStudent(request);
+  if (!student) {
+    return noStoreJson({ error: 'يجب تسجيل الدخول أولاً' }, { status: 401 });
+  }
+
   try {
     await lockerStore.ensureLoaded();
     const body = await request.json();
     const action = body.action || 'book';
 
-    // أ) البحث الذكي عن زملاء نفس الفرقة غير المسجلين
     if (action === 'search_peers') {
-      const { cohort, query, excludeCodes = [] } = body;
-      const cleanQuery = (query || '').trim();
+      const term = sanitizeSearchTerm(body.query);
+      const excludeCodes = Array.isArray(body.excludeCodes)
+        ? body.excludeCodes.filter((c: unknown) => typeof c === 'string').slice(0, 20)
+        : [];
 
-      // استعلام الطلاب من نفس الفرقة
       let dbQuery = supabaseAdmin
         .from('students')
         .select('student_code, full_name, academic_year')
+        .eq('academic_year', student.academic_year)
         .limit(30);
 
-      const norm = normalizeCohort(cohort);
-      if (norm) {
-        dbQuery = dbQuery.or(`academic_year.eq.${norm},academic_year.ilike.%${norm}%`);
-      }
-
-      if (cleanQuery) {
-        dbQuery = dbQuery.or(`full_name.ilike.%${cleanQuery}%,student_code.ilike.%${cleanQuery}%`);
+      if (term) {
+        if (/^\d+$/.test(term)) {
+          dbQuery = dbQuery.ilike('student_code', `%${term}%`);
+        } else {
+          dbQuery = dbQuery.ilike('full_name', `%${term}%`);
+        }
       }
 
       const { data: peers, error } = await dbQuery;
-
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return noStoreJson({ error: 'تعذر البحث عن الزملاء' }, { status: 500 });
       }
 
-      // فلترة الطلاب: استبعاد من هم محجوزين مسبقاً في دواليب أو في قائمة الانتظار
-      const availablePeers = (peers || []).filter(student => {
-        // استبعاد المستبعدين مسبقاً في الطلب الحالي
-        if (excludeCodes.includes(student.student_code)) return false;
-
-        // فحص هل الطالب مسكن في أي دولاب
-        const status = lockerStore.getStudentLockerStatus({ code: student.student_code, name: student.full_name });
+      const availablePeers = (peers || []).filter((peer: any) => {
+        if (peer.student_code === student.student_code) return false;
+        if (excludeCodes.includes(peer.student_code)) return false;
+        const status = lockerStore.getStudentLockerStatus({
+          code: peer.student_code,
+          name: peer.full_name,
+        });
         return status.status === 'none';
       });
 
-      return NextResponse.json({
-        success: true,
-        peers: availablePeers.slice(0, 15)
-      });
+      return noStoreJson({ success: true, peers: availablePeers.slice(0, 15) });
     }
 
-    // ب) تقديم طلب حجز دولاب
     if (action === 'book') {
-      const {
-        cohort,
-        representative_phone,
-        student_names,
-        student_codes,
-        preferred_letter
-      } = body;
+      const { representative_phone, student_names, student_codes, preferred_letter } = body;
 
-      if (!cohort || !representative_phone || !student_names || student_names.length !== 4) {
-        return NextResponse.json({
-          error: 'يشترط تسجيل 4 طلاب بالتمام والكمال للدولاب الواحد (مقدم الطلب + 3 زملاء)'
-        }, { status: 400 });
+      if (
+        !Array.isArray(student_names) ||
+        student_names.length !== 4 ||
+        !Array.isArray(student_codes) ||
+        student_codes.length !== 4
+      ) {
+        return noStoreJson(
+          { error: 'يشترط تسجيل 4 طلاب بالتمام والكمال للدولاب الواحد (مقدم الطلب + 3 زملاء)' },
+          { status: 400 }
+        );
+      }
+
+      const cleanNames = student_names.map((n: unknown) => String(n || '').trim().slice(0, 80));
+      const cleanCodes = student_codes.map((c: unknown) => String(c || '').trim().slice(0, 20));
+
+      if (cleanNames.some((n: string) => !n) || cleanCodes.some((c: string) => !/^[A-Za-z0-9\-_]+$/.test(c))) {
+        return noStoreJson({ error: 'بيانات الطلاب غير صالحة' }, { status: 400 });
+      }
+
+      const ownVariants = getStudentCodeVariants(student.student_code);
+      if (!cleanCodes.some((c: string) => ownVariants.includes(c))) {
+        return noStoreJson({ error: 'لا يمكنك حجز دولاب دون إدراج كودك ضمن الطلاب الأربعة' }, { status: 403 });
+      }
+
+      const phone = String(representative_phone || '').replace(/[^\d]/g, '');
+      if (!/^01\d{9}$/.test(phone)) {
+        return noStoreJson({ error: 'رقم هاتف الممثل غير صالح' }, { status: 400 });
       }
 
       const result = await lockerStore.bookLocker({
-        cohort,
-        representative_phone,
-        student_names,
-        student_codes: student_codes || [],
-        preferred_letter
+        cohort: student.academic_year,
+        representative_phone: phone,
+        student_names: cleanNames,
+        student_codes: cleanCodes,
+        preferred_letter: typeof preferred_letter === 'string' ? preferred_letter.slice(0, 2) : undefined,
       });
 
       if (!result.success) {
-        return NextResponse.json({ error: result.message }, { status: 400 });
+        return noStoreJson({ error: result.message }, { status: 400 });
       }
 
-      return NextResponse.json({
+      return noStoreJson({
         success: true,
         isWaitlist: result.isWaitlist,
         booking: result.booking || null,
         waitlist: result.waitlist || null,
         locker: result.locker || null,
-        message: result.message
+        message: result.message,
       });
     }
 
-    return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
+    return noStoreJson({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'حدث خطأ بالخادم' }, { status: 500 });
+    return noStoreJson({ error: 'حدث خطأ بالخادم' }, { status: 500 });
   }
 }

@@ -19,6 +19,20 @@ import AdminUsersModal from "@/components/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
 import StudentPortalHubModal from "@/components/StudentPortalHubModal";
 
+function syncStaffSession(accessToken?: string | null) {
+  if (!accessToken || typeof window === 'undefined') return;
+  fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    credentials: 'same-origin',
+  }).catch(() => {});
+}
+
+function clearStaffSessionCookie() {
+  if (typeof window === 'undefined') return;
+  fetch('/api/auth/session', { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+}
+
 export default function Home() {
   const [user, setUser] = useState<any>(() => {
     if (typeof window !== 'undefined') {
@@ -109,6 +123,7 @@ export default function Home() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       try {
         if (session?.user) {
+          syncStaffSession(session.access_token);
           const profile = await fetchProfile(session.user);
           if (profile) {
             setUser(profile);
@@ -147,11 +162,13 @@ export default function Home() {
       async (event, session) => {
         try {
           if (session?.user) {
+            syncStaffSession(session.access_token);
             const profile = await fetchProfile(session.user);
             if (profile) {
               if (profile.is_suspended || (profile.locked_until && new Date(profile.locked_until) > new Date())) {
                 alert("تم إيقاف حسابك أو قفله بواسطة الإدارة.");
                 await supabase.auth.signOut();
+                clearStaffSessionCookie();
                 setUser(null);
                 setOriginalAdminUser(null);
                 return;
@@ -161,6 +178,7 @@ export default function Home() {
             }
           } else if (event === 'SIGNED_OUT') {
             // ONLY explicitly wipe user if user intentionally clicked Sign Out!
+            clearStaffSessionCookie();
             setUser(null);
             setOriginalAdminUser(null);
             try { localStorage.removeItem('cached_profile'); } catch(e) {}

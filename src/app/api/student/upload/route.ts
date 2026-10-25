@@ -1,23 +1,21 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { checkAndNotifyPlagiarism } from "@/lib/plagiarismNotifier";
+import { supabaseAdmin } from '@/lib/supabase';
+import { checkAndNotifyPlagiarism } from '@/lib/plagiarismNotifier';
+import { getStudentCodeVariants } from '@/lib/codeHelper';
+import { isStudentEnrolledInCourse } from '@/lib/courseEnrollment';
+import { getStudentSession, noStoreJson } from '@/lib/serverAuth';
+import { verifyTelegramInitData } from '@/lib/telegramAuth';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-async function sendTelegramMessage(botToken: string, chatId: number | string, text: string, replyMarkup: any = null) {
+async function sendTelegramMessage(botToken: string, chatId: number | string, text: string) {
   try {
-    const body: any = { chat_id: chatId, text: text, parse_mode: "HTML" };
-    if (replyMarkup) body.reply_markup = replyMarkup;
     await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
     });
   } catch (e) {
-    console.error("sendTelegramMessage error:", e);
+    console.error('sendTelegramMessage error:', e);
   }
 }
 
@@ -33,148 +31,221 @@ function calculateSimilarity(hash1: string, hash2: string): number {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { photo, stuId, crsId, projId, imageHash } = body;
+    const { photo, stuId, crsId, projId, imageHash, initData } = body;
 
-    if (!photo || !stuId || !crsId || !projId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (
+      typeof stuId !== 'string' ||
+      !stuId ||
+      stuId.length > 64 ||
+      typeof crsId !== 'string' ||
+      !crsId ||
+      crsId.length > 64 ||
+      typeof projId !== 'string' ||
+      !projId ||
+      projId.length > 200 ||
+      typeof photo !== 'string'
+    ) {
+      return noStoreJson({ error: 'بيانات الرفع غير مكتملة' }, { status: 400 });
     }
 
-    // Fetch Telegram Bot Token
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const match = photo.match(/^data:image\/(?:jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/);
+    if (!match) {
+      return noStoreJson({ error: 'صيغة الصورة غير صالحة' }, { status: 400 });
+    }
 
-    // 1. Fetch current student details & verify active status
-    const { data: currentStudent } = await supabase
-      .from("students")
-      .select("id, full_name, student_code, academic_year, section, telegram_id, is_active")
-      .eq("id", stuId)
+    const buffer = Buffer.from(match[1], 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_PHOTO_BYTES) {
+      return noStoreJson({ error: 'حجم الصورة غير مسموح' }, { status: 413 });
+    }
+
+    const { data: currentStudent } = await supabaseAdmin
+      .from('students')
+      .select('id, full_name, student_code, academic_year, section, telegram_id, is_active')
+      .eq('id', stuId)
       .maybeSingle();
 
     if (!currentStudent || currentStudent.is_active === false) {
-      return NextResponse.json({ error: "الطالب غير مسجل أو حسابه غير نشط" }, { status: 403 });
+      return noStoreJson({ error: 'الطالب غير مسجل أو حسابه غير نشط' }, { status: 403 });
     }
 
-    // 2. Fetch course details & verify student eligibility
-    const { data: course, error: courseError } = await supabase
-      .from("courses")
-      .select("id, name, academic_year, course_type, sections, custom_week_names, teacher_id")
-      .eq("id", crsId)
+    const session = getStudentSession(request);
+    const sessionOwnsStudent =
+      !!session &&
+      (session.code === currentStudent.student_code ||
+        getStudentCodeVariants(session.code).includes(currentStudent.student_code) ||
+        getStudentCodeVariants(currentStudent.student_code).includes(session.code));
+
+    let staffTelegramProfile: { id: string; role: string } | null = null;
+
+    if (!sessionOwnsStudent) {
+      let telegramUser = verifyTelegramInitData(initData, process.env.TELEGRAM_BOT_TOKEN);
+      if (!telegramUser) {
+        const { data: settings } = await supabaseAdmin
+          .from('system_settings')
+          .select('telegram_config')
+          .eq('id', 1)
+          .maybeSingle();
+        const configuredToken = settings?.telegram_config?.token;
+        if (configuredToken) {
+          telegramUser = verifyTelegramInitData(initData, String(configuredToken));
+        }
+      }
+      const telegramOwnsStudent =
+        !!telegramUser &&
+        !!currentStudent.telegram_id &&
+        String(currentStudent.telegram_id) === telegramUser.id;
+
+      if (!telegramOwnsStudent) {
+        // Offline camera mode: a staff member scans a student card inside Telegram.
+        if (telegramUser) {
+          const { data: staffProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id, role, is_active')
+            .eq('telegram_id', telegramUser.id)
+            .maybeSingle();
+          if (
+            staffProfile &&
+            staffProfile.is_active !== false &&
+            ['مدير', 'مدير مساعد', 'admin', 'أدمن', 'عضو هيئة تدريس', 'معلم'].includes(String(staffProfile.role))
+          ) {
+            staffTelegramProfile = { id: staffProfile.id, role: String(staffProfile.role) };
+          }
+        }
+        if (!staffTelegramProfile) {
+          return noStoreJson({ error: 'غير مصرح برفع العمل لهذا الطالب' }, { status: 401 });
+        }
+      }
+    }
+
+    const { data: course, error: courseError } = await supabaseAdmin
+      .from('courses')
+      .select('id, name, academic_year, course_type, sections, custom_week_names, teacher_id, shared_with, excluded_students, makeup_students, student_section_overrides')
+      .eq('id', crsId)
       .maybeSingle();
 
     if (!course || courseError) {
-      return NextResponse.json({ error: "المقرر الدراسي غير موجود" }, { status: 404 });
+      return noStoreJson({ error: 'المقرر الدراسي غير موجود' }, { status: 404 });
     }
 
-    // HIGH-3 FIX: Prevent uploading to another student's/year's courses
-    if (course.academic_year !== currentStudent.academic_year) {
-      return NextResponse.json({ error: "الطالب غير مقيد بالفرقة الدراسية لهذا المقرر" }, { status: 403 });
-    }
-    if (course.course_type === 'sections' && Array.isArray(course.sections) && course.sections.length > 0) {
-      if (!course.sections.includes(currentStudent.section)) {
-        return NextResponse.json({ error: "المقرر غير متاح لسكشن الطالب" }, { status: 403 });
+    if (staffTelegramProfile) {
+      const staffIsAdmin = ['مدير', 'مدير مساعد', 'admin', 'أدمن'].includes(staffTelegramProfile.role);
+      const ownsCourse =
+        course.teacher_id === staffTelegramProfile.id ||
+        (Array.isArray(course.shared_with) && course.shared_with.includes(staffTelegramProfile.id));
+      if (!staffIsAdmin && !ownsCourse) {
+        return noStoreJson({ error: 'غير مصرح برفع العمل لهذا المقرر' }, { status: 403 });
       }
+    }
+
+    if (!isStudentEnrolledInCourse(course, currentStudent)) {
+      return noStoreJson({ error: 'هذا المقرر غير متاح لفرقتك أو سكشنك' }, { status: 403 });
     }
 
     const projects = (course?.custom_week_names as any)?.__projects__ || [];
     const project = projects.find((p: any) => p.id === projId);
     if (!project) {
-      return NextResponse.json({ error: "المشروع المطلوب غير متاح في هذا المقرر" }, { status: 404 });
+      return noStoreJson({ error: 'المشروع المطلوب غير متاح في هذا المقرر' }, { status: 404 });
     }
-    const projectName = project.name || "مشروع";
+    if (project.portal_enabled === false || project.is_active === false) {
+      return noStoreJson({ error: 'استقبال صور هذا المشروع غير مفعل حالياً' }, { status: 403 });
+    }
+    const projectName = project.name || project.title || 'مشروع';
 
-    // 3. Convert base64 data to Buffer and upload
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, "base64");
-    const uploadTimestamp = Date.now();
-    const fileName = `${stuId}/${crsId}/${projId}_${uploadTimestamp}.jpg`;
+    const base64Data = match[1].replace(/\s/g, '');
+    const fileName = `${currentStudent.id}/${crsId}/${projId}_${Date.now()}.jpg`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("artworks")
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('artworks')
       .upload(fileName, buffer, {
-        contentType: "image/jpeg",
+        contentType: 'image/jpeg',
         upsert: true,
       });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
-      return NextResponse.json({ error: "فشل رفع الصورة إلى السحابة: " + uploadError.message }, { status: 500 });
+      console.error('Storage upload error:', uploadError.message);
+      return noStoreJson({ error: 'فشل رفع الصورة إلى السحابة' }, { status: 500 });
     }
 
-    // 4. Get Public URL
-    const { data: publicUrlData } = supabase.storage.from("artworks").getPublicUrl(fileName);
+    const { data: publicUrlData } = supabaseAdmin.storage.from('artworks').getPublicUrl(fileName);
     const photoUrl = publicUrlData.publicUrl;
 
-    // 5. Similarity / Plagiarism Detection (>90%)
     let maxSimilarity = 0;
-    let matchedStudentInfo: any = null;
 
-    if (imageHash) {
-      // Fetch existing evaluations for this course and project
-      const { data: existingEvals } = await supabase
-        .from("evaluations")
-        .select("id, student_id, ai_status, created_at, photo_url, students ( full_name, student_code )")
-        .eq("course_id", crsId)
-        .eq("project_name", projectName)
-        .neq("student_id", stuId);
+    if (typeof imageHash === 'string' && imageHash) {
+      const { data: existingEvals } = await supabaseAdmin
+        .from('evaluations')
+        .select('id, student_id, ai_status, created_at, photo_url, students ( full_name, student_code )')
+        .eq('course_id', crsId)
+        .eq('project_name', projectName)
+        .neq('student_id', currentStudent.id);
 
       if (existingEvals && existingEvals.length > 0) {
         for (const ev of existingEvals) {
-          // ai_status may store `hash:XXXXX` or JSON
-          let prevHash = "";
-          if (ev.ai_status && ev.ai_status.startsWith("hash:")) {
-            prevHash = ev.ai_status.replace("hash:", "").split("|")[0];
+          let prevHash = '';
+          if (ev.ai_status && ev.ai_status.startsWith('hash:')) {
+            prevHash = ev.ai_status.replace('hash:', '').split('|')[0];
           }
 
           if (prevHash) {
             const sim = calculateSimilarity(imageHash, prevHash);
             if (sim > maxSimilarity) {
               maxSimilarity = sim;
-              matchedStudentInfo = {
-                student: ev.students,
-                uploadTime: new Date(ev.created_at).toLocaleString("ar-EG"),
-                photoUrl: ev.photo_url,
-              };
             }
           }
         }
       }
     }
 
-    // Store hash inside ai_status: `hash:HASH|sim:MAXSIM`
-    const aiStatusPayload = imageHash ? `hash:${imageHash}|sim:${maxSimilarity}` : "pending";
+    const { data: existingEval } = await supabaseAdmin
+      .from('evaluations')
+      .select('score')
+      .eq('course_id', crsId)
+      .eq('student_id', currentStudent.id)
+      .eq('project_name', projectName)
+      .maybeSingle();
 
-    // 6. Upsert into evaluations table
+    const preservedScore =
+      existingEval && existingEval.score !== null && existingEval.score !== undefined
+        ? existingEval.score
+        : null;
+
+    const aiStatusPayload = typeof imageHash === 'string' && imageHash ? `hash:${imageHash}|sim:${maxSimilarity}` : 'pending';
+
     const evaluationPayload: any = {
       course_id: crsId,
-      student_id: stuId,
+      student_id: currentStudent.id,
       project_name: projectName,
-      score: 0,
+      score: preservedScore,
       teacher_id: course?.teacher_id || null,
       photo_url: photoUrl,
       ai_status: aiStatusPayload,
     };
 
-    const { error: dbError } = await supabase
-      .from("evaluations")
-      .upsert(evaluationPayload, { onConflict: "course_id,student_id,project_name" });
+    const { error: dbError } = await supabaseAdmin
+      .from('evaluations')
+      .upsert(evaluationPayload, { onConflict: 'course_id,student_id,project_name' });
 
     if (dbError) {
-      // Fallback if photo_url / ai_status column not yet ready
-      console.warn("DB Upsert warning, falling back:", dbError.message);
-      await supabase.from("evaluations").upsert({
-        course_id: crsId,
-        student_id: stuId,
-        project_name: projectName,
-        score: 0,
-        teacher_id: course?.teacher_id || null,
-      }, { onConflict: "course_id,student_id,project_name" });
+      console.warn('DB Upsert warning, falling back:', dbError.message);
+      await supabaseAdmin.from('evaluations').upsert(
+        {
+          course_id: crsId,
+          student_id: currentStudent.id,
+          project_name: projectName,
+          score: preservedScore,
+          teacher_id: course?.teacher_id || null,
+        },
+        { onConflict: 'course_id,student_id,project_name' }
+      );
     }
 
-    // 7. Instant Student Confirmation via Telegram
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (botToken && currentStudent?.telegram_id) {
-      const cairoDate = new Date().toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo", year: "numeric", month: "numeric", day: "numeric" });
-      const cairoTime = new Date().toLocaleTimeString("ar-EG", { timeZone: "Africa/Cairo", hour: "2-digit", minute: "2-digit" });
-      const studentMsg = `✅ <b>تم استلام وتوثيق عملك بنجاح!</b>\n\n` +
-        `📚 <b>المقرر:</b> ${course?.name || "المقرر"}\n` +
+      const cairoDate = new Date().toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', year: 'numeric', month: 'numeric', day: 'numeric' });
+      const cairoTime = new Date().toLocaleTimeString('ar-EG', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit' });
+      const studentMsg =
+        `✅ <b>تم استلام وتوثيق عملك بنجاح!</b>\n\n` +
+        `📚 <b>المقرر:</b> ${course?.name || 'المقرر'}\n` +
         `📝 <b>المشروع:</b> ${projectName}\n` +
         `⏱️ <b>وقت الرفع:</b> ${cairoTime} (${cairoDate})\n\n` +
         `⏳ <i>حالة العمل: بانتظار مراجعة وتقييم أستاذ المقرر. يمكنك متابعة أعمالك عبر زر (معرض أعمالي).</i>`;
@@ -182,7 +253,6 @@ export async function POST(request: Request) {
       sendTelegramMessage(botToken, currentStudent.telegram_id, studentMsg);
     }
 
-    // 8. تشغيل محرك كشف التطابق بالذكاء الاصطناعي وإرسال الصورتين والتفاصيل لبوت التليجرام في الخلفية
     checkAndNotifyPlagiarism(
       {
         student_code: currentStudent.student_code,
@@ -190,23 +260,18 @@ export async function POST(request: Request) {
         course_id: crsId,
         course_name: course?.name,
         project_name: projectName,
-        images: [
-          {
-            url: photoUrl,
-            dhash: imageHash || "",
-          },
-        ],
+        images: [{ url: photoUrl, dhash: imageHash || '' }],
         created_at: new Date().toISOString(),
       },
-      supabase,
+      supabaseAdmin,
       80
-    ).catch(err => {
-      console.warn("Background AI plagiarism detection warning:", err);
+    ).catch((err) => {
+      console.warn('Background AI plagiarism detection warning:', err);
     });
 
-    return NextResponse.json({ success: true, photoUrl });
+    return noStoreJson({ success: true, photoUrl });
   } catch (err: any) {
-    console.error("Unexpected upload error:", err);
-    return NextResponse.json({ error: err.message || "حدث خطأ غير متوقع" }, { status: 500 });
+    console.error('Unexpected upload error:', err);
+    return noStoreJson({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
   }
 }

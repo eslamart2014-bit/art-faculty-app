@@ -100,7 +100,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         supabase.auth.getUser(),
         supabase.from('attendance').select('student_id, date, status, course_id, id').eq('course_id', resolvedParams.id),
         supabase.from('evaluations').select('*').eq('course_id', resolvedParams.id),
-        supabase.from('system_settings').select('term1_start, term2_start, term1_end, term2_end').eq('id', 1).maybeSingle(),
+        fetch('/api/public/settings', { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
       ]);
       const courseData = courseRes.data;
       if (courseData) setCourse(courseData);
@@ -178,9 +180,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       const evalData = evalRes.data;
       setEvaluations(evalData || []);
 
-      // Generate Weeks List based on official term start date from system_settings
+      // Generate Weeks List based on official term start date from public settings
       if (courseData) {
-        const systemTerms = systemTermsRes.data;
+        const systemTerms = systemTermsRes;
 
         const arabicNumbers = ["الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس", "السابع", "الثامن", "التاسع", "العاشر", "الحادي عشر", "الثاني عشر", "الثالث عشر", "الرابع عشر", "الخامس عشر", "السادس عشر", "السابع عشر", "الثامن عشر", "التاسع عشر", "العشرون"];
         

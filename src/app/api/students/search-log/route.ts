@@ -1,67 +1,80 @@
-import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { localStore } from '@/lib/localFallbackStore';
+import { noStoreJson } from '@/lib/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_ACTIONS = new Set(['student_search', 'download_card', 'view_card']);
+const MAX_TEXT = 120;
+
+function cleanText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TEXT);
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { 
-      student_code, 
-      student_name, 
-      academic_year, 
-      section, 
-      action = 'student_search', 
-      query, 
-      device_id,
-      device_info 
-    } = body;
+    const ip = getClientIp(request);
+    if (isRateLimited(`search-log:${ip}`, 60, 60_000)) {
+      return noStoreJson({ success: false, error: 'too many requests' }, { status: 429 });
+    }
 
-    const userAgent = request.headers.get('user-agent') || device_info?.userAgent || '';
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-               request.headers.get('x-real-ip') || 
-               'unknown';
+    const body = await request.json();
+    const action = ALLOWED_ACTIONS.has(body.action) ? body.action : 'student_search';
+    const query = cleanText(body.query);
+    const studentCode = cleanText(body.student_code);
+    const studentName = cleanText(body.student_name);
+    const academicYear = cleanText(body.academic_year);
+    const section = cleanText(body.section);
+
+    const codeValue = studentCode || (query ? `query:${query}` : null);
+    if (!codeValue) {
+      return noStoreJson({ success: false, error: 'missing student reference' }, { status: 400 });
+    }
+
+    const userAgent = (request.headers.get('user-agent') || '').slice(0, 500);
+    const deviceId = cleanText(body.device_id) || 'unknown_device';
 
     const logEntry = {
-      student_code: student_code || (query ? `query:${query}` : 'unknown'),
-      action: action, // 'student_search' | 'download_card' | 'view_card'
-      device_id: device_id || device_info?.deviceId || 'unknown_device',
+      student_code: codeValue,
+      action,
+      device_id: deviceId,
       user_agent: userAgent,
       details: {
-        student_name: student_name || null,
-        academic_year: academic_year || null,
-        section: section || null,
-        query: query || null,
-        ip: ip,
-        platform: device_info?.platform || null,
-        screen: device_info?.screenResolution || null,
-        timestamp: new Date().toISOString()
+        student_name: studentName,
+        academic_year: academicYear,
+        section,
+        query,
+        ip,
+        platform: cleanText(body.device_info?.platform),
+        screen: cleanText(body.device_info?.screenResolution),
+        timestamp: new Date().toISOString(),
       },
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
 
-    // 1. حفظ في Supabase
     try {
       await supabaseAdmin.from('portal_audit_logs').insert({
         student_code: logEntry.student_code,
         action: logEntry.action,
         device_id: logEntry.device_id,
         user_agent: logEntry.user_agent,
-        details: logEntry.details
+        details: logEntry.details,
       });
     } catch (dbErr) {
       console.warn('Supabase search log insert fallback:', dbErr);
     }
 
-    // 2. حفظ محلي احتياطي (Local Fallback)
     try {
       localStore.saveAuditLog(logEntry);
     } catch (localErr) {}
 
-    return NextResponse.json({ success: true });
+    return noStoreJson({ success: true });
   } catch (err: any) {
     console.error('Error logging student search:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return noStoreJson({ success: false, error: 'log failed' }, { status: 500 });
   }
 }

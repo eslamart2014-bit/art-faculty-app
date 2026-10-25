@@ -1,6 +1,16 @@
 import { supabase } from "@/lib/supabase";
 import { getLocalCache, setLocalCache } from "@/lib/syncEngine";
 
+async function fetchPublicSettings() {
+  try {
+    const res = await fetch("/api/public/settings", { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * محرك التخزين المحلي المسبق لأعضاء هيئة التدريس
  * يقوم بتنزيل المقررات وقوائم الطلاب وحفظها على ذاكرة الهاتف (localStorage / IndexedDB)
@@ -11,14 +21,9 @@ export async function preloadFacultyData(userId: string) {
 
   try {
     // 1. تحميل إعدادات النظام ومصطلحات الترم في الخلفية
-    supabase
-      .from("system_settings")
-      .select("term1_start, term2_start, term1_end, term2_end, is_maintenance_mode, maintenance_message")
-      .eq("id", 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setLocalCache("cached_system_settings", data);
-      });
+    fetchPublicSettings().then((data) => {
+      if (data) setLocalCache("cached_system_settings", data);
+    });
 
     // 2. تحميل خريطة أسماء الأساتذة والزملاء
     supabase
@@ -140,12 +145,8 @@ export async function forceDownloadFacultyOfflinePack(
     onProgress?.("جاري الاتصال بالنظام وتحديث إعدادات الفصل الدراسي...", 15);
 
     // 1. الإعدادات وقوائم الأساتذة
-    const [settingsRes, profilesRes, coursesRes] = await Promise.all([
-      supabase
-        .from("system_settings")
-        .select("term1_start, term2_start, term1_end, term2_end, is_maintenance_mode, maintenance_message")
-        .eq("id", 1)
-        .maybeSingle(),
+    const [settingsData, profilesRes, coursesRes] = await Promise.all([
+      fetchPublicSettings(),
       supabase
         .from("profiles")
         .select("id, full_name, degree"),
@@ -156,7 +157,7 @@ export async function forceDownloadFacultyOfflinePack(
         .order("created_at", { ascending: false })
     ]);
 
-    if (settingsRes.data) setLocalCache("cached_system_settings", settingsRes.data);
+    if (settingsData) setLocalCache("cached_system_settings", settingsData);
     if (profilesRes.data) {
       const map: Record<string, string> = {};
       profilesRes.data.forEach((p) => { map[p.id] = p.full_name; });

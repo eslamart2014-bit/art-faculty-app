@@ -6,9 +6,23 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publish
 // Client for browser / client-side components
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Admin client for secure server-side API routes (bypasses RLS)
-// Safely created ONLY in server runtime when service key is provided; otherwise fall back to standard client
+// Admin client for secure server-side API routes (bypasses RLS).
+// On the server it fails closed if the service key is missing; it must never
+// silently downgrade to the anon client.
 const serverKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-export const supabaseAdmin = (typeof window === 'undefined' && serverKey)
-  ? createClient(supabaseUrl, serverKey)
+const missingServerKey = new Proxy(
+  {},
+  {
+    get() {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured on the server');
+    },
+  }
+);
+
+export const supabaseAdmin = (typeof window === 'undefined')
+  ? (serverKey
+      ? createClient(supabaseUrl, serverKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        })
+      : (missingServerKey as any))
   : supabase;

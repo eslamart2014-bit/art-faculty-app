@@ -1267,7 +1267,7 @@ export default function StudentPortalHubModal({
                           }}
                         >
                           <span>⚡</span>
-                          <span>{actionLoading ? "جاري الاعتماد الفوري وتفعيل الحساب..." : "⚡ اعتماد فوري ومباشر (بدون رقم سري)"}</span>
+                          <span>{actionLoading ? "جاري الاعتماد الفوري وتفعيل الحساب..." : "⚡ اعتماد فوري وتفعيل الحساب"}</span>
                         </button>
                         <div style={{
                           background: "rgba(16, 185, 129, 0.08)",
@@ -1280,7 +1280,7 @@ export default function StudentPortalHubModal({
                           lineHeight: "1.5",
                           marginTop: "8px"
                         }}>
-                          💡 بمجرد النقر، يتم اعتماد وتفعيل الحساب فورياً؛ ويدخل الطالب تلقائياً وبشكل مباشر على حسابه ومقرراته دون الحاجة لكتابة أي رقم سري.
+                          💡 بمجرد النقر يتم اعتماد وتفعيل الحساب فوراً، ثم يدخل الطالب إلى بوابته باستخدام كوده ورقمه السري.
                         </div>
                       </div>
                     )}

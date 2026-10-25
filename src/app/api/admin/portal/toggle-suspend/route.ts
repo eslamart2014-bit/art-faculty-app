@@ -2,15 +2,19 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
+import { requireAdmin } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireAdmin(request);
+  if (!guard.ok) return guard.response;
+
   try {
     const { student_code, status } = await request.json();
 
-    if (!student_code) {
-      return NextResponse.json({ error: 'يرجى تحديد كود الطالب' }, { status: 400 });
+    if (typeof student_code !== 'string' || !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code.trim())) {
+      return NextResponse.json({ error: 'يرجى تحديد كود طالب صالح' }, { status: 400 });
     }
 
     const cleanCode = formatStudentCode(student_code);

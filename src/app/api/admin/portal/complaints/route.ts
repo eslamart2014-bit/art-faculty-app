@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
     // 1. Fetch complaints from student_complaints
     const { data: complaints, error } = await supabaseAdmin
@@ -13,7 +17,7 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching student complaints:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'تعذر تحميل الشكاوى' }, { status: 500 });
     }
 
     // 2. Fetch replies map from system_settings

@@ -73,6 +73,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, count: successCount });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('notify_warning error:', error);
+    return NextResponse.json({ error: 'تعذر إرسال الإشعار' }, { status: 500 });
   }
 }

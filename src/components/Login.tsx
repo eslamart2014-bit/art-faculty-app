@@ -291,6 +291,10 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       setStudentError("يرجى إدخال كود الطالب الجامعي");
       return;
     }
+    if (!studentPin.trim()) {
+      setStudentError("يرجى إدخال الرقم السري الخاص بك");
+      return;
+    }
 
     setStudentLoginLoading(true);
     setStudentError("");
@@ -302,7 +306,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student_code: formatStudentCode(studentCode),
-          pin_code: studentPin.trim() || undefined,
+          pin_code: studentPin.trim(),
           device_info: dev
         })
       });
@@ -386,25 +390,43 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       if (newAttempts >= 3) {
         setIsLocked(true);
         setError("تم قفل الحساب بسبب تجاوز 3 محاولات خاطئة. يرجى مراجعة الإدارة.");
-        try {
-          await fetch('/api/auth/lock', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-internal-secret': 'art-faculty-lock-internal-2026'
-            },
-            body: JSON.stringify({ email })
-          });
-        } catch (err) {}
       } else {
         setError(`بيانات الدخول غير صحيحة. (تبقت لك ${3 - newAttempts} محاولات)`);
       }
     } else if (data.user) {
+      if (!data.session?.access_token) {
+        setError("تعذر بدء الجلسة. يرجى المحاولة مجدداً.");
+        await supabase.auth.signOut();
+        return;
+      }
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", data.user.id)
         .maybeSingle();
+
+      if (profile?.is_suspended || (profile?.locked_until && new Date(profile.locked_until) > new Date())) {
+        await supabase.auth.signOut();
+        setError("تم إيقاف حسابك أو قفله بواسطة الإدارة. يرجى التواصل مع الإدارة.");
+        return;
+      }
+
+      try {
+        const sessionRes = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+          credentials: "same-origin",
+        });
+        if (!sessionRes.ok) {
+          await supabase.auth.signOut();
+          setError("حسابك غير مسجل في قائمة الكادر. يرجى مراجعة الإدارة.");
+          return;
+        }
+      } catch {
+        setError("تعذر تأمين جلسة الدخول. تحقق من الاتصال وحاول مجدداً.");
+        return;
+      }
 
       const userMeta = data.user.user_metadata || {};
       const safeProfile = profile || {
@@ -902,7 +924,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
                 <div style={{ textAlign: "center", marginBottom: "12px", marginTop: "-4px" }}>
                   <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4" }}>
-                    💡 إذا تم اعتماد حسابك من قِبل المنسق، يمكنك الدخول بكودك مباشرة دون كتابة رقم سري.
+                    💡 الدخول يتطلب كود الطالب والرقم السري المعتمد. إذا لم يكن لديك رقم سري، راجع منسق المنظومة.
                   </span>
                 </div>
 

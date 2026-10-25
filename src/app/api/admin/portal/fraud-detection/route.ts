@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,10 @@ function parseDeviceName(userAgent: string): string {
   return 'متصفح / هاتف ذكي';
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
     // 1. جلب الطلاب المسجلين وحساباتهم
     const { data: students, error: stErr } = await supabaseAdmin

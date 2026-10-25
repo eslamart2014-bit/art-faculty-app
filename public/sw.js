@@ -1,18 +1,70 @@
-// Service Worker v3.6.85 - Next.js True Offline-First Engine
-const CACHE_VERSION = 'v3.6.85';
+// Service Worker v3.7.0 - Next.js offline shell (authenticated routes are network-only)
+const CACHE_VERSION = 'v3.7.0';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
+// Only the public login shell and static PWA assets are pre-cached.
 const CORE_ASSETS = [
   '/',
-  '/system',
-  '/student-portal',
-  '/coordinator',
-  '/instructor',
   '/manifest.json',
   '/manifest-student.json',
   '/icon-192.png'
 ];
+
+// Personal or staff-only areas: never cache their HTML/RSC payloads.
+const AUTH_ROUTE_PREFIXES = [
+  '/system',
+  '/student-portal',
+  '/coordinator',
+  '/instructor',
+  '/admin-portal',
+  '/camera',
+  '/course',
+  '/bot'
+];
+
+function isAuthenticatedRoute(pathname) {
+  return AUTH_ROUTE_PREFIXES.some(
+    prefix => pathname === prefix || pathname.startsWith(prefix + '/')
+  );
+}
+
+const OFFLINE_HTML = `
+  <!DOCTYPE html>
+  <html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>نظام التربية الفنية — جامعة قنا • كلية التربية النوعية</title>
+    <style>
+      body { background: #121212; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; box-sizing: border-box; }
+      .card { background: #1e1e1e; border: 1px solid #333; border-radius: 16px; padding: 30px 20px; max-width: 380px; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+      .icon { font-size: 50px; margin-bottom: 15px; }
+      h2 { color: #4CAF50; margin: 0 0 10px 0; font-size: 20px; }
+      p { color: #aaa; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0; }
+      button { background: #2196F3; color: #fff; border: none; padding: 12px 25px; border-radius: 25px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">📶</div>
+      <h2>أنت في وضع عدم الاتصال</h2>
+      <p>تعذر الوصول إلى الإنترنت. أعد الاتصال ثم حاول فتح الصفحة مرة أخرى.</p>
+      <button onclick="window.location.href='/'">الذهاب للرئيسية</button>
+    </div>
+    <script>
+      window.addEventListener('online', () => window.location.reload());
+    </script>
+  </body>
+  </html>
+`;
+
+function offlineHtmlResponse() {
+  return new Response(OFFLINE_HTML, {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+  });
+}
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
@@ -55,27 +107,7 @@ self.addEventListener('fetch', event => {
   // Skip non-GET requests
   if (req.method !== 'GET') return;
 
-  // Cache immutable /api/media/* responses (Telegram file_id images - content-addressable, never expire)
-  if (url.pathname.startsWith('/api/media/')) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async cache => {
-        const cached = await cache.match(req);
-        if (cached) return cached;
-        try {
-          const res = await fetch(req);
-          if (res && res.status === 200) {
-            cache.put(req, res.clone());
-          }
-          return res;
-        } catch (e) {
-          return cached || new Response('Image not available offline', { status: 503 });
-        }
-      })
-    );
-    return;
-  }
-
-  // Skip other /api/ backend calls and Supabase (handled client-side via syncEngine)
+  // Never cache media or API responses: they are user-specific and require cookies.
   if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co')) {
     return;
   }
@@ -102,11 +134,26 @@ self.addEventListener('fetch', event => {
   }
 
   // 2. Navigation requests & Next.js Client-Side Transitions (HTML & RSC)
-  // Fast-Network with immediate Cache Fallback (Never hangs on slow/flaky campus signals)
   const isNavigation = req.mode === 'navigate';
   const isRSC = url.searchParams.has('_rsc') || req.headers.get('RSC') === '1';
 
   if (isNavigation || isRSC) {
+    // Personal/staff areas must never be stored or served from a shared cache.
+    if (isAuthenticatedRoute(url.pathname)) {
+      event.respondWith((async () => {
+        try {
+          return await fetch(req);
+        } catch (err) {
+          if (isRSC) {
+            return new Response('[]', { headers: { 'Content-Type': 'application/json' } });
+          }
+          return offlineHtmlResponse();
+        }
+      })());
+      return;
+    }
+
+    // Public login shell: fast network with offline fallback.
     event.respondWith((async () => {
       // 1. Try to fetch with a fast 1500ms timeout
       const controller = new AbortController();
@@ -140,7 +187,7 @@ self.addEventListener('fetch', event => {
         const cachedClean = await caches.match(url.pathname);
         if (cachedClean) return cachedClean;
 
-        // C. Fallback to App Shell '/'
+        // C. Fallback to the public app shell
         const rootShell = await caches.match('/');
         if (rootShell) return rootShell;
 
@@ -148,38 +195,7 @@ self.addEventListener('fetch', event => {
           return new Response('[]', { headers: { 'Content-Type': 'application/json' } });
         }
 
-        // D. Standalone beautiful offline fallback page
-        return new Response(`
-          <!DOCTYPE html>
-          <html lang="ar" dir="rtl">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>نظام التربية الفنية — جامعة قنا • كلية التربية النوعية</title>
-            <style>
-              body { background: #121212; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; padding: 20px; box-sizing: border-box; }
-              .card { background: #1e1e1e; border: 1px solid #333; border-radius: 16px; padding: 30px 20px; max-width: 380px; width: 100%; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
-              .icon { font-size: 50px; margin-bottom: 15px; }
-              h2 { color: #4CAF50; margin: 0 0 10px 0; font-size: 20px; }
-              p { color: #aaa; font-size: 14px; line-height: 1.6; margin: 0 0 20px 0; }
-              button { background: #2196F3; color: #fff; border: none; padding: 12px 25px; border-radius: 25px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <div class="icon">📶</div>
-              <h2>أنت في وضع عدم الاتصال</h2>
-              <p>التطبيق يعمل بدون إنترنت بكامل كفاءته. اضغط على الزر بالأسفل للعودة إلى الشاشة الرئيسية واستعراض مقرراتك.</p>
-              <button onclick="window.location.href='/'">الذهاب للرئيسية</button>
-            </div>
-            <script>
-              window.addEventListener('online', () => window.location.reload());
-            </script>
-          </body>
-          </html>
-        `, {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' }
-        });
+        return offlineHtmlResponse();
       }
     })());
     return;

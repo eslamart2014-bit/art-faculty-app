@@ -311,10 +311,11 @@ function CameraApp() {
         }
       }
 
+      const tgInitData = typeof window !== "undefined" ? ((window as any).Telegram?.WebApp?.initData || "") : "";
       const response = await fetch("/api/student/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo: finalPhoto, stuId, crsId, projId, imageHash }),
+        body: JSON.stringify({ photo: finalPhoto, stuId, crsId, projId, imageHash, initData: tgInitData }),
       });
 
       const result = await response.json();

@@ -8,46 +8,96 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
-    // Verify the caller's JWT token
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const token = authHeader.replace('Bearer ', '');
 
-    // Confirm the token belongs to a valid Supabase user
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    const { userId, email, fullName, degree } = await request.json();
+    const body = await request.json();
+    const { userId, email, fullName, degree } = body || {};
 
     if (!userId || !email) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    // Ensure the token's user matches the userId being registered (no impersonation)
     if (user.id !== userId) {
       return NextResponse.json({ error: 'Forbidden — userId mismatch' }, { status: 403 });
     }
 
-    const { error: updateError } = await supabaseAdmin.from("profiles").upsert({
-      id: userId,
-      email: email,
-      full_name: fullName,
-      degree: normalizeAcademicDegree(degree),
-      is_active: true
-    });
+    const verifiedEmail = String(user.email || '').toLowerCase().trim();
+    const requestedEmail = String(email || '').toLowerCase().trim();
+    if (!verifiedEmail || (requestedEmail && requestedEmail !== verifiedEmail)) {
+      return NextResponse.json({ error: 'Forbidden — email mismatch' }, { status: 403 });
+    }
 
-    if (updateError) throw updateError;
-    
-    // Update invitation status
-    await supabaseAdmin.from("invitations").update({ status: "completed" }).eq("email", email.toLowerCase().trim());
+    const cleanName = typeof fullName === 'string' ? fullName.trim().slice(0, 120) : '';
+    if (cleanName.length < 3) {
+      return NextResponse.json({ error: 'الاسم غير صالح' }, { status: 400 });
+    }
+
+    const { data: invitation, error: invitationError } = await supabaseAdmin
+      .from('invitations')
+      .select('id, email, status')
+      .eq('email', verifiedEmail)
+      .eq('status', 'pending')
+      .maybeSingle();
+
+    if (invitationError) {
+      console.error('Invitation lookup error:', invitationError.message);
+      return NextResponse.json({ error: 'تعذر التحقق من الدعوة' }, { status: 500 });
+    }
+
+    if (!invitation) {
+      return NextResponse.json(
+        { error: 'لا توجد دعوة سارية لهذا البريد الإلكتروني. يرجى مراجعة الإدارة.' },
+        { status: 403 }
+      );
+    }
+
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, is_active')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (existingProfile?.is_active === false) {
+      return NextResponse.json({ error: 'الحساب موقوف. يرجى مراجعة الإدارة.' }, { status: 403 });
+    }
+
+    const profilePayload: Record<string, unknown> = {
+      id: userId,
+      email: verifiedEmail,
+      full_name: cleanName,
+      degree: normalizeAcademicDegree(degree),
+      is_active: true,
+    };
+
+    if (!existingProfile) {
+      profilePayload.role = 'عضو هيئة تدريس';
+    }
+
+    const { error: updateError } = await supabaseAdmin.from('profiles').upsert(profilePayload);
+
+    if (updateError) {
+      console.error('Profile registration error:', updateError.message);
+      return NextResponse.json({ error: 'تعذر إكمال التسجيل' }, { status: 500 });
+    }
+
+    await supabaseAdmin
+      .from('invitations')
+      .update({ status: 'completed' })
+      .eq('id', invitation.id)
+      .eq('status', 'pending');
 
     return NextResponse.json({ success: true });
-
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('register-profile error:', error);
+    return NextResponse.json({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
   }
 }

@@ -62,21 +62,22 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         console.warn("Session check in MaintenanceGuard:", err);
       }
 
-      // 2. Fetch maintenance state & granular scope
+      // 2. Fetch maintenance state & granular scope from the public safe endpoint
       try {
-        const { data: settings } = await supabase
-          .from("system_settings")
-          .select("is_maintenance_mode, maintenance_message, telegram_config")
-          .eq("id", 1)
-          .maybeSingle();
+        const res = await fetch("/api/public/settings", { cache: "no-store" });
+        if (res.ok) {
+          const settings = await res.json();
+          const newMaintenance = !!settings?.is_maintenance_mode;
 
-        if (settings) {
-          currentIsMaintenance = !!settings.is_maintenance_mode;
-          setIsMaintenance(currentIsMaintenance);
-          setMessage(settings.maintenance_message || "تطبيقنا يخضع لعملية صيانة حالياً. نرجو المحاولة لاحقاً...");
-          
-          const scope = settings.telegram_config?.maintenance_scope || "faculty";
+          setMessage(settings?.maintenance_message || "تطبيقنا يخضع لعملية صيانة حالياً. نرجو المحاولة لاحقاً...");
+          const scope = settings?.maintenance_scope || "faculty";
           setMaintenanceScope(scope);
+
+          if (currentIsMaintenance && !newMaintenance && !isAdminRef.current) {
+            window.location.reload();
+          }
+          currentIsMaintenance = newMaintenance;
+          setIsMaintenance(newMaintenance);
         }
       } catch (err) {
         console.warn("Settings check in MaintenanceGuard:", err);
@@ -87,32 +88,11 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
 
     checkStatus();
 
-    // 3. Realtime listener for system_settings updates
-    const channel = supabase
-      .channel("system_settings_changes")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "system_settings" },
-        (payload) => {
-          const newData = payload.new;
-          const newMaintenance = !!newData.is_maintenance_mode;
-          setIsMaintenance(newMaintenance);
-          setMessage(newData.maintenance_message || "تطبيقنا يخضع لعملية صيانة حالياً. نرجو المحاولة لاحقاً...");
-          
-          const scope = newData.telegram_config?.maintenance_scope || "faculty";
-          setMaintenanceScope(scope);
-
-          // If maintenance just ended, reload for normal users so they get the latest version
-          if (currentIsMaintenance && !newMaintenance && !isAdminRef.current) {
-            window.location.reload();
-          }
-          currentIsMaintenance = newMaintenance;
-        }
-      )
-      .subscribe();
+    // 3. Poll periodically (no direct system_settings access from the browser anymore)
+    const interval = setInterval(checkStatus, 60_000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
+import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { lockerStore } from '@/lib/lockerStore';
-import { formatInstructorTitle, getDegreePrefix } from '@/lib/academicHelper';
+import { formatInstructorTitle } from '@/lib/academicHelper';
+import { getStudentSession, requireCoordinator, noStoreJson } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +21,17 @@ function normalizeArabic(str: string = ''): string {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = (searchParams.get('code') || '').trim();
-  const pin = (searchParams.get('pin') || '').trim();
   const isImpersonate = searchParams.get('impersonate') === 'true';
 
-  if (!code) {
-    return NextResponse.json({ error: 'Missing student code' }, { status: 400 });
+  if (!code || !/^[A-Za-z0-9\-_]{1,20}$/.test(code)) {
+    return noStoreJson({ error: 'كود الطالب غير صالح' }, { status: 400 });
+  }
+
+  if (isImpersonate) {
+    const guard = await requireCoordinator(request);
+    if (!guard.ok) return guard.response;
+  } else if (!getStudentSession(request)) {
+    return noStoreJson({ error: 'يجب تسجيل الدخول بالرقم السري أولاً' }, { status: 401 });
   }
 
   const cleanCode = formatStudentCode(code);
@@ -38,25 +45,36 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (stErr || !student) {
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+      return noStoreJson({ error: 'Student not found' }, { status: 404 });
     }
 
-    // التحقق الأمني: جلب بيانات الحساب المعتمد
+    if (!isImpersonate) {
+      const session = getStudentSession(request)!;
+      const sessionVariants = getStudentCodeVariants(session.code);
+      const studentVariants = getStudentCodeVariants(student.student_code);
+      const ownsRecord =
+        session.code === student.student_code ||
+        sessionVariants.includes(student.student_code) ||
+        studentVariants.includes(session.code);
+      if (!ownsRecord) {
+        return noStoreJson({ error: 'غير مصرح بالوصول لبيانات طالب آخر' }, { status: 403 });
+      }
+    }
+
+    // التحقق الأمني: جلب بيانات الحساب المعتمد (جدول الحسابات هو المصدر الأساسي)
     let accountData: any = null;
-    if (student.telegram_browser_id) {
+    try {
+      const { data: acc } = await supabaseAdmin
+        .from('student_accounts')
+        .select('student_code, status, is_pin_used, activated_by, mobile')
+        .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
+        .maybeSingle();
+      accountData = acc;
+    } catch (e) {}
+
+    if (!accountData && student.telegram_browser_id) {
       try {
         accountData = JSON.parse(student.telegram_browser_id);
-      } catch (e) {}
-    }
-
-    if (!accountData) {
-      try {
-        const { data: acc } = await supabaseAdmin
-          .from('student_accounts')
-          .select('*')
-          .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-        accountData = acc;
       } catch (e) {}
     }
 
@@ -66,26 +84,13 @@ export async function GET(request: Request) {
 
     // التحقق من تعليق الحساب
     if (accountData?.status === 'suspended') {
-      return NextResponse.json(
+      return noStoreJson(
         { error: 'تم تعليق هذا الحساب مؤقتاً من قِبل إدارة المنظومة. يرجى مراجعة إدارة الكلية.' },
         { status: 403 }
       );
     }
 
-    const expectedPin = (accountData?.pin_code || '').trim();
     const isActivated = Boolean(accountData?.is_pin_used || accountData?.status === 'active' || accountData?.activated_by);
-
-    // إذا لم يكن الحساب معتمداً بعد من الإدارة، يُطلب التحقق بالرقم السري
-    if (!isImpersonate && !isActivated && expectedPin && pin) {
-      const cleanInputPin = pin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
-      const cleanExpectedPin = expectedPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase();
-      if (cleanInputPin !== cleanExpectedPin) {
-        return NextResponse.json(
-          { error: 'غير مصرح: الحساب بانتظار اعتماد المنسق أو إدخال الرقم السري الصحيح.' },
-          { status: 401 }
-        );
-      }
-    }
 
     // كائن طالب آمن ومجرد من أي بيانات حساسة
     const safeStudent = {
@@ -94,7 +99,6 @@ export async function GET(request: Request) {
       student_code: student.student_code,
       academic_year: student.academic_year,
       section: student.section,
-      pin_code: expectedPin || undefined,
       status: isActivated ? 'active' : (accountData?.status || 'pending'),
     };
 
@@ -485,15 +489,32 @@ export async function GET(request: Request) {
     let studentLocker = null;
     try {
       await lockerStore.ensureLoaded();
-      studentLocker = lockerStore.getStudentLockerStatus({
+      const rawLocker: any = lockerStore.getStudentLockerStatus({
         code: student.student_code,
         name: student.full_name
       });
+      studentLocker = {
+        status: rawLocker?.status || 'none',
+        booking: rawLocker?.booking
+          ? {
+              id: rawLocker.booking.id,
+              status: rawLocker.booking.status,
+              locker_code: rawLocker.booking.locker_code,
+              created_at: rawLocker.booking.created_at,
+            }
+          : null,
+        waitlist: rawLocker?.waitlist
+          ? { id: rawLocker.waitlist.id, status: rawLocker.waitlist.status, created_at: rawLocker.waitlist.created_at }
+          : null,
+        locker: rawLocker?.locker
+          ? { locker_code: rawLocker.locker.locker_code, letter: rawLocker.locker.letter, number: rawLocker.locker.number }
+          : null,
+      };
     } catch (e) {
       console.warn('Locker status error in dashboard:', e);
     }
 
-    return NextResponse.json({
+    return noStoreJson({
       student: safeStudent,
       attendance: attendanceByCourse,
       projects: projectsByCourse,
@@ -501,20 +522,9 @@ export async function GET(request: Request) {
       warnings: attendanceByCourse.filter((c: any) => c.hasWarning),
       locker: studentLocker,
       hide_warnings_tab: !!(sysSettings as any)?.telegram_config?.hide_warnings_tab,
-    }, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }
     });
   } catch (err: any) {
     console.error('Dashboard data error:', err);
-    return NextResponse.json({ error: err.message }, {
-      status: 500,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      }
-    });
+    return noStoreJson({ error: 'تعذر تحميل بيانات الطالب' }, { status: 500 });
   }
 }

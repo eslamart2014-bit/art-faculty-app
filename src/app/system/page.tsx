@@ -83,7 +83,7 @@ export default function SystemPage() {
   const [pwaHintVisible, setPwaHintVisible] = useState(false);
 
   // Student registration lookup status (already active / pending / new)
-  const [lookupStatus, setLookupStatus] = useState<{ isAlreadyActive?: boolean; isPending?: boolean; message?: string; pin_code?: string; student?: any } | null>(null);
+  const [lookupStatus, setLookupStatus] = useState<{ isAlreadyActive?: boolean; isPending?: boolean; message?: string; student?: any } | null>(null);
 
   // Impersonation mode (Admin browsing as student)
   const [isImpersonating, setIsImpersonating] = useState(false);
@@ -507,6 +507,7 @@ export default function SystemPage() {
 
   // Restore Session or Impersonate on Mount
   useEffect(() => {
+    (async () => {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("fania_last_portal", "/system");
@@ -535,7 +536,7 @@ export default function SystemPage() {
               setCurrentStudent(data.student);
               setImpersonatedStudentName(data.student.full_name);
               setAccountStatus("active");
-              loadDashboard(data.student.student_code, undefined, true);
+              loadDashboard(data.student.student_code, true);
             }
           })
           .catch(err => console.error(err));
@@ -543,14 +544,25 @@ export default function SystemPage() {
       }
     }
 
-    // 1. الأولوية القصوى: فحص الجلسة المحفوظة مسبقاً على هذا الموبايل/المتصفح
+    // 1. استعادة الجلسة: كوكي الطالب الآمن (HttpOnly) هو المصدر الوحيد لتأكيد الدخول
     try {
       const saved = typeof window !== "undefined" ? localStorage.getItem("fania_student_session") : null;
+      let savedSession: any = null;
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.student_code) {
-          setCurrentStudent(parsed);
+        try {
+          savedSession = JSON.parse(saved);
+        } catch (e) {
+          savedSession = null;
+        }
+        if (!savedSession?.student_code) savedSession = null;
+        // إزالة أي أرقام سرية قديمة حُفظت في إصدارات سابقة من التطبيق
+        if (savedSession?.pin_code) delete savedSession.pin_code;
+      }
 
+      const sessionRes = await fetch("/api/students/session", { cache: "no-store", credentials: "same-origin" });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        if (sessionData?.authenticated && sessionData.student_code) {
           // تنظيف أي بارامترات في الرابط مثل ?mode=register حتى لا تعلق الصفحة في وضع التسجيل
           if (typeof window !== "undefined" && window.location.search) {
             window.history.replaceState({}, '', window.location.pathname);
@@ -559,72 +571,40 @@ export default function SystemPage() {
             localStorage.removeItem("fania_pending_reg_code");
             sessionStorage.removeItem("fania_prefetched_student");
           }
-
-          // فحص فوري لحالة الحساب من الخادم للتأكد هل تم الاعتماد
-          const devInfo = getOrCreateDeviceInfo();
-          fetch(`/api/students/lookup?code=${encodeURIComponent(parsed.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data.isAlreadyActive) {
-                // الحساب معتمد! تحديث الجلسة والدخول المباشر فوراً دون أي كلمة سر
-                const activeSession = {
-                  ...parsed,
-                  ...(data.student || {}),
-                  pin_code: data.student?.pin_code || data.pin_code || parsed.pin_code || "",
-                  status: "active",
-                  is_pin_used: true
-                };
-                localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                setCurrentStudent(activeSession);
-                setAccountStatus("active");
-                setSuccessMsg("🎉 تم اعتماد وتفعيل حسابك بنجاح! مرحباً بك في منظومة فنية.");
-                loadDashboard(parsed.student_code, activeSession.pin_code);
-              } else if (data.isPending) {
-                setAccountStatus("pending");
-              } else if (data.isNew) {
-                localStorage.removeItem("fania_student_session");
-                setCurrentStudent(null);
-                setAccountStatus(null);
-                setAuthMode("register");
-                setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك.");
-              }
-            })
-            .catch(() => {
-              const isAct = parsed.is_pin_used || parsed.status === "active";
-              setAccountStatus(isAct ? "active" : "pending");
-              if (isAct) {
-                loadDashboard(parsed.student_code, parsed.pin_code);
-              }
-            });
-
-          fetchCoordinators(parsed.student_code);
+          await loadDashboard(sessionData.student_code);
+          fetchCoordinators(sessionData.student_code);
           return;
         }
-      } else {
-        // فحص ما إذا كان هناك كود طالب مسجل مسبقاً على هذا الجهاز للدخول التلقائي فور الاعتماد
-        const savedCode = typeof window !== "undefined" ? localStorage.getItem("fania_student_code") : null;
-        if (savedCode) {
-          const devInfo = getOrCreateDeviceInfo();
-          fetch(`/api/students/lookup?code=${encodeURIComponent(savedCode)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data.isAlreadyActive && !data.device_locked) {
-                const activeSession = {
-                  ...(data.student || {}),
-                  student_code: savedCode,
-                  pin_code: data.student?.pin_code || data.pin_code || "",
-                  status: "active",
-                  is_pin_used: true
-                };
-                localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                setCurrentStudent(activeSession);
-                setAccountStatus("active");
-                setSuccessMsg("🎉 تم اعتماد حسابك بنجاح! مرحباً بك في منظومة فنية.");
-                loadDashboard(savedCode, activeSession.pin_code);
-              }
-            })
-            .catch(() => {});
+      }
+
+      // لا توجد جلسة موثقة على الخادم: لا دخول تلقائي إطلاقاً، ونمسح أي بيانات دخول/أرقام سرية قديمة من التخزين المحلي
+      localStorage.removeItem("fania_student_session");
+      localStorage.removeItem("fania_student_code");
+      localStorage.removeItem("fania_pending_reg_code");
+
+      if (savedSession?.student_code) {
+        setRegCode(savedSession.student_code);
+        setAuthMode("login");
+        const devInfo = getOrCreateDeviceInfo();
+        try {
+          const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(savedSession.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`);
+          const data = await res.json();
+          if (data.isPending) {
+            setCurrentStudent({ ...savedSession, status: "pending" });
+            setAccountStatus("pending");
+          } else if (data.isNew) {
+            setCurrentStudent(null);
+            setAccountStatus(null);
+            setAuthMode("register");
+            setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك.");
+          } else if (data.isAlreadyActive) {
+            setSuccessMsg("حسابك مفعل. يرجى إدخال الرقم السري لتسجيل الدخول.");
+          }
+        } catch (e) {
+          setErrorMsg("تعذر التحقق من حالة الحساب. يرجى إدخال الرقم السري لتسجيل الدخول.");
         }
+        fetchCoordinators(savedSession.student_code);
+        return;
       }
     } catch (e) {}
 
@@ -662,6 +642,7 @@ export default function SystemPage() {
       if (p.get("mode") === "login") setAuthMode("login");
       if (p.get("mode") === "register") setAuthMode("register");
     }
+      })();
 
     return () => {
       stopCamera();
@@ -714,19 +695,19 @@ export default function SystemPage() {
         if (!isMounted) return;
 
         if (data.isAlreadyActive) {
-          const activeSession = {
-            ...currentStudent,
-            ...(data.student || {}),
-            pin_code: data.student?.pin_code || data.pin_code || currentStudent.pin_code || "",
-            status: "active",
-            is_pin_used: true
-          };
-          localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-          localStorage.setItem("fania_student_code", currentStudent.student_code);
-          setCurrentStudent(activeSession);
-          setAccountStatus("active");
-          setSuccessMsg("🎉 تم تفعيل حسابك بنجاح من قبل المنسق! مرحباً بك في منظومة فنية.");
-          loadDashboard(currentStudent.student_code, activeSession.pin_code);
+          // تم اعتماد الحساب: لا دخول تلقائي — نطلب الرقم السري لإنشاء جلسة آمنة
+          const approvedCode = currentStudent.student_code;
+          localStorage.removeItem("fania_student_session");
+          localStorage.removeItem("fania_student_code");
+          setCurrentStudent(null);
+          setAccountStatus(null);
+          setRegCode(approvedCode);
+          setEnteredPin("");
+          setAuthMode("login");
+          setSuccessMsg("🎉 تم اعتماد حسابك بنجاح! يرجى إدخال الرقم السري لتسجيل الدخول.");
+          if (typeof window !== "undefined") {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
         } else if (data.isNew) {
           localStorage.removeItem("fania_student_session");
           setCurrentStudent(null);
@@ -798,29 +779,15 @@ export default function SystemPage() {
     return () => clearTimeout(timer);
   }, [regCode, authMode]);
 
-  // Load Dashboard Data
-  const loadDashboard = async (code: string, pin?: string, isImpersonationMode?: boolean) => {
+  // Load Dashboard Data (authentication relies solely on the HttpOnly student session cookie)
+  const loadDashboard = async (code: string, isImpersonationMode?: boolean) => {
     setLoading(true);
     setErrorMsg("");
     try {
-      let activePin = pin;
-      if (!activePin) {
-        try {
-          const sessionSaved = localStorage.getItem("fania_student_session");
-          if (sessionSaved) {
-            const parsed = JSON.parse(sessionSaved);
-            activePin = parsed?.pin_code;
-          }
-        } catch (e) {}
-      }
-      if (!activePin && currentStudent?.pin_code) {
-        activePin = currentStudent.pin_code;
-      }
-
-      const pinParam = activePin ? `&pin=${encodeURIComponent(activePin)}` : "";
       const impParam = isImpersonationMode || isImpersonating ? "&impersonate=true" : "";
-      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${pinParam}${impParam}&_t=${Date.now()}`, {
+      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${impParam}&_t=${Date.now()}`, {
         cache: "no-store",
+        credentials: "same-origin",
         headers: {
           "Cache-Control": "no-cache",
           "Pragma": "no-cache"
@@ -830,8 +797,14 @@ export default function SystemPage() {
 
       if (!res.ok) {
         if (res.status === 401) {
-          setAccountStatus("pending");
-          setErrorMsg(data.error || "مطلوب الرقم السري لتفعيل الحساب");
+          localStorage.removeItem("fania_student_session");
+          setCurrentStudent(null);
+          setAccountStatus(null);
+          setDashboardData(null);
+          setRegCode(code);
+          setEnteredPin("");
+          setAuthMode("login");
+          setErrorMsg(data.error || "انتهت جلستك. يرجى إدخال الرقم السري لتسجيل الدخول.");
         } else {
           setErrorMsg(data.error || "تعذر تحميل بيانات الطالب");
         }
@@ -850,7 +823,7 @@ export default function SystemPage() {
         }
         if (data.student) {
           const mergedStudent = { ...(currentStudent || {}), ...data.student };
-          if (activePin) mergedStudent.pin_code = activePin;
+          delete mergedStudent.pin_code;
           setCurrentStudent(mergedStudent);
           if (!isImpersonationMode && !isImpersonating) {
             localStorage.setItem("fania_student_session", JSON.stringify(mergedStudent));
@@ -1180,7 +1153,6 @@ export default function SystemPage() {
         body: JSON.stringify({
           student_code: currentStudent.student_code,
           student_name: currentStudent.full_name,
-          pin_code: currentStudent?.pin_code || enteredPin || "",
           course_id: courseId,
           course_name: courseName,
           project_name: projTitle,
@@ -1285,7 +1257,7 @@ export default function SystemPage() {
         alert("✓ تم تسليم العمل الفني بنجاح!\nالعمل الآن محفوظ في تبويب المشروع وبانتظار رصد الدرجة من أستاذ المقرر.");
 
         // 5. مزامنة البيانات في الخلفية
-        loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
+        loadDashboard(currentStudent.student_code);
       }
     } catch (e: any) {
       alert("خطأ أثناء رفع المشروع: " + e.message);
@@ -1355,8 +1327,14 @@ export default function SystemPage() {
           setErrorMsg(data.error || "فشل التسجيل");
         }
       } else {
-        setSuccessMsg(data.message);
+        const registeredPin = data.student?.pin_code;
+        setSuccessMsg(
+          registeredPin
+            ? `${data.message} رقمك السري للدخول: ${registeredPin} — احتفظ به ولا تشاركه مع أحد.`
+            : data.message
+        );
         const pendingSession = { ...data.student, status: "pending" };
+        delete pendingSession.pin_code;
         setCurrentStudent(pendingSession);
         setAccountStatus("pending");
         fetchCoordinators(data.student.student_code);
@@ -1382,6 +1360,10 @@ export default function SystemPage() {
       setErrorMsg("يرجى إدخال كود الطالب الجامعي");
       return;
     }
+    if (!enteredPin.trim()) {
+      setErrorMsg("يرجى إدخال الرقم السري الخاص بك");
+      return;
+    }
 
     setLoading(true);
     setErrorMsg("");
@@ -1393,7 +1375,7 @@ export default function SystemPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_code: regCode.trim(),
-          pin_code: enteredPin.trim() || undefined,
+          pin_code: enteredPin.trim(),
           device_info: deviceInfo
         })
       });
@@ -1406,18 +1388,18 @@ export default function SystemPage() {
           setErrorMsg(data.error || "بيانات الدخول غير صحيحة");
         }
       } else {
-        const fullSession = {
+        const safeSession = {
           ...data.student,
-          pin_code: data.student?.pin_code || enteredPin.trim() || "",
           status: "active",
           is_pin_used: true
         };
-        setCurrentStudent(fullSession);
+        setCurrentStudent(safeSession);
         setAccountStatus("active");
-        localStorage.setItem("fania_student_session", JSON.stringify(fullSession));
+        localStorage.setItem("fania_student_session", JSON.stringify(safeSession));
         localStorage.setItem("fania_student_code", data.student.student_code);
+        setEnteredPin("");
         setSuccessMsg("🎉 تم تسجيل الدخول بنجاح! مرحباً بك في منظومة فنية.");
-        loadDashboard(data.student.student_code, fullSession.pin_code);
+        loadDashboard(data.student.student_code);
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "حدث خطأ في الاتصال");
@@ -1455,15 +1437,16 @@ export default function SystemPage() {
         const updatedStudent = {
           ...currentStudent,
           ...(data.student || {}),
-          pin_code: enteredPin.trim(),
           status: "active",
           is_pin_used: true
         };
+        delete (updatedStudent as any).pin_code;
         localStorage.setItem("fania_student_session", JSON.stringify(updatedStudent));
         setCurrentStudent(updatedStudent);
         setAccountStatus("active");
+        setEnteredPin("");
         setSuccessMsg("تم تفعيل حسابك بنجاح! جاري تحميل مقرراتك وحضورك...");
-        loadDashboard(updatedStudent.student_code, enteredPin.trim());
+        loadDashboard(updatedStudent.student_code);
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "خطأ أثناء التحقق من الرقم السري");
@@ -1497,7 +1480,10 @@ export default function SystemPage() {
 
   // Handle Logout
   const handleLogout = () => {
+    fetch("/api/students/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
     localStorage.removeItem("fania_student_session");
+    localStorage.removeItem("fania_student_code");
+    localStorage.removeItem("fania_pending_reg_code");
     setCurrentStudent(null);
     setAccountStatus(null);
     setDashboardData(null);
@@ -1505,6 +1491,7 @@ export default function SystemPage() {
     setEnteredPin("");
     setRegCode("");
     setRegMobile("");
+    setAuthMode("login");
   };
 
   // Handle Complaint Submit
@@ -1532,7 +1519,7 @@ export default function SystemPage() {
       if (res.ok) {
         setComplaintSuccessMsg("✅ تم إرسال شكوتك بنجاح. سوف يتم مراجعتها والرد عليك قريباً. يرجى متابعة هذا القسم للاطلاع على الرد فور اعتماده.");
         setComplaintText("");
-        loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin);
+        loadDashboard(currentStudent.student_code);
       } else {
         alert(data.error || "تعذر إرسال الشكوى");
       }
@@ -1658,7 +1645,7 @@ export default function SystemPage() {
               <span>جاري التحقق من التفعيل تلقائياً...</span>
             </div>
             <p style={{ color: "#94a3b8", fontSize: "12px", margin: 0, lineHeight: "1.6" }}>
-              بمجرد أن يقوم المنسق بمطابقة بياناتك واعتماد حسابك، سيتم فتح لوحة تحكمك ومقرراتك فوراً دون الحاجة لكتابة أي كود أو رقم سري.
+              بمجرد أن يقوم المنسق بمطابقة بياناتك واعتماد حسابك، ستظهر لك شاشة الدخول لإدخال رقمك السري وفتح لوحة تحكمك ومقرراتك.
             </p>
           </div>
 
@@ -1671,21 +1658,18 @@ export default function SystemPage() {
                 const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(currentStudent.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`);
                 const data = await res.json();
                 if (data.isAlreadyActive) {
-                  const activeSession = {
-                    ...currentStudent,
-                    ...(data.student || {}),
-                    pin_code: data.student?.pin_code || data.pin_code || currentStudent.pin_code || "",
-                    status: "active",
-                    is_pin_used: true
-                  };
-                  localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                  setCurrentStudent(activeSession);
-                  setAccountStatus("active");
+                  localStorage.removeItem("fania_student_session");
+                  localStorage.removeItem("fania_student_code");
+                  const approvedCode = currentStudent.student_code;
+                  setCurrentStudent(null);
+                  setAccountStatus(null);
+                  setRegCode(approvedCode);
+                  setEnteredPin("");
+                  setAuthMode("login");
                   if (typeof window !== "undefined") {
                     window.history.replaceState({}, '', window.location.pathname);
                   }
-                  setSuccessMsg("🎉 تم تفعيل واعتماد حسابك بنجاح! مرحباً بك في منظومة فنية.");
-                  loadDashboard(currentStudent.student_code, activeSession.pin_code);
+                  setSuccessMsg("🎉 تم اعتماد حسابك بنجاح! يرجى إدخال الرقم السري لتسجيل الدخول.");
                 } else if (data.isNew) {
                   localStorage.removeItem("fania_student_session");
                   setCurrentStudent(null);
@@ -1693,7 +1677,7 @@ export default function SystemPage() {
                   setAuthMode("register");
                   setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
                 } else {
-                  alert("الحساب ما زال بانتظار اعتماد المنسق. بمجرد أن يضغط المنسق على اعتماد الحساب من لوحته، اضغط هذا الزر مجدداً أو سيتم الدخول تلقائياً.");
+                  alert("الحساب ما زال بانتظار اعتماد المنسق. بمجرد أن يعتمد المنسق حسابك، ستظهر لك شاشة الدخول بالرقم السري.");
                 }
               } catch(e) {
                 alert("تعذر التحقق من حالة الاتصال حالياً.");
@@ -2013,7 +1997,7 @@ export default function SystemPage() {
 
             {/* زر التحديث */}
             <button 
-              onClick={() => loadDashboard(currentStudent.student_code, currentStudent?.pin_code || enteredPin)} 
+              onClick={() => loadDashboard(currentStudent.student_code)} 
               className="btn-compact"
               disabled={loading}
               title="تحديث البيانات فورياً"
@@ -4130,7 +4114,7 @@ export default function SystemPage() {
               </div>
               <div style={{ textAlign: "center", marginTop: "8px" }}>
                 <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4", display: "inline-block" }}>
-                  💡 إذا تم اعتماد وتفعيل حسابك من قِبل المنسق، يمكنك الضغط على تسجيل الدخول بكودك مباشرة دون كتابة رقم سري.
+                  💡 الدخول يتطلب كود الطالب والرقم السري المعتمد. إذا لم يكن لديك رقم سري، راجع منسق المنظومة.
                 </span>
               </div>
             </div>
@@ -4234,34 +4218,15 @@ export default function SystemPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const activeSession = {
-                          ...(matchedStudent || {}),
-                          pin_code: lookupStatus?.pin_code || (matchedStudent as any)?.pin_code || "",
-                          status: "active",
-                          is_pin_used: true
-                        };
-                        localStorage.setItem("fania_student_session", JSON.stringify(activeSession));
-                        setCurrentStudent(activeSession);
-                        setAccountStatus("active");
-                        if (typeof window !== "undefined") {
-                          window.history.replaceState({}, '', window.location.pathname);
-                        }
-                        loadDashboard(activeSession.student_code, activeSession.pin_code);
-                      }}
-                      style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", border: "none", borderRadius: "8px", padding: "9px 16px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                    >
-                      <span>🚀</span>
-                      <span>الدخول إلى لوحة التحكم فوراً</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
+                        setRegCode(matchedStudent?.student_code || regCode);
+                        setEnteredPin("");
                         setAuthMode("login");
                         setErrorMsg("");
                       }}
-                      style={{ background: "#1e293b", color: "#cbd5e1", border: "1px solid #334155", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", cursor: "pointer" }}
+                      style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", border: "none", borderRadius: "8px", padding: "9px 16px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                     >
-                      تسجيل الدخول برقم سري 🔐
+                      <span>🔐</span>
+                      <span>تسجيل الدخول بالرقم السري</span>
                     </button>
                   </div>
                 </div>

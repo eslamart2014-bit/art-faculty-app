@@ -3,22 +3,30 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
+import { noStoreJson, setStudentSession } from '@/lib/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { student_code, pin_code, device_info } = await request.json();
-
-    if (!student_code) {
-      return NextResponse.json(
-        { error: 'يرجى إدخال كود الطالب' },
-        { status: 400 }
-      );
+    const ip = getClientIp(request);
+    if (isRateLimited(`student-login:${ip}`, 20, 60_000)) {
+      return noStoreJson({ error: 'عدد المحاولات كبير، يرجى المحاولة بعد قليل' }, { status: 429 });
     }
 
-    const cleanCode = formatStudentCode(student_code);
-    const cleanPin = pin_code ? pin_code.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase() : '';
+    const { student_code, pin_code, device_info } = await request.json();
+
+    if (typeof student_code !== 'string' || !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code.trim())) {
+      return noStoreJson({ error: 'يرجى إدخال كود طالب صالح' }, { status: 400 });
+    }
+
+    const cleanCode = formatStudentCode(String(student_code).trim());
+    const cleanPin = String(pin_code || '')
+      .replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString())
+      .trim()
+      .toLowerCase();
+    const codeCandidates = Array.from(new Set([String(student_code).trim(), cleanCode].filter(Boolean)));
 
     // جلب الحساب من student_accounts أو telegram_browser_id
     let account: any = null;
@@ -27,7 +35,7 @@ export async function POST(request: Request) {
       const { data } = await supabaseAdmin
         .from('student_accounts')
         .select('*')
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .in('student_code', codeCandidates)
         .maybeSingle();
       account = data;
     } catch (e) {}
@@ -36,7 +44,7 @@ export async function POST(request: Request) {
       const { data: st } = await supabaseAdmin
         .from('students')
         .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .in('student_code', codeCandidates)
         .maybeSingle();
       if (st) {
         studentRecord = st;
@@ -96,20 +104,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // استخراج ومقارنة الأرقام السرية المحتملة
-    let telegramPin = '';
-    if (studentRecord?.telegram_browser_id) {
-      try {
-        telegramPin = JSON.parse(studentRecord.telegram_browser_id)?.pin_code || '';
-      } catch (e) {}
-    }
-
+    // استخراج ومقارنة الأرقام السرية المعتمدة
     const expectedPins = [
       (account.pin_code || '').replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase(),
-      telegramPin.replace(/[٠-٩]/g, (d: string) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()).trim().toLowerCase()
     ].filter(Boolean);
 
-    const isPinMatch = isAccountActive || expectedPins.some(p => p === cleanPin);
+    // Strictly require the stored PIN. Activation must never bypass the PIN check.
+    const isPinMatch = expectedPins.length > 0 && cleanPin.length > 0 && expectedPins.includes(cleanPin);
+    const hasNoPinConfigured = expectedPins.length === 0;
+
+    if (hasNoPinConfigured) {
+      return noStoreJson(
+        { error: 'لا يوجد رقم سري معتمد لهذا الحساب. يرجى مراجعة منسق المنظومة لإعادة تعيينه.' },
+        { status: 409 }
+      );
+    }
 
     if (!isPinMatch) {
       const failed = (account.failed_attempts || 0) + 1;
@@ -142,7 +151,6 @@ export async function POST(request: Request) {
       account.is_pin_used = true;
     }
 
-    const isAdminSession = request.headers.get('X-Admin-Impersonate') === 'true' || device_info?.is_admin_session === true;
     const deviceId = device_info?.deviceId || 'unknown';
 
     // استخراج bound_device_id
@@ -156,7 +164,7 @@ export async function POST(request: Request) {
       } catch (e) {}
     }
 
-    if (!isAdminSession && deviceId !== 'unknown') {
+    if (deviceId !== 'unknown') {
       if (boundDeviceId) {
         if (boundDeviceId !== deviceId) {
           return NextResponse.json(
@@ -201,19 +209,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // تحديث دائم في students.telegram_browser_id
-    try {
-      const mergedPayload = {
-        ...account,
-        ...resetSecurity,
-        devices: updatedDevices,
-        last_login_at: new Date().toISOString()
-      };
-      await supabaseAdmin
-        .from('students')
-        .update({ telegram_browser_id: JSON.stringify(mergedPayload) })
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-    } catch (e) {}
+    // NOTE: لا نُكرّر بيانات الحساب (بما فيها PIN) داخل students.telegram_browser_id.
+    // student_accounts هو المصدر الوحيد للحساب، والبيانات القديمة تبقى كما هي بدون حذف.
 
     // تسجيل الدخول في الأوديت لوج
     try {
@@ -226,10 +223,19 @@ export async function POST(request: Request) {
       });
     } catch (e) {}
 
-    return NextResponse.json({
-      success: true,
-      student: account,
-    });
+    const safeStudent = {
+      id: account.student_id || studentRecord?.id || null,
+      full_name: account.full_name || studentRecord?.full_name || '',
+      student_code: account.student_code || studentRecord?.student_code || cleanCode,
+      academic_year: account.academic_year || studentRecord?.academic_year || '',
+      section: account.section || studentRecord?.section || '',
+      mobile: account.mobile || null,
+      status: 'active',
+    };
+
+    const response = noStoreJson({ success: true, student: safeStudent });
+    setStudentSession(response, safeStudent.student_code);
+    return response;
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطأ في الخادم' }, { status: 500 });
   }

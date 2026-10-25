@@ -1,5 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
+
+function buildWebhookUrl(request: Request): string | null {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+  if (configured) {
+    return `${configured.replace(/\/+$/, '')}/api/bot/webhook`;
+  }
+  const host = request.headers.get('host');
+  if (!host) return null;
+  const protocol = host.includes('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https';
+  return `${protocol}://${host}/api/bot/webhook`;
+}
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -51,27 +63,33 @@ export async function POST(request: Request) {
 
       const botInfo = tgData.result;
 
-      // 2. Set Webhook
-      const host = request.headers.get('host');
-      const protocol = host?.includes('localhost') ? 'http' : 'https';
-      const webhookUrl = `${protocol}://${host}/api/bot/webhook`;
+      // 2. Set Webhook with a per-install secret token so forged updates are rejected
+      const webhookUrl = buildWebhookUrl(request);
+      if (!webhookUrl) {
+        return NextResponse.json({ error: 'تعذر تحديد رابط الموقع لربط الويبهوك' }, { status: 500 });
+      }
 
-      const hookRes = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`);
+      const { data: sysData } = await supabaseAdmin.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+      const currentConfig = sysData?.telegram_config || {};
+      const webhookSecret = typeof currentConfig.webhook_secret === 'string' && currentConfig.webhook_secret.length >= 32
+        ? currentConfig.webhook_secret
+        : randomBytes(32).toString('hex');
+
+      const hookRes = await fetch(
+        `https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${encodeURIComponent(webhookSecret)}`
+      );
       const hookData = await hookRes.json();
 
       if (!hookData.ok) {
         return NextResponse.json({ error: 'Failed to set webhook: ' + hookData.description }, { status: 500 });
       }
 
-      // 3. Fetch existing config to preserve flags
-      const { data: sysData } = await supabaseAdmin.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
-      const currentConfig = sysData?.telegram_config || {};
-
       const settingsValue = {
         ...currentConfig,
         token: botToken,
         botInfo: botInfo,
-        webhookUrl: webhookUrl
+        webhookUrl: webhookUrl,
+        webhook_secret: webhookSecret
       };
 
       const { error: dbError } = await supabaseAdmin
@@ -82,6 +100,41 @@ export async function POST(request: Request) {
       if (dbError) throw dbError;
 
       return NextResponse.json({ success: true, botInfo, data: settingsValue });
+    }
+
+    if (action === 'register_webhook') {
+      const { data: sysData } = await supabaseAdmin.from('system_settings').select('telegram_config').eq('id', 1).maybeSingle();
+      const currentConfig = sysData?.telegram_config || {};
+      const botToken = typeof currentConfig.token === 'string' ? currentConfig.token : '';
+      if (!botToken) {
+        return NextResponse.json({ error: 'لم يتم حفظ توكن البوت بعد' }, { status: 400 });
+      }
+
+      const webhookUrl = buildWebhookUrl(request);
+      if (!webhookUrl) {
+        return NextResponse.json({ error: 'تعذر تحديد رابط الموقع لربط الويبهوك' }, { status: 500 });
+      }
+
+      const webhookSecret = typeof currentConfig.webhook_secret === 'string' && currentConfig.webhook_secret.length >= 32
+        ? currentConfig.webhook_secret
+        : randomBytes(32).toString('hex');
+
+      const hookRes = await fetch(
+        `https://api.telegram.org/bot${botToken}/setWebhook?url=${encodeURIComponent(webhookUrl)}&secret_token=${encodeURIComponent(webhookSecret)}`
+      );
+      const hookData = await hookRes.json();
+      if (!hookData.ok) {
+        return NextResponse.json({ error: 'Failed to set webhook: ' + hookData.description }, { status: 500 });
+      }
+
+      const settingsValue = { ...currentConfig, webhookUrl, webhook_secret: webhookSecret };
+      const { error: dbError } = await supabaseAdmin
+        .from('system_settings')
+        .update({ telegram_config: settingsValue, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+      if (dbError) throw dbError;
+
+      return NextResponse.json({ success: true, webhookUrl });
     }
 
     if (action === 'save_student_permissions') {
@@ -125,6 +178,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error("TELEGRAM API ERROR:", error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ أثناء تنفيذ العملية' }, { status: 500 });
   }
 }

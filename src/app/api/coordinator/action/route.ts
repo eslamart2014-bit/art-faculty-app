@@ -3,12 +3,20 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter, generatePinCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
+import { requireCoordinator } from '@/lib/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const guard = await requireCoordinator(request);
+  if (!guard.ok) return guard.response;
+
   try {
-    const { action, student_code, coordinator_name } = await request.json();
+    const { action, student_code } = await request.json();
+    const coordinator_name = guard.ctx.profile.full_name || guard.ctx.user.email || 'منسق النظام';
+    if (typeof student_code !== 'string' || !/^[A-Za-z0-9\-_]{1,20}$/.test(student_code.trim())) {
+      return NextResponse.json({ error: 'كود الطالب غير صالح' }, { status: 400 });
+    }
     const cleanCode = formatStudentCode(student_code);
     const variants = getStudentCodeVariants(cleanCode || student_code);
     const filter = buildStudentCodeFilter(variants);

@@ -12,11 +12,7 @@ export async function POST(request: Request) {
   
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   try {
-    const { action, userId, newPassword, newRole, adminId, email, fullName, degree } = await request.json();
-
-    if (!adminId) {
-      return NextResponse.json({ error: 'Missing adminId' }, { status: 401 });
-    }
+    const { action, userId, newPassword, newRole, email, fullName, degree } = await request.json();
 
     // Verify Authorization Header
     const authHeader = request.headers.get('authorization');
@@ -56,9 +52,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'يرجى إدخال اسم الزميل والبريد الإلكتروني' }, { status: 400 });
       }
 
-      const cleanEmail = email.toLowerCase().trim();
-      const cleanName = fullName.trim();
+      const cleanEmail = String(email).toLowerCase().trim();
+      const cleanName = String(fullName).trim().slice(0, 120);
       const userDegree = normalizeAcademicDegree(degree);
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanName.length < 3) {
+        return NextResponse.json({ error: 'بيانات الزميل غير صالحة' }, { status: 400 });
+      }
+
+      const allowedRoles = ['مدير', 'مدير مساعد', 'عضو هيئة تدريس', 'معلم', 'admin', 'أدمن'];
+      const requestedRole = typeof newRole === 'string' ? newRole.trim() : '';
+      const assignedRole =
+        profile.role === 'مدير' && allowedRoles.includes(requestedRole)
+          ? requestedRole
+          : 'عضو هيئة تدريس';
       
       // Generate clean memorable password
       const randomDigits = Math.floor(100000 + Math.random() * 900000);
@@ -94,7 +101,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'البريد مسجل مسبقاً ولكن تعذر العثور على الحساب لتحديثه.' }, { status: 400 });
           }
         } else {
-          return NextResponse.json({ error: 'خطأ في إنشاء الحساب: ' + createError.message }, { status: 400 });
+          console.error('createUser error:', createError.message);
+          return NextResponse.json({ error: 'تعذر إنشاء الحساب. يرجى المحاولة لاحقاً.' }, { status: 400 });
         }
       } else if (createData?.user) {
         createdAuthUserId = createData.user.id;
@@ -110,7 +118,7 @@ export async function POST(request: Request) {
         email: cleanEmail,
         full_name: cleanName,
         degree: userDegree,
-        role: newRole || 'عضو هيئة تدريس',
+        role: assignedRole,
         is_suspended: false,
         failed_attempts: 0,
         locked_until: null
@@ -118,14 +126,14 @@ export async function POST(request: Request) {
 
       if (profileError) {
         console.error('Error upserting profile:', profileError);
-        return NextResponse.json({ error: 'خطأ في إنشاء ملف المستخدم: ' + profileError.message }, { status: 500 });
+        return NextResponse.json({ error: 'تعذر حفظ ملف المستخدم. يرجى المحاولة لاحقاً.' }, { status: 500 });
       }
 
       // Upsert invitations table as completed
       try {
         await supabaseAdmin.from('invitations').upsert({
           email: cleanEmail,
-          created_by: adminId,
+          created_by: user.id,
           status: 'completed'
         }, { onConflict: 'email' });
       } catch (invErr) {
@@ -151,6 +159,9 @@ export async function POST(request: Request) {
 
     if (action === 'change_password') {
       if (!userId || !newPassword) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+      if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+        return NextResponse.json({ error: 'كلمة المرور يجب أن تكون بين 8 و128 حرفاً' }, { status: 400 });
+      }
       
       const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: newPassword
@@ -186,8 +197,13 @@ export async function POST(request: Request) {
       if (profile.role !== 'مدير') {
         return NextResponse.json({ error: 'Forbidden: Only admin can change roles' }, { status: 403 });
       }
-      const roleToSet = newRole || 'teacher';
       if (!userId) return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+
+      const allowedRoles = ['مدير', 'مدير مساعد', 'عضو هيئة تدريس', 'معلم', 'admin', 'أدمن'];
+      const roleToSet = typeof newRole === 'string' ? newRole.trim() : '';
+      if (!allowedRoles.includes(roleToSet)) {
+        return NextResponse.json({ error: 'الدور المطلوب غير صالح' }, { status: 400 });
+      }
 
       const { error: roleError } = await supabaseAdmin
         .from('profiles')
@@ -203,8 +219,21 @@ export async function POST(request: Request) {
 
       const updateData: any = {};
       if (degree !== undefined) updateData.degree = normalizeAcademicDegree(degree);
-      if (fullName !== undefined) updateData.full_name = fullName.trim();
-      if (newRole !== undefined && profile.role === 'مدير') updateData.role = newRole;
+      if (fullName !== undefined) {
+        const cleanName = String(fullName).trim().slice(0, 120);
+        if (cleanName.length < 3) {
+          return NextResponse.json({ error: 'الاسم غير صالح' }, { status: 400 });
+        }
+        updateData.full_name = cleanName;
+      }
+      if (newRole !== undefined && profile.role === 'مدير') {
+        const allowedRoles = ['مدير', 'مدير مساعد', 'عضو هيئة تدريس', 'معلم', 'admin', 'أدمن'];
+        const roleToSet = typeof newRole === 'string' ? newRole.trim() : '';
+        if (!allowedRoles.includes(roleToSet)) {
+          return NextResponse.json({ error: 'الدور المطلوب غير صالح' }, { status: 400 });
+        }
+        updateData.role = roleToSet;
+      }
 
       const { error: updateError } = await supabaseAdmin
         .from('profiles')
@@ -323,6 +352,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('ADMIN USERS API ERROR:', error);
+    return NextResponse.json({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
   }
 }
