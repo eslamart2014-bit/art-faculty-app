@@ -10,6 +10,9 @@ on:
       - main
       - security/emergency-hardening
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Android APK
@@ -25,18 +28,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle 8.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Build with Gradle
         working-directory: android-student
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          # Generate wrapper if needed and set execution permission
-          if [ ! -f "gradlew" ]; then
-            gradle wrapper --gradle-version 8.2.2
-          fi
-          chmod +x gradlew
-          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
+          gradle assembleRelease assembleDebug --no-daemon --stacktrace
 
       - name: Rename APKs for clarity
         working-directory: android-student
