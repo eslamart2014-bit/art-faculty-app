@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">بوابة الطالب - التربية الفنية</string>
+    <string name="error_offline_title">لا يوجد اتصال بالإنترنت</string>
+    <string name="error_offline_desc">يرجى التأكد من تشغيل الواي فاي أو بيانات الهاتف والمحاولة مرة أخرى.</string>
+    <string name="btn_retry">إعادة المحاولة 🔄</string>
+    <string name="exit_prompt">اضغط مرة أخرى للخروج من التطبيق</string>
+    <string name="choose_photo_title">اختيار صورة اللوحة الفنية</string>
+    <string name="permission_camera_denied">تم رفض إذن الكاميرا. يرجى تفعيله من إعدادات الهاتف لالتقاط صور الأعمال الفنية.</string>
+</resources>

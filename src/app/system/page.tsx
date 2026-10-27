@@ -651,9 +651,8 @@ export default function SystemPage() {
 
   // PWA Install Prompt Listener for Android & Mobile
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone;
+    const isNativeApp = navigator.userAgent.includes("ArtEduStudentApp");
+    const isStandalone = isNativeApp || window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone;
     if (isStandalone) return;
 
     const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
