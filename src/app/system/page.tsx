@@ -649,6 +649,75 @@ export default function SystemPage() {
     };
   }, []);
 
+  // Native Android Back Button & Gesture Navigation Handler
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    (window as any).handleAndroidBack = () => {
+      // 1. Image preview modal
+      if (previewModalImage) {
+        setPreviewModalImage(null);
+        return true;
+      }
+      // 2. Project view modal
+      if (selectedProjectForView) {
+        setSelectedProjectForView(null);
+        return true;
+      }
+      // 3. Course chat/eval modal
+      if (selectedCourseForEval) {
+        setSelectedCourseForEval(null);
+        return true;
+      }
+      // 4. QR modal
+      if (showQRModal) {
+        setShowQRModal(false);
+        return true;
+      }
+      // 5. Manual PIN modal
+      if (showManualPinBox) {
+        setShowManualPinBox(false);
+        return true;
+      }
+      // 6. ID Camera modal
+      if (showIdCamera) {
+        setShowIdCamera(false);
+        return true;
+      }
+      // 7. If logged in and on secondary tab (attendance, lockers, complaints, warnings), return to main evaluation tab
+      if (currentStudent && activeTab !== "evaluation") {
+        setActiveTab("evaluation");
+        return true;
+      }
+      // 8. If in login screen entering PIN, return to code screen
+      if (!currentStudent && showLoginPin) {
+        setShowLoginPin(false);
+        return true;
+      }
+      // 9. If in login screen, return to register screen
+      if (!currentStudent && authMode === "login") {
+        setAuthMode("register");
+        return true;
+      }
+      return false;
+    };
+
+    return () => {
+      delete (window as any).handleAndroidBack;
+    };
+  }, [
+    previewModalImage,
+    selectedProjectForView,
+    selectedCourseForEval,
+    showQRModal,
+    showManualPinBox,
+    showIdCamera,
+    currentStudent,
+    activeTab,
+    showLoginPin,
+    authMode
+  ]);
+
   // PWA Install Prompt Listener for Android & Mobile
   useEffect(() => {
     const isNativeApp = navigator.userAgent.includes("ArtEduStudentApp");

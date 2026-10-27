@@ -12,12 +12,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
+import android.webkit.WebBackForwardList;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -36,7 +38,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String TARGET_URL = "https://art-faculty-app.vercel.app/system";
 
     private WebView webView;
-    private SwipeRefreshLayout swipeRefreshLayout;
     private ProgressBar progressBar;
     private LinearLayout offlineLayout;
     private Button btnRetry;
@@ -115,17 +115,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void initViews() {
         webView = findViewById(R.id.webView);
-        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
         progressBar = findViewById(R.id.progressBar);
         offlineLayout = findViewById(R.id.offlineLayout);
         btnRetry = findViewById(R.id.btnRetry);
-
-        swipeRefreshLayout.setColorSchemeResources(R.color.primary);
-        swipeRefreshLayout.setOnRefreshListener(() -> {
-            offlineLayout.setVisibility(View.GONE);
-            webView.setVisibility(View.VISIBLE);
-            webView.reload();
-        });
 
         btnRetry.setOnClickListener(v -> {
             offlineLayout.setVisibility(View.GONE);
@@ -145,17 +137,23 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
 
-        // 2. Viewport & Rendering
+        // 2. Viewport & 100% Native Touch Scrolling
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
+        // Enable smooth scrolling and scrollbars
+        webView.setVerticalScrollBarEnabled(true);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+
         // 3. Media & Audio/Video
         settings.setMediaPlaybackRequiresUserGesture(false);
 
-        // 4. Custom User-Agent tag (allows backend to detect the native Android student app)
+        // 4. Custom User-Agent tag
         String defaultUA = settings.getUserAgentString();
         settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.0 (Android; Mobile)");
 
@@ -177,7 +175,6 @@ public class MainActivity extends AppCompatActivity {
                     progressBar.setProgress(newProgress);
                 } else {
                     progressBar.setVisibility(View.GONE);
-                    swipeRefreshLayout.setRefreshing(false);
                 }
             }
 
@@ -194,7 +191,6 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                // Grant camera permission to web components (QR scanner / live camera)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     for (String resource : request.getResources()) {
                         if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
@@ -229,7 +225,6 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                swipeRefreshLayout.setRefreshing(false);
                 progressBar.setVisibility(View.GONE);
             }
 
@@ -238,7 +233,6 @@ public class MainActivity extends AppCompatActivity {
                 if (request.isForMainFrame()) {
                     webView.setVisibility(View.GONE);
                     offlineLayout.setVisibility(View.VISIBLE);
-                    swipeRefreshLayout.setRefreshing(false);
                 }
             }
         });
@@ -262,7 +256,6 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(MainActivity.this, "بدأ تحميل الملف: " + filename, Toast.LENGTH_SHORT).show();
                     }
                 } catch (Exception e) {
-                    // Fallback to external browser/downloader
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                         startActivity(intent);
@@ -331,7 +324,6 @@ public class MainActivity extends AppCompatActivity {
     private void launchPhotoChooserIntent() {
         Intent takePictureIntent = null;
 
-        // Prepare Camera Intent
         try {
             File photoFile = createImageFile();
             if (photoFile != null) {
@@ -348,7 +340,6 @@ public class MainActivity extends AppCompatActivity {
             mCameraPhotoUri = null;
         }
 
-        // Prepare Gallery/File Intent
         Intent contentSelectionIntent = new Intent(Intent.ACTION_GET_CONTENT);
         contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE);
         contentSelectionIntent.setType("image/*");
@@ -378,22 +369,76 @@ public class MainActivity extends AppCompatActivity {
         return File.createTempFile(imageFileName, ".jpg", storageDir);
     }
 
+    /**
+     * Complete, robust Android Back Navigation:
+     * Supports Gesture Navigation (swiping from edges on Android 10-15),
+     * Soft Navigation bar buttons, and Physical hardware back buttons.
+     */
     private void setupBackNavigation() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack();
-                } else {
-                    if (System.currentTimeMillis() - backPressedTime < 2000) {
-                        finish();
-                    } else {
-                        backPressedTime = System.currentTimeMillis();
-                        Toast.makeText(MainActivity.this, R.string.exit_prompt, Toast.LENGTH_SHORT).show();
-                    }
-                }
+                handleBackPressAction();
             }
         });
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            handleBackPressAction();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    private void handleBackPressAction() {
+        if (webView == null) {
+            finish();
+            return;
+        }
+
+        // 1. Evaluate web handler: closes any open modal, dialog, or switches back to home tab
+        webView.evaluateJavascript(
+            "(function() { " +
+            "  try { " +
+            "    if (typeof window.handleAndroidBack === 'function') { " +
+            "      return window.handleAndroidBack() === true; " +
+            "    } " +
+            "    var closeBtn = document.querySelector('.close-modal, [data-modal-close], .preview-close'); " +
+            "    if (closeBtn) { closeBtn.click(); return true; } " +
+            "  } catch(e) {} " +
+            "  return false; " +
+            "})()",
+            value -> {
+                if ("true".equalsIgnoreCase(value)) {
+                    // Handled inside the webapp (modal or tab closed smoothly)!
+                    return;
+                }
+
+                // 2. Check if WebView has internal page history inside the portal
+                if (webView.canGoBack()) {
+                    WebBackForwardList list = webView.copyBackForwardList();
+                    int cur = list.getCurrentIndex();
+                    if (cur > 0) {
+                        String prevUrl = list.getItemAtIndex(cur - 1).getUrl();
+                        if (prevUrl != null && prevUrl.contains("art-faculty-app.vercel.app")) {
+                            webView.goBack();
+                            return;
+                        }
+                    }
+                }
+
+                // 3. At root screen: double-tap to exit
+                long now = System.currentTimeMillis();
+                if (now - backPressedTime < 2000) {
+                    finish();
+                } else {
+                    backPressedTime = now;
+                    Toast.makeText(MainActivity.this, R.string.exit_prompt, Toast.LENGTH_SHORT).show();
+                }
+            }
+        );
     }
 
     private void checkPermissions() {
