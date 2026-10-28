@@ -145,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @SuppressLint("BatteryLife")
     private void checkBatteryOptimization() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
@@ -159,7 +160,6 @@ public class MainActivity extends AppCompatActivity {
                                 .setMessage("لضمان وصول إشعارات المشاريع، الحضور، واعتماد الدواليب حتى والتطبيق مغلق، يرجى استثناء التطبيق من قيود توفير شحن البطارية.")
                                 .setPositiveButton("تفعيل الآن", (dialog, which) -> {
                                     try {
-                                        @SuppressLint("BatteryLife")
                                         Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
                                         intent.setData(Uri.parse("package:" + getPackageName()));
                                         startActivity(intent);
@@ -396,39 +396,6 @@ public class MainActivity extends AppCompatActivity {
 
             try {
                 CookieManager.getInstance().flush();
-            } catch (Exception ignored) {}
-        }
-    }
-
-    private void checkBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                    SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
-                    boolean alreadyPrompted = prefs.getBoolean("battery_prompted", false);
-                    if (!alreadyPrompted) {
-                        prefs.edit().putBoolean("battery_prompted", true).apply();
-                        new AlertDialog.Builder(this)
-                                .setTitle("تفعيل الإشعارات الفورية 🔔")
-                                .setMessage("لضمان وصول إشعارات المشاريع، الحضور، واعتماد الدواليب حتى والتطبيق مغلق، يرجى استثناء التطبيق من قيود توفير شحن البطارية.")
-                                .setPositiveButton("تفعيل الآن", (dialog, which) -> {
-                                    try {
-                                        @SuppressLint("BatteryLife")
-                                        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                                        intent.setData(Uri.parse("package:" + getPackageName()));
-                                        startActivity(intent);
-                                    } catch (Exception e) {
-                                        try {
-                                            Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                                            startActivity(fallback);
-                                        } catch (Exception ignored) {}
-                                    }
-                                })
-                                .setNegativeButton("لاحقاً", (dialog, which) -> dialog.dismiss())
-                                .show();
-                    }
-                }
             } catch (Exception ignored) {}
         }
     }

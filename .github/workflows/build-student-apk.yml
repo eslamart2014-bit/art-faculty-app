@@ -56,7 +56,11 @@ jobs:
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          gradle assembleRelease assembleDebug --no-daemon --stacktrace
+          set -o pipefail
+          gradle assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle_err.txt || {
+            echo "::error file=gradle::$(grep -E '(error:|FAILURE:|Exception|Caused by:|what went wrong)' -i /tmp/gradle_err.txt | head -n 25 | tr '\n' ' ')"
+            exit 1
+          }
 
       - name: Rename APKs for clarity
         working-directory: android-student
