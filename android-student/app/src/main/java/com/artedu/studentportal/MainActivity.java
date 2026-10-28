@@ -181,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 4. Custom User-Agent tag
         String defaultUA = settings.getUserAgentString();
-        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.2 (Android; Mobile)");
+        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.3 (Android; Mobile)");
 
         // 5. Caching Strategy
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -400,16 +400,6 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private void startApkDownloadAndInstall(String downloadUrl, String versionName) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!getPackageManager().canRequestPackageInstalls()) {
-                Toast.makeText(this, R.string.permission_install_unknown, Toast.LENGTH_LONG).show();
-                try {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                } catch (Exception ignored) {}
-            }
-        }
-
         Toast.makeText(this, R.string.downloading_update, Toast.LENGTH_SHORT).show();
 
         try {

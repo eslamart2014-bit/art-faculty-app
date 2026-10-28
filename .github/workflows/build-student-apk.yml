@@ -62,13 +62,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/security/emergency-hardening'
         with:
-          tag_name: student-app-v1.0.2
-          name: "📱 تطبيق بوابة الطلاب - الإصدار v1.0.2"
+          tag_name: student-app-v1.0.3
+          name: "📱 تطبيق بوابة الطلاب - الإصدار المعتمد v1.0.3"
           make_latest: true
           body: |
             ### تطبيق بوابة الطالب — قسم التربية الفنية 🎓
-            - ملف APK جاهز للتثبيت الفوري على هواتف أندرويد.
-            - يشمل تسجيل الدخول، قفل الحساب على جهاز الطالب، رفع المشروعات، وحجز الخزائن.
+            - ملف APK رسمي معتمد وموقع بشهادة الكلية الرقمية.
+            - متوافق مع كافة أجهزة أندرويد ويدعم الإشعارات الفورية والتحديث المباشر.
             - تم البناء تلقائياً عبر GitHub Actions.
           files: dist-apk/*.apk
           prerelease: false
