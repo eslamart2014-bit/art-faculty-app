@@ -16,6 +16,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.view.KeyEvent;
@@ -132,6 +133,7 @@ public class MainActivity extends AppCompatActivity {
         setupWebView();
         setupBackNavigation();
         checkAndRequestPermissions();
+        checkBatteryOptimization();
 
         // 2. Check for APK updates from server
         checkAppUpdates();
@@ -140,6 +142,39 @@ public class MainActivity extends AppCompatActivity {
             webView.restoreState(savedInstanceState);
         } else {
             webView.loadUrl(TARGET_URL);
+        }
+    }
+
+    private void checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
+                    boolean alreadyPrompted = prefs.getBoolean("battery_prompted", false);
+                    if (!alreadyPrompted) {
+                        prefs.edit().putBoolean("battery_prompted", true).apply();
+                        new AlertDialog.Builder(this)
+                                .setTitle("تفعيل الإشعارات الفورية 🔔")
+                                .setMessage("لضمان وصول إشعارات المشاريع، الحضور، واعتماد الدواليب حتى والتطبيق مغلق، يرجى استثناء التطبيق من قيود توفير شحن البطارية.")
+                                .setPositiveButton("تفعيل الآن", (dialog, which) -> {
+                                    try {
+                                        @SuppressLint("BatteryLife")
+                                        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                                        intent.setData(Uri.parse("package:" + getPackageName()));
+                                        startActivity(intent);
+                                    } catch (Exception e) {
+                                        try {
+                                            Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                                            startActivity(fallback);
+                                        } catch (Exception ignored) {}
+                                    }
+                                })
+                                .setNegativeButton("لاحقاً", (dialog, which) -> dialog.dismiss())
+                                .show();
+                    }
+                }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -177,10 +212,11 @@ public class MainActivity extends AppCompatActivity {
         webView.setBackgroundColor(0xFF0F172A);
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-        // Enable smooth scrolling and scrollbars
+        // Enable smooth scrolling and scrollbars without accidental browser refresh
         webView.setVerticalScrollBarEnabled(true);
         webView.setHorizontalScrollBarEnabled(false);
-        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        webView.setNestedScrollingEnabled(true);
         webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
 
         // 3. Media & Audio/Video
@@ -323,9 +359,25 @@ public class MainActivity extends AppCompatActivity {
     public class NativeBridge {
         @JavascriptInterface
         public void saveStudentSession(String studentCode, String studentName) {
+            saveStudentSession(studentCode, studentName, "");
+        }
+
+        @JavascriptInterface
+        public void saveStudentSession(String studentCode, String studentName, String sessionToken) {
             if (studentCode != null && !studentCode.trim().isEmpty()) {
                 SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
-                prefs.edit().putString(StudentNotificationWorker.KEY_STUDENT_CODE, studentCode.trim()).apply();
+                SharedPreferences.Editor editor = prefs.edit()
+                        .putString(StudentNotificationWorker.KEY_STUDENT_CODE, studentCode.trim())
+                        .putString(StudentNotificationWorker.KEY_STUDENT_NAME, studentName != null ? studentName.trim() : "");
+                if (sessionToken != null && !sessionToken.trim().isEmpty()) {
+                    editor.putString(StudentNotificationWorker.KEY_STUDENT_TOKEN, sessionToken.trim());
+                }
+                editor.apply();
+
+                // Flush cookies to persistent disk storage
+                try {
+                    CookieManager.getInstance().flush();
+                } catch (Exception ignored) {}
 
                 // Instantly trigger an initial background notification check
                 OneTimeWorkRequest checkRequest = new OneTimeWorkRequest.Builder(StudentNotificationWorker.class).build();
@@ -336,7 +388,48 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void clearStudentSession() {
             SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
-            prefs.edit().remove(StudentNotificationWorker.KEY_STUDENT_CODE).apply();
+            prefs.edit()
+                    .remove(StudentNotificationWorker.KEY_STUDENT_CODE)
+                    .remove(StudentNotificationWorker.KEY_STUDENT_NAME)
+                    .remove(StudentNotificationWorker.KEY_STUDENT_TOKEN)
+                    .apply();
+
+            try {
+                CookieManager.getInstance().flush();
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
+                    boolean alreadyPrompted = prefs.getBoolean("battery_prompted", false);
+                    if (!alreadyPrompted) {
+                        prefs.edit().putBoolean("battery_prompted", true).apply();
+                        new AlertDialog.Builder(this)
+                                .setTitle("تفعيل الإشعارات الفورية 🔔")
+                                .setMessage("لضمان وصول إشعارات المشاريع، الحضور، واعتماد الدواليب حتى والتطبيق مغلق، يرجى استثناء التطبيق من قيود توفير شحن البطارية.")
+                                .setPositiveButton("تفعيل الآن", (dialog, which) -> {
+                                    try {
+                                        @SuppressLint("BatteryLife")
+                                        Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                                        intent.setData(Uri.parse("package:" + getPackageName()));
+                                        startActivity(intent);
+                                    } catch (Exception e) {
+                                        try {
+                                            Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                                            startActivity(fallback);
+                                        } catch (Exception ignored) {}
+                                    }
+                                })
+                                .setNegativeButton("لاحقاً", (dialog, which) -> dialog.dismiss())
+                                .show();
+                    }
+                }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -408,7 +501,13 @@ public class MainActivity extends AppCompatActivity {
         builder.setCancelable(!forceUpdate);
 
         builder.setPositiveButton(R.string.btn_update_now, (dialog, which) -> {
-            startApkDownloadAndInstall(downloadUrl, versionName);
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            } catch (Exception e) {
+                Toast.makeText(this, "تعذر فتح رابط التحديث", Toast.LENGTH_SHORT).show();
+            }
         });
 
         if (!forceUpdate) {
@@ -416,74 +515,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         builder.show();
-    }
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void startApkDownloadAndInstall(String downloadUrl, String versionName) {
-        Toast.makeText(this, R.string.downloading_update, Toast.LENGTH_SHORT).show();
-
-        try {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
-            request.setTitle("تحديث بوابة الطالب (v" + versionName + ")");
-            request.setDescription("جاري تنزيل التحديث الجديد...");
-            request.setMimeType("application/vnd.android.package-archive");
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-            String fileName = "ArtEdu_Student_v" + versionName + ".apk";
-            File destinationFile = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName);
-            if (destinationFile.exists()) {
-                destinationFile.delete();
-            }
-            request.setDestinationUri(Uri.fromFile(destinationFile));
-
-            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-            if (dm != null) {
-                long downloadId = dm.enqueue(request);
-
-                // Register receiver to trigger install when download completes
-                BroadcastReceiver onComplete = new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                        if (id == downloadId) {
-                            unregisterReceiver(this);
-                            installApk(destinationFile);
-                        }
-                    }
-                };
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED);
-                } else {
-                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
-                }
-            }
-        } catch (Exception e) {
-            // Fallback: Open download in browser
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
-                startActivity(intent);
-            } catch (Exception ignored) {}
-        }
-    }
-
-    private void installApk(File apkFile) {
-        try {
-            if (apkFile != null && apkFile.exists()) {
-                Uri apkUri = FileProvider.getUriForFile(
-                        this,
-                        getApplicationContext().getPackageName() + ".fileprovider",
-                        apkFile
-                );
-
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-            }
-        } catch (Exception e) {
-            Toast.makeText(this, "تعذر فتح ملف التثبيت", Toast.LENGTH_SHORT).show();
-        }
     }
 
     private boolean handleUrlScheme(Uri uri) {

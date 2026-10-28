@@ -35,6 +35,8 @@ html, body {
   color: var(--text);
   user-select: none;
   overflow: hidden; /* App container handles scroll */
+  overscroll-behavior-y: contain;
+  -webkit-overscroll-behavior-y: contain;
 }
 
 a {
@@ -239,6 +241,8 @@ input::placeholder, textarea::placeholder {
   height: 100%;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  -webkit-overscroll-behavior-y: contain;
   position: relative;
 }
 

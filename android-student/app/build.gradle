@@ -10,20 +10,24 @@ android {
         applicationId "com.artedu.studentportal"
         minSdk 24
         targetSdk 34
-        versionCode 5
-        versionName "1.0.4"
+        versionCode 6
+        versionName "1.0.5"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
         release {
-            storeFile file('artedu-release-key.jks')
-            storePassword 'artedu2026portal'
-            keyAlias 'artedu_release'
-            keyPassword 'artedu2026portal'
-            v1SigningEnabled true
-            v2SigningEnabled true
+            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "artedu-official-release.jks"
+            def keystoreFile = file(keystorePath)
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword System.getenv("KEYSTORE_PASSWORD") ?: "artedu2026portal_secure"
+                keyAlias System.getenv("KEY_ALIAS") ?: "artedu_release"
+                keyPassword System.getenv("KEY_PASSWORD") ?: "artedu2026portal_secure"
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
         }
     }
 
@@ -31,7 +35,13 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "artedu-official-release.jks"
+            def keystoreFile = file(keystorePath)
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
         debug {
             applicationIdSuffix ".debug"

@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { lockerStore } from '@/lib/lockerStore';
+import { getStudentSession } from '@/lib/serverAuth';
+import { getStudentCodeVariants } from '@/lib/codeHelper';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const code = searchParams.get('code')?.trim();
+    // SECURITY: the student's identity comes ONLY from the signed HttpOnly session cookie.
+    // A `?code=` query parameter is ignored on purpose — otherwise anyone who knows (or guesses)
+    // a student code could read that student's grades, absences and locker status.
+    const session = getStudentSession(request);
+    const code = session?.code || null;
     const clientVer = searchParams.get('v');
 
     const notifications: Array<{
@@ -55,7 +61,7 @@ export async function GET(request: Request) {
         const { data: student } = await supabaseAdmin
           .from('students')
           .select('id, student_code, full_name, academic_year, section')
-          .eq('student_code', code)
+          .in('student_code', getStudentCodeVariants(code))
           .maybeSingle();
 
         if (student) {

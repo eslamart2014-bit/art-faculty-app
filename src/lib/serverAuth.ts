@@ -179,7 +179,10 @@ export function verifyStudentSessionToken(token: string | null | undefined): Stu
 }
 
 export function getStudentSession(request: Request): StudentSession | null {
-  return verifyStudentSessionToken(parseCookies(request.headers.get('cookie'))[STUDENT_COOKIE]);
+  const customHeader = request.headers.get('x-student-token');
+  const bearer = getBearerToken(request);
+  const cookie = parseCookies(request.headers.get('cookie'))[STUDENT_COOKIE];
+  return verifyStudentSessionToken(customHeader || bearer || cookie);
 }
 
 function cookieBase() {

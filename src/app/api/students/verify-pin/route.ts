@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
-import { noStoreJson, setStudentSession } from '@/lib/serverAuth';
+import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/serverAuth';
 import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -166,6 +166,7 @@ export async function POST(request: Request) {
       success: true,
       message: 'تم تفعيل حسابك بنجاح ومرحباً بك في منظومة فنية!',
       student: safeStudent,
+      token: createStudentSessionToken(safeStudent.student_code, 180 * 24 * 60 * 60),
     });
     setStudentSession(response, safeStudent.student_code);
     return response;

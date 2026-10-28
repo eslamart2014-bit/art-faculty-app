@@ -88,6 +88,7 @@ export default function SystemPage() {
     } catch (e) {}
     return null;
   });
+  const [isClientReady, setIsClientReady] = useState(false);
   const [projectSubTab, setProjectSubTab] = useState<"required" | "submitted">("required");
   const [activeUploadStage, setActiveUploadStage] = useState<"stage1" | "stage2">("stage1");
   const [loading, setLoading] = useState(false);
@@ -539,6 +540,7 @@ export default function SystemPage() {
 
   // Restore Session or Impersonate on Mount
   useEffect(() => {
+    setIsClientReady(true);
     (async () => {
     if (typeof window !== "undefined") {
       try {
@@ -610,6 +612,7 @@ export default function SystemPage() {
               if (typeof window !== "undefined" && window.location.search) {
                 window.history.replaceState({}, '', window.location.pathname);
               }
+              if (sessionData.token) localStorage.setItem("fania_student_token", sessionData.token);
               await loadDashboard(sessionData.student_code);
               fetchCoordinators(sessionData.student_code);
               return;
@@ -618,7 +621,8 @@ export default function SystemPage() {
           // إذا انتهت الجلسة صراحة من الخادم (401/Unauthorized)
           if (sessionRes.status === 401) {
             localStorage.removeItem("fania_student_session");
-            localStorage.removeItem("fania_student_code");
+    localStorage.removeItem("fania_student_code");
+    localStorage.removeItem("fania_student_token");
             setCurrentStudent(null);
             setAccountStatus(null);
             setAuthMode("login");
@@ -723,9 +727,9 @@ export default function SystemPage() {
         setShowLoginPin(false);
         return true;
       }
-      // 9. If in login screen, return to register screen
-      if (!currentStudent && authMode === "login") {
-        setAuthMode("register");
+      // 9. If ID preview is open
+      if (tempIdCardPreview) {
+        setTempIdCardPreview(null);
         return true;
       }
       return false;
@@ -754,7 +758,8 @@ export default function SystemPage() {
       const bridge = (window as any).ArtEduNativeBridge;
       if (bridge) {
         if (currentStudent?.student_code) {
-          bridge.saveStudentSession(currentStudent.student_code, currentStudent.full_name || "");
+          const token = localStorage.getItem("fania_student_token") || "";
+          bridge.saveStudentSession(currentStudent.student_code, currentStudent.full_name || "", token);
         } else {
           bridge.clearStudentSession();
         }
@@ -1547,6 +1552,7 @@ export default function SystemPage() {
         setAccountStatus("active");
         localStorage.setItem("fania_student_session", JSON.stringify(safeSession));
         localStorage.setItem("fania_student_code", data.student.student_code);
+        if (data.token) localStorage.setItem("fania_student_token", data.token);
         setEnteredPin("");
         setSuccessMsg("🎉 تم تسجيل الدخول بنجاح! مرحباً بك في منظومة فنية.");
         loadDashboard(data.student.student_code);
@@ -1592,6 +1598,7 @@ export default function SystemPage() {
         };
         delete (updatedStudent as any).pin_code;
         localStorage.setItem("fania_student_session", JSON.stringify(updatedStudent));
+        if (data.token) localStorage.setItem("fania_student_token", data.token);
         setCurrentStudent(updatedStudent);
         setAccountStatus("active");
         setEnteredPin("");
@@ -4166,9 +4173,41 @@ export default function SystemPage() {
     );
   }
 
-  // ==========================================
+    // ==========================================
   // VIEW 3: شاشة تسجيل الدخول والتسجيل الجديد للطلاب (Auth Screen)
   // ==========================================
+  if (!isClientReady) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#0f172a",
+        color: "#fff",
+        padding: "20px",
+        direction: "rtl"
+      }}>
+        <div style={{
+          width: "68px",
+          height: "68px",
+          borderRadius: "20px",
+          overflow: "hidden",
+          marginBottom: "16px",
+          boxShadow: "0 10px 30px rgba(37, 99, 235, 0.4)"
+        }}>
+          <img src="/icon-192.png" alt="بوابة الطالب" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#f8fafc", marginBottom: "6px" }}>
+          بوابة الطالب — قسم التربية الفنية
+        </div>
+        <div style={{ fontSize: "12px", color: "#38bdf8" }}>
+          جاري فتح البوابة والتحقق من الحساب...
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "16px", maxWidth: "440px", margin: "0 auto", direction: "rtl" }}>
       

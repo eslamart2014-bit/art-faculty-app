@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
 import { localStore } from '@/lib/localFallbackStore';
 import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
-import { noStoreJson, setStudentSession } from '@/lib/serverAuth';
+import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/serverAuth';
 import { getClientIp, isRateLimited } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -233,7 +233,8 @@ export async function POST(request: Request) {
       status: 'active',
     };
 
-    const response = noStoreJson({ success: true, student: safeStudent });
+    const token = createStudentSessionToken(safeStudent.student_code, 180 * 24 * 60 * 60);
+    const response = noStoreJson({ success: true, student: safeStudent, token });
     setStudentSession(response, safeStudent.student_code);
     return response;
   } catch (err: any) {

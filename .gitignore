@@ -48,3 +48,16 @@ scratch/
 .local_portal_db.json
 .lockers_db.json
 
+
+# Android keystores, build artifacts and credentials
+*.jks
+*.keystore
+*.aab
+*.apk
+dist-apk/
+android-student/app/artedu-release-key.jks
+android-student/app/artedu-official-release.jks
+android-student/app/build/
+android-student/build/
+android-student/.gradle/
+android-student/local.properties

@@ -32,6 +32,8 @@ public class StudentNotificationWorker extends Worker {
     public static final String CHANNEL_NAME = "تنبيهات بوابة الطلاب";
     public static final String PREFS_NAME = "ArtEduStudentPrefs";
     public static final String KEY_STUDENT_CODE = "saved_student_code";
+    public static final String KEY_STUDENT_NAME = "saved_student_name";
+    public static final String KEY_STUDENT_TOKEN = "saved_student_token";
     public static final String KEY_SHOWN_NOTIFS = "shown_notification_ids";
 
     private static final String NOTIF_API_ENDPOINT = "https://art-faculty-app.vercel.app/api/students/notifications";
@@ -50,19 +52,31 @@ public class StudentNotificationWorker extends Worker {
 
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String studentCode = prefs.getString(KEY_STUDENT_CODE, "");
+            String studentToken = prefs.getString(KEY_STUDENT_TOKEN, "");
 
             String requestUrl = NOTIF_API_ENDPOINT + "?v=" + BuildConfig.VERSION_CODE;
-            if (studentCode != null && !studentCode.trim().isEmpty()) {
-                requestUrl += "&code=" + studentCode.trim();
-            }
 
-            // Fetch notifications from server
+            // Fetch notifications from server, authenticated with HMAC token and WebView cookies.
             URL url = new URL(requestUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
-            conn.setConnectTimeout(10000);
+            conn.setConnectTimeout(12000);
             conn.setReadTimeout(15000);
-            conn.setRequestProperty("User-Agent", "ArtEduStudentApp/1.0.4");
+            conn.setRequestProperty("User-Agent", "ArtEduStudentApp/" + BuildConfig.VERSION_NAME);
+
+            // Pass authentication token directly in headers for 100% reliable closed-app delivery
+            if (studentToken != null && !studentToken.trim().isEmpty()) {
+                conn.setRequestProperty("x-student-token", studentToken.trim());
+                conn.setRequestProperty("Authorization", "Bearer " + studentToken.trim());
+            }
+
+            // Also forward any available WebKit cookies as fallback
+            try {
+                String cookies = android.webkit.CookieManager.getInstance().getCookie("https://art-faculty-app.vercel.app");
+                if (cookies != null && !cookies.isEmpty() && studentCode != null && !studentCode.trim().isEmpty()) {
+                    conn.setRequestProperty("Cookie", cookies);
+                }
+            } catch (Exception ignored) {}
 
             int responseCode = conn.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -95,46 +109,11 @@ public class StudentNotificationWorker extends Worker {
                     prefs.edit().putStringSet(KEY_SHOWN_NOTIFS, shownIds).apply();
                 }
             }
-
             conn.disconnect();
             return Result.success();
         } catch (Exception e) {
-            // Silently retry on next scheduled interval
             return Result.retry();
         }
-    }
-
-    @SuppressLint("MissingPermission")
-    private void showNotification(Context context, int notificationId, String title, String message) {
-        try {
-            Intent intent = new Intent(context, MainActivity.class);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                    context,
-                    notificationId,
-                    intent,
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                            ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                            : PendingIntent.FLAG_UPDATE_CURRENT
-            );
-
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.app_icon)
-                    .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.app_icon))
-                    .setContentTitle(title)
-                    .setContentText(message)
-                    .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setDefaults(NotificationCompat.DEFAULT_ALL)
-                    .setAutoCancel(true)
-                    .setContentIntent(pendingIntent);
-
-            NotificationManagerCompat manager = NotificationManagerCompat.from(context);
-            manager.notify(notificationId, builder.build());
-        } catch (SecurityException ignored) {
-            // Notification permission might be denied on Android 13
-        } catch (Exception ignored) {}
     }
 
     public static void createNotificationChannel(Context context) {
@@ -144,7 +123,7 @@ public class StudentNotificationWorker extends Worker {
                     CHANNEL_NAME,
                     NotificationManager.IMPORTANCE_HIGH
             );
-            channel.setDescription("إشعارات بمواعيد تسليم المشاريع، رصد الدرجات، وتنبيهات الحضور والغياب");
+            channel.setDescription("إشعارات الحضور والمشاريع والدواليب والتحديثات الرسمية للطلاب");
             channel.enableVibration(true);
             channel.enableLights(true);
 
@@ -152,6 +131,40 @@ public class StudentNotificationWorker extends Worker {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void showNotification(Context context, int notificationId, String title, String message) {
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId,
+                intent,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                        : PendingIntent.FLAG_UPDATE_CURRENT
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.app_icon)
+                .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.app_icon))
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setDefaults(NotificationCompat.DEFAULT_ALL);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
+        try {
+            notificationManager.notify(notificationId, builder.build());
+        } catch (SecurityException ignored) {
+            // Android 13+ requires POST_NOTIFICATIONS permission
         }
     }
 }
