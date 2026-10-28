@@ -6,4 +6,9 @@
     <string name="exit_prompt">اضغط مرة أخرى للخروج من التطبيق</string>
     <string name="choose_photo_title">اختيار صورة اللوحة الفنية</string>
     <string name="permission_camera_denied">تم رفض إذن الكاميرا. يرجى تفعيله من إعدادات الهاتف لالتقاط صور الأعمال الفنية.</string>
+    <string name="update_available_title">🚀 يتوفر تحديث جديد للتطبيق</string>
+    <string name="btn_update_now">تحديث الآن 📲</string>
+    <string name="btn_later">لاحقاً</string>
+    <string name="downloading_update">جاري تنزيل التحديث في الخلفية...</string>
+    <string name="permission_install_unknown">يرجى السماح للتطبيق بتثبيت التحديثات الخارجية للمتابعة.</string>
 </resources>

@@ -62,8 +62,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/security/emergency-hardening'
         with:
-          tag_name: student-app-v1.0.1
-          name: "📱 تطبيق بوابة الطلاب - الإصدار v1.0.1"
+          tag_name: student-app-v1.0.2
+          name: "📱 تطبيق بوابة الطلاب - الإصدار v1.0.2"
           make_latest: true
           body: |
             ### تطبيق بوابة الطالب — قسم التربية الفنية 🎓

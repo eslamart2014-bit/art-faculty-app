@@ -718,6 +718,21 @@ export default function SystemPage() {
     authMode
   ]);
 
+  // Sync session with Native Android App for Background Notifications
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const bridge = (window as any).ArtEduNativeBridge;
+      if (bridge) {
+        if (currentStudent?.student_code) {
+          bridge.saveStudentSession(currentStudent.student_code, currentStudent.full_name || "");
+        } else {
+          bridge.clearStudentSession();
+        }
+      }
+    } catch (e) {}
+  }, [currentStudent?.student_code]);
+
   // PWA Install Prompt Listener for Android & Mobile
   useEffect(() => {
     const isNativeApp = navigator.userAgent.includes("ArtEduStudentApp");

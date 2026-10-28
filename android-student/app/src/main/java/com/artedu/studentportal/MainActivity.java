@@ -2,9 +2,14 @@ package com.artedu.studentportal;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -12,10 +17,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -38,16 +45,30 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final String TARGET_URL = "https://art-faculty-app.vercel.app/system";
+    private static final String APK_VERSION_ENDPOINT = "https://art-faculty-app.vercel.app/api/public/apk-version";
 
     private WebView webView;
     private ProgressBar progressBar;
@@ -69,17 +90,14 @@ public class MainActivity extends AppCompatActivity {
                     if (result.getResultCode() == RESULT_OK) {
                         Intent data = result.getData();
                         if (data != null && data.getData() != null) {
-                            // User picked a photo from Gallery/Files
                             results = new Uri[]{data.getData()};
                         } else if (data != null && data.getClipData() != null) {
-                            // Multiple files selected
                             int count = data.getClipData().getItemCount();
                             results = new Uri[count];
                             for (int i = 0; i < count; i++) {
                                 results[i] = data.getClipData().getItemAt(i).getUri();
                             }
                         } else if (mCameraPhotoUri != null) {
-                            // User took photo with Camera
                             results = new Uri[]{mCameraPhotoUri};
                         }
                     }
@@ -88,11 +106,12 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-    // Permission launcher for Camera
-    private final ActivityResultLauncher<String> requestPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                if (!isGranted) {
-                    Toast.makeText(this, R.string.permission_camera_denied, Toast.LENGTH_LONG).show();
+    // Multiple permission launcher (Camera & Notifications)
+    private final ActivityResultLauncher<String[]> permissionsLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+                Boolean cameraGranted = result.get(Manifest.permission.CAMERA);
+                if (cameraGranted != null && !cameraGranted) {
+                    Toast.makeText(this, R.string.permission_camera_denied, Toast.LENGTH_SHORT).show();
                 }
             });
 
@@ -101,10 +120,17 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // 1. Create Notification Channel & Schedule Background Worker (Runs even when closed!)
+        StudentNotificationWorker.createNotificationChannel(this);
+        scheduleBackgroundNotificationWorker();
+
         initViews();
         setupWebView();
         setupBackNavigation();
-        checkPermissions();
+        checkAndRequestPermissions();
+
+        // 2. Check for APK updates from server
+        checkAppUpdates();
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
@@ -155,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
 
         // 4. Custom User-Agent tag
         String defaultUA = settings.getUserAgentString();
-        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.0 (Android; Mobile)");
+        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.2 (Android; Mobile)");
 
         // 5. Caching Strategy
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -165,6 +191,9 @@ public class MainActivity extends AppCompatActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
         }
+
+        // 7. Native Bridge for Webapp interaction (Session sync & Immediate notification check)
+        webView.addJavascriptInterface(new NativeBridge(), "ArtEduNativeBridge");
 
         // WebChromeClient (Progress, File upload, Camera permission)
         webView.setWebChromeClient(new WebChromeClient() {
@@ -268,15 +297,190 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Handles opening external schemes like WhatsApp, Telegram, tel:, mailto:
+     * JavaScript Interface Bridge:
+     * Called by src/app/system/page.tsx when student logs in or logs out
      */
+    public class NativeBridge {
+        @JavascriptInterface
+        public void saveStudentSession(String studentCode, String studentName) {
+            if (studentCode != null && !studentCode.trim().isEmpty()) {
+                SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
+                prefs.edit().putString(StudentNotificationWorker.KEY_STUDENT_CODE, studentCode.trim()).apply();
+
+                // Instantly trigger an initial background notification check
+                OneTimeWorkRequest checkRequest = new OneTimeWorkRequest.Builder(StudentNotificationWorker.class).build();
+                WorkManager.getInstance(MainActivity.this).enqueue(checkRequest);
+            }
+        }
+
+        @JavascriptInterface
+        public void clearStudentSession() {
+            SharedPreferences prefs = getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE);
+            prefs.edit().remove(StudentNotificationWorker.KEY_STUDENT_CODE).apply();
+        }
+    }
+
+    /**
+     * Schedules WorkManager to run periodic notification checks every 15 minutes,
+     * EVEN WHEN THE APPLICATION IS COMPLETELY CLOSED OR SWIPED AWAY.
+     */
+    private void scheduleBackgroundNotificationWorker() {
+        Constraints constraints = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+
+        PeriodicWorkRequest periodicRequest = new PeriodicWorkRequest.Builder(
+                StudentNotificationWorker.class,
+                15, TimeUnit.MINUTES
+        ).setConstraints(constraints).build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "art_edu_student_periodic_sync",
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodicRequest
+        );
+    }
+
+    /**
+     * In-App Auto-Updater:
+     * Checks server for new APK version. Prompts student with changelog and downloads/installs APK directly.
+     */
+    private void checkAppUpdates() {
+        new Thread(() -> {
+            try {
+                URL url = new URL(APK_VERSION_ENDPOINT);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(6000);
+                conn.setReadTimeout(6000);
+
+                if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+
+                    JSONObject json = new JSONObject(sb.toString());
+                    int remoteVersionCode = json.optInt("versionCode", 0);
+                    String remoteVersionName = json.optString("versionName", "1.0.0");
+                    String downloadUrl = json.optString("downloadUrl", "");
+                    String changelog = json.optString("changelog", "تحسينات جديدة في الأداء وسرعة التطبيق.");
+                    boolean forceUpdate = json.optBoolean("forceUpdate", false);
+
+                    int currentVersionCode = BuildConfig.VERSION_CODE;
+
+                    if (remoteVersionCode > currentVersionCode && !downloadUrl.isEmpty()) {
+                        runOnUiThread(() -> promptUpdateDialog(remoteVersionName, changelog, downloadUrl, forceUpdate));
+                    }
+                }
+                conn.disconnect();
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
+    private void promptUpdateDialog(String versionName, String changelog, String downloadUrl, boolean forceUpdate) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(getString(R.string.update_available_title) + " (v" + versionName + ")");
+        builder.setMessage(changelog + "\n\nهل ترغب في التحديث الآن للاستفادة من أحدث الميزات؟");
+        builder.setCancelable(!forceUpdate);
+
+        builder.setPositiveButton(R.string.btn_update_now, (dialog, which) -> {
+            startApkDownloadAndInstall(downloadUrl, versionName);
+        });
+
+        if (!forceUpdate) {
+            builder.setNegativeButton(R.string.btn_later, (dialog, which) -> dialog.dismiss());
+        }
+
+        builder.show();
+    }
+
+    private void startApkDownloadAndInstall(String downloadUrl, String versionName) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!getPackageManager().canRequestPackageInstalls()) {
+                Toast.makeText(this, R.string.permission_install_unknown, Toast.LENGTH_LONG).show();
+                try {
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        Toast.makeText(this, R.string.downloading_update, Toast.LENGTH_SHORT).show();
+
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
+            request.setTitle("تحديث بوابة الطالب (v" + versionName + ")");
+            request.setDescription("جاري تنزيل التحديث الجديد...");
+            request.setMimeType("application/vnd.android.package-archive");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+
+            String fileName = "ArtEdu_Student_v" + versionName + ".apk";
+            File destinationFile = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName);
+            if (destinationFile.exists()) {
+                destinationFile.delete();
+            }
+            request.setDestinationUri(Uri.fromFile(destinationFile));
+
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (dm != null) {
+                long downloadId = dm.enqueue(request);
+
+                // Register receiver to trigger install when download completes
+                BroadcastReceiver onComplete = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                        if (id == downloadId) {
+                            unregisterReceiver(this);
+                            installApk(destinationFile);
+                        }
+                    }
+                };
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+                }
+            }
+        } catch (Exception e) {
+            // Fallback: Open download in browser
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
+                startActivity(intent);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void installApk(File apkFile) {
+        try {
+            if (apkFile != null && apkFile.exists()) {
+                Uri apkUri = FileProvider.getUriForFile(
+                        this,
+                        getApplicationContext().getPackageName() + ".fileprovider",
+                        apkFile
+                );
+
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر فتح ملف التثبيت", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private boolean handleUrlScheme(Uri uri) {
         String scheme = uri.getScheme();
         String host = uri.getHost();
 
         if (scheme == null) return false;
 
-        // External protocols: WhatsApp, Telegram, Phone, Email
         if (scheme.equalsIgnoreCase("whatsapp") || scheme.equalsIgnoreCase("tg") ||
                 scheme.equalsIgnoreCase("tel") || scheme.equalsIgnoreCase("mailto")) {
             try {
@@ -289,7 +493,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // External URLs: wa.me, t.me
         if (host != null && (host.contains("wa.me") || host.contains("t.me") || host.contains("telegram.me"))) {
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW, uri);
@@ -300,12 +503,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Restrict navigation: Keep within our domain and student portal
         if (host != null && host.contains("art-faculty-app.vercel.app")) {
-            return false; // Load in WebView
+            return false;
         }
 
-        // Open unknown external domains in external Chrome/browser
         if (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https")) {
             try {
                 Intent intent = new Intent(Intent.ACTION_VIEW, uri);
@@ -317,10 +518,6 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    /**
-     * Launches a native Android chooser allowing student to either capture a new photo with Camera
-     * or select an existing photo from the Gallery.
-     */
     private void launchPhotoChooserIntent() {
         Intent takePictureIntent = null;
 
@@ -369,11 +566,6 @@ public class MainActivity extends AppCompatActivity {
         return File.createTempFile(imageFileName, ".jpg", storageDir);
     }
 
-    /**
-     * Complete, robust Android Back Navigation:
-     * Supports Gesture Navigation (swiping from edges on Android 10-15),
-     * Soft Navigation bar buttons, and Physical hardware back buttons.
-     */
     private void setupBackNavigation() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
@@ -398,7 +590,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // 1. Evaluate web handler: closes any open modal, dialog, or switches back to home tab
         webView.evaluateJavascript(
             "(function() { " +
             "  try { " +
@@ -412,11 +603,9 @@ public class MainActivity extends AppCompatActivity {
             "})()",
             value -> {
                 if ("true".equalsIgnoreCase(value)) {
-                    // Handled inside the webapp (modal or tab closed smoothly)!
                     return;
                 }
 
-                // 2. Check if WebView has internal page history inside the portal
                 if (webView.canGoBack()) {
                     WebBackForwardList list = webView.copyBackForwardList();
                     int cur = list.getCurrentIndex();
@@ -429,7 +618,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                // 3. At root screen: double-tap to exit
                 long now = System.currentTimeMillis();
                 if (now - backPressedTime < 2000) {
                     finish();
@@ -441,9 +629,21 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
-    private void checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA);
+    private void checkAndRequestPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            boolean hasCamera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+            boolean hasNotif = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+
+            if (!hasCamera || !hasNotif) {
+                permissionsLauncher.launch(new String[]{
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.POST_NOTIFICATIONS
+                });
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                permissionsLauncher.launch(new String[]{Manifest.permission.CAMERA});
+            }
         }
     }
 
