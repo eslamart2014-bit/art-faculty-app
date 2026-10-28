@@ -66,8 +66,28 @@ export default function SystemPage() {
   // Navigation & Auth State
   const [authMode, setAuthMode] = useState<"register" | "login">("register");
   const [showLoginPin, setShowLoginPin] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState<any>(null);
-  const [accountStatus, setAccountStatus] = useState<"pending" | "active" | null>(null);
+  const [currentStudent, setCurrentStudent] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("fania_student_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.student_code) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  });
+  const [accountStatus, setAccountStatus] = useState<"pending" | "active" | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("fania_student_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.student_code) return parsed.status || "active";
+      }
+    } catch (e) {}
+    return null;
+  });
   const [projectSubTab, setProjectSubTab] = useState<"required" | "submitted">("required");
   const [activeUploadStage, setActiveUploadStage] = useState<"stage1" | "stage2">("stage1");
   const [loading, setLoading] = useState(false);
@@ -108,7 +128,19 @@ export default function SystemPage() {
 
   // Active Tab in Student Dashboard
   const [activeTab, setActiveTab] = useState<"attendance" | "evaluation" | "warnings" | "complaints" | "lockers">("evaluation");
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const savedData = localStorage.getItem("fania_cached_dashboard_data");
+      if (savedData) return JSON.parse(savedData);
+    } catch (e) {}
+    return null;
+  });
+  const [isOffline, setIsOffline] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("fania_last_sync_time") || "";
+  });
 
   // Course WhatsApp-Style Chat State
   const [selectedCourseForEval, setSelectedCourseForEval] = useState<any>(null);
@@ -544,7 +576,7 @@ export default function SystemPage() {
       }
     }
 
-    // 1. استعادة الجلسة: كوكي الطالب الآمن (HttpOnly) هو المصدر الوحيد لتأكيد الدخول
+    // 1. استعادة الجلسة والدخول الفوري المباشر (Instant Auto-Login & Offline-First)
     try {
       const saved = typeof window !== "undefined" ? localStorage.getItem("fania_student_session") : null;
       let savedSession: any = null;
@@ -555,56 +587,53 @@ export default function SystemPage() {
           savedSession = null;
         }
         if (!savedSession?.student_code) savedSession = null;
-        // إزالة أي أرقام سرية قديمة حُفظت في إصدارات سابقة من التطبيق
         if (savedSession?.pin_code) delete savedSession.pin_code;
       }
 
-      const sessionRes = await fetch("/api/students/session", { cache: "no-store", credentials: "same-origin" });
-      if (sessionRes.ok) {
-        const sessionData = await sessionRes.json();
-        if (sessionData?.authenticated && sessionData.student_code) {
-          // تنظيف أي بارامترات في الرابط مثل ?mode=register حتى لا تعلق الصفحة في وضع التسجيل
-          if (typeof window !== "undefined" && window.location.search) {
-            window.history.replaceState({}, '', window.location.pathname);
-          }
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("fania_pending_reg_code");
-            sessionStorage.removeItem("fania_prefetched_student");
-          }
-          await loadDashboard(sessionData.student_code);
-          fetchCoordinators(sessionData.student_code);
+      // إذا كانت هناك جلسة محفوظة للطالب: الدخول الفوري دون إظهار شاشة الدخول
+      if (savedSession?.student_code) {
+        setCurrentStudent(savedSession);
+        setAccountStatus(savedSession.status || "active");
+
+        // إذا كان الجهاز غير متصل بالإنترنت: اعرض البيانات المحفوظة محلياً فوراً
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          setIsOffline(true);
           return;
         }
-      }
 
-      // لا توجد جلسة موثقة على الخادم: لا دخول تلقائي إطلاقاً، ونمسح أي بيانات دخول/أرقام سرية قديمة من التخزين المحلي
-      localStorage.removeItem("fania_student_session");
-      localStorage.removeItem("fania_student_code");
-      localStorage.removeItem("fania_pending_reg_code");
-
-      if (savedSession?.student_code) {
-        setRegCode(savedSession.student_code);
-        setAuthMode("login");
-        const devInfo = getOrCreateDeviceInfo();
+        // إذا كان متصلاً بالإنترنت: نتحقق من السيرفر في الخلفية
         try {
-          const res = await fetch(`/api/students/lookup?code=${encodeURIComponent(savedSession.student_code)}&deviceId=${encodeURIComponent(devInfo.deviceId)}&_t=${Date.now()}`);
-          const data = await res.json();
-          if (data.isPending) {
-            setCurrentStudent({ ...savedSession, status: "pending" });
-            setAccountStatus("pending");
-          } else if (data.isNew) {
+          const sessionRes = await fetch("/api/students/session", { cache: "no-store", credentials: "same-origin" });
+          if (sessionRes.ok) {
+            const sessionData = await sessionRes.json();
+            if (sessionData?.authenticated && sessionData.student_code) {
+              if (typeof window !== "undefined" && window.location.search) {
+                window.history.replaceState({}, '', window.location.pathname);
+              }
+              await loadDashboard(sessionData.student_code);
+              fetchCoordinators(sessionData.student_code);
+              return;
+            }
+          }
+          // إذا انتهت الجلسة صراحة من الخادم (401/Unauthorized)
+          if (sessionRes.status === 401) {
+            localStorage.removeItem("fania_student_session");
+            localStorage.removeItem("fania_student_code");
             setCurrentStudent(null);
             setAccountStatus(null);
-            setAuthMode("register");
-            setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك.");
-          } else if (data.isAlreadyActive) {
-            setSuccessMsg("حسابك مفعل. يرجى إدخال الرقم السري لتسجيل الدخول.");
+            setAuthMode("login");
+            setRegCode(savedSession.student_code);
+            setErrorMsg("انتهت الجلسة. يرجى إدخال الرقم السري لتسجيل الدخول.");
+            return;
           }
-        } catch (e) {
-          setErrorMsg("تعذر التحقق من حالة الحساب. يرجى إدخال الرقم السري لتسجيل الدخول.");
+        } catch (netErr) {
+          // اتصال ضعيف أو تعذر الوصول للسيرفر: استمر في عرض البيانات المحلية كوضع أوفلاين
+          setIsOffline(true);
+          return;
         }
-        fetchCoordinators(savedSession.student_code);
-        return;
+      } else {
+        // لا يوجد حساب مسجل: فتح صفحة تسجيل الدخول تلقائياً
+        setAuthMode("login");
       }
     } catch (e) {}
 
@@ -731,6 +760,25 @@ export default function SystemPage() {
         }
       }
     } catch (e) {}
+  }, [currentStudent?.student_code]);
+
+  // Telecom-style Realtime Online/Offline Network Listener
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateOnline = () => {
+      const online = navigator.onLine;
+      setIsOffline(!online);
+      if (online && currentStudent?.student_code) {
+        loadDashboard(currentStudent.student_code);
+      }
+    };
+    setIsOffline(!navigator.onLine);
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
   }, [currentStudent?.student_code]);
 
   // PWA Install Prompt Listener for Android & Mobile
@@ -913,9 +961,28 @@ export default function SystemPage() {
           }
           setAccountStatus("active");
         }
+
+        // حفظ البيانات محلياً وتحديث وقت آخر مزامنة
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("fania_cached_dashboard_data", JSON.stringify(data));
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+            const dateStr = now.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+            const fullSync = `${timeStr} (${dateStr})`;
+            localStorage.setItem("fania_last_sync_time", fullSync);
+            setLastSyncTime(fullSync);
+            setIsOffline(false);
+          }
+        } catch (e) {}
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || "خطأ في الاتصال بالخادم");
+      if (typeof window !== "undefined" && localStorage.getItem("fania_cached_dashboard_data")) {
+        setIsOffline(true);
+        setErrorMsg("");
+      } else {
+        setErrorMsg(err?.message || "خطأ في الاتصال بالخادم");
+      }
     } finally {
       setLoading(false);
     }
@@ -1567,6 +1634,8 @@ export default function SystemPage() {
     localStorage.removeItem("fania_student_session");
     localStorage.removeItem("fania_student_code");
     localStorage.removeItem("fania_pending_reg_code");
+    localStorage.removeItem("fania_cached_dashboard_data");
+    localStorage.removeItem("fania_last_sync_time");
     setCurrentStudent(null);
     setAccountStatus(null);
     setDashboardData(null);
@@ -1972,6 +2041,63 @@ export default function SystemPage() {
             </button>
           </div>
         )}
+
+        {/* شريط حالة الاتصال ومزامنة البيانات (Telecom-style Offline/Sync Banner) */}
+        {isOffline ? (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(217, 119, 6, 0.12))",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
+            borderRadius: "14px",
+            padding: "9px 13px",
+            marginBottom: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: "12px",
+            color: "#fbbf24",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.25)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>📡</span>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "12px" }}>أنت غير متصل بالإنترنت</div>
+                <div style={{ fontSize: "10px", color: "rgba(251, 191, 36, 0.85)" }}>تتصفح البيانات المحفوظة محلياً على جهازك</div>
+              </div>
+            </div>
+            {lastSyncTime && (
+              <div style={{
+                textAlign: "left",
+                fontSize: "10.5px",
+                color: "#fef3c7",
+                background: "rgba(0,0,0,0.3)",
+                padding: "4px 8px",
+                borderRadius: "8px",
+                border: "1px solid rgba(245, 158, 11, 0.2)"
+              }}>
+                <span style={{ opacity: 0.8 }}>آخر تحديث: </span>
+                <span style={{ fontFamily: "monospace", direction: "ltr", display: "inline-block", fontWeight: 600 }}>{lastSyncTime}</span>
+              </div>
+            )}
+          </div>
+        ) : lastSyncTime ? (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "4px 8px",
+            marginBottom: "6px",
+            fontSize: "10.5px",
+            color: "#64748b"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }}></span>
+              <span style={{ color: "#94a3b8" }}>متصل بالخادم</span>
+            </div>
+            <div style={{ fontFamily: "monospace", direction: "ltr" }}>
+              آخر مزامنة: {lastSyncTime}
+            </div>
+          </div>
+        ) : null}
 
         {/* شريط أعلى منظم: دائرة الحساب، اسم الطالب وكوده بوضوح، وأزرار التحكم الثلاثة */}
         <div className="student-top-bar">

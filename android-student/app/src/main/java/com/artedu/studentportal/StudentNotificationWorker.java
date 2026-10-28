@@ -51,9 +51,9 @@ public class StudentNotificationWorker extends Worker {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String studentCode = prefs.getString(KEY_STUDENT_CODE, "");
 
-            String requestUrl = NOTIF_API_ENDPOINT;
+            String requestUrl = NOTIF_API_ENDPOINT + "?v=" + BuildConfig.VERSION_CODE;
             if (studentCode != null && !studentCode.trim().isEmpty()) {
-                requestUrl += "?code=" + studentCode.trim();
+                requestUrl += "&code=" + studentCode.trim();
             }
 
             // Fetch notifications from server
@@ -62,7 +62,7 @@ public class StudentNotificationWorker extends Worker {
             conn.setRequestMethod("GET");
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(15000);
-            conn.setRequestProperty("User-Agent", "ArtEduStudentApp/1.0.2");
+            conn.setRequestProperty("User-Agent", "ArtEduStudentApp/1.0.4");
 
             int responseCode = conn.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
