@@ -29,30 +29,33 @@ jobs:
           java-version: '17'
 
       - name: Prepare Signing Keystore
-        working-directory: android-student/app
         run: |
+          mkdir -p android-student/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "Using production keystore from repository secrets..."
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > artedu-official-release.jks
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android-student/app/artedu-official-release.jks
           else
             echo "Generating high-security official release keystore for CI build..."
-            keytool -genkeypair -v -keystore artedu-official-release.jks -alias artedu_release \
+            keytool -genkeypair -v -keystore android-student/app/artedu-official-release.jks -alias artedu_release \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass "artedu2026portal_secure" \
               -keypass "artedu2026portal_secure" \
+              -deststoretype pkcs12 \
               -dname "CN=Faculty of Art Education, OU=Helwan University, O=Faculty of Art Education, L=Zamalek, ST=Cairo, C=EG"
           fi
+          ls -la android-student/app/artedu-official-release.jks
 
       - name: Set up Gradle 8.4
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.4'
+          cache-disabled: true
 
       - name: Build with Gradle
         working-directory: android-student
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
-          KEYSTORE_FILE: artedu-official-release.jks
+          KEYSTORE_FILE: ${{ github.workspace }}/android-student/app/artedu-official-release.jks
           KEYSTORE_PASSWORD: artedu2026portal_secure
           KEY_ALIAS: artedu_release
           KEY_PASSWORD: artedu2026portal_secure

@@ -18,13 +18,13 @@ android {
 
     signingConfigs {
         release {
-            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "artedu-official-release.jks"
+            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "${projectDir}/artedu-official-release.jks"
             def keystoreFile = file(keystorePath)
             if (keystoreFile.exists()) {
                 storeFile keystoreFile
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: "artedu2026portal_secure"
-                keyAlias System.getenv("KEY_ALIAS") ?: "artedu_release"
-                keyPassword System.getenv("KEY_PASSWORD") ?: "artedu2026portal_secure"
+                storePassword(System.getenv("KEYSTORE_PASSWORD") ?: "artedu2026portal_secure")
+                keyAlias(System.getenv("KEY_ALIAS") ?: "artedu_release")
+                keyPassword(System.getenv("KEY_PASSWORD") ?: "artedu2026portal_secure")
                 v1SigningEnabled true
                 v2SigningEnabled true
             }
@@ -35,7 +35,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "artedu-official-release.jks"
+            def keystorePath = System.getenv("KEYSTORE_FILE") ?: "${projectDir}/artedu-official-release.jks"
             def keystoreFile = file(keystorePath)
             if (keystoreFile.exists()) {
                 signingConfig signingConfigs.release
