@@ -15,17 +15,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Top Loading Progress Bar -->
-    <ProgressBar
-        android:id="@+id/progressBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:indeterminate="false"
-        android:max="100"
-        android:progressDrawable="@drawable/progress_drawable"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent" />
+
 
     <!-- Offline Error View -->
     <LinearLayout

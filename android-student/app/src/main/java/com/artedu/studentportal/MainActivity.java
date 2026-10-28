@@ -27,15 +27,17 @@ import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebBackForwardList;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -56,7 +58,10 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -71,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String APK_VERSION_ENDPOINT = "https://art-faculty-app.vercel.app/api/public/apk-version";
 
     private WebView webView;
-    private ProgressBar progressBar;
     private LinearLayout offlineLayout;
     private Button btnRetry;
 
@@ -141,7 +145,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void initViews() {
         webView = findViewById(R.id.webView);
-        progressBar = findViewById(R.id.progressBar);
         offlineLayout = findViewById(R.id.offlineLayout);
         btnRetry = findViewById(R.id.btnRetry);
 
@@ -170,6 +173,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
+        // Hardware acceleration & seamless background
+        webView.setBackgroundColor(0xFF0F172A);
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
         // Enable smooth scrolling and scrollbars
         webView.setVerticalScrollBarEnabled(true);
         webView.setHorizontalScrollBarEnabled(false);
@@ -181,10 +188,14 @@ public class MainActivity extends AppCompatActivity {
 
         // 4. Custom User-Agent tag
         String defaultUA = settings.getUserAgentString();
-        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.3 (Android; Mobile)");
+        settings.setUserAgentString(defaultUA + " ArtEduStudentApp/1.0.4 (Android; Mobile)");
 
-        // 5. Caching Strategy
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // 5. Native Offline-First Caching Strategy
+        if (!isNetworkAvailable()) {
+            settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        } else {
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        }
 
         // 6. Cookies
         CookieManager.getInstance().setAcceptCookie(true);
@@ -195,18 +206,8 @@ public class MainActivity extends AppCompatActivity {
         // 7. Native Bridge for Webapp interaction (Session sync & Immediate notification check)
         webView.addJavascriptInterface(new NativeBridge(), "ArtEduNativeBridge");
 
-        // WebChromeClient (Progress, File upload, Camera permission)
+        // WebChromeClient (File upload, Camera permission - No browser progress bar!)
         webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress < 100) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(newProgress);
-                } else {
-                    progressBar.setVisibility(View.GONE);
-                }
-            }
-
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 if (mFilePathCallback != null) {
@@ -232,7 +233,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // WebViewClient (Navigation security, external apps, offline fallback)
+        // WebViewClient (Local-First Asset Interception, Offline Fallback)
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -247,6 +248,20 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                WebResourceResponse cachedStatic = handleResourceCaching(uri);
+                if (cachedStatic != null) {
+                    return cachedStatic;
+                }
+                WebResourceResponse cachedHtml = handleHtmlCaching(uri);
+                if (cachedHtml != null) {
+                    return cachedHtml;
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
+            @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 offlineLayout.setVisibility(View.GONE);
                 webView.setVisibility(View.VISIBLE);
@@ -254,14 +269,19 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                progressBar.setVisibility(View.GONE);
+                // Page ready - seamless native render
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
-                    webView.setVisibility(View.GONE);
-                    offlineLayout.setVisibility(View.VISIBLE);
+                    String currentUrl = view.getUrl();
+                    if (currentUrl == null || currentUrl.isEmpty() || currentUrl.equals("about:blank")) {
+                        webView.setVisibility(View.GONE);
+                        offlineLayout.setVisibility(View.VISIBLE);
+                    } else {
+                        Toast.makeText(MainActivity.this, "أنت تعمل حالياً في وضع عدم الاتصال", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
         });
@@ -642,5 +662,156 @@ public class MainActivity extends AppCompatActivity {
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         webView.saveState(outState);
+    }
+
+    /**
+     * Local Offline-First Asset Interceptor:
+     * Caches static JS chunks, CSS, fonts, and images in app private storage.
+     * Serves directly from flash memory with zero network delay and zero data usage.
+     */
+    private WebResourceResponse handleResourceCaching(Uri uri) {
+        if (uri == null) return null;
+        String url = uri.toString();
+
+        if (!url.contains("/_next/static/") && !url.contains("/api/media/") &&
+                !url.endsWith(".woff2") && !url.endsWith(".ttf") && !url.endsWith(".svg") &&
+                !url.endsWith(".png") && !url.endsWith(".jpg") && !url.endsWith(".jpeg") &&
+                !url.endsWith(".css") && !url.endsWith(".js")) {
+            return null;
+        }
+
+        try {
+            File cacheDir = new File(getCacheDir(), "web_assets_cache");
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs();
+            }
+
+            String filename = Integer.toHexString(url.hashCode()) + getExtension(url);
+            File localFile = new File(cacheDir, filename);
+
+            if (localFile.exists() && localFile.length() > 0) {
+                String mimeType = getMimeTypeFromUrl(url);
+                return new WebResourceResponse(mimeType, "UTF-8", new FileInputStream(localFile));
+            }
+
+            // Fetch from network and save to local disk cache
+            if (isNetworkAvailable()) {
+                URL netUrl = new URL(url);
+                HttpURLConnection connection = (HttpURLConnection) netUrl.openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(10000);
+                connection.setRequestProperty("User-Agent", "ArtEduStudentApp/1.0.4 (Android; Mobile)");
+
+                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                    InputStream in = connection.getInputStream();
+                    FileOutputStream out = new FileOutputStream(localFile);
+                    byte[] buffer = new byte[8192];
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+                    out.close();
+                    in.close();
+
+                    String mimeType = connection.getContentType();
+                    if (mimeType == null || mimeType.isEmpty()) {
+                        mimeType = getMimeTypeFromUrl(url);
+                    } else if (mimeType.contains(";")) {
+                        mimeType = mimeType.split(";")[0].trim();
+                    }
+                    return new WebResourceResponse(mimeType, "UTF-8", new FileInputStream(localFile));
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    /**
+     * Caches the main /system HTML so the portal UI opens immediately (0ms)
+     * even when there is no internet connection or weak signal.
+     */
+    private WebResourceResponse handleHtmlCaching(Uri uri) {
+        if (uri == null) return null;
+        String url = uri.toString();
+        if (!url.contains("art-faculty-app.vercel.app/system")) {
+            return null;
+        }
+
+        File cacheDir = new File(getFilesDir(), "html_cache");
+        if (!cacheDir.exists()) cacheDir.mkdirs();
+        File htmlFile = new File(cacheDir, "system_portal.html");
+
+        boolean isConnected = isNetworkAvailable();
+
+        // If offline and cached version exists, serve it instantly
+        if (!isConnected && htmlFile.exists() && htmlFile.length() > 0) {
+            try {
+                return new WebResourceResponse("text/html", "UTF-8", new FileInputStream(htmlFile));
+            } catch (Exception ignored) {}
+        }
+
+        // If online, update local copy in background for instant startup next time
+        if (isConnected) {
+            new Thread(() -> {
+                try {
+                    URL netUrl = new URL(url);
+                    HttpURLConnection conn = (HttpURLConnection) netUrl.openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(10000);
+                    conn.setRequestProperty("User-Agent", "ArtEduStudentApp/1.0.4 (Android; Mobile)");
+                    if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                        InputStream in = conn.getInputStream();
+                        FileOutputStream out = new FileOutputStream(htmlFile);
+                        byte[] buffer = new byte[8192];
+                        int read;
+                        while ((read = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, read);
+                        }
+                        out.close();
+                        in.close();
+                    }
+                    conn.disconnect();
+                } catch (Exception ignored) {}
+            }).start();
+        }
+
+        return null;
+    }
+
+    private boolean isNetworkAvailable() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                NetworkInfo info = cm.getActiveNetworkInfo();
+                return info != null && info.isConnected();
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
+
+    private String getMimeTypeFromUrl(String url) {
+        if (url.endsWith(".js")) return "application/javascript";
+        if (url.endsWith(".css")) return "text/css";
+        if (url.endsWith(".png")) return "image/png";
+        if (url.endsWith(".jpg") || url.endsWith(".jpeg")) return "image/jpeg";
+        if (url.endsWith(".svg")) return "image/svg+xml";
+        if (url.endsWith(".woff2")) return "font/woff2";
+        if (url.endsWith(".woff")) return "font/woff";
+        if (url.endsWith(".ttf")) return "font/ttf";
+        return "application/octet-stream";
+    }
+
+    private String getExtension(String url) {
+        int dot = url.lastIndexOf('.');
+        int q = url.indexOf('?');
+        if (dot != -1) {
+            if (q != -1 && q > dot) {
+                return url.substring(dot, q);
+            } else if (q == -1) {
+                return url.substring(dot);
+            }
+        }
+        return ".bin";
     }
 }
