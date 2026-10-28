@@ -1,5 +1,6 @@
 package com.artedu.studentportal;
 
+import android.annotation.SuppressLint;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -103,6 +104,7 @@ public class StudentNotificationWorker extends Worker {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private void showNotification(Context context, int notificationId, String title, String message) {
         try {
             Intent intent = new Intent(context, MainActivity.class);

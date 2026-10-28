@@ -398,6 +398,7 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private void startApkDownloadAndInstall(String downloadUrl, String versionName) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (!getPackageManager().canRequestPackageInstalls()) {
