@@ -214,6 +214,13 @@ export default function SystemPage() {
     }, 150);
   };
 
+  useEffect(() => {
+    if (showSelfieModal && selfieVideoRef.current && selfieStream) {
+      selfieVideoRef.current.srcObject = selfieStream;
+      selfieVideoRef.current.play().catch(() => {});
+    }
+  }, [showSelfieModal, selfieStream]);
+
   const captureSelfieFrame = () => {
     if (!selfieVideoRef.current) return null;
     const video = selfieVideoRef.current;
@@ -2304,71 +2311,80 @@ export default function SystemPage() {
         {/* شريط أعلى منظم: دائرة الحساب، اسم الطالب وكوده بوضوح، وأزرار التحكم الثلاثة */}
         <div className="student-top-bar">
           {/* قسم بيانات وهوية الطالب ودائرة الحساب */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
-            {/* الدائرة المخصصة للحساب مع شارة + لالتقاط صورة شخصية سيلفي */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, width: "100%" }}>
+            {/* الدائرة المخصصة للحساب مع علامة + كبيرة تملأ الدائرة بوضوح */}
             <div 
               onClick={handleOpenSelfieModal}
-              style={{ position: "relative", cursor: "pointer", flexShrink: 0 }}
+              style={{ 
+                position: "relative", 
+                cursor: "pointer", 
+                flexShrink: 0,
+                width: "44px",
+                height: "44px",
+                borderRadius: "50%",
+                background: (currentStudent?.avatar_url || currentStudent?.photo_url)
+                  ? "#0f172a"
+                  : "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                border: "2.5px solid #10b981",
+                boxShadow: "0 0 10px rgba(16, 185, 129, 0.45)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                transition: "transform 0.15s ease"
+              }}
               title="اضغط هنا لالتقاط أو تغيير صورتك الشخصية 📷"
             >
-              <div 
-                style={{ 
-                  width: "40px", 
-                  height: "40px", 
-                  minWidth: "40px", 
-                  borderRadius: "50%", 
-                  background: "linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%)", 
-                  border: "2px solid rgba(56, 189, 248, 0.5)",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
-                  display: "flex", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  color: "#fff", 
-                  fontWeight: "bold", 
-                  fontSize: "15px",
-                  overflow: "hidden"
-                }}
-              >
-                {currentStudent?.avatar_url || currentStudent?.photo_url ? (
+              {currentStudent?.avatar_url || currentStudent?.photo_url ? (
+                <>
                   <img 
                     src={currentStudent.avatar_url || currentStudent.photo_url} 
                     alt={currentStudent.full_name || "صورة الطالب"} 
                     style={{ width: "100%", height: "100%", objectFit: "cover" }} 
                   />
-                ) : (
-                  <span>{currentStudent.full_name?.trim()?.charAt(0) || <User size={18} />}</span>
-                )}
-              </div>
-              {/* شارة + الصغيرة على الدائرة */}
-              <div style={{
-                position: "absolute",
-                bottom: "-2px",
-                left: "-2px",
-                width: "16px",
-                height: "16px",
-                borderRadius: "50%",
-                background: "#10b981",
-                border: "2px solid #0f172a",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                fontSize: "11px",
-                fontWeight: "900",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
-              }}>
-                +
-              </div>
+                  {/* علامة + تملأ الدائرة بوضوح */}
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(0, 0, 0, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#ffffff",
+                    fontSize: "26px",
+                    fontWeight: "900",
+                    lineHeight: 1,
+                    textShadow: "0 2px 4px rgba(0,0,0,0.8)"
+                  }}>
+                    +
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: "100%",
+                  color: "#ffffff",
+                  fontSize: "30px",
+                  fontWeight: "900",
+                  lineHeight: 1,
+                  userSelect: "none"
+                }}>
+                  +
+                </div>
+              )}
             </div>
 
-            {/* الاسم الكامل والكود والفرقة بحجم متناسق مع شاشات الهواتف */}
+            {/* الاسم الكامل والكود والفرقة بحجم متناسق ومصغر مع شاشات الهواتف */}
             <div style={{ minWidth: 0, flex: 1 }}>
               <div 
                 style={{ 
                   color: "#ffffff", 
                   fontWeight: "bold", 
-                  fontSize: "13.5px", 
-                  lineHeight: "1.3",
+                  fontSize: "13px", 
+                  lineHeight: "1.25",
                   letterSpacing: "-0.2px",
                   wordBreak: "break-word"
                 }}
@@ -2378,10 +2394,10 @@ export default function SystemPage() {
               </div>
               <div style={{ 
                 color: "#38bdf8", 
-                fontSize: "11px", 
+                fontSize: "10.5px", 
                 display: "flex", 
                 alignItems: "center", 
-                gap: "5px", 
+                gap: "4px", 
                 flexWrap: "wrap",
                 marginTop: "2px",
                 lineHeight: "1.2"
@@ -2403,8 +2419,17 @@ export default function SystemPage() {
             </div>
           </div>
 
-          {/* مجموعة أزرار التحكم الثلاثة: رمز QR، تحديث، خروج */}
-          <div className="student-actions-group">
+          {/* مجموعة أزرار التحكم الثلاثة: متساوية العرض والارتفاع تماماً 1fr 1fr 1fr */}
+          <div 
+            className="student-actions-group"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "6px",
+              width: "100%",
+              marginTop: "4px"
+            }}
+          >
             {/* زر رمز QR */}
             <button 
               onClick={() => setShowQRModal(true)} 
@@ -2414,18 +2439,21 @@ export default function SystemPage() {
                 background: "rgba(16, 185, 129, 0.12)",
                 color: "#10b981",
                 border: "1px solid rgba(16, 185, 129, 0.3)",
-                borderRadius: "10px",
+                borderRadius: "8px",
                 cursor: "pointer",
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "5px",
-                fontSize: "12px",
+                gap: "4px",
+                fontSize: "11px",
                 fontWeight: "bold",
-                transition: "all 0.15s ease"
+                height: "32px",
+                width: "100%",
+                padding: "0 2px",
+                whiteSpace: "nowrap"
               }}
             >
-              <QrCode size={14} />
+              <QrCode size={13} />
               <span>رمز QR</span>
             </button>
 
@@ -2439,18 +2467,21 @@ export default function SystemPage() {
                 background: "rgba(56, 189, 248, 0.12)",
                 color: "#38bdf8",
                 border: "1px solid rgba(56, 189, 248, 0.3)",
-                borderRadius: "10px",
+                borderRadius: "8px",
                 cursor: "pointer",
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "5px",
-                fontSize: "12px",
+                gap: "4px",
+                fontSize: "11px",
                 fontWeight: "bold",
-                transition: "all 0.15s ease"
+                height: "32px",
+                width: "100%",
+                padding: "0 2px",
+                whiteSpace: "nowrap"
               }}
             >
-              <RotateCw size={14} className={loading ? "animate-spin" : ""} />
+              <RotateCw size={13} className={loading ? "animate-spin" : ""} />
               <span>تحديث</span>
             </button>
 
@@ -2463,18 +2494,21 @@ export default function SystemPage() {
                 background: "rgba(239, 68, 68, 0.12)",
                 color: "#f87171",
                 border: "1px solid rgba(239, 68, 68, 0.3)",
-                borderRadius: "10px",
+                borderRadius: "8px",
                 cursor: "pointer",
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "5px",
-                fontSize: "12px",
+                gap: "4px",
+                fontSize: "11px",
                 fontWeight: "bold",
-                transition: "all 0.15s ease"
+                height: "32px",
+                width: "100%",
+                padding: "0 2px",
+                whiteSpace: "nowrap"
               }}
             >
-              <LogOut size={14} />
+              <LogOut size={13} />
               <span>تسجيل خروج</span>
             </button>
           </div>
@@ -2698,13 +2732,13 @@ export default function SystemPage() {
                 )}
 
                 {/* شريط التبويب: المشروعات المطلوبة / المشروعات المُسلَّمة */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                   <button
                     onClick={() => setProjectSubTab("required")}
                     style={{
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      fontSize: "13px",
+                      padding: "8px 10px",
+                      borderRadius: "10px",
+                      fontSize: "12px",
                       fontWeight: "bold",
                       border: projectSubTab === "required" ? "2px solid #38bdf8" : "1px solid #2a374f",
                       background: projectSubTab === "required" ? "rgba(56, 189, 248, 0.16)" : "#141b29",
@@ -2712,7 +2746,7 @@ export default function SystemPage() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "8px",
+                      gap: "6px",
                       cursor: "pointer",
                       transition: "all 0.2s",
                       position: "relative"
@@ -2722,9 +2756,9 @@ export default function SystemPage() {
                     <span style={{
                       background: projectSubTab === "required" ? "#0284c7" : "rgba(255,255,255,0.1)",
                       color: "#fff",
-                      fontSize: "11px",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
+                      fontSize: "10.5px",
+                      padding: "1px 6px",
+                      borderRadius: "10px",
                       fontWeight: "bold"
                     }}>
                       {requiredProjects.length}
@@ -2734,10 +2768,10 @@ export default function SystemPage() {
                         background: "#ef4444",
                         color: "#fff",
                         borderRadius: "999px",
-                        minWidth: "18px",
-                        height: "18px",
-                        padding: "0 5px",
-                        fontSize: "10px",
+                        minWidth: "16px",
+                        height: "16px",
+                        padding: "0 4px",
+                        fontSize: "9px",
                         fontWeight: "900",
                         display: "inline-flex",
                         alignItems: "center",
@@ -2754,9 +2788,9 @@ export default function SystemPage() {
                   <button
                     onClick={() => setProjectSubTab("submitted")}
                     style={{
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      fontSize: "13px",
+                      padding: "8px 10px",
+                      borderRadius: "10px",
+                      fontSize: "12px",
                       fontWeight: "bold",
                       border: projectSubTab === "submitted" ? "2px solid #10b981" : "1px solid #2a374f",
                       background: projectSubTab === "submitted" ? "rgba(16, 185, 129, 0.16)" : "#141b29",
@@ -2764,7 +2798,7 @@ export default function SystemPage() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: "8px",
+                      gap: "6px",
                       cursor: "pointer",
                       transition: "all 0.2s",
                       position: "relative"
@@ -2774,9 +2808,9 @@ export default function SystemPage() {
                     <span style={{
                       background: projectSubTab === "submitted" ? "#059669" : "rgba(255,255,255,0.1)",
                       color: "#fff",
-                      fontSize: "11px",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
+                      fontSize: "10.5px",
+                      padding: "1px 6px",
+                      borderRadius: "10px",
                       fontWeight: "bold"
                     }}>
                       {submittedProjects.length}
@@ -2786,10 +2820,10 @@ export default function SystemPage() {
                         background: "#ef4444",
                         color: "#fff",
                         borderRadius: "999px",
-                        minWidth: "18px",
-                        height: "18px",
-                        padding: "0 5px",
-                        fontSize: "10px",
+                        minWidth: "16px",
+                        height: "16px",
+                        padding: "0 4px",
+                        fontSize: "9px",
                         fontWeight: "900",
                         display: "inline-flex",
                         alignItems: "center",
@@ -2806,7 +2840,7 @@ export default function SystemPage() {
 
                 {/* شبكة كروت المشاريع */}
                 {displayedProjects.length > 0 ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
                     {displayedProjects.map((proj: any) => {
                       const projKey = `${proj.courseId}_${proj.title || proj.id}`;
                       const seenRec = seenNotifications.seenProjects?.[projKey];
@@ -2830,13 +2864,13 @@ export default function SystemPage() {
                               ? "2px solid #ef4444" 
                               : (proj.isGraded ? "1px solid rgba(239, 68, 68, 0.6)" : "1px solid #2a374f"),
                             boxShadow: isCardUnread ? "0 0 16px rgba(239, 68, 68, 0.35)" : "none",
-                            borderRadius: "14px",
-                            padding: "16px",
+                            borderRadius: "12px",
+                            padding: "12px",
                             cursor: "pointer",
                             transition: "all 0.2s ease",
                             display: "flex",
                             flexDirection: "column",
-                            gap: "10px",
+                            gap: "8px",
                             position: "relative"
                           }}
                           onMouseEnter={(e) => {
@@ -2874,7 +2908,7 @@ export default function SystemPage() {
                           )}
                           {/* رأس الكارت: اسم المشروع وحالة الرفع والمؤقت */}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                            <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px", lineHeight: "1.4" }}>
+                            <div style={{ color: "#fff", fontWeight: "bold", fontSize: "13.5px", lineHeight: "1.3" }}>
                               🎨 {proj.title}
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
@@ -3535,192 +3569,142 @@ export default function SystemPage() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: ATTENDANCE (سجل الحضور والغياب مع تفاصيل التواريخ) */}
+        {/* TAB 2: ATTENDANCE (سجل الحضور والغياب مع جدول التواريخ التلقائي) */}
         {/* ========================================================= */}
         {activeTab === "attendance" && (
           <div className="animate-fade-in">
-            <h3 style={{ fontSize: "15px", color: "#fff", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <CalendarCheck size={18} color="#38bdf8" />
+            <h3 style={{ fontSize: "13.5px", color: "#fff", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <CalendarCheck size={16} color="#38bdf8" />
               <span>سجلات حضور المحاضرات والسكاشن:</span>
             </h3>
 
             {dashboardData?.attendance?.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {dashboardData.attendance.map((c: any) => {
-                  const isExpanded = expandedAttendanceCourseId === c.courseId;
-                  return (
-                    <div key={c.courseId} className="glass-card" style={{ padding: "16px", borderRadius: "14px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                          <span style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>{c.courseName}</span>
-                          {(c.instructorTitle || c.instructorName) && (
-                            <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "normal" }}>
-                              👨‍🏫 أستاذ المقرر: {c.instructorTitle || c.instructorName}
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ 
-                          fontSize: "12px", 
-                          padding: "4px 10px", 
-                          borderRadius: "8px", 
-                          background: c.rate >= 75 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                          color: c.rate >= 75 ? "#34d399" : "#f87171",
-                          fontWeight: "bold",
-                          border: c.rate >= 75 ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid rgba(239, 68, 68, 0.4)"
-                        }}>
-                          نسبة الحضور: {c.rate}%
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {dashboardData.attendance.map((c: any) => (
+                  <div key={c.courseId} className="glass-card" style={{ padding: "12px", borderRadius: "12px" }}>
+                    {/* رأس المقرر بدون نسبة الحضور */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13.5px" }}>{c.courseName}</span>
+                        {(c.instructorTitle || c.instructorName) && (
+                          <span style={{ fontSize: "10.5px", color: "#94a3b8", fontWeight: "normal" }}>
+                            👨‍🏫 أستاذ المقرر: {c.instructorTitle || c.instructorName}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: "10.5px",
+                        color: "#38bdf8",
+                        background: "rgba(56, 189, 248, 0.12)",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        border: "1px solid rgba(56, 189, 248, 0.25)"
+                      }}>
+                        {c.courseType === 'sections' ? 'سكشن عملي' : 'محاضرة'}
+                      </span>
+                    </div>
+
+                    {/* بطاقتان فقط متساويتان: حضور ✅ وغياب ❌ (بدون نسبة) */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                      {/* بطاقة الحضور */}
+                      <div style={{
+                        background: "rgba(16, 185, 129, 0.12)",
+                        border: "1px solid rgba(16, 185, 129, 0.35)",
+                        borderRadius: "10px",
+                        padding: "6px 4px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <span style={{ fontSize: "11.5px", fontWeight: "bold", color: "#34d399", marginBottom: "1px" }}>
+                          حضور ✅
+                        </span>
+                        <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
+                          {c.attended}
+                        </span>
+                        <span style={{ fontSize: "10px", color: "#a7f3d0", marginTop: "1px" }}>
+                          {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
                         </span>
                       </div>
 
-                      {/* بطاقات إحصائيات الحضور والغياب البارزة والواضحة للطالب */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "14px" }}>
-                        {/* بطاقة الحضور الكبيرة والواضحة */}
-                        <div style={{
-                          background: "rgba(16, 185, 129, 0.15)",
-                          border: "1.5px solid rgba(16, 185, 129, 0.45)",
-                          borderRadius: "12px",
-                          padding: "10px 6px",
-                          textAlign: "center",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          boxShadow: "0 4px 14px rgba(16, 185, 129, 0.12)"
-                        }}>
-                          <span style={{ fontSize: "15px", fontWeight: "900", color: "#34d399", marginBottom: "2px", letterSpacing: "0.3px" }}>
-                            حضور ✅
-                          </span>
-                          <span style={{ fontSize: "28px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
-                            {c.attended}
-                          </span>
-                          <span style={{ fontSize: "11px", color: "#a7f3d0", marginTop: "2px" }}>
-                            {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
-                          </span>
-                        </div>
-
-                        {/* بطاقة الغياب */}
-                        <div style={{
-                          background: "rgba(239, 68, 68, 0.1)",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                          borderRadius: "12px",
-                          padding: "10px 6px",
-                          textAlign: "center",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <span style={{ fontSize: "13px", fontWeight: "bold", color: "#f87171", marginBottom: "2px" }}>
-                            غياب ❌
-                          </span>
-                          <span style={{ fontSize: "24px", fontWeight: "bold", color: "#ffffff", lineHeight: "1.1" }}>
-                            {c.absent}
-                          </span>
-                          <span style={{ fontSize: "11px", color: "#fca5a5", marginTop: "2px" }}>
-                            {c.excused > 0 ? `(${c.excused} عذر)` : (c.courseType === 'sections' ? 'سكشن' : 'محاضرة')}
-                          </span>
-                        </div>
-
-                        {/* بطاقة نسبة الحضور والإجمالي */}
-                        <div style={{
-                          background: "rgba(56, 189, 248, 0.1)",
-                          border: "1px solid rgba(56, 189, 248, 0.3)",
-                          borderRadius: "12px",
-                          padding: "10px 6px",
-                          textAlign: "center",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}>
-                          <span style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "2px" }}>
-                            النسبة 📊
-                          </span>
-                          <span style={{ fontSize: "24px", fontWeight: "bold", color: "#ffffff", lineHeight: "1.1" }}>
-                            {c.rate}%
-                          </span>
-                          <span style={{ fontSize: "11px", color: "#93c5fd", marginTop: "2px" }}>
-                            من {c.total || c.totalLectures || (c.records?.length || 0)} {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
-                          </span>
-                        </div>
+                      {/* بطاقة الغياب */}
+                      <div style={{
+                        background: "rgba(239, 68, 68, 0.1)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        borderRadius: "10px",
+                        padding: "6px 4px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <span style={{ fontSize: "11.5px", fontWeight: "bold", color: "#f87171", marginBottom: "1px" }}>
+                          غياب ❌
+                        </span>
+                        <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
+                          {c.absent}
+                        </span>
+                        <span style={{ fontSize: "10px", color: "#fca5a5", marginTop: "1px" }}>
+                          {c.excused > 0 ? `(${c.excused} عذر)` : (c.courseType === 'sections' ? 'سكشن' : 'محاضرة')}
+                        </span>
                       </div>
+                    </div>
 
-                      {/* زر فتح/إغلاق التواريخ التفصيلية */}
-                      <button
-                        type="button"
-                        onClick={() => setExpandedAttendanceCourseId(isExpanded ? null : c.courseId)}
-                        className="btn-compact"
-                        style={{
-                          width: "100%",
-                          padding: "8px",
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          borderRadius: "8px",
-                          color: "#38bdf8",
-                          fontSize: "12px",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px"
-                        }}
-                      >
-                        <span>{isExpanded ? "إخفاء التفاصيل" : `عرض تفاصيل التواريخ وال${c.courseType === 'sections' ? 'سكاشن' : 'محاضرات'}`}</span>
-                        <span>{isExpanded ? "▲" : "▼"}</span>
-                      </button>
-
-                      {/* قائمة التواريخ التفصيلية */}
-                      {isExpanded && (
-                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {c.records && c.records.length > 0 ? (
-                            c.records.map((rec: any, rIdx: number) => {
-                              const isPresent = rec.status === "حاضر";
-                              const isExcused = rec.status === "إذن" || rec.status === "عذر";
-                              return (
-                                <div
-                                  key={rIdx}
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    background: isPresent ? "rgba(16, 185, 129, 0.06)" : isExcused ? "rgba(245, 158, 11, 0.06)" : "rgba(239, 68, 68, 0.06)",
-                                    border: isPresent ? "1px solid rgba(16, 185, 129, 0.2)" : isExcused ? "1px solid rgba(245, 158, 11, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)",
-                                    padding: "8px 12px",
-                                    borderRadius: "8px",
-                                    fontSize: "12px"
-                                  }}
-                                >
-                                  <span style={{ color: "#ffffff", fontWeight: "bold", fontSize: "13px" }}>
-                                    📅 {rec.formattedDate || rec.date}
-                                  </span>
-                                  <span style={{
-                                    fontWeight: "900",
-                                    fontSize: "13px",
-                                    padding: "3px 10px",
-                                    borderRadius: "8px",
-                                    background: isPresent ? "rgba(16, 185, 129, 0.25)" : isExcused ? "rgba(245, 158, 11, 0.25)" : "rgba(239, 68, 68, 0.25)",
-                                    color: isPresent ? "#34d399" : isExcused ? "#fbbf24" : "#f87171",
-                                    border: isPresent ? "1px solid #10b981" : isExcused ? "1px solid #f59e0b" : "1px solid #ef4444"
-                                  }}>
-                                    {isPresent ? "حاضر ✅" : isExcused ? "عذر 📝" : "غائب ❌"}
-                                  </span>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div style={{ color: "#94a3b8", fontSize: "11px", textAlign: "center", padding: "8px" }}>
-                              لا توجد تواريخ تفصيلية مسجلة لهذا المقرر.
-                            </div>
-                          )}
+                    {/* جدول تواريخ الحضور بشكل تلقائي تحت كل مقرر بدون أزرار فتح/إغلاق */}
+                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "8px" }}>
+                      <div style={{ fontSize: "10.5px", color: "#94a3b8", fontWeight: "bold", marginBottom: "6px" }}>
+                        📅 سجل التواريخ المفصلة:
+                      </div>
+                      {c.records && c.records.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          {c.records.map((rec: any, rIdx: number) => {
+                            const isPresent = rec.status === "حاضر";
+                            const isExcused = rec.status === "إذن" || rec.status === "عذر";
+                            return (
+                              <div
+                                key={rIdx}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  background: isPresent ? "rgba(16, 185, 129, 0.08)" : isExcused ? "rgba(245, 158, 11, 0.08)" : "rgba(239, 68, 68, 0.08)",
+                                  border: isPresent ? "1px solid rgba(16, 185, 129, 0.2)" : isExcused ? "1px solid rgba(245, 158, 11, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontSize: "11px"
+                                }}
+                              >
+                                <span style={{ color: "#ffffff", fontWeight: "600", fontSize: "11px" }}>
+                                  📅 {rec.formattedDate || rec.date}
+                                </span>
+                                <span style={{
+                                  fontWeight: "bold",
+                                  fontSize: "10.5px",
+                                  padding: "2px 8px",
+                                  borderRadius: "6px",
+                                  background: isPresent ? "rgba(16, 185, 129, 0.25)" : isExcused ? "rgba(245, 158, 11, 0.25)" : "rgba(239, 68, 68, 0.25)",
+                                  color: isPresent ? "#34d399" : isExcused ? "#fbbf24" : "#f87171"
+                                }}>
+                                  {isPresent ? "حاضر ✅" : isExcused ? "عذر 📝" : "غائب ❌"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ color: "#64748b", fontSize: "10.5px", textAlign: "center", padding: "6px" }}>
+                          لا توجد تواريخ تفصيلية مسجلة بعد.
                         </div>
                       )}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="glass-card" style={{ padding: "24px", textAlign: "center", color: "#94a3b8" }}>
+              <div className="glass-card" style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
                 لا توجد سجلات حضور مسجلة لك حتى الآن.
               </div>
             )}
@@ -4251,6 +4235,252 @@ export default function SystemPage() {
         </div>
       )}
 
+        {/* نافذة التقاط الصورة الشخصية السيلفي وحفظها على التليجرام */}
+        {showSelfieModal && (
+          <div style={{
+            position: "fixed",
+            inset: 0,
+            width: "100vw",
+            height: "100dvh",
+            maxHeight: "100dvh",
+            background: "#000",
+            zIndex: 999999,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            direction: "rtl"
+          }}>
+            {/* شريط العنوان وزر الإلغاء */}
+            <div style={{
+              flexShrink: 0,
+              padding: "10px 14px",
+              background: "rgba(0, 0, 0, 0.85)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+              zIndex: 10
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "16px" }}>🤳</span>
+                <span style={{ color: "#fff", fontSize: "13px", fontWeight: "bold" }}>التقاط صورة شخصية للحساب</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { stopSelfieCamera(); setShowSelfieModal(false); setSelfiePhoto(null); setSelfieMsg(""); }}
+                style={{
+                  background: "rgba(239, 68, 68, 0.25)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239, 68, 68, 0.5)",
+                  borderRadius: "8px",
+                  padding: "5px 10px",
+                  fontSize: "11px",
+                  fontWeight: "bold",
+                  cursor: "pointer"
+                }}
+              >
+                إلغاء ✕
+              </button>
+            </div>
+
+            {/* منطقة الكاميرا الحية أو المعاينة */}
+            <div style={{
+              flex: "1 1 0%",
+              minHeight: 0,
+              position: "relative",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#05070f"
+            }}>
+              {!selfiePhoto ? (
+                <>
+                  <video
+                    ref={selfieVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      transform: "scaleX(-1)"
+                    }}
+                  />
+                  {/* إطار دائري لتوجيه الوجه */}
+                  <div style={{
+                    position: "absolute",
+                    width: "220px",
+                    height: "220px",
+                    borderRadius: "50%",
+                    border: "3px dashed #10b981",
+                    boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 25px rgba(16, 185, 129, 0.4)",
+                    pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}>
+                    <span style={{
+                      color: "#34d399",
+                      fontSize: "11px",
+                      fontWeight: "bold",
+                      background: "rgba(0, 0, 0, 0.65)",
+                      padding: "4px 10px",
+                      borderRadius: "6px"
+                    }}>
+                      اضبط وجهك داخل الدائرة 👤
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px"
+                }}>
+                  <div style={{
+                    width: "200px",
+                    height: "200px",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: "3px solid #10b981",
+                    boxShadow: "0 0 25px rgba(16, 185, 129, 0.5)",
+                    marginBottom: "12px"
+                  }}>
+                    <img src={selfiePhoto} alt="معاينة الصورة الشخصية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                  <div style={{ color: "#34d399", fontSize: "12px", fontWeight: "bold" }}>
+                    تم التقاط صورتك بنجاح! جاهزة للحفظ ✅
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* رسالة الحالة إن وجدت */}
+            {selfieMsg && (
+              <div style={{
+                padding: "8px 12px",
+                background: "rgba(16, 185, 129, 0.15)",
+                color: "#34d399",
+                fontSize: "11px",
+                textAlign: "center",
+                fontWeight: "bold",
+                borderTop: "1px solid rgba(16, 185, 129, 0.3)"
+              }}>
+                {selfieMsg}
+              </div>
+            )}
+
+            {/* شريط التحكم السفلي */}
+            <div style={{
+              flexShrink: 0,
+              padding: "12px 16px",
+              paddingBottom: "max(18px, env(safe-area-inset-bottom, 18px))",
+              background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95), #070a12)",
+              borderTop: "1px solid rgba(16, 185, 129, 0.25)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "10px",
+              zIndex: 10
+            }}>
+              {!selfiePhoto ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const photo = captureSelfieFrame();
+                      if (photo) setSelfiePhoto(photo);
+                    }}
+                    style={{
+                      width: "64px",
+                      height: "64px",
+                      borderRadius: "50%",
+                      background: "#ffffff",
+                      border: "4px solid #10b981",
+                      boxShadow: "0 0 20px rgba(16, 185, 129, 0.7)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none"
+                    }}
+                    title="التقاط الصورة الشخصية"
+                  >
+                    <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "#059669" }} />
+                  </button>
+                  <span style={{ color: "#34d399", fontSize: "11px", fontWeight: "bold" }}>
+                    التقاط الصورة الشخصية 📸
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: "8px", width: "100%", maxWidth: "340px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelfiePhoto(null);
+                      setSelfieMsg("");
+                      startSelfieCamera();
+                    }}
+                    disabled={isSavingSelfie}
+                    style={{
+                      flex: 1,
+                      padding: "10px",
+                      background: "rgba(255, 255, 255, 0.1)",
+                      color: "#fff",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: "pointer"
+                    }}
+                  >
+                    إعادة التقاط 🔄
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveSelfie}
+                    disabled={isSavingSelfie}
+                    style={{
+                      flex: 1.4,
+                      padding: "10px",
+                      background: "linear-gradient(135deg, #10b981, #059669)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      cursor: isSavingSelfie ? "wait" : "pointer",
+                      boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px"
+                    }}
+                  >
+                    {isSavingSelfie ? (
+                      <>
+                        <RotateCw size={14} className="animate-spin" />
+                        <span>جاري الحفظ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={15} />
+                        <span>حفظ الصورة 💾</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </footer>
@@ -4692,242 +4922,6 @@ export default function SystemPage() {
       <footer style={{ textAlign: "center", paddingTop: "16px", color: "#64748b", fontSize: "11px" }}>
         جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
-
-      {/* نافذة التقاط الصورة الشخصية السيلفي وحفظها على التليجرام */}
-      {showSelfieModal && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          width: "100vw",
-          height: "100dvh",
-          maxHeight: "100dvh",
-          background: "#000",
-          zIndex: 999999,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          direction: "rtl"
-        }}>
-          {/* شريط العنوان وزر الإلغاء */}
-          <div style={{
-            flexShrink: 0,
-            padding: "12px 16px",
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-            zIndex: 10
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "16px" }}>🤳</span>
-              <span style={{ color: "#fff", fontSize: "13.5px", fontWeight: "bold" }}>التقاط صورة شخصية للحساب</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => { stopSelfieCamera(); setShowSelfieModal(false); setSelfiePhoto(null); setSelfieMsg(""); }}
-              style={{
-                background: "rgba(239, 68, 68, 0.25)",
-                color: "#ef4444",
-                border: "1px solid rgba(239, 68, 68, 0.5)",
-                borderRadius: "8px",
-                padding: "6px 12px",
-                fontSize: "12px",
-                fontWeight: "bold",
-                cursor: "pointer"
-              }}
-            >
-              إلغاء ✕
-            </button>
-          </div>
-
-          {/* منطقة الكاميرا الحية أو المعاينة */}
-          <div style={{
-            flex: "1 1 0%",
-            minHeight: 0,
-            position: "relative",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#05070f"
-          }}>
-            {!selfiePhoto ? (
-              <>
-                <video
-                  ref={selfieVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    transform: "scaleX(-1)"
-                  }}
-                />
-                {/* إطار دائري لتوجيه الوجه */}
-                <div style={{
-                  position: "absolute",
-                  width: "240px",
-                  height: "240px",
-                  borderRadius: "50%",
-                  border: "3px dashed #10b981",
-                  boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 25px rgba(16, 185, 129, 0.4)",
-                  pointerEvents: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}>
-                  <span style={{
-                    color: "#34d399",
-                    fontSize: "11px",
-                    fontWeight: "bold",
-                    background: "rgba(0, 0, 0, 0.65)",
-                    padding: "4px 10px",
-                    borderRadius: "6px"
-                  }}>
-                    اضبط وجهك داخل الدائرة 👤
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "20px"
-              }}>
-                <div style={{
-                  width: "220px",
-                  height: "220px",
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "4px solid #10b981",
-                  boxShadow: "0 0 30px rgba(16, 185, 129, 0.5)",
-                  marginBottom: "14px"
-                }}>
-                  <img src={selfiePhoto} alt="معاينة الصورة الشخصية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
-                <div style={{ color: "#34d399", fontSize: "13px", fontWeight: "bold" }}>
-                  تم التقاط صورتك بنجاح! جاهزة للحفظ ✅
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* رسالة الحالة إن وجدت */}
-          {selfieMsg && (
-            <div style={{
-              padding: "8px 14px",
-              background: "rgba(16, 185, 129, 0.15)",
-              color: "#34d399",
-              fontSize: "12px",
-              textAlign: "center",
-              fontWeight: "bold",
-              borderTop: "1px solid rgba(16, 185, 129, 0.3)"
-            }}>
-              {selfieMsg}
-            </div>
-          )}
-
-          {/* شريط التحكم السفلي */}
-          <div style={{
-            flexShrink: 0,
-            padding: "16px 20px",
-            paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
-            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95), #070a12)",
-            borderTop: "1px solid rgba(16, 185, 129, 0.25)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "12px",
-            zIndex: 10
-          }}>
-            {!selfiePhoto ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const photo = captureSelfieFrame();
-                    if (photo) setSelfiePhoto(photo);
-                  }}
-                  style={{
-                    width: "72px",
-                    height: "72px",
-                    borderRadius: "50%",
-                    background: "#ffffff",
-                    border: "5px solid #10b981",
-                    boxShadow: "0 0 25px rgba(16, 185, 129, 0.8)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    outline: "none"
-                  }}
-                  title="التقاط الصورة الشخصية"
-                >
-                  <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#059669" }} />
-                </button>
-                <span style={{ color: "#34d399", fontSize: "12px", fontWeight: "bold" }}>
-                  التقاط الصورة الشخصية 📸
-                </span>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: "10px", width: "100%", maxWidth: "360px" }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelfiePhoto(null);
-                    setSelfieMsg("");
-                    startSelfieCamera();
-                  }}
-                  disabled={isSavingSelfie}
-                  style={{
-                    flex: 1,
-                    padding: "12px",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    color: "#fff",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    borderRadius: "10px",
-                    fontSize: "13px",
-                    fontWeight: "bold",
-                    cursor: "pointer"
-                  }}
-                >
-                  إعادة التقاط 🔄
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveSelfie}
-                  disabled={isSavingSelfie}
-                  style={{
-                    flex: 1.4,
-                    padding: "12px",
-                    background: "linear-gradient(135deg, #10b981, #059669)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "10px",
-                    fontSize: "13px",
-                    fontWeight: "bold",
-                    cursor: isSavingSelfie ? "wait" : "pointer",
-                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <span>{isSavingSelfie ? "جاري الحفظ..." : "حفظ الصورة 💾"}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* نافذة كاميرا بطاقة الهوية الذكية المتوافقة مع جميع شاشات الهواتف */}
       {showIdCamera && (
