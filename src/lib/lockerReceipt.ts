@@ -32,72 +32,66 @@ export function getLockerReceiptPaperHtml(data: LockerReceiptData): string {
   const names = data.studentNames || [];
   const capacity = Math.max(names.length, 4);
 
-  // توليد صفوف جدول الأسماء
+  // توليد صفوف جدول الأسماء - التنسيق الأصلي
   const rowsHtml = names
     .map((name, idx) => `
     <tr>
-      <td style="border: 2px solid #000; padding: 8px 6px; text-align: center; font-weight: 800; font-size: 14px; width: 10%; color: #000;">${idx + 1}</td>
-      <td style="border: 2px solid #000; padding: 8px 14px; text-align: right; font-weight: 800; font-size: 15px; width: 60%; color: #000;">${name}</td>
-      <td style="border: 2px solid #000; padding: 8px 6px; text-align: center; color: #555; font-size: 13px; width: 30%;">................................</td>
+      <td style="border: 1px solid #000; padding: 8px; text-align: center; color: #000; font-weight: bold;">${idx + 1}</td>
+      <td style="border: 1px solid #000; padding: 8px 15px 8px 8px; text-align: right; color: #000; font-weight: bold;">${name}</td>
+      <td style="border: 1px solid #000; padding: 8px; text-align: center; color: #666;">................................</td>
     </tr>
   `)
     .join('');
 
-  // توليد محتوى مستطيل الأسماء للقص واللصق على الدولاب
-  const rowHeight = Math.floor(160 / capacity);
+  // توليد محتوى مستطيل الأسماء للقص واللصق - التنسيق الأصلي
+  const rowHeight = Math.floor(151 / capacity);
   const namesBoxHtml = names
-    .map((name) => `<div style="border-bottom: 2px solid #000; height: ${rowHeight}px; line-height: ${rowHeight}px; display: flex; align-items: center; justify-content: center; padding: 0 8px; font-weight: 800; font-size: 14px; color: #000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box;">${name}</div>`)
+    .map((name, idx) => `
+      <div style="border-bottom: ${idx === names.length - 1 ? 'none' : '2px solid #000'}; height: ${rowHeight}px; line-height: ${rowHeight}px; display: flex; align-items: center; justify-content: center; padding: 0 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box; color: #000; font-size: 16px; font-weight: bold;">
+        ${name}
+      </div>
+    `)
     .join('');
 
   return `
-    <div style="width: 794px; min-height: 1115px; background: #ffffff; color: #000000; padding: 35px 40px; box-sizing: border-box; font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; direction: rtl; text-align: center; margin: 0 auto;">
-      <!-- الترويسة العليا -->
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000000; padding-bottom: 12px; margin-bottom: 16px;">
-        <div style="text-align: right; line-height: 1.4;">
-          <div style="font-size: 15px; font-weight: 800; color: #000;">جامعة قنا</div>
-          <div style="font-size: 15px; font-weight: 800; color: #111;">كلية التربية النوعية</div>
-          <div style="font-size: 15px; font-weight: 800; color: #111;">قسم التربية الفنية</div>
-        </div>
-        <div style="text-align: center;">
-          <div style="width: 52px; height: 52px; border: 2px solid #000; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; background: #f8fafc;">
-            🎨
-          </div>
-        </div>
-        <div style="text-align: left; font-size: 13px; font-weight: 800; line-height: 1.6; color: #000;">
-          <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
-          <div>مشرف النظام: ${supervisor}</div>
-        </div>
+    <div style="width: 794px; min-height: 1120px; background: #ffffff; color: #000000; padding: 40px; box-sizing: border-box; font-family: 'Cairo', 'Amiri', 'Segoe UI', Tahoma, sans-serif; direction: rtl; text-align: center; margin: 0 auto; position: relative;">
+      
+      <!-- الترويسة العليا الأصلية -->
+      <div style="position: relative; min-height: 24px; margin-bottom: 8px;">
+        <div style="position: absolute; left: 0; top: 0; font-size: 13px; font-weight: bold; color: #000;">مشرف النظام: ${supervisor}</div>
+        <div style="position: absolute; right: 0; top: 0; font-size: 13px; font-weight: bold; color: #000;">تاريخ التسجيل: ${dateStr}</div>
       </div>
 
-      <h2 style="font-size: 22px; font-weight: 900; margin: 12px 0 16px 0; text-decoration: underline; color: #000; letter-spacing: 0.5px;">
-        استمارة تسجيل وتخصيص دولاب طلاب
-      </h2>
+      <h3 style="margin: 0; font-weight: bold; font-size: 20px; color: #000;">جامعة قنا</h3>
+      <h4 style="margin: 2px 0; font-weight: 600; font-size: 16px; color: #000;">كلية التربية النوعية</h4>
+      <h4 style="margin: 2px 0; font-weight: 600; font-size: 16px; color: #000;">قسم التربية الفنية</h4>
+      <h3 style="margin: 6px 0 16px 0; font-weight: bold; font-size: 20px; text-decoration: underline; color: #000;">استمارة تسجيل دولاب</h3>
 
-      <!-- جدول بيانات الدولاب الأساسية -->
-      <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; font-weight: bold; border: 2px solid #000;">
+      <!-- جدول بيانات الدولاب الأساسية الأصلي -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 15px; font-weight: bold; border: 1px solid #000;">
         <thead>
-          <tr style="background-color: #f1f5f9;">
-            <th style="border: 2px solid #000; padding: 10px; width: 33%; font-size: 15px; color: #000;">الفرقة الدراسية</th>
-            <th style="border: 2px solid #000; padding: 10px; width: 34%; background-color: #e0f2fe; color: #0369a1; font-size: 15px;">كود الدولاب</th>
-            <th style="border: 2px solid #000; padding: 10px; width: 33%; font-size: 15px; color: #000;">رقم هاتف المندوب</th>
+          <tr style="background-color: #f2f2f2;">
+            <th style="border: 1px solid #000; padding: 8px; width: 33%; text-align: center; color: #000;">الفرقة</th>
+            <th style="border: 1px solid #000; padding: 8px; width: 33%; text-align: center; color: #000;">كود الدولاب</th>
+            <th style="border: 1px solid #000; padding: 8px; width: 34%; text-align: center; color: #000;">رقم الموبايل</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border: 2px solid #000; padding: 10px; font-size: 16px; font-weight: 800; color: #000;">${data.cohort || 'عام'}</td>
-            <td style="border: 2px solid #000; padding: 10px; font-size: 28px; font-weight: 900; color: #0284c7; background: #fff;">${data.lockerCode}</td>
-            <td style="border: 2px solid #000; padding: 10px; font-size: 16px; font-weight: 800; direction: ltr; color: #000;">${data.phone}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: center; color: #000;">${data.cohort || 'عام'}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 22px; font-weight: 900; color: #000;">${data.lockerCode}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: center; color: #000; direction: ltr;">${data.phone}</td>
           </tr>
         </tbody>
       </table>
 
-      <!-- جدول أسماء الطلاب المشتركين والتوقيعات -->
-      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; font-weight: bold; border: 2px solid #000;">
+      <!-- جدول أسماء الطلاب المشتركين والتوقيعات الأصلي -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 15px; font-weight: bold; border: 1px solid #000;">
         <thead>
-          <tr style="background-color: #f1f5f9;">
-            <th style="border: 2px solid #000; padding: 8px; width: 10%; color: #000; font-size: 14px;">م</th>
-            <th style="border: 2px solid #000; padding: 8px 14px; width: 60%; text-align: right; color: #000; font-size: 14px;">اسم الطالب المشترك</th>
-            <th style="border: 2px solid #000; padding: 8px; width: 30%; color: #000; font-size: 14px;">التوقيع بالاستلام</th>
+          <tr style="background-color: #f2f2f2;">
+            <th style="border: 1px solid #000; padding: 8px; width: 10%; text-align: center; color: #000;">#</th>
+            <th style="border: 1px solid #000; padding: 8px; width: 60%; text-align: center; color: #000;">الاسم</th>
+            <th style="border: 1px solid #000; padding: 8px; width: 30%; text-align: center; color: #000;">التوقيع</th>
           </tr>
         </thead>
         <tbody>
@@ -105,31 +99,32 @@ export function getLockerReceiptPaperHtml(data: LockerReceiptData): string {
         </tbody>
       </table>
 
-      <!-- الإقرار والتعهد -->
-      <p style="font-size: 13.5px; margin: 18px 0 12px 0; font-weight: 800; color: #111; line-height: 1.6; text-align: justify; text-align-last: center;">
-        ⚠️ <strong>إقرار وتعهد:</strong> نقر نحن الطلاب المذكورة أسماؤنا أعلاه باستلام الدولاب الموضح كوده بحالة سليمة ونلتزم بالمحافظة التامة عليه ونظافته، وفي حالة حدوث أي تلفيات نتحمل كامل تكاليف الإصلاح.
+      <!-- الإقرار والتعهد الأصلي -->
+      <p style="font-size: 14px; margin-top: 14px; margin-bottom: 20px; font-weight: bold; color: #000; text-align: center;">
+        نقر نحن المذكور أسماؤنا باستلام الدولاب والمحافظة عليه، وفي حالة التلف نتكفل بإصلاحه.
       </p>
 
-      <!-- خط القص -->
-      <div style="border-top: 2px dashed #000000; margin: 24px 0 12px 0;"></div>
-      <div style="font-size: 13px; font-weight: 800; color: #0284c7; margin-bottom: 14px;">
-        ✂️ يتم قص هذا الجزء ولصقه على باب الدولاب من الخارج لتعريف أصحابه
-      </div>
+      <!-- خط القص الأصلي -->
+      <div style="border-top: 1px dashed #000; margin: 25px 0;"></div>
 
-      <!-- بطاقة الكود والأسماء للقص -->
-      <div style="display: flex; justify-content: center; align-items: stretch; gap: 14px; margin-top: 10px;">
-        <div style="border: 3px double #000; width: 160px; height: 160px; font-size: 46px; font-weight: 900; display: flex; align-items: center; justify-content: center; background: #fafafa; color: #000; flex-shrink: 0;">
+      <p style="margin: 10px 0 15px 0; font-size: 13px; font-weight: bold; color: #000; text-align: center;">
+        ✂️ قص هذا الجزء والصقه على الدولاب
+      </p>
+
+      <!-- المربع والمستطيل للقص الأصلي -->
+      <div style="display: flex; justify-content: center; align-items: flex-start; gap: 10px; margin-top: 10px;">
+        <div style="border: 3px double #000; width: 151px; height: 151px; font-size: 42px; font-weight: 900; line-height: 151px; text-align: center; background: #fff; color: #000; flex-shrink: 0; box-sizing: border-box;">
           ${data.lockerCode}
         </div>
-        <div style="border: 3px double #000; flex: 1; height: 160px; background: #fafafa; display: flex; flex-direction: column;">
+        <div style="border: 3px double #000; width: 340px; height: 151px; text-align: center; font-size: 16px; font-weight: bold; background: #fff; color: #000; display: flex; flex-direction: column; box-sizing: border-box;">
           ${namesBoxHtml}
         </div>
       </div>
 
-      <!-- تذييل الاستمارة وتوقيع المشرف -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #999; font-size: 13px; font-weight: 800; color: #000;">
+      <!-- التاريخ وتوقيع المشرف في الأسفل الأصلي -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px; font-size: 13px; font-weight: bold; color: #000;">
         <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
-        <div>توقيع مشرف المنظومة: ...........................................</div>
+        <div>توقيع مشرف النظام: .......................................................</div>
       </div>
     </div>
   `;
