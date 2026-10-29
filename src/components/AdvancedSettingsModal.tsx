@@ -4,6 +4,7 @@ import QRScanner from "@/components/QRScanner";
 
 import { extractStudentCode, sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, normalizeAcademicYear } from "@/lib/scannerHelper";
 import LockerAdminTab from "./lockers/LockerAdminTab";
+import { staffFetch } from "@/lib/staffAuthFetch";
 
 interface AdvancedSettingsModalProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
   const fetchAppStats = async () => {
     setLoadingAppStats(true);
     try {
-      const res = await fetch("/api/admin/portal/settings?_t=" + Date.now());
+      const res = await staffFetch("/api/admin/portal/settings?_t=" + Date.now());
       if (res.ok) {
         const json = await res.json();
         if (json?.app_stats) setAppStats(json.app_stats);
@@ -77,7 +78,7 @@ export default function AdvancedSettingsModal({ isOpen, onClose, user, onOpenRos
     setSavingMigrationScreen(true);
     try {
       const nextVal = !studentMigrationScreen;
-      const res = await fetch("/api/admin/portal/settings", {
+      const res = await staffFetch("/api/admin/portal/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ student_migration_screen: nextVal })

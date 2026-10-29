@@ -62,7 +62,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       }
     }
 
-    if (isApp) {
+    if (isAndroidAppClient()) {
       setIsAndroidApp(true);
       setRoleMode("student");
     }
@@ -369,9 +369,24 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       // Login Successful! Store student session and redirect
       if (typeof window !== "undefined") {
         localStorage.setItem("fania_student_session", JSON.stringify(data.student));
-        localStorage.setItem("fania_student_code", data.student.student_code || formatStudentCode(studentCode));
+        const finalCode = data.student.student_code || formatStudentCode(studentCode);
+        localStorage.setItem("fania_student_code", finalCode);
         localStorage.setItem("fania_last_portal", "/system");
         localStorage.setItem("fania_app_mode", "student");
+
+        if (isAndroidAppClient()) {
+          fetch('/api/students/track-install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              student_code: finalCode,
+              action: 'install',
+              version: '1.0.6',
+              source: 'android_native_app_login'
+            })
+          }).catch(() => {});
+        }
+
         window.location.href = "/system";
       }
     } catch (e: any) {

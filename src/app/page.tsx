@@ -19,14 +19,11 @@ import SuggestionsChatModal from "@/components/SuggestionsChatModal";
 import AdminUsersModal from "@/components/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
 import StudentPortalHubModal from "@/components/StudentPortalHubModal";
+import { syncStaffSessionClient } from "@/lib/staffAuthFetch";
 
 function syncStaffSession(accessToken?: string | null) {
-  if (!accessToken || typeof window === 'undefined') return;
-  fetch('/api/auth/session', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: 'same-origin',
-  }).catch(() => {});
+  if (typeof window === 'undefined') return;
+  syncStaffSessionClient(accessToken || undefined).catch(() => {});
 }
 
 function clearStaffSessionCookie() {

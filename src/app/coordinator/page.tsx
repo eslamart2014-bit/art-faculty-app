@@ -23,6 +23,7 @@ import {
   UserCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { staffFetch, syncStaffSessionClient } from "@/lib/staffAuthFetch";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
@@ -55,47 +56,18 @@ export default function CoordinatorPortalPage() {
     };
   }, []);
 
-  // دالة موحدة لإرسال عمليات المنسق مع التوكن المعتمد
+  // دالة موحدة ومؤمنة بالكامل لإرسال عمليات المنسق
   const sendCoordinatorAction = async (payload: any) => {
-    let token = "";
-    try {
-      const { data } = await supabase.auth.getSession();
-      token = data?.session?.access_token || "";
-    } catch (e) {}
-
-    // فحص بديل مباشر من localStorage لتوكن Supabase
-    if (!token && typeof window !== "undefined") {
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
-            const val = localStorage.getItem(key);
-            if (val) {
-              const parsed = JSON.parse(val);
-              token = parsed?.access_token || parsed?.currentSession?.access_token || "";
-              if (token) break;
-            }
-          }
-        }
-      } catch (e) {}
-    }
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    return fetch("/api/coordinator/action", {
+    return staffFetch("/api/coordinator/action", {
       method: "POST",
-      headers,
-      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     });
   };
 
-  // التحقق من صلاحية المستخدم
+  // التحقق من صلاحية المستخدم وتجديد الجلسة
   useEffect(() => {
     const checkAuth = async () => {
       // تحميل فوري من الملف الشخصي المحفوظ
@@ -108,15 +80,10 @@ export default function CoordinatorPortalPage() {
         }
       } catch (e) {}
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        fetch('/api/auth/session', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
-          credentials: 'same-origin',
-        }).catch(() => {});
-      }
+      // مزامنة فورية للجلسة مع الخادم
+      await syncStaffSessionClient().catch(() => {});
 
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
       const { data: profile } = await supabase

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import {
   clearStaffSession,
+  createStaffSessionToken,
   getStaffContext,
-  jwtExpirySeconds,
   noStoreJson,
   setStaffSession,
 } from '@/lib/serverAuth';
@@ -26,8 +26,15 @@ export async function POST(request: Request) {
     return noStoreJson({ error: 'جلسة غير صالحة' }, { status: 401 });
   }
 
-  const response = noStoreJson({ success: true, profile: safeProfile(ctx) });
-  setStaffSession(response, ctx.token, jwtExpirySeconds(ctx.token));
+  // Issue durable 7-day server signed session token
+  const signedToken = createStaffSessionToken(ctx.user.id, ctx.role, 7 * 24 * 3600);
+  const response = noStoreJson({
+    success: true,
+    profile: safeProfile(ctx),
+    token: signedToken
+  });
+
+  setStaffSession(response, signedToken, 7 * 24 * 3600, request);
   return response;
 }
 
@@ -39,9 +46,9 @@ export async function GET(request: Request) {
   return noStoreJson({ success: true, profile: safeProfile(ctx) });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const response = NextResponse.json({ success: true });
-  clearStaffSession(response);
+  clearStaffSession(response, request);
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireCoordinator, noStoreJson } from '@/lib/serverAuth';
+import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,59 +20,96 @@ export async function GET(request: Request) {
     if (error) throw error;
     const cfg = data?.telegram_config || {};
 
-    // 2. Fetch total unique students who registered FCM device tokens (Installed and running app)
-    const { data: tokenRows } = await supabaseAdmin
-      .from('device_tokens')
-      .select('student_code, updated_at');
+    // 2. Fetch total unique students who installed the app
+    // We combine BOTH device_tokens (FCM push registrations) AND portal_audit_logs (apk_install events)
+    const [{ data: tokenRows }, { data: installAuditRows }] = await Promise.all([
+      supabaseAdmin.from('device_tokens').select('student_code, updated_at'),
+      supabaseAdmin.from('portal_audit_logs').select('student_code, created_at, details').eq('action', 'apk_install')
+    ]);
 
-    const uniqueInstallCodes = Array.from(new Set((tokenRows || []).map((r: any) => r.student_code).filter(Boolean)));
+    // Build map of installs: student_code -> latest installed_at
+    const installMap = new Map<string, string>();
+    (tokenRows || []).forEach((r: any) => {
+      if (r.student_code) {
+        const clean = formatStudentCode(r.student_code);
+        installMap.set(clean, r.updated_at || new Date().toISOString());
+      }
+    });
+    (installAuditRows || []).forEach((r: any) => {
+      if (r.student_code) {
+        const clean = formatStudentCode(r.student_code);
+        const existing = installMap.get(clean);
+        if (!existing || new Date(r.created_at) > new Date(existing)) {
+          installMap.set(clean, r.created_at || new Date().toISOString());
+        }
+      }
+    });
+
+    const uniqueInstallCodes = Array.from(installMap.keys());
 
     // 3. Fetch downloads from portal_audit_logs
     const { data: downloadRows } = await supabaseAdmin
       .from('portal_audit_logs')
-      .select('student_code, created_at')
+      .select('student_code, created_at, details')
       .eq('action', 'apk_download')
       .order('created_at', { ascending: false });
 
-    const uniqueDownloadCodes = Array.from(new Set((downloadRows || []).map((r: any) => r.student_code).filter(Boolean)));
+    // Build map of downloads: student_code -> latest downloaded_at
+    const downloadMap = new Map<string, string>();
+    (downloadRows || []).forEach((dr: any) => {
+      if (dr.student_code) {
+        const clean = formatStudentCode(dr.student_code);
+        if (!downloadMap.has(clean)) {
+          downloadMap.set(clean, dr.created_at || new Date().toISOString());
+        }
+      }
+    });
 
-    // 4. Enrich install students with names and sections for detailed list
-    let installedStudentsList: any[] = [];
+    const uniqueDownloadCodes = Array.from(downloadMap.keys());
+
+    // 4. Enrich students with names and sections for detailed list
     const allRelevantCodes = Array.from(new Set([...uniqueInstallCodes, ...uniqueDownloadCodes]));
 
     let studentMap = new Map<string, any>();
     if (allRelevantCodes.length > 0) {
+      const allVariants = allRelevantCodes.flatMap(c => getStudentCodeVariants(c));
       const { data: studentRecords } = await supabaseAdmin
         .from('students')
         .select('student_code, full_name, academic_year, section')
-        .in('student_code', allRelevantCodes);
+        .in('student_code', allVariants);
 
       (studentRecords || []).forEach((s: any) => {
+        const clean = formatStudentCode(s.student_code);
+        studentMap.set(clean, s);
         studentMap.set(s.student_code, s);
       });
     }
 
-    installedStudentsList = (tokenRows || []).map((tr: any) => {
-      const info = studentMap.get(tr.student_code) || {};
+    const installedStudentsList = uniqueInstallCodes.map((code) => {
+      const info = studentMap.get(code) || {};
       return {
-        student_code: tr.student_code,
+        student_code: code,
         full_name: info.full_name || 'طالب مسجل',
         academic_year: info.academic_year || '',
         section: info.section || '',
-        installed_at: tr.updated_at
+        installed_at: installMap.get(code) || new Date().toISOString()
       };
     });
 
-    const downloadedStudentsList = (downloadRows || []).map((dr: any) => {
-      const info = studentMap.get(dr.student_code) || {};
+    const downloadedStudentsList = uniqueDownloadCodes.map((code) => {
+      const info = studentMap.get(code) || {};
       return {
-        student_code: dr.student_code,
+        student_code: code,
         full_name: info.full_name || 'طالب مسجل',
         academic_year: info.academic_year || '',
         section: info.section || '',
-        downloaded_at: dr.created_at
+        downloaded_at: downloadMap.get(code) || new Date().toISOString()
       };
     });
+
+    // Sort installed list by latest install date descending
+    installedStudentsList.sort((a, b) => new Date(b.installed_at).getTime() - new Date(a.installed_at).getTime());
+    downloadedStudentsList.sort((a, b) => new Date(b.downloaded_at).getTime() - new Date(a.downloaded_at).getTime());
 
     // 5. Total active students in system for percentage calculation
     const { count: totalStudentsCount } = await supabaseAdmin
@@ -91,10 +129,10 @@ export async function GET(request: Request) {
         downloads_count: uniqueDownloadCodes.length,
         total_download_clicks: (downloadRows || []).length,
         downloaded_students: downloadedStudentsList,
-        last_install_at: tokenRows?.[tokenRows.length - 1]?.updated_at || null,
+        last_install_at: installedStudentsList[0]?.installed_at || null,
         security_status: {
           level: 'high',
-          protocol: 'Firebase Cloud Messaging (FCM) Encrypted Token',
+          protocol: 'Firebase Cloud Messaging (FCM) Encrypted Token & Audit Log',
           compliant: true,
           details: 'تتبع آمن ومشفر 100% دون طلب أي صلاحيات حساسة أو موقع جغرافي، معتمد ومطابق لسياسات Google Play والأندرويد الرسمية.'
         }

@@ -41,6 +41,7 @@ import {
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
+import { staffFetch } from "@/lib/staffAuthFetch";
 
 interface StudentPortalHubModalProps {
   isOpen: boolean;
@@ -197,7 +198,7 @@ export default function StudentPortalHubModal({
   const fetchPortalSettings = async () => {
     setLoadingPortalSettings(true);
     try {
-      const res = await fetch("/api/admin/portal/settings?_t=" + Date.now());
+      const res = await staffFetch("/api/admin/portal/settings?_t=" + Date.now());
       if (res.ok) {
         const json = await res.json();
         if (json?.settings) {
@@ -230,7 +231,7 @@ export default function StudentPortalHubModal({
     setSavingPortalSettings(true);
     setPortalSettingsMsg("");
     try {
-      const res = await fetch("/api/admin/portal/settings", {
+      const res = await staffFetch("/api/admin/portal/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newSettings),
@@ -273,7 +274,7 @@ export default function StudentPortalHubModal({
   const fetchSearchLogs = async () => {
     setLoadingSearchLogs(true);
     try {
-      const res = await fetch("/api/admin/portal/search-logs");
+      const res = await staffFetch("/api/admin/portal/search-logs");
       const data = await res.json();
       if (data && data.success) {
         setSearchLogsData(data);
@@ -288,7 +289,7 @@ export default function StudentPortalHubModal({
   const fetchPortalStats = async () => {
     setLoadingStats(true);
     try {
-      const res = await fetch("/api/admin/portal/stats?_t=" + Date.now(), { cache: "no-store" });
+      const res = await staffFetch("/api/admin/portal/stats?_t=" + Date.now(), { cache: "no-store" });
       const data = await res.json();
 
       if (data && data.success) {
@@ -309,7 +310,7 @@ export default function StudentPortalHubModal({
   const fetchCoordinatorStats = async () => {
     setLoadingCoordStats(true);
     try {
-      const res = await fetch("/api/admin/portal/coordinator-stats");
+      const res = await staffFetch("/api/admin/portal/coordinator-stats");
       const data = await res.json();
       if (data && data.success) {
         setCoordStats({
@@ -331,7 +332,7 @@ export default function StudentPortalHubModal({
     setAccountListFilter("");
     setLoadingRegisteredList(true);
     try {
-      const res = await fetch("/api/admin/portal/registered-students", { cache: "no-store" });
+      const res = await staffFetch("/api/admin/portal/registered-students", { cache: "no-store" });
       const data = await res.json();
       if (data && data.success) {
         setRegisteredStudentsList(data.students || []);
@@ -346,7 +347,7 @@ export default function StudentPortalHubModal({
   // تفعيل واعتماد مباشر لحساب الطالب من داخل قائمة الحسابات
   const handleDirectActivateFromList = async (studentCode: string) => {
     try {
-      const res = await fetch("/api/admin/portal", {
+      const res = await staffFetch("/api/admin/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -375,7 +376,7 @@ export default function StudentPortalHubModal({
     setActionLoading(true);
     setActionMessage("");
     try {
-      const res = await fetch("/api/admin/portal", {
+      const res = await staffFetch("/api/admin/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -391,7 +392,7 @@ export default function StudentPortalHubModal({
         // Re-inspect the account to refresh details immediately
         await handleInspectAccount(studentCode);
         // Refresh registered accounts list
-        const listRes = await fetch("/api/admin/portal/registered-students", { cache: "no-store" });
+        const listRes = await staffFetch("/api/admin/portal/registered-students", { cache: "no-store" });
         const listData = await listRes.json();
         if (listData?.success) {
           setRegisteredStudentsList(listData.students || []);
@@ -413,7 +414,7 @@ export default function StudentPortalHubModal({
     }
 
     try {
-      const res = await fetch("/api/admin/portal", {
+      const res = await staffFetch("/api/admin/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -452,7 +453,7 @@ export default function StudentPortalHubModal({
     setActionMessage("");
 
     try {
-      const res = await fetch(`/api/admin/portal?action=inspect&code=${encodeURIComponent(code)}`);
+      const res = await staffFetch(`/api/admin/portal?action=inspect&code=${encodeURIComponent(code)}`);
       const data = await res.json();
       if (!res.ok) {
         setAccountInspectError(data.error || "تعذر العثور على الطالب");
@@ -478,7 +479,7 @@ export default function StudentPortalHubModal({
 
       setActionLoading(true);
       try {
-        const res = await fetch("/api/admin/portal", {
+        const res = await staffFetch("/api/admin/portal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -511,7 +512,7 @@ export default function StudentPortalHubModal({
 
     setActionLoading(true);
     try {
-      const res = await fetch("/api/admin/portal", {
+      const res = await staffFetch("/api/admin/portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -553,7 +554,7 @@ export default function StudentPortalHubModal({
   const fetchFraudData = async () => {
     setLoadingFraud(true);
     try {
-      const res = await fetch("/api/admin/portal/fraud-detection");
+      const res = await staffFetch("/api/admin/portal/fraud-detection");
       const data = await res.json();
       if (res.ok) {
         setFraudData(data);
@@ -571,7 +572,7 @@ export default function StudentPortalHubModal({
     const thresh = threshOverride !== undefined ? threshOverride : plagiarismThreshold;
     setLoadingPlagiarism(true);
     try {
-      const res = await fetch(`/api/admin/portal/plagiarism-audit?threshold=${thresh}`);
+      const res = await staffFetch(`/api/admin/portal/plagiarism-audit?threshold=${thresh}`);
       const data = await res.json();
       if (res.ok) {
         setPlagiarismData(data);
@@ -588,7 +589,7 @@ export default function StudentPortalHubModal({
   const handleSendTelegramPlagiarismAlert = async (m: any, matchId: string) => {
     try {
       setSendingTelegramMatchId(matchId);
-      const res = await fetch("/api/admin/portal/notify-plagiarism", {
+      const res = await staffFetch("/api/admin/portal/notify-plagiarism", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

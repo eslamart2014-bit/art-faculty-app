@@ -801,6 +801,20 @@ export default function SystemPage() {
         savedStudentCode = localStorage.getItem("fania_student_code") || "";
       }
 
+      if (isNativeApp && savedStudentCode) {
+        fetch("/api/students/track-install", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            student_code: savedStudentCode,
+            action: "install",
+            version: "1.0.6",
+            source: "android_app_launch"
+          })
+        }).catch(() => {});
+      }
+
       // أ) وضع المعاينة التجريبي
       if (isTestUpdate) {
         setIsTestMigrationMode(true);
@@ -1007,15 +1021,32 @@ export default function SystemPage() {
     authMode
   ]);
 
-  // Sync session with Native Android App for Background Notifications
+  // Sync session with Native Android App for Background Notifications & Track Install
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      const isNative = isAndroidAppClient();
       const bridge = (window as any).ArtEduNativeBridge;
+      const code = currentStudent?.student_code;
+
+      if ((isNative || bridge) && code) {
+        fetch("/api/students/track-install", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            student_code: code,
+            action: "install",
+            version: "1.0.6",
+            source: "android_native_app_session"
+          })
+        }).catch(() => {});
+      }
+
       if (bridge) {
-        if (currentStudent?.student_code) {
+        if (code) {
           const token = localStorage.getItem("fania_student_token") || "";
-          bridge.saveStudentSession(currentStudent.student_code, currentStudent.full_name || "", token);
+          bridge.saveStudentSession(code, currentStudent.full_name || "", token);
           const registerPush = (tries: number) => {
             try {
               const pt = typeof bridge.getPushToken === "function" ? bridge.getPushToken() : "";
@@ -1028,14 +1059,14 @@ export default function SystemPage() {
                     ...(token ? { "x-student-token": token, "Authorization": "Bearer " + token } : {})
                   },
                   credentials: "same-origin",
-                  body: JSON.stringify({ token: pt, student_code: currentStudent.student_code })
+                  body: JSON.stringify({ token: pt, student_code: code })
                 }).catch(() => {});
               } else if (tries > 0) {
-                setTimeout(() => registerPush(tries - 1), 3000);
+                setTimeout(() => registerPush(tries - 1), 2000);
               }
             } catch (e) {}
           };
-          registerPush(8);
+          registerPush(10);
         } else {
           bridge.clearStudentSession();
         }
