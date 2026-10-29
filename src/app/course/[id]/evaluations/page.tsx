@@ -1028,6 +1028,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
           teacher_id: course.teacher_id
         });
       }
+      try {
+        fetch('/api/push/notify-evaluation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_id: s.student.id,
+            course_id: course.id,
+            project_name: selectedProject.name,
+            score: validScore
+          })
+        }).catch(() => {});
+      } catch (_) {}
     }
 
     if (markAttendanceWithEval) {
@@ -1147,6 +1159,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       score: scoreNum,
       teacher_id: course.teacher_id
     }, { onConflict: 'course_id,student_id,project_name' });
+    try {
+      fetch('/api/push/notify-evaluation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: targetStudent.id,
+          course_id: course.id,
+          project_name: selectedProject.name,
+          score: scoreNum
+        })
+      }).catch(() => {});
+    } catch (_) {}
 
     // Send Telegram Notification
     supabase.auth.getSession().then(({ data: { session } }) => {

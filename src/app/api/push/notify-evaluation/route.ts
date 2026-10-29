@@ -34,11 +34,13 @@ export async function POST(request: Request) {
     }
 
     const scoreDisplay = score !== undefined && score !== null ? ` (الدرجة: ${score})` : '';
+    const evalTag = `eval_${student.student_code}_${project_name}_${course_id || 'course'}`;
     const pushResult = await sendPushToStudents([student.student_code], {
       title: '🎨 تم رصد تقييم جديد لأعمالك',
       body: `تم رصد تقييم مشروع "${project_name}" بمقرر ${courseName}${scoreDisplay}`,
       type: 'grade',
-      id: `eval_${student_id}_${project_name}_${Date.now()}`,
+      id: evalTag,
+      tag: evalTag,
     });
 
     return NextResponse.json({ success: true, result: pushResult });

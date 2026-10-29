@@ -139,6 +139,7 @@ export async function POST(request: Request) {
             body: 'تم اعتماد حجز الدولاب رقم (' + booking.locker_code + ') وتخصيصه لك رسميًا.',
             type: 'locker',
             id: 'locker_approved_' + booking.locker_code + '_' + booking.id,
+            tag: 'locker_' + booking.locker_code,
           });
         }
       } catch (pushErr) {

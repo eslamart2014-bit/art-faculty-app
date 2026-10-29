@@ -500,6 +500,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           const recordsToDelete = attendance.filter(a => toDeleteIds.includes(a.student_id));
           if (recordsToDelete.length > 0) {
             await supabase.from("attendance").delete().in("id", recordsToDelete.map(r => r.id));
+            try {
+              fetch('/api/push/notify-attendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  student_ids: toDeleteIds,
+                  course_id: course.id,
+                  date: saveDate,
+                  action: 'cancelled'
+                })
+              }).catch(() => {});
+            } catch (_) {}
           }
         }
         if (toInsertIds.length > 0) {
@@ -882,6 +894,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const record = attendance.find(a => a.student_id === longPressStudent.id);
     if (record) {
       await supabase.from("attendance").delete().eq("id", record.id);
+      try {
+        fetch('/api/push/notify-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_ids: [longPressStudent.id],
+            course_id: course.id,
+            date: record.date,
+            action: 'cancelled'
+          })
+        }).catch(() => {});
+      } catch (_) {}
       setAttendance(attendance.filter(a => a.id !== record.id));
       
       const newSet = new Set(selectedStudentIds);

@@ -36,11 +36,13 @@ export async function POST(request: Request) {
     }
 
     const maxScoreText = max_score ? ` (من ${max_score} درجة)` : '';
+    const projTag = `proj_${course_id}_${project_name}`;
     const pushResult = await sendPushToStudents(codes, {
       title: '📌 تم إضافة مشروع جديد مطلوب تسليمه',
       body: `تم إضافة مشروع جديد "${project_name}" بمقرر ${course.name}${maxScoreText}`,
       type: 'project',
-      id: `proj_${course_id}_${project_name}_${Date.now()}`,
+      id: projTag,
+      tag: projTag,
     });
 
     return NextResponse.json({ success: true, result: pushResult });

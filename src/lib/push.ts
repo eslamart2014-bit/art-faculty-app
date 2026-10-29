@@ -6,10 +6,32 @@ export type PushPayload = {
   body: string;
   type?: 'attendance' | 'project' | 'locker' | 'grade' | 'announcement' | 'general';
   id?: string;
+  tag?: string; // Tag for notification deduplication and replacing existing cards on device
   url?: string;
 };
 
 let messagingInstance: any = null;
+
+// Server-side in-memory deduplication cache (15 seconds debounce window)
+const sentPushCache = new Map<string, number>();
+
+function isDuplicate(tag: string | undefined): boolean {
+  if (!tag) return false;
+  const now = Date.now();
+  const lastSent = sentPushCache.get(tag);
+  if (lastSent && now - lastSent < 15_000) {
+    return true;
+  }
+  sentPushCache.set(tag, now);
+
+  // Periodically clean up entries older than 60 seconds
+  if (sentPushCache.size > 500) {
+    for (const [k, v] of sentPushCache.entries()) {
+      if (now - v > 60_000) sentPushCache.delete(k);
+    }
+  }
+  return false;
+}
 
 export async function getFirebaseMessaging() {
   if (messagingInstance) return messagingInstance;
@@ -59,12 +81,19 @@ export async function getFirebaseMessaging() {
 /**
  * Sends high-priority FCM push notification to a list of student codes.
  * Works even when the app is completely closed / swiped from recent apps.
+ * Automatically deduplicates identical messages within 15 seconds.
  */
 export async function sendPushToStudents(
   codes: string[],
   payload: PushPayload
-): Promise<{ sent: number; totalTokens: number; failureCount: number; errors?: any[] }> {
+): Promise<{ sent: number; totalTokens: number; failureCount: number; errors?: any[]; duplicateSkipped?: boolean }> {
   if (!codes || codes.length === 0) return { sent: 0, totalTokens: 0, failureCount: 0 };
+
+  // Deduplicate on server: if exact same tag was dispatched within 15 seconds, skip
+  if (payload.tag && isDuplicate(payload.tag)) {
+    console.log('[push] Duplicate skipped on server for tag:', payload.tag);
+    return { sent: 0, totalTokens: 0, failureCount: 0, duplicateSkipped: true };
+  }
 
   const allVariants = Array.from(
     new Set(codes.flatMap((c) => getStudentCodeVariants(c)).filter(Boolean))
@@ -99,6 +128,7 @@ export async function sendPushToStudents(
   }
 
   const notifId = payload.id || `notif_${Date.now()}`;
+  const notifTag = payload.tag || notifId;
   let totalSent = 0;
   let totalFailed = 0;
   const errorLogs: any[] = [];
@@ -111,9 +141,6 @@ export async function sendPushToStudents(
     try {
       const response = await messaging.sendEachForMulticast({
         tokens: batch,
-        // CRITICAL: BOTH notification AND data are supplied.
-        // Google Play Services uses 'notification' to render to system tray immediately
-        // even when app process is completely killed.
         notification: {
           title: payload.title,
           body: payload.body,
@@ -123,6 +150,7 @@ export async function sendPushToStudents(
           body: payload.body,
           type: payload.type || 'general',
           id: notifId,
+          tag: notifTag,
           url: payload.url || '/system',
         },
         android: {
@@ -130,6 +158,7 @@ export async function sendPushToStudents(
           ttl: 24 * 60 * 60 * 1000, // 24 hours
           notification: {
             channelId: 'art_edu_student_alerts',
+            tag: notifTag, // Ensures Android system tray replaces any existing card with the same tag
             sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,
@@ -189,6 +218,8 @@ export async function broadcastPushToAll(
 
   if (tokens.length === 0) return { sent: 0, totalTokens: 0, failureCount: 0 };
 
+  const notifId = payload.id || `broadcast_${Date.now()}`;
+  const notifTag = payload.tag || notifId;
   let totalSent = 0;
   let totalFailed = 0;
 
@@ -204,13 +235,15 @@ export async function broadcastPushToAll(
         title: payload.title,
         body: payload.body,
         type: payload.type || 'announcement',
-        id: payload.id || `broadcast_${Date.now()}`,
+        id: notifId,
+        tag: notifTag,
       },
       android: {
         priority: 'high',
         ttl: 24 * 60 * 60 * 1000,
         notification: {
           channelId: 'art_edu_student_alerts',
+          tag: notifTag,
           sound: 'default',
           defaultSound: true,
           defaultVibrateTimings: true,

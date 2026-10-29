@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.device_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_student_code ON public.device_tokens(student_code);
 
--- 2. تفعيل مكتبة الطلبات الشبكية السريعة في سوبابيس (pg_net)
+-- 2. تفعيل مكتبة الطلبات الشبكية في سوبابيس (pg_net)
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
 -- 3. دالة إرسال الإشعار الفوري إلى سيرفر Vercel
@@ -27,7 +27,7 @@ BEGIN
   payload := jsonb_build_object(
     'table', TG_TABLE_NAME,
     'type', TG_OP,
-    'record', row_to_json(NEW),
+    'record', CASE WHEN TG_OP = 'DELETE' THEN row_to_json(OLD) ELSE row_to_json(NEW) END,
     'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END
   );
 
@@ -42,14 +42,14 @@ BEGIN
     timeout_milliseconds := 5000
   );
 
-  RETURN NEW;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
 END;
 $$;
 
--- 4. تشغيل الإشعار الفوري عند تسجيل أو تعديل الحضور
+-- 4. تشغيل الإشعار الفوري عند تسجيل أو تعديل أو إلغاء الحضور
 DROP TRIGGER IF EXISTS tr_push_attendance ON public.attendance;
 CREATE TRIGGER tr_push_attendance
-AFTER INSERT OR UPDATE ON public.attendance
+AFTER INSERT OR UPDATE OR DELETE ON public.attendance
 FOR EACH ROW
 EXECUTE FUNCTION public.notify_push_webhook();
 

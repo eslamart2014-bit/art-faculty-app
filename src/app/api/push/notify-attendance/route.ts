@@ -11,7 +11,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'student_ids array is required' }, { status: 400 });
     }
 
-    const { student_ids, course_id, date } = body;
+    const { student_ids, course_id, date, action } = body;
+    const isCancelled = action === 'cancelled';
 
     // 1. Fetch course details
     let courseName = 'المقرر';
@@ -36,16 +37,31 @@ export async function POST(request: Request) {
     }
 
     const displayDate = date || new Date().toISOString().split('T')[0];
-    const pushResult = await sendPushToStudents(codes, {
-      title: '✅ تم تسجيل حضورك',
-      body: `تم تسجيل حضورك اليوم بنجاح في مقرر ${courseName} (${displayDate})`,
-      type: 'attendance',
-      id: `att_${course_id || 'course'}_${displayDate}_${Date.now()}`,
-    });
+
+    const title = isCancelled ? 'ℹ️ تم إلغاء تسجيل الحضور' : '✅ تم تسجيل حضورك';
+    const messageBody = isCancelled
+      ? `تم إلغاء تسجيل حضورك في مقرر ${courseName} (${displayDate})`
+      : `تم تسجيل حضورك اليوم بنجاح في مقرر ${courseName} (${displayDate})`;
+
+    let totalSent = 0;
+
+    // Send push per student so that the tag is unique per student & date
+    for (const code of codes) {
+      const dedupTag = `att_${code}_${displayDate}_${course_id || 'course'}`;
+      const res = await sendPushToStudents([code], {
+        title,
+        body: messageBody,
+        type: 'attendance',
+        id: dedupTag,
+        tag: dedupTag,
+      });
+      totalSent += res.sent;
+    }
 
     return NextResponse.json({
       success: true,
-      result: pushResult,
+      sent: totalSent,
+      action: isCancelled ? 'cancelled' : 'present',
     });
   } catch (error: any) {
     console.error('[notify-attendance]', error);

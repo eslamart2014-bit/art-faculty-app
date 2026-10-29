@@ -43,7 +43,9 @@ public class StudentFcmService extends FirebaseMessagingService {
         if (title == null || title.isEmpty()) title = "بوابة التربية الفنية 🎓";
 
         String id = data.get("id");
-        int notificationId = (id != null ? id : String.valueOf(System.currentTimeMillis())).hashCode();
+        String tag = data.get("tag");
+        if (tag == null) tag = id;
+        int notificationId = (tag != null ? tag : String.valueOf(System.currentTimeMillis())).hashCode();
 
         // Mark as shown so the polling worker does not duplicate it.
         if (id != null) {
@@ -73,7 +75,11 @@ public class StudentFcmService extends FirebaseMessagingService {
                 .setContentIntent(pi)
                 .setDefaults(NotificationCompat.DEFAULT_ALL);
         try {
-            NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+            if (tag != null && !tag.isEmpty()) {
+                NotificationManagerCompat.from(this).notify(tag, notificationId, builder.build());
+            } else {
+                NotificationManagerCompat.from(this).notify(notificationId, builder.build());
+            }
         } catch (SecurityException ignored) {
         }
     }

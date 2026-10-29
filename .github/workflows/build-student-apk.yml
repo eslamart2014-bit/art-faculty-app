@@ -100,3 +100,11 @@ jobs:
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Broadcast Push Notification to Students
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -s -X POST https://art-faculty-app.vercel.app/api/push/broadcast-update \
+            -H "Content-Type: application/json" \
+            -H "x-webhook-secret: b8d48d9d6c9ebe4d7b675be4c795d7d0a405707b37a7dc39" \
+            -d '{"version":"1.0.6","changelog":"⚡ يتوفر تحديث جديد لبوابة الطلاب (v1.0.6). افتح التطبيق لتحديثه فوراً!"}' || true
