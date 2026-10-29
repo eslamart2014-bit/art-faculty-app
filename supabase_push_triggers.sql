@@ -1,13 +1,13 @@
 -- =========================================================================
--- إعداد نظام الإشعارات الفورية التلقائي في Supabase (Attendance & Projects Push)
+-- إعداد نظام الإشعارات الفورية التلقائي في Supabase (Attendance & Evaluations Push)
 -- انسخ هذا الكود بالكامل والصقه في:
 -- Supabase Dashboard > SQL Editor > New Query > اضغط Run
 -- =========================================================================
 
--- 1. تفعيل مكتبة الطلبات الشبكية في السوبابيس
+-- 1. تفعيل مكتبة الطلبات الشبكية السريعة في سوبابيس
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- 2. دالة إرسال الإشعار التلقائي إلى خادم Vercel
+-- 2. دالة إرسال الإشعار الفوري إلى سيرفر Vercel
 CREATE OR REPLACE FUNCTION public.notify_push_webhook()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -23,7 +23,7 @@ BEGIN
     'old_record', CASE WHEN TG_OP = 'UPDATE' THEN row_to_json(OLD) ELSE NULL END
   );
 
-  -- إرسال طلب HTTP POST في الخلفية بدون أي تأخير على قاعدة البيانات
+  -- إرسال الإشعار في الخلفية عبر pg_net بدون أي تأخير على قاعدة البيانات
   PERFORM net.http_post(
     url := 'https://art-faculty-app.vercel.app/api/push/webhook',
     headers := jsonb_build_object(
@@ -38,16 +38,16 @@ BEGIN
 END;
 $$;
 
--- 3. تفعيل التريجر لجدول الحضور (عند تسجيل حضور جديد أو تعديله)
+-- 3. تشغيل الإشعار الفوري عند تسجيل أو تعديل الحضور
 DROP TRIGGER IF EXISTS tr_push_attendance ON public.attendance;
 CREATE TRIGGER tr_push_attendance
 AFTER INSERT OR UPDATE ON public.attendance
 FOR EACH ROW
 EXECUTE FUNCTION public.notify_push_webhook();
 
--- 4. تفعيل التريجر لجدول المشاريع (عند إضافة مشروع جديد)
-DROP TRIGGER IF EXISTS tr_push_projects ON public.projects;
-CREATE TRIGGER tr_push_projects
-AFTER INSERT ON public.projects
+-- 4. تشغيل الإشعار الفوري عند رصد تقييم جديد أو تحديث الدرجات
+DROP TRIGGER IF EXISTS tr_push_evaluations ON public.evaluations;
+CREATE TRIGGER tr_push_evaluations
+AFTER INSERT OR UPDATE ON public.evaluations
 FOR EACH ROW
 EXECUTE FUNCTION public.notify_push_webhook();
