@@ -50,6 +50,19 @@ export async function POST(request: Request) {
       return noStoreJson({ error: error.message }, { status: 500 });
     }
 
+    // Record installation / active mobile app session in portal_audit_logs
+    try {
+      await supabaseAdmin.from('portal_audit_logs').insert({
+        student_code: formatted,
+        action: 'apk_install',
+        details: {
+          source: 'android_fcm_token_registration',
+          token_prefix: token.substring(0, 16),
+          registered_at: new Date().toISOString()
+        }
+      });
+    } catch (e) {}
+
     return noStoreJson({ success: true, registered: formatted });
   } catch (err: any) {
     return noStoreJson({ error: err?.message || 'Server error' }, { status: 500 });

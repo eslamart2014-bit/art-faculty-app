@@ -1,3 +1,4 @@
+import { isAndroidAppRequest } from '@/lib/deviceFingerprint';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode } from '@/lib/codeHelper';
@@ -164,13 +165,29 @@ export async function POST(request: Request) {
       } catch (e) {}
     }
 
+    const isFromApk = isAndroidAppRequest(request, { device_info });
+
     if (deviceId !== 'unknown') {
       if (boundDeviceId) {
-        if (boundDeviceId !== deviceId) {
+        // فحص هل الحساب تم ربطه سابقاً بتطبيق الأندرويد أم بمتصفح
+        const wasBoundToApk = account.bound_device_platform === 'apk';
+
+        if (isFromApk && !wasBoundToApk) {
+          // ترقية ذكية وفورية من المتصفح إلى تطبيق الأندرويد:
+          // الطالب يسجل دخوله من التطبيق، نسمح له بالدخول فوراً ونربطه بجهاز التطبيق
+          // ونفصل جلسة المتصفح السابقة تلقائياً
+          boundDeviceId = deviceId;
+          resetSecurity.bound_device_id = deviceId;
+          resetSecurity.bound_device_platform = 'apk';
+          resetSecurity.app_migrated_at = new Date().toISOString();
+        } else if (boundDeviceId !== deviceId) {
+          // إذا كان مقيداً بجهاز تطبيق آخر، أو مقيداً بمتصفح آخر وتلك محاولة من متصفح ثانٍ:
           return NextResponse.json(
             {
               device_locked: true,
-              error: 'هذا الحساب مقيّد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد والسماح بتسجيل الدخول من هذا الجهاز.',
+              error: wasBoundToApk
+                ? 'هذا الحساب مقيّد بجهاز هاتف آخر. يرجى التوجه إلى منسقك لفك القيد والسماح بتسجيل الدخول من هذا الهاتف.'
+                : 'هذا الحساب مقيّد بجهاز آخر. يرجى التوجه إلى منسقك لفك القيد والسماح بتسجيل الدخول من هذا الجهاز.',
               coordinator_name: account.activated_by || 'منسق النظام'
             },
             { status: 403 }
@@ -179,6 +196,7 @@ export async function POST(request: Request) {
       } else {
         boundDeviceId = deviceId;
         resetSecurity.bound_device_id = deviceId;
+        resetSecurity.bound_device_platform = isFromApk ? 'apk' : 'web';
       }
     }
 

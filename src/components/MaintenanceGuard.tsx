@@ -146,7 +146,13 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
 
   // Granular check: should we block this route?
   let isBlocked = false;
-  if (isMaintenance && !isAdmin) {
+  const isTestUpdate = typeof window !== 'undefined' && (
+    window.location.search.includes('test_update=1') ||
+    window.location.search.includes('preview_update=1') ||
+    pathname === '/student-portal/update-notice'
+  );
+
+  if (isMaintenance && !isAdmin && !isTestUpdate) {
     if (maintenanceScope === "faculty") {
       isBlocked = isFacultyRoute;
     } else if (maintenanceScope === "portal") {

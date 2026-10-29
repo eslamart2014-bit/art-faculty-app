@@ -1,3 +1,4 @@
+import { isAndroidAppRequest } from '@/lib/deviceFingerprint';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
     try {
       const { data: acc } = await supabaseAdmin
         .from('student_accounts')
-        .select('student_code, status, is_pin_used, activated_by, mobile')
+        .select('student_code, status, is_pin_used, activated_by, mobile, bound_device_id, bound_device_platform')
         .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
         .maybeSingle();
       accountData = acc;
@@ -80,6 +81,23 @@ export async function GET(request: Request) {
 
     if (!accountData) {
       accountData = localStore.getAccount(cleanCode) || localStore.getAccount(code);
+    }
+
+    // التحقق مما إذا كان الحساب قد تم تفعيله على تطبيق الأندرويد، وهذا الطلب من متصفح بجهاز مختلف
+    const requestDeviceId = (searchParams.get('deviceId') || request.headers.get('x-device-id') || '').trim();
+    const isFromApk = isAndroidAppRequest(request, null);
+
+    if (!isFromApk && accountData?.bound_device_platform === 'apk') {
+      if (requestDeviceId && accountData.bound_device_id && accountData.bound_device_id !== requestDeviceId) {
+        return noStoreJson(
+          {
+            error: 'تم تسجيل الدخول بنجاح من تطبيق الأندرويد الجديد 📱. تم إنهاء الجلسة على هذا المتصفح لحماية حسابك.',
+            app_migrated: true,
+            device_locked: true
+          },
+          { status: 401 }
+        );
+      }
     }
 
     // التحقق من تعليق الحساب

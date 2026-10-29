@@ -467,6 +467,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     };
 
     await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course!.id);
+
+    const oldName = longPressProject.name;
+    const newName = editProjectName.trim();
+    if (oldName && newName && oldName !== newName) {
+      try {
+        await supabase.from("evaluations").update({ project_name: newName }).eq("course_id", course!.id).eq("project_name", oldName);
+        await supabase.from("student_submissions").update({ project_name: newName }).eq("course_id", course!.id).eq("project_name", oldName);
+      } catch (err) {
+        console.error("Error cascading project rename to evaluations:", err);
+      }
+    }
     
     setProjects(updatedProjects);
     if (course) setCourse({ ...course, custom_week_names: updatedCustomWeekNames });

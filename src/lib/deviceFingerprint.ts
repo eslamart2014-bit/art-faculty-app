@@ -81,3 +81,52 @@ function simpleHash(str: string): string {
   }
   return Math.abs(hash).toString(36);
 }
+
+export function isAndroidAppRequest(request?: Request | null, body?: any): boolean {
+  if (!request && !body) return false;
+  const ua = ((request?.headers?.get('user-agent') || '') + ' ' + (body?.device_info?.userAgent || '')).toLowerCase();
+  const xRequestedWith = (request?.headers?.get('x-requested-with') || '').toLowerCase();
+  const isExplicitApp = body?.is_app === true || body?.platform === 'android_app' || body?.device_info?.is_app === true;
+  
+  return (
+    isExplicitApp ||
+    ua.includes('artedustudentapp') ||
+    ua.includes('artedu') ||
+    xRequestedWith.includes('artedu') ||
+    (ua.includes('wv') && ua.includes('android')) ||
+    (ua.includes('version/4.0') && ua.includes('chrome') && ua.includes('mobile safari') && ua.includes('android'))
+  );
+}
+
+
+export function isAndroidAppClient(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ua = (navigator.userAgent || '').toLowerCase();
+    if (ua.includes('artedustudentapp') || ua.includes('artedu')) {
+      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
+      return true;
+    }
+    if (ua.includes('wv') && ua.includes('android')) {
+      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
+      return true;
+    }
+    if (ua.includes('version/4.0') && ua.includes('chrome') && ua.includes('mobile safari') && ua.includes('android')) {
+      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
+      return true;
+    }
+    if ((window as any).isAndroidApp === true) {
+      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
+      return true;
+    }
+    if (localStorage.getItem('fania_is_android_app') === '1') {
+      return true;
+    }
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('app') === 'android' || urlParams.get('is_app') === '1') {
+      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}

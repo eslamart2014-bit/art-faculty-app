@@ -21,6 +21,7 @@ export async function GET() {
       is_maintenance_mode: Boolean(data?.is_maintenance_mode),
       maintenance_message: typeof data?.maintenance_message === 'string' ? data.maintenance_message : null,
       maintenance_scope: typeof cfg.maintenance_scope === 'string' ? cfg.maintenance_scope : 'faculty',
+      student_migration_screen: Boolean(cfg.student_migration_screen),
     });
   } catch (err) {
     console.error('public settings error:', err);

@@ -766,7 +766,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   const saveBatchCameraAttendance = async () => {
     if (scannedStudents.length === 0) return;
-    const saveDate = getTodayLocalDateStr();
+    const saveDate = getEffectiveSaveDate(selectedWeekKey);
     
     // 1. Instant Optimistic UI (0ms!)
     const newAtt = [...attendance];

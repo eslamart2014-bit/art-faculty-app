@@ -41,6 +41,7 @@ import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
 import { compressImageToWebP } from "@/lib/imageCompressor";
 import StudentLockerTab from "@/components/lockers/StudentLockerTab";
 import QRCode from "react-qr-code";
+import StudentMigrationNotice from "@/components/StudentMigrationNotice";
 
 function formatRemainingTime(deadlineStr?: string | null): { text: string; isExpired: boolean; isUrgent: boolean } {
   if (!deadlineStr) return { text: '', isExpired: false, isUrgent: false };
@@ -147,6 +148,23 @@ export default function SystemPage() {
   const [selectedCourseForEval, setSelectedCourseForEval] = useState<any>(null);
   const [selectedProjectTab, setSelectedProjectTab] = useState<string>("all");
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
+
+  // Student Migration to App Notice State
+  const [migrationStudentData, setMigrationStudentData] = useState<any>(null);
+  const [showMigrationModal, setShowMigrationModal] = useState<boolean>(false);
+  const [isTestMigrationMode, setIsTestMigrationMode] = useState<boolean>(false);
+  const [apkInfo, setApkInfo] = useState<{ downloadUrl: string; version: string } | null>(null);
+
+  const fetchMigrationInfo = async (code: string) => {
+    try {
+      const res = await fetch(`/api/students/migration-info?code=${encodeURIComponent(code)}&test_update=1`);
+      const data = await res.json();
+      if (data?.success && data?.student) {
+        setMigrationStudentData(data.student);
+        if (data.apk) setApkInfo({ downloadUrl: data.apk.downloadUrl, version: data.apk.version || '1.0.6' });
+      }
+    } catch (e) {}
+  };
 
   // New Project Cards Grid & View State
   const [selectedProjectForView, setSelectedProjectForView] = useState<any | null>(null);
@@ -576,6 +594,29 @@ export default function SystemPage() {
           .catch(err => console.error(err));
         return;
       }
+
+      const isTestUpdate = params.get("test_update") === "1" || params.get("preview_update") === "1" || params.get("preview") === "1";
+      const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
+
+      if (isTestUpdate) {
+        setIsTestMigrationMode(true);
+        const testCode = params.get("code") || localStorage.getItem("fania_student_code") || "0687";
+        fetchMigrationInfo(testCode);
+        setShowMigrationModal(true);
+      } else if (!isBypassed) {
+        fetch("/api/public/settings", { cache: "no-store" })
+          .then(r => r.json())
+          .then(settings => {
+            if (settings?.student_migration_screen) {
+              const code = localStorage.getItem("fania_student_code");
+              if (code) {
+                fetchMigrationInfo(code);
+                setShowMigrationModal(true);
+              }
+            }
+          })
+          .catch(() => {});
+      }
     }
 
     // 1. استعادة الجلسة والدخول الفوري المباشر (Instant Auto-Login & Offline-First)
@@ -940,13 +981,15 @@ export default function SystemPage() {
     setLoading(true);
     setErrorMsg("");
     try {
+      const dev = getOrCreateDeviceInfo();
       const impParam = isImpersonationMode || isImpersonating ? "&impersonate=true" : "";
-      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}${impParam}&_t=${Date.now()}`, {
+      const res = await fetch(`/api/students/dashboard-data?code=${encodeURIComponent(code)}&deviceId=${encodeURIComponent(dev.deviceId)}${impParam}&_t=${Date.now()}`, {
         cache: "no-store",
         credentials: "same-origin",
         headers: {
           "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
+          "Pragma": "no-cache",
+          "x-device-id": dev.deviceId
         }
       });
       const data = await res.json();
@@ -954,6 +997,7 @@ export default function SystemPage() {
       if (!res.ok) {
         if (res.status === 401) {
           localStorage.removeItem("fania_student_session");
+          localStorage.removeItem("fania_student_code");
           setCurrentStudent(null);
           setAccountStatus(null);
           setDashboardData(null);
@@ -961,6 +1005,11 @@ export default function SystemPage() {
           setEnteredPin("");
           setAuthMode("login");
           setErrorMsg(data.error || "انتهت جلستك. يرجى إدخال الرقم السري لتسجيل الدخول.");
+          if (data?.app_migrated) {
+            setTimeout(() => {
+              window.location.href = "/student-portal";
+            }, 2500);
+          }
         } else {
           setErrorMsg(data.error || "تعذر تحميل بيانات الطالب");
         }
@@ -1721,6 +1770,31 @@ export default function SystemPage() {
 
   // ==========================================
   // ==========================================
+  // ==========================================
+  // VIEW 0: شاشة إشعار الترقية لتطبيق الأندرويد الجديد (Student Migration to Mobile App)
+  // ==========================================
+  if (showMigrationModal && migrationStudentData) {
+    return (
+      <StudentMigrationNotice
+        student={migrationStudentData}
+        apkDownloadUrl={apkInfo?.downloadUrl}
+        apkVersion={apkInfo?.version}
+        isTestMode={isTestMigrationMode}
+        onContinueToWeb={() => {
+          localStorage.setItem("fania_bypass_update_notice", "1");
+          setShowMigrationModal(false);
+          if (isTestMigrationMode && typeof window !== "undefined") {
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+          }
+        }}
+        onSwitchStudentCode={(newCode) => {
+          fetchMigrationInfo(newCode);
+        }}
+      />
+    );
+  }
+
   // VIEW 1: شاشة انتظار اعتماد المنسق (Pending Approval)
   // ==========================================
   if (currentStudent && accountStatus === "pending") {
@@ -2291,6 +2365,34 @@ export default function SystemPage() {
             </button>
           </div>
         </div>
+
+        {/* شريط الوصول السريع لبيانات تطبيق الأندرويد الجديد (كود الدخول وكلمة المرور) */}
+        {migrationStudentData && (
+          <div 
+            onClick={() => setShowMigrationModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(168, 85, 247, 0.12))',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '12px',
+              padding: '8px 12px',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>📱</span>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#60a5fa' }}>تطبيق الأندرويد الجديد متاح الآن</div>
+                <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>اضغط هنا لعرض كودك وكلمة المرور الخاصة بك وتحميل التطبيق</div>
+              </div>
+            </div>
+            <span style={{ fontSize: '11px', color: '#c084fc', fontWeight: 'bold', background: 'rgba(168, 85, 247, 0.2)', padding: '3px 8px', borderRadius: '6px' }}>عرض البيانات ↗</span>
+          </div>
+        )}
 
         {/* تابات التنقل الرئيسية لشاشة الطالب (5 تابات متساوية العرض تماماً تغطي كامل الشاشة) */}
         <div 
@@ -4242,22 +4344,22 @@ export default function SystemPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "16px", maxWidth: "440px", margin: "0 auto", direction: "rtl" }}>
       
       <div>
-        {/* زر العودة لبوابة الأساتذة */}
+        {/* زر سحب الكيو ار كود */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <Link 
-            href="/?mode=faculty" 
+            href="/?tab=qr" 
             onClick={() => {
               if (typeof window !== "undefined") {
                 localStorage.removeItem("fania_last_portal");
-                localStorage.setItem("fania_app_mode", "faculty");
+                localStorage.setItem("fania_bypass_update_notice", "1");
               }
             }}
-            style={{ color: "#94a3b8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px" }}
+            style={{ color: "#38bdf8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12.5px", fontWeight: "bold" }}
           >
-            <ChevronLeft size={15} />
-            <span>العودة لبوابة الأساتذة</span>
+            <QrCode size={15} />
+            <span>سحب الكيو ار كود</span>
           </Link>
-          <span style={{ color: "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>نظام فنية الموحد</span>
+          <span style={{ color: "#64748b", fontSize: "11px", fontWeight: "bold" }}>نظام فنية الموحد</span>
         </div>
 
         <header style={{ textAlign: "center", paddingTop: "10px", marginBottom: "16px" }}>

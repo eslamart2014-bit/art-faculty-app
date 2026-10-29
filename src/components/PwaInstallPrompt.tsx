@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 
 export default function PwaInstallPrompt() {
+  const pathname = usePathname();
   const [showPrompt, setShowPrompt] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
@@ -11,17 +13,25 @@ export default function PwaInstallPrompt() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Don't show if already installed as standalone
+    // 1. حجب النافذة تماماً عن مسارات الطلاب وبوابة الطلاب حتى لا تزعجهم
+    const isStudentPath = pathname?.startsWith("/student-portal") || pathname?.startsWith("/system");
+    const isStudentSession = Boolean(localStorage.getItem("fania_student_session") || localStorage.getItem("fania_student_code"));
+    if (isStudentPath || isStudentSession) {
+      setShowPrompt(false);
+      return;
+    }
+
+    // 2. إذا كان التطبيق مثبتاً بالفعل كـ standalone PWA، لا داعي لإظهار النافذة
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
     if (isStandalone) return;
 
+    // 3. فحص أجهزة iOS للدكاترة
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(ios);
 
     if (ios) {
-      // Check if user dismissed iOS hint recently (within 24 hours)
       const dismissed = localStorage.getItem("pwa_dismissed_ios");
       if (!dismissed || Date.now() - parseInt(dismissed) > 24 * 60 * 60 * 1000) {
         setShowPrompt(true);
@@ -29,7 +39,7 @@ export default function PwaInstallPrompt() {
       return;
     }
 
-    // Android / Chrome - listen for beforeinstallprompt event and show prompt immediately!
+    // 4. أجهزة Android / Chrome للدكاترة (تثبيت PWA رسمي)
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -38,7 +48,7 @@ export default function PwaInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+  }, [pathname]);
 
   const handleDismiss = () => {
     setShowPrompt(false);
@@ -88,62 +98,55 @@ export default function PwaInstallPrompt() {
         />
         <div>
           <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>تثبيت التطبيق على جهازك</span>
+            <span>تثبيت تطبيق المنظومة على جهازك</span>
             <span style={{ fontSize: "10px", background: "rgba(37,99,235,0.3)", color: "#60a5fa", padding: "2px 6px", borderRadius: "4px" }}>
-              تثبيت عادي
+              لوحة هيئة التدريس (PWA)
             </span>
           </div>
           <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
             {isIOS
               ? 'اضغط على زر المشاركة (Share) في المتصفح ثم اختر "إضافة إلى الصفحة الرئيسية"'
-              : "للوصول المباشر والعمل السريع بدون تشتت"}
+              : "للوصول المباشر السريع للوحة المقر والتقييمات بدون تشتت"}
           </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
-        {!isIOS && (
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {!isIOS && deferredPrompt && (
           <button
             onClick={handleInstall}
             style={{
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              background: "#2563eb",
               color: "#fff",
               border: "none",
-              borderRadius: "10px",
-              padding: "9px 16px",
-              fontSize: "13px",
+              borderRadius: "8px",
+              padding: "8px 14px",
               fontWeight: "bold",
+              fontSize: "12.5px",
               cursor: "pointer",
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
               gap: "6px",
-              boxShadow: "0 2px 10px rgba(37, 99, 235, 0.4)",
-              margin: 0
             }}
           >
-            <Download size={15} />
-            <span>تثبيت التطبيق</span>
+            <Download size={14} />
+            تثبيت الآن
           </button>
         )}
         <button
           onClick={handleDismiss}
           style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "#94a3b8",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "10px",
-            padding: "8px 12px",
-            fontSize: "12px",
+            background: "transparent",
+            border: "none",
+            color: "#64748b",
             cursor: "pointer",
-            display: "inline-flex",
+            padding: "6px",
+            display: "flex",
             alignItems: "center",
-            gap: "4px",
-            margin: 0
           }}
-          title="إغلاق التنبيه"
+          title="إغلاق"
         >
-          <X size={14} />
-          <span>لاحقاً</span>
+          <X size={18} />
         </button>
       </div>
     </div>

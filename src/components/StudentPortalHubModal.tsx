@@ -34,7 +34,9 @@ import {
   EyeOff as EyeOffIcon,
   Eye as EyeOnIcon,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Download,
+  ShieldCheck
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
@@ -106,7 +108,12 @@ export default function StudentPortalHubModal({
   // Advanced Portal Settings
   const [portalSettings, setPortalSettings] = useState<{
     hide_warnings_tab: boolean;
-  }>({ hide_warnings_tab: false });
+    student_migration_screen?: boolean;
+  }>({ hide_warnings_tab: false, student_migration_screen: false });
+  const [appStats, setAppStats] = useState<any>(null);
+  const [showAppStatsList, setShowAppStatsList] = useState(false);
+  const [appStatsViewMode, setAppStatsViewMode] = useState<'installs' | 'downloads'>('installs');
+  const [appStatsSearch, setAppStatsSearch] = useState('');
   const [loadingPortalSettings, setLoadingPortalSettings] = useState(false);
   const [savingPortalSettings, setSavingPortalSettings] = useState(false);
   const [portalSettingsMsg, setPortalSettingsMsg] = useState("");
@@ -195,8 +202,11 @@ export default function StudentPortalHubModal({
         const json = await res.json();
         if (json?.settings) {
           setPortalSettings(json.settings);
-          return;
         }
+        if (json?.app_stats) {
+          setAppStats(json.app_stats);
+        }
+        return;
       }
       // Fallback
       const { data } = await supabase
@@ -733,7 +743,7 @@ export default function StudentPortalHubModal({
           { id: "search_logs", label: "سجلات البحث 🔍", color: "#8b5cf6" },
           { id: "fraud", label: "رادار الأجهزة المشتركة 🚨", color: "#ef4444" },
           { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" },
-          { id: "advanced_settings", label: "إعدادات متقدمة ⚙️", color: "#64748b" }
+          { id: "advanced_settings", label: "الإعدادات المتقدمة وتطبيق الأندرويد 📱⚙️", color: "#10b981" }
         ].map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -770,6 +780,42 @@ export default function StudentPortalHubModal({
         {activeTab === "overview" && (
           <div className="animate-fade-in">
             
+            {/* بطاقة رصد تطبيق الأندرويد السريعة للوصول المباشر */}
+            <div 
+              onClick={() => setActiveTab("advanced_settings")}
+              style={{
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
+                borderRadius: "14px",
+                padding: "14px 18px",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                cursor: "pointer",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.25)",
+                transition: "transform 0.15s ease"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "26px" }}>📱</span>
+                <div>
+                  <div style={{ fontSize: "14.5px", fontWeight: "bold", color: "#6ee7b7", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span>تطبيق الأندرويد الجديد (v1.0.6)</span>
+                    <span style={{ fontSize: "11px", background: "rgba(16, 185, 129, 0.25)", color: "#a7f3d0", padding: "2px 8px", borderRadius: "10px", fontWeight: "bold" }}>
+                      {appStats?.installed_count ?? 0} طالب مثبت
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "3px" }}>
+                    انقر هنا للدخول إلى الإعدادات المتقدمة ورصد التحميلات والتثبيت ونشر الشاشة للطلاب
+                  </div>
+                </div>
+              </div>
+              <span style={{ fontSize: "12px", color: "#38bdf8", fontWeight: "bold", background: "rgba(56, 189, 248, 0.15)", padding: "6px 12px", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.35)", whiteSpace: "nowrap" }}>
+                الإعدادات المتقدمة ⚙️ ↗
+              </span>
+            </div>
+
             {/* بطاقات الإحصائيات السريعة */}
             <div
               style={{
@@ -1928,6 +1974,354 @@ export default function StudentPortalHubModal({
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+                {/* ── قسم تتبع تطبيق الأندرويد الجديد ─────────────────── */}
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)",
+                  border: "1px solid rgba(56, 189, 248, 0.25)",
+                  borderRadius: "16px",
+                  padding: "20px",
+                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)"
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <div style={{ fontWeight: "bold", color: "#38bdf8", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Smartphone size={18} color="#38bdf8" />
+                        رصد تثبيت وتحميل تطبيق الأندرويد الجديد (v1.0.6)
+                      </div>
+                      <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "3px" }}>
+                        إحصائيات فورية ترصد تثبيت الطلاب الفعلي للتطبيق بنظام إشعارات Firebase
+                      </div>
+                    </div>
+                    <div style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(16, 185, 129, 0.12)",
+                      border: "1px solid rgba(16, 185, 129, 0.3)",
+                      padding: "4px 10px",
+                      borderRadius: "20px",
+                      color: "#34d399",
+                      fontSize: "11px",
+                      fontWeight: "bold"
+                    }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981", display: "inline-block" }}></span>
+                      حماية وأمان أندرويد 100%
+                    </div>
+                  </div>
+
+                  {/* البطاقات الإحصائية */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px", marginBottom: "16px" }}>
+                    {/* بطاقة التثبيت الفعلي */}
+                    <div style={{
+                      background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.06) 100%)",
+                      border: "1px solid rgba(16, 185, 129, 0.3)",
+                      borderRadius: "14px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between"
+                    }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ color: "#a7f3d0", fontSize: "12px", fontWeight: "bold" }}>الطلاب الذين ثبتوا التطبيق</span>
+                          <Smartphone size={20} color="#10b981" />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
+                          <span style={{ fontSize: "28px", fontWeight: "900", color: "#ffffff" }}>
+                            {appStats?.installed_count ?? 0}
+                          </span>
+                          <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+                            طالباً ({appStats?.total_students ? (((appStats.installed_count || 0) / appStats.total_students) * 100).toFixed(1) : 0}% من الدفعة)
+                          </span>
+                        </div>
+                        <div style={{ color: "#6ee7b7", fontSize: "11px", marginTop: "4px" }}>
+                          ✓ سجلوا أجهزتهم وتصلهم الإشعارات حتى والتطبيق مغلق
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAppStatsViewMode('installs');
+                          setShowAppStatsList(true);
+                        }}
+                        disabled={!appStats?.installed_count}
+                        style={{
+                          marginTop: "14px",
+                          background: appStats?.installed_count ? "rgba(16, 185, 129, 0.2)" : "rgba(255,255,255,0.05)",
+                          border: `1px solid ${appStats?.installed_count ? "rgba(16, 185, 129, 0.4)" : "rgba(255,255,255,0.1)"}`,
+                          color: appStats?.installed_count ? "#6ee7b7" : "#64748b",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          cursor: appStats?.installed_count ? "pointer" : "default",
+                          fontSize: "11.5px",
+                          fontWeight: "bold",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <Users size={13} />
+                        عرض قائمة الطلاب المثبتين ({appStats?.installed_count || 0})
+                      </button>
+                    </div>
+
+                    {/* بطاقة التحميل والنقر */}
+                    <div style={{
+                      background: "linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(2, 132, 199, 0.06) 100%)",
+                      border: "1px solid rgba(56, 189, 248, 0.3)",
+                      borderRadius: "14px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between"
+                    }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ color: "#bae6fd", fontSize: "12px", fontWeight: "bold" }}>الطلاب الذين نقروا لتحميل الـ APK</span>
+                          <Download size={20} color="#38bdf8" />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "8px" }}>
+                          <span style={{ fontSize: "28px", fontWeight: "900", color: "#ffffff" }}>
+                            {appStats?.downloads_count ?? 0}
+                          </span>
+                          <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+                            طالباً ({appStats?.total_download_clicks ?? 0} إجمالي النقرات)
+                          </span>
+                        </div>
+                        <div style={{ color: "#7dd3fc", fontSize: "11px", marginTop: "4px" }}>
+                          ✓ بدأوا تنزيل ملف التحديث ArtEdu-Student-Portal-Release.apk
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAppStatsViewMode('downloads');
+                          setShowAppStatsList(true);
+                        }}
+                        disabled={!appStats?.downloads_count}
+                        style={{
+                          marginTop: "14px",
+                          background: appStats?.downloads_count ? "rgba(56, 189, 248, 0.2)" : "rgba(255,255,255,0.05)",
+                          border: `1px solid ${appStats?.downloads_count ? "rgba(56, 189, 248, 0.4)" : "rgba(255,255,255,0.1)"}`,
+                          color: appStats?.downloads_count ? "#7dd3fc" : "#64748b",
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          cursor: appStats?.downloads_count ? "pointer" : "default",
+                          fontSize: "11.5px",
+                          fontWeight: "bold",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px"
+                        }}
+                      >
+                        <Users size={13} />
+                        عرض سجل التحميلات ({appStats?.downloads_count || 0})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* تفاصيل القائمة المنسدلة للطلاب (إذا نقر المشرف على أي زر) */}
+                  {showAppStatsList && (
+                    <div style={{
+                      background: "rgba(0, 0, 0, 0.35)",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: "12px",
+                      padding: "14px",
+                      marginBottom: "16px"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => setAppStatsViewMode('installs')}
+                            style={{
+                              background: appStatsViewMode === 'installs' ? "#10b981" : "rgba(255,255,255,0.06)",
+                              color: appStatsViewMode === 'installs' ? "#fff" : "#94a3b8",
+                              border: "none",
+                              padding: "4px 10px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              cursor: "pointer"
+                            }}
+                          >
+                            📱 المثبتين ({appStats?.installed_count || 0})
+                          </button>
+                          <button
+                            onClick={() => setAppStatsViewMode('downloads')}
+                            style={{
+                              background: appStatsViewMode === 'downloads' ? "#0284c7" : "rgba(255,255,255,0.06)",
+                              color: appStatsViewMode === 'downloads' ? "#fff" : "#94a3b8",
+                              border: "none",
+                              padding: "4px 10px",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              cursor: "pointer"
+                            }}
+                          >
+                            📥 المحمّلين ({appStats?.downloads_count || 0})
+                          </button>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <input
+                            type="text"
+                            placeholder="بحث بالاسم أو الكود..."
+                            value={appStatsSearch}
+                            onChange={(e) => setAppStatsSearch(e.target.value)}
+                            style={{
+                              background: "rgba(255,255,255,0.08)",
+                              border: "1px solid rgba(255,255,255,0.15)",
+                              borderRadius: "6px",
+                              padding: "3px 8px",
+                              color: "#fff",
+                              fontSize: "11px",
+                              width: "140px"
+                            }}
+                          />
+                          <button
+                            onClick={() => setShowAppStatsList(false)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#94a3b8",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              padding: "2px 6px"
+                            }}
+                          >
+                            إغلاق ✕
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+                        {(() => {
+                          const currentList = appStatsViewMode === 'installs' 
+                            ? (appStats?.installed_students || []) 
+                            : (appStats?.downloaded_students || []);
+                          const filtered = currentList.filter((s: any) => 
+                            !appStatsSearch || 
+                            (s.full_name || '').includes(appStatsSearch) || 
+                            (s.student_code || '').includes(appStatsSearch)
+                          );
+
+                          if (filtered.length === 0) {
+                            return (
+                              <div style={{ textAlign: "center", color: "#64748b", padding: "16px", fontSize: "12px" }}>
+                                لا توجد سجلات مطابقة حالياً
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11.5px" }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", textAlign: "right" }}>
+                                  <th style={{ padding: "6px 8px" }}>كود الطالب</th>
+                                  <th style={{ padding: "6px 8px" }}>اسم الطالب</th>
+                                  <th style={{ padding: "6px 8px" }}>الفرقة / السكشن</th>
+                                  <th style={{ padding: "6px 8px" }}>التاريخ والوقت</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {filtered.map((item: any, idx: number) => (
+                                  <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                    <td style={{ padding: "6px 8px", color: "#38bdf8", fontFamily: "monospace", fontWeight: "bold" }}>
+                                      {item.student_code}
+                                    </td>
+                                    <td style={{ padding: "6px 8px", color: "#e2e8f0" }}>{item.full_name}</td>
+                                    <td style={{ padding: "6px 8px", color: "#94a3b8" }}>
+                                      {item.academic_year || ''} {item.section ? `(سكشن ${item.section})` : ''}
+                                    </td>
+                                    <td style={{ padding: "6px 8px", color: "#64748b", fontSize: "10.5px" }}>
+                                      {item.installed_at || item.downloaded_at ? new Date(item.installed_at || item.downloaded_at).toLocaleString("ar-EG") : '—'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* بوكس الأمان والخصوصية للأندرويد */}
+                  <div style={{
+                    background: "rgba(16, 185, 129, 0.06)",
+                    border: "1px solid rgba(16, 185, 129, 0.2)",
+                    borderRadius: "10px",
+                    padding: "10px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px"
+                  }}>
+                    <ShieldCheck size={20} color="#10b981" style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: "11px", color: "#a7f3d0", lineHeight: "1.5" }}>
+                      <strong>معيار أمان أندرويد (Privacy-Safe):</strong> الرصد يعتمد كلياً على التوكن المشفر الآمن (Firebase Token) لخدمة الإشعارات الرسمية دون طلب أي صلاحيات حساسة، ولا يؤثر إطلاقاً على أمان هاتف الطالب أو استهلاك البطارية.
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── إعداد: تفعيل شاشة إشعار الترقية للطلاب (المفتاح الرئيسي) ── */}
+                <div style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: `1px solid ${portalSettings.student_migration_screen ? "#10b981" : "rgba(255,255,255,0.08)"}`,
+                  borderRadius: "14px",
+                  padding: "18px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  flexWrap: "wrap",
+                  transition: "border-color 0.3s ease"
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: "bold", color: "#e2e8f0", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Smartphone size={16} color={portalSettings.student_migration_screen ? "#10b981" : "#94a3b8"} />
+                      شاشة إشعار الترقية لتطبيق الأندرويد للطلاب
+                    </div>
+                    <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px", lineHeight: "1.6" }}>
+                      {portalSettings.student_migration_screen
+                        ? "🟢 الشاشة مفعلة للعامة — أي طالب يفتح البوابة القديمة ستظهر له شاشة بيانات حسابه وزر تحميل الـ APK"
+                        : "⚪ الشاشة في وضع التجربة الخاص بك فقط — الطلاب يدخلون بشكل طبيعي (أو يواجهون شاشة الصيانة إن كانت مفعلة)"}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const next = { ...portalSettings, student_migration_screen: !portalSettings.student_migration_screen };
+                      savePortalSettings(next);
+                    }}
+                    disabled={savingPortalSettings}
+                    style={{
+                      background: portalSettings.student_migration_screen ? "#10b98133" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${portalSettings.student_migration_screen ? "#10b981" : "rgba(255,255,255,0.15)"}`,
+                      borderRadius: "10px",
+                      padding: "10px 20px",
+                      color: portalSettings.student_migration_screen ? "#10b981" : "#94a3b8",
+                      fontWeight: "bold",
+                      fontSize: "13px",
+                      cursor: savingPortalSettings ? "wait" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      whiteSpace: "nowrap",
+                      transition: "all 0.2s ease",
+                      minWidth: "140px",
+                      justifyContent: "center"
+                    }}
+                  >
+                    {savingPortalSettings ? (
+                      <><RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} /> جارٍ الحفظ...</>
+                    ) : portalSettings.student_migration_screen ? (
+                      <><CheckCircle2 size={14} /> الشاشة منشورة للطلاب</>
+                    ) : (
+                      <>نشر الشاشة للطلاب</>
+                    )}
+                  </button>
+                </div>
 
                 {/* ── إعداد: إخفاء تاب الإنذارات ─────────────────── */}
                 <div style={{

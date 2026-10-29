@@ -17,7 +17,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
-import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
+import { getOrCreateDeviceInfo, isAndroidAppClient } from "@/lib/deviceFingerprint";
 import { normalizeAcademicDegree } from "@/lib/academicHelper";
 
 const LEVELS = [
@@ -37,6 +37,29 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
 
   // Main role mode switcher: Student vs Faculty (Students first)
   const [roleMode, setRoleMode] = useState<"student" | "faculty">("student");
+  const [isAndroidApp, setIsAndroidApp] = useState(false);
+
+  useEffect(() => {
+    const isApp = isAndroidAppClient();
+    if (isApp) {
+      setIsAndroidApp(true);
+      setRoleMode("student");
+    }
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "qr" || tabParam === "login" || tabParam === "first_time") {
+        setStudentTab(tabParam as any);
+      }
+      const modeParam = params.get("mode");
+      if (modeParam === "faculty" && !isApp) {
+        setRoleMode("faculty");
+      } else if (modeParam === "student") {
+        setRoleMode("student");
+      }
+    }
+  }, []);
 
   // ==========================================
   // FACULTY LOGIN STATE
@@ -477,8 +500,22 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </div>
 
-        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) */}
-        <div style={{
+        {/* If in Android APK, show return to app login */}
+        {isAndroidApp && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", padding: "8px 12px", background: "rgba(56, 189, 248, 0.1)", borderRadius: "10px", border: "1px solid rgba(56, 189, 248, 0.25)" }}>
+            <span style={{ fontSize: "12px", color: "#38bdf8", fontWeight: "bold" }}>📱 تطبيق الأندرويد • بوابة الطلاب</span>
+            <a 
+              href="/system" 
+              style={{ fontSize: "12px", color: "#fff", textDecoration: "none", background: "rgba(255, 255, 255, 0.15)", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}
+            >
+              العودة لتسجيل دخول التطبيق ↩
+            </a>
+          </div>
+        )}
+
+        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) - HIDDEN IN ANDROID APK */}
+        {!isAndroidApp && (
+          <div style={{
           display: "flex",
           background: "rgba(255, 255, 255, 0.08)",
           borderRadius: "14px",
@@ -535,6 +572,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             <span>أعضاء هيئة التدريس</span>
           </button>
         </div>
+        )}
 
         {/* ========================================================= */}
         {/* FACULTY MODE: DIRECT LOGIN ONLY (NO FIRST-TIME TAB) */}
