@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     );
 
     if (!uploadRes.success || !uploadRes.url) {
-      return noStoreJson({ error: uploadRes.error || 'تعذر حفظ الصورة على سيرفر التليجرام' }, { status: 502 });
+      return noStoreJson({ error: uploadRes.error || 'تعذر حفظ الصورة الشخصية على السيرفر' }, { status: 502 });
     }
 
     const avatarUrl = uploadRes.url;

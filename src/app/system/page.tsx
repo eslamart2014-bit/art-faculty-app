@@ -178,12 +178,14 @@ export default function SystemPage() {
   const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
   const [isSavingSelfie, setIsSavingSelfie] = useState<boolean>(false);
   const [selfieMsg, setSelfieMsg] = useState<string>("");
+  const [faceDetected, setFaceDetected] = useState<boolean>(false);
   const selfieVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const startSelfieCamera = async () => {
     try {
       setSelfiePhoto(null);
       setSelfieMsg("");
+      setFaceDetected(false);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
         audio: false
@@ -203,11 +205,13 @@ export default function SystemPage() {
       selfieStream.getTracks().forEach(t => t.stop());
       setSelfieStream(null);
     }
+    setFaceDetected(false);
   };
 
   const handleOpenSelfieModal = () => {
     setSelfiePhoto(null);
     setSelfieMsg("");
+    setFaceDetected(false);
     setShowSelfieModal(true);
     setTimeout(() => {
       startSelfieCamera();
@@ -220,6 +224,82 @@ export default function SystemPage() {
       selfieVideoRef.current.play().catch(() => {});
     }
   }, [showSelfieModal, selfieStream]);
+
+  // محرك التعرف الذكي على الوجه (Native FaceDetector API + Fast Canvas Analysis)
+  useEffect(() => {
+    if (!showSelfieModal || !selfieStream || selfiePhoto) {
+      setFaceDetected(false);
+      return;
+    }
+
+    let isMounted = true;
+    let timerId: any = null;
+
+    const checkFaceInFrame = async () => {
+      const video = selfieVideoRef.current;
+      if (!video || video.readyState < 2 || video.paused || video.ended) {
+        if (isMounted) timerId = setTimeout(checkFaceInFrame, 300);
+        return;
+      }
+
+      try {
+        // 1. فحص عبر FaceDetector API المدمجة بالمتصفح إن توفرت
+        if (typeof (window as any).FaceDetector === "function") {
+          const detector = new (window as any).FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+          const faces = await detector.detect(video);
+          if (isMounted) {
+            setFaceDetected(Array.isArray(faces) && faces.length > 0);
+          }
+        } else {
+          // 2. تحليل لوني دقيق وفائق السرعة لمحيط الوجه في منتصف الدائرة
+          const canvas = document.createElement("canvas");
+          canvas.width = 48;
+          canvas.height = 48;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          if (ctx) {
+            const vw = video.videoWidth || 640;
+            const vh = video.videoHeight || 640;
+            const size = Math.min(vw, vh) * 0.55;
+            const sx = (vw - size) / 2;
+            const sy = (vh - size) / 2;
+            ctx.drawImage(video, sx, sy, size, size, 0, 0, 48, 48);
+
+            const imgData = ctx.getImageData(0, 0, 48, 48).data;
+            let skinPixels = 0;
+            const total = 48 * 48;
+
+            for (let i = 0; i < imgData.length; i += 4) {
+              const r = imgData[i];
+              const g = imgData[i + 1];
+              const b = imgData[i + 2];
+              if (r > 60 && g > 40 && b > 20 && r > g && r > b && (r - g) > 12 && (r - b) > 14) {
+                skinPixels++;
+              }
+            }
+
+            const skinRatio = skinPixels / total;
+            const hasFace = skinRatio >= 0.20 && skinRatio <= 0.88;
+            if (isMounted) {
+              setFaceDetected(hasFace);
+            }
+          }
+        }
+      } catch (e) {
+        // تجاهل أي خطأ عابر في إطار الفيديو
+      }
+
+      if (isMounted) {
+        timerId = setTimeout(checkFaceInFrame, 250);
+      }
+    };
+
+    timerId = setTimeout(checkFaceInFrame, 350);
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [showSelfieModal, selfieStream, selfiePhoto]);
 
   const captureSelfieFrame = () => {
     if (!selfieVideoRef.current) return null;
@@ -239,7 +319,7 @@ export default function SystemPage() {
   const handleSaveSelfie = async () => {
     if (!selfiePhoto || !currentStudent) return;
     setIsSavingSelfie(true);
-    setSelfieMsg("جاري حفظ صورتك على سيرفر التليجرام...");
+    setSelfieMsg("جاري حفظ واعتماد صورتك الشخصية...");
     try {
       const res = await fetch("/api/students/avatar", {
         method: "POST",
@@ -255,7 +335,7 @@ export default function SystemPage() {
         try {
           localStorage.setItem("fania_student_avatar", data.avatar_url);
         } catch (e) {}
-        setSelfieMsg("تم حفظ وتعيين صورتك بنجاح! 🎉");
+        setSelfieMsg("تم حفظ صورتك الشخصية واعتمادها بنجاح! 🎉");
         setTimeout(() => {
           stopSelfieCamera();
           setShowSelfieModal(false);
@@ -2312,7 +2392,7 @@ export default function SystemPage() {
         <div className="student-top-bar">
           {/* قسم بيانات وهوية الطالب ودائرة الحساب */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, width: "100%" }}>
-            {/* الدائرة المخصصة للحساب مع علامة + كبيرة تملأ الدائرة بوضوح */}
+            {/* الدائرة المخصصة للحساب: تعرض الصورة الشخصية النقية بعد الالتقاط وتختفي علامة + تلقائياً */}
             <div 
               onClick={handleOpenSelfieModal}
               style={{ 
@@ -2325,40 +2405,26 @@ export default function SystemPage() {
                 background: (currentStudent?.avatar_url || currentStudent?.photo_url)
                   ? "#0f172a"
                   : "linear-gradient(135deg, #059669 0%, #10b981 100%)",
-                border: "2.5px solid #10b981",
-                boxShadow: "0 0 10px rgba(16, 185, 129, 0.45)",
+                border: (currentStudent?.avatar_url || currentStudent?.photo_url)
+                  ? "2px solid #38bdf8"
+                  : "2.5px solid #10b981",
+                boxShadow: (currentStudent?.avatar_url || currentStudent?.photo_url)
+                  ? "0 2px 8px rgba(0, 0, 0, 0.4)"
+                  : "0 0 10px rgba(16, 185, 129, 0.45)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
                 transition: "transform 0.15s ease"
               }}
-              title="اضغط هنا لالتقاط أو تغيير صورتك الشخصية 📷"
+              title={currentStudent?.avatar_url || currentStudent?.photo_url ? "صورتك الشخصية (اضغط لتغييرها) 📷" : "اضغط هنا لالتقاط صورتك الشخصية 📷"}
             >
               {currentStudent?.avatar_url || currentStudent?.photo_url ? (
-                <>
-                  <img 
-                    src={currentStudent.avatar_url || currentStudent.photo_url} 
-                    alt={currentStudent.full_name || "صورة الطالب"} 
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }} 
-                  />
-                  {/* علامة + تملأ الدائرة بوضوح */}
-                  <div style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(0, 0, 0, 0.35)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#ffffff",
-                    fontSize: "26px",
-                    fontWeight: "900",
-                    lineHeight: 1,
-                    textShadow: "0 2px 4px rgba(0,0,0,0.8)"
-                  }}>
-                    +
-                  </div>
-                </>
+                <img 
+                  src={currentStudent.avatar_url || currentStudent.photo_url} 
+                  alt={currentStudent.full_name || "صورة الطالب"} 
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                />
               ) : (
                 <div style={{
                   display: "flex",
@@ -4270,17 +4336,21 @@ export default function SystemPage() {
                 type="button"
                 onClick={() => { stopSelfieCamera(); setShowSelfieModal(false); setSelfiePhoto(null); setSelfieMsg(""); }}
                 style={{
-                  background: "rgba(239, 68, 68, 0.25)",
-                  color: "#ef4444",
-                  border: "1px solid rgba(239, 68, 68, 0.5)",
-                  borderRadius: "8px",
-                  padding: "5px 10px",
-                  fontSize: "11px",
-                  fontWeight: "bold",
-                  cursor: "pointer"
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  background: "rgba(255, 255, 255, 0.12)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  padding: 0
                 }}
+                title="إغلاق"
               >
-                إلغاء ✕
+                <X size={15} />
               </button>
             </div>
 
@@ -4309,28 +4379,35 @@ export default function SystemPage() {
                       transform: "scaleX(-1)"
                     }}
                   />
-                  {/* إطار دائري لتوجيه الوجه */}
+                  {/* إطار دائري لتوجيه الوجه مع التعرف الذكي على الوجه */}
                   <div style={{
                     position: "absolute",
-                    width: "220px",
-                    height: "220px",
+                    width: "230px",
+                    height: "230px",
                     borderRadius: "50%",
-                    border: "3px dashed #10b981",
-                    boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 25px rgba(16, 185, 129, 0.4)",
+                    border: faceDetected ? "3.5px solid #10b981" : "2.5px dashed rgba(56, 189, 248, 0.75)",
+                    boxShadow: faceDetected 
+                      ? "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 30px rgba(16, 185, 129, 0.75)"
+                      : "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.3)",
                     pointerEvents: "none",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
+                    transition: "all 0.25s ease"
                   }}>
                     <span style={{
-                      color: "#34d399",
+                      color: faceDetected ? "#34d399" : "#38bdf8",
                       fontSize: "11px",
                       fontWeight: "bold",
-                      background: "rgba(0, 0, 0, 0.65)",
+                      background: "rgba(0, 0, 0, 0.75)",
+                      border: faceDetected ? "1px solid #10b981" : "1px solid rgba(56, 189, 248, 0.3)",
                       padding: "4px 10px",
-                      borderRadius: "6px"
+                      borderRadius: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "5px"
                     }}>
-                      اضبط وجهك داخل الدائرة 👤
+                      {faceDetected ? "🟢 تم التعرف على الوجه بنجاح ✅" : "👤 اضبط وجهك داخل الدائرة"}
                     </span>
                   </div>
                 </>
@@ -4401,20 +4478,27 @@ export default function SystemPage() {
                       height: "64px",
                       borderRadius: "50%",
                       background: "#ffffff",
-                      border: "4px solid #10b981",
-                      boxShadow: "0 0 20px rgba(16, 185, 129, 0.7)",
+                      border: faceDetected ? "4px solid #10b981" : "4px solid #38bdf8",
+                      boxShadow: faceDetected ? "0 0 25px rgba(16, 185, 129, 0.9)" : "0 0 15px rgba(56, 189, 248, 0.5)",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      outline: "none"
+                      outline: "none",
+                      transition: "all 0.2s ease"
                     }}
                     title="التقاط الصورة الشخصية"
                   >
-                    <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "#059669" }} />
+                    <div style={{
+                      width: "46px",
+                      height: "46px",
+                      borderRadius: "50%",
+                      background: faceDetected ? "#059669" : "#0284c7",
+                      transition: "all 0.2s ease"
+                    }} />
                   </button>
-                  <span style={{ color: "#34d399", fontSize: "11px", fontWeight: "bold" }}>
-                    التقاط الصورة الشخصية 📸
+                  <span style={{ color: faceDetected ? "#34d399" : "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>
+                    {faceDetected ? "الوجه جاهز! اضغط للالتقاط 📸" : "التقاط الصورة الشخصية 📸"}
                   </span>
                 </div>
               ) : (
