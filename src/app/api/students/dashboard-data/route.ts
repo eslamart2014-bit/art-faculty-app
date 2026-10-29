@@ -110,6 +110,14 @@ export async function GET(request: Request) {
 
     const isActivated = Boolean(accountData?.is_pin_used || accountData?.status === 'active' || accountData?.activated_by);
 
+    let studentAvatar: string | null = null;
+    if (student.telegram_browser_id) {
+      try {
+        const parsed = JSON.parse(student.telegram_browser_id);
+        studentAvatar = parsed.avatar_url || null;
+      } catch (e) {}
+    }
+
     // كائن طالب آمن ومجرد من أي بيانات حساسة
     const safeStudent = {
       id: student.id,
@@ -118,6 +126,7 @@ export async function GET(request: Request) {
       academic_year: student.academic_year,
       section: student.section,
       status: isActivated ? 'active' : (accountData?.status || 'pending'),
+      avatar_url: studentAvatar,
     };
 
     // 2. جلب الحضور، التقييمات، التسليمات، والمقررات بالتوازي الفوري (Promise.all) لتسريع الاستجابة
