@@ -19,10 +19,10 @@ export interface LockerReceiptData {
 }
 
 /**
- * توليد كود HTML الأنيق والمتجاوب لاستمارة الدولاب
- * مصمم ليتناسب تماماً مع طباعة A4 وشاشات الموبايل بدون أي تشوه
+ * توليد كود الـ HTML الداخلي للورقة A4 (بدون Doctype أو tags خارجية)
+ * ليتم استخدامه مباشرة في التحويل إلى PDF بدون أي تشوه أو صفحات فارغة
  */
-export function generateLockerReceiptHtml(data: LockerReceiptData, isForPdfExport = false): string {
+export function getLockerReceiptPaperHtml(data: LockerReceiptData): string {
   const dateStr = data.date || new Date().toLocaleDateString('ar-EG', {
     year: 'numeric',
     month: '2-digit',
@@ -36,17 +36,113 @@ export function generateLockerReceiptHtml(data: LockerReceiptData, isForPdfExpor
   const rowsHtml = names
     .map((name, idx) => `
     <tr>
-      <td style="width: 10%; padding: 8px 4px; border: 1px solid #000; text-align: center; font-weight: bold;">${idx + 1}</td>
-      <td style="width: 60%; padding: 8px 12px; border: 1px solid #000; text-align: right; font-weight: bold; font-size: 15px;">${name}</td>
-      <td style="width: 30%; padding: 8px 6px; border: 1px solid #000; text-align: center; color: #555; font-size: 13px;">................................</td>
+      <td style="border: 2px solid #000; padding: 8px 6px; text-align: center; font-weight: 800; font-size: 14px; width: 10%; color: #000;">${idx + 1}</td>
+      <td style="border: 2px solid #000; padding: 8px 14px; text-align: right; font-weight: 800; font-size: 15px; width: 60%; color: #000;">${name}</td>
+      <td style="border: 2px solid #000; padding: 8px 6px; text-align: center; color: #555; font-size: 13px; width: 30%;">................................</td>
     </tr>
   `)
     .join('');
 
   // توليد محتوى مستطيل الأسماء للقص واللصق على الدولاب
   const namesBoxHtml = names
-    .map((name) => `<div style="border-bottom: 2px solid #000; height: calc(100% / ${capacity}); display: flex; align-items: center; justify-content: center; padding: 0 8px; font-weight: bold; font-size: 15px; color: #000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${name}</div>`)
+    .map((name) => `<div style="border-bottom: 2px solid #000; height: calc(100% / ${capacity}); display: flex; align-items: center; justify-content: center; padding: 0 8px; font-weight: 800; font-size: 15px; color: #000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box;">${name}</div>`)
     .join('');
+
+  return `
+    <div style="width: 794px; min-height: 1115px; background: #ffffff; color: #000000; padding: 35px 40px; box-sizing: border-box; font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; direction: rtl; text-align: center; margin: 0 auto;">
+      <!-- الترويسة العليا -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000000; padding-bottom: 12px; margin-bottom: 16px;">
+        <div style="text-align: right; line-height: 1.4;">
+          <div style="font-size: 15px; font-weight: 800; color: #000;">جامعة قنا</div>
+          <div style="font-size: 15px; font-weight: 800; color: #111;">كلية التربية النوعية</div>
+          <div style="font-size: 15px; font-weight: 800; color: #111;">قسم التربية الفنية</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="width: 52px; height: 52px; border: 2px solid #000; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; background: #f8fafc;">
+            🎨
+          </div>
+        </div>
+        <div style="text-align: left; font-size: 13px; font-weight: 800; line-height: 1.6; color: #000;">
+          <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
+          <div>مشرف النظام: ${supervisor}</div>
+        </div>
+      </div>
+
+      <h2 style="font-size: 22px; font-weight: 900; margin: 12px 0 16px 0; text-decoration: underline; color: #000; letter-spacing: 0.5px;">
+        استمارة تسجيل وتخصيص دولاب طلاب
+      </h2>
+
+      <!-- جدول بيانات الدولاب الأساسية -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; font-weight: bold; border: 2px solid #000;">
+        <thead>
+          <tr style="background-color: #f1f5f9;">
+            <th style="border: 2px solid #000; padding: 10px; width: 33%; font-size: 15px; color: #000;">الفرقة الدراسية</th>
+            <th style="border: 2px solid #000; padding: 10px; width: 34%; background-color: #e0f2fe; color: #0369a1; font-size: 15px;">كود الدولاب</th>
+            <th style="border: 2px solid #000; padding: 10px; width: 33%; font-size: 15px; color: #000;">رقم هاتف المندوب</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="border: 2px solid #000; padding: 10px; font-size: 16px; font-weight: 800; color: #000;">${data.cohort || 'عام'}</td>
+            <td style="border: 2px solid #000; padding: 10px; font-size: 28px; font-weight: 900; color: #0284c7; background: #fff;">${data.lockerCode}</td>
+            <td style="border: 2px solid #000; padding: 10px; font-size: 16px; font-weight: 800; direction: ltr; color: #000;">${data.phone}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- جدول أسماء الطلاب المشتركين والتوقيعات -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; font-weight: bold; border: 2px solid #000;">
+        <thead>
+          <tr style="background-color: #f1f5f9;">
+            <th style="border: 2px solid #000; padding: 8px; width: 10%; color: #000; font-size: 14px;">م</th>
+            <th style="border: 2px solid #000; padding: 8px 14px; width: 60%; text-align: right; color: #000; font-size: 14px;">اسم الطالب المشترك</th>
+            <th style="border: 2px solid #000; padding: 8px; width: 30%; color: #000; font-size: 14px;">التوقيع بالاستلام</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <!-- الإقرار والتعهد -->
+      <p style="font-size: 13.5px; margin: 18px 0 12px 0; font-weight: 800; color: #111; line-height: 1.6; text-align: justify; text-align-last: center;">
+        ⚠️ <strong>إقرار وتعهد:</strong> نقر نحن الطلاب المذكورة أسماؤنا أعلاه باستلام الدولاب الموضح كوده بحالة سليمة ونلتزم بالمحافظة التامة عليه ونظافته، وفي حالة حدوث أي تلفيات نتحمل كامل تكاليف الإصلاح.
+      </p>
+
+      <!-- خط القص -->
+      <div style="border-top: 2px dashed #000000; margin: 24px 0 12px 0;"></div>
+      <div style="font-size: 13px; font-weight: 800; color: #0284c7; margin-bottom: 14px;">
+        ✂️ يتم قص هذا الجزء ولصقه على باب الدولاب من الخارج لتعريف أصحابه
+      </div>
+
+      <!-- بطاقة الكود والأسماء للقص -->
+      <div style="display: flex; justify-content: center; align-items: stretch; gap: 14px; margin-top: 10px;">
+        <div style="border: 3px double #000; width: 160px; height: 160px; font-size: 46px; font-weight: 900; display: flex; align-items: center; justify-content: center; background: #fafafa; color: #000; flex-shrink: 0;">
+          ${data.lockerCode}
+        </div>
+        <div style="border: 3px double #000; flex: 1; height: 160px; background: #fafafa; display: flex; flex-direction: column;">
+          ${namesBoxHtml}
+        </div>
+      </div>
+
+      <!-- تذييل الاستمارة وتوقيع المشرف -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #999; font-size: 13px; font-weight: 800; color: #000;">
+        <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
+        <div>توقيع مشرف المنظومة: ...........................................</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * توليد كود HTML الكامل عند المعاينة في المتصفح
+ */
+export function generateLockerReceiptHtml(data: LockerReceiptData, isForPdfExport = false): string {
+  if (isForPdfExport) {
+    return getLockerReceiptPaperHtml(data);
+  }
+
+  const paperContent = getLockerReceiptPaperHtml(data);
 
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -58,270 +154,57 @@ export function generateLockerReceiptHtml(data: LockerReceiptData, isForPdfExpor
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: "Cairo", system-ui, -apple-system, sans-serif;
       direction: rtl;
       text-align: center;
-      margin: 0;
-      padding: ${isForPdfExport ? '0' : '20px 14px'};
+      background: #0f172a;
       color: #000;
-      background: ${isForPdfExport ? '#ffffff' : '#0f172a'};
+      padding: 16px 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
       min-height: 100vh;
     }
-
-    .paper-container {
+    .preview-card {
       width: 100%;
-      max-width: 800px;
-      background: #ffffff;
-      color: #000;
-      padding: ${isForPdfExport ? '25px 35px' : '30px 24px'};
-      border-radius: ${isForPdfExport ? '0' : '16px'};
-      box-shadow: ${isForPdfExport ? 'none' : '0 20px 45px rgba(0,0,0,0.5)'};
-      border: ${isForPdfExport ? 'none' : '1px solid #334155'};
-      box-sizing: border-box;
-    }
-
-    h2, h3, h4 { margin: 0; }
-    h3 { font-weight: 800; font-size: 20px; color: #000; }
-    h4 { font-weight: 700; font-size: 16px; color: #222; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 14px;
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    th, td {
-      border: 1px solid #000;
-      padding: 8px 6px;
-      text-align: center;
-    }
-
-    th {
-      background-color: #f1f5f9;
-      color: #000;
-      font-size: 14px;
-    }
-
-    .divider {
-      border-top: 2px dashed #000;
-      margin: 22px 0 16px 0;
-      position: relative;
-    }
-
-    .small-pledge {
-      font-size: 13.5px;
-      margin-top: 14px;
-      margin-bottom: 6px;
-      font-weight: bold;
-      color: #111;
-      line-height: 1.6;
-    }
-
-    .cutline {
-      margin: 8px 0 14px 0;
-      font-size: 13px;
-      font-weight: 800;
-      color: #0284c7;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    /* مربع كود الدولاب للقص */
-    .codeBox {
-      border: 3px double #000;
-      width: 145px;
-      height: 145px;
-      font-size: 42px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fafafa;
-      color: #000;
-      flex-shrink: 0;
-    }
-
-    /* مستطيل الأسماء للقص واللصق على الدولاب */
-    .namesBox {
-      border: 3px double #000;
-      flex: 1;
-      min-width: 240px;
-      height: 145px;
-      background: #fafafa;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .boxes-wrapper {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 14px;
+      max-width: 820px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      overflow: hidden;
       margin-top: 10px;
-      flex-wrap: wrap;
     }
-
-    /* الطباعة على الورق A4 */
-    @page { size: A4 portrait; margin: 10mm; }
     @media print {
-      body { margin: 0; padding: 0; background: #fff; }
+      body { background: #fff; padding: 0; }
       .no-print { display: none !important; }
-      .paper-container { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+      .preview-card { box-shadow: none; border-radius: 0; max-width: 100%; }
     }
   </style>
 </head>
 <body>
-
-  <!-- شريط الأدوات العلوي للشاشة (يختفي عند الطباعة) -->
-  ${!isForPdfExport ? `
-  <div class="no-print" style="width: 100%; max-width: 800px; background: #1e293b; border: 1px solid #334155; padding: 14px 18px; border-radius: 14px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; box-sizing: border-box;">
+  <div class="no-print" style="width: 100%; max-width: 820px; background: #1e293b; border: 1px solid #334155; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <div style="font-size: 14px; font-weight: bold; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
       <span>📄</span>
       <span>استمارة تسجيل الدولاب (${data.lockerCode})</span>
     </div>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-      <button id="btnDownloadDirect" style="background: linear-gradient(135deg, #10b981, #059669); color: #fff; border: none; padding: 9px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 13.5px; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">
-        <span>💾</span>
-        <span>تحميل ملف PDF مباشر</span>
-      </button>
-      <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-family: inherit; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
-        <span>🖨️</span>
-        <span>طباعة</span>
+    <div style="display: flex; gap: 8px;">
+      <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px;">
+        🖨️ طباعة
       </button>
     </div>
   </div>
-  ` : ''}
 
-  <div class="paper-container" id="printable-locker-form">
-    <!-- الترويسة العليا -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 14px;">
-      <div style="text-align: right;">
-        <h4 style="font-size: 14px;">جامعة قنا</h4>
-        <h4 style="font-size: 14px;">كلية التربية النوعية</h4>
-        <h4 style="font-size: 14px;">قسم التربية الفنية</h4>
-      </div>
-      <div style="text-align: center;">
-        <div style="width: 48px; height: 48px; border: 2px solid #000; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; background: #f8fafc;">
-          🎨
-        </div>
-      </div>
-      <div style="text-align: left; font-size: 12.5px; font-weight: bold; line-height: 1.6;">
-        <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
-        <div>مشرف النظام: ${supervisor}</div>
-      </div>
-    </div>
-
-    <h3 style="margin: 12px 0 16px 0; text-decoration: underline; font-size: 21px; letter-spacing: 0.5px;">
-      استمارة تسجيل وتخصيص دولاب طلاب
-    </h3>
-
-    <!-- جدول بيانات الدولاب الأساسية -->
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 33%;">الفرقة الدراسية</th>
-          <th style="width: 34%; background: #e0f2fe; color: #0369a1;">كود الدولاب</th>
-          <th style="width: 33%;">رقم هاتف المندوب</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="font-size: 15px;">${data.cohort || 'عام'}</td>
-          <td style="font-size: 26px; font-weight: 900; color: #0284c7; padding: 10px 4px;">${data.lockerCode}</td>
-          <td dir="ltr" style="font-size: 15px; font-weight: bold;">${data.phone}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- جدول أسماء الطلاب المشتركين والتوقيعات -->
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 10%;">م</th>
-          <th style="width: 60%; text-align: right; padding-right: 12px;">اسم الطالب المشترك</th>
-          <th style="width: 30%;">التوقيع بالاستلام</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-    </table>
-
-    <p class="small-pledge">
-      ⚠️ <strong>إقرار وتعهد:</strong> نقر نحن الطلاب المذكورة أسماؤنا أعلاه باستلام الدولاب الموضح كوده بحالة سليمة ونلتزم بالمحافظة التامة عليه ونظافته، وفي حالة حدوث أي تلفيات نتحمل كامل تكاليف الإصلاح.
-    </p>
-
-    <div class="divider"></div>
-
-    <div class="cutline">
-      <span>✂️</span>
-      <span>يتم قص هذا الجزء ولصقه على باب الدولاب من الخارج لتعريف أصحابه</span>
-    </div>
-
-    <!-- بطاقة القص واللصق على الدولاب -->
-    <div class="boxes-wrapper">
-      <div class="codeBox">
-        ${data.lockerCode}
-      </div>
-      <div class="namesBox">
-        ${namesBoxHtml}
-      </div>
-    </div>
-
-    <!-- تذييل الاستمارة وتوقيع المشرف -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid #ccc; font-size: 13px; font-weight: bold;">
-      <div>تاريخ التسجيل: <span style="direction: ltr; display: inline-block;">${dateStr}</span></div>
-      <div>توقيع مشرف المنظومة: ...........................................</div>
-    </div>
+  <div class="preview-card" id="paper-target">
+    ${paperContent}
   </div>
-
-  ${!isForPdfExport ? `
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script>
-    document.getElementById('btnDownloadDirect')?.addEventListener('click', function() {
-      const btn = this;
-      btn.innerText = '⏳ جاري تنزيل الـ PDF...';
-      btn.disabled = true;
-      const element = document.getElementById('printable-locker-form');
-      const opt = {
-        margin: [8, 8, 8, 8],
-        filename: 'استمارة_دولاب_${data.lockerCode}.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      html2pdf().set(opt).from(element).save().then(function() {
-        btn.innerText = '✅ تم التنزيل بنجاح!';
-        setTimeout(function() {
-          btn.innerHTML = '<span>💾</span><span>تحميل ملف PDF مباشر</span>';
-          btn.disabled = false;
-        }, 3000);
-      }).catch(function(err) {
-        alert('حدث خطأ أثناء إنشاء ملف PDF');
-        btn.innerText = '💾 تحميل ملف PDF مباشر';
-        btn.disabled = false;
-      });
-    });
-  </script>
-  ` : ''}
-
 </body>
 </html>`;
 }
 
 /**
- * الوظيفة الرئيسية: تنزيل استمارة الدولاب كملف PDF تلقائياً ومباشرة
- * تدعم تطبيق الأندرويد (DownloadManager) والمتصفحات العادية بسلاسة تامة وبدون أي تشوه في التنسيق
+ * تنزيل استمارة الدولاب كملف PDF بدون صفحات فارغة
  */
 export async function downloadLockerReceiptPdf(
   data: LockerReceiptData,
@@ -336,23 +219,26 @@ export async function downloadLockerReceiptPdf(
   notify('جاري إعداد استمارة الـ PDF...');
 
   try {
-    // 1. إنشاء حاوية مؤقتة لتنسيق A4 القياسي
+    // 1. إنشاء الحاوية عند النقطة (0,0) بدون إزاحة x سالبة لتفادي الصفحات الفارغة في html2canvas
     const container = document.createElement('div');
     container.id = 'locker-pdf-render-temp';
     container.style.position = 'fixed';
-    container.style.left = '-9999px';
     container.style.top = '0';
-    container.style.width = '794px'; // 210mm at 96 DPI
+    container.style.left = '0';
+    container.style.width = '794px';
     container.style.background = '#ffffff';
     container.style.color = '#000000';
     container.style.direction = 'rtl';
-    container.style.zIndex = '-9999';
+    container.style.zIndex = '-9999'; // خلف محتوى الصفحة ليختفي عن عيني المستخدم
+    container.style.pointerEvents = 'none';
 
-    // حقن كود الـ HTML النقي المجهز للـ PDF
-    container.innerHTML = generateLockerReceiptHtml(data, true);
+    // حقن كود الورقة النقي
+    container.innerHTML = getLockerReceiptPaperHtml(data);
     document.body.appendChild(container);
 
-    // 2. تحميل مكتبة html2pdf ديناميكياً
+    // انتظار لحظي لضمان معالجة الخطوط وحساب أبعاد العناصر في الـ DOM
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     notify('جاري توليد ملف الـ PDF عالي الدقة...');
     const html2pdf = (await import('html2pdf.js')).default;
     const safeFilename = `استمارة_دولاب_${data.lockerCode}.pdf`;
@@ -366,7 +252,11 @@ export async function downloadLockerReceiptPdf(
         useCORS: true,
         letterRendering: true,
         logging: false,
-        windowWidth: 800
+        windowWidth: 800,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0
       },
       jsPDF: {
         unit: 'mm' as const,
@@ -377,15 +267,14 @@ export async function downloadLockerReceiptPdf(
 
     const worker = html2pdf().set(opt).from(container);
 
-    // 3. فحص بيئة التشغيل: هل نحن داخل تطبيق الأندرويد أم متصفح ويب عادي؟
     const isApp = isAndroidAppClient();
 
     if (isApp) {
-      notify('جاري معالجة التحميل لتطبيق الأندرويد...');
-      // استخراج الـ PDF كـ Base64 لنقله للمخزن المؤقت والسماح لـ Android DownloadManager بتنزيله
+      notify('جاري تنزيل الملف لهاتفك...');
+      // 1. توليد Base64
       const pdfBase64 = await worker.outputPdf('datauristring');
 
-      // محاولة الحفظ المباشر إذا كان NativeBridge متوفراً
+      // 2. إذا كان NativeBridge متوفراً، حفظ مباشر
       const nativeBridge = (window as any).ArtEduNativeBridge;
       if (nativeBridge && typeof nativeBridge.saveBase64File === 'function') {
         try {
@@ -396,7 +285,7 @@ export async function downloadLockerReceiptPdf(
         } catch (e) {}
       }
 
-      // إرسال الـ Base64 إلى مسار التنزيل السحابي ليقوم نظام أندرويد بتحميله عبر DownloadManager
+      // 3. مسار السيرفر لتحميل الملف عبر Android DownloadManager
       const res = await fetch('/api/students/lockers/receipt-download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -409,21 +298,18 @@ export async function downloadLockerReceiptPdf(
 
       const resJson = await res.json();
       if (resJson?.downloadUrl) {
-        // توجيه المتصفح/الويب فيو للرابط المباشر، مما يُطلق Android DownloadManager فوراً
         window.location.href = resJson.downloadUrl;
         notify('تم بدء تنزيل الاستمارة بنجاح!');
       } else {
-        // بديل احتياطي: الحفظ عبر المتصفح
         await worker.save();
       }
     } else {
-      // متصفح عادي (كمبيوتر / آيفون): حفظ وتنزيل مباشر وفوري
+      // متصفح عادي
       notify('جاري التنزيل...');
       await worker.save();
       notify('تم تنزيل الاستمارة بنجاح!');
     }
 
-    // تنظيف الحاوية المؤقتة
     if (document.body.contains(container)) {
       document.body.removeChild(container);
     }
@@ -435,15 +321,11 @@ export async function downloadLockerReceiptPdf(
     if (container && document.body.contains(container)) {
       document.body.removeChild(container);
     }
-    // في حالة الفشل نفتح المعاينة كحل أخير
     previewLockerReceipt(data);
     return false;
   }
 }
 
-/**
- * فتح الاستمارة في نافذة جديدة للمعاينة والطباعة (بديل عند الحاجة)
- */
 export function previewLockerReceipt(data: LockerReceiptData) {
   if (typeof window === 'undefined') return;
   const html = generateLockerReceiptHtml(data, false);
@@ -455,10 +337,6 @@ export function previewLockerReceipt(data: LockerReceiptData) {
   }
 }
 
-/**
- * الدالة الافتراضية المتوافقة مع الكود السابق:
- * تنفذ التنزيل التلقائي لملف الـ PDF فوراً
- */
 export function printLockerReceipt(data: LockerReceiptData) {
   return downloadLockerReceiptPdf(data);
 }

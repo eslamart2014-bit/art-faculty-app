@@ -3861,10 +3861,13 @@ export default function SystemPage() {
             position: "fixed",
             top: 0,
             left: 0,
-            width: "100%",
-            height: "100%",
+            inset: 0,
+            width: "100vw",
+            height: "100dvh",
+            maxHeight: "100dvh",
             background: "#000",
-            zIndex: 99999,
+            zIndex: 999999,
+            overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             direction: "rtl"
@@ -3958,7 +3961,7 @@ export default function SystemPage() {
             </div>
 
             {/* معاينة الفيديو المباشر للكاميرا بدون أي وميض أو اهتزاز */}
-            <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: "#000" }}>
+            <div style={{ flex: "1 1 0%", minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: "#000" }}>
               {/* وميض الالتقاط البصري للشاشة (Shutter Flash) */}
               {isShutterFlashing && (
                 <div style={{
@@ -4030,10 +4033,12 @@ export default function SystemPage() {
             {/* شريط التحكم السفلي: التقاط لايف إجباري 100% بدون أي زر لرفع ملفات */}
             <div style={{
               padding: "16px 20px",
-              background: "rgba(0,0,0,0.92)",
+              paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
+              background: "rgba(0,0,0,0.95)",
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "center"
+              alignItems: "center",
+              flexShrink: 0
             }}>
               {/* مصغرات الصور السابقة للمشروع متعدد الزوايا */}
               <div style={{ display: "flex", gap: "6px", alignItems: "center", minWidth: "60px" }}>
@@ -4740,25 +4745,115 @@ export default function SystemPage() {
         جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
 
-      {/* نافذة كاميرا بطاقة الهوية */}
+      {/* نافذة كاميرا بطاقة الهوية الذكية المتوافقة مع جميع شاشات الهواتف */}
       {showIdCamera && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "#000", zIndex: 99999, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "12px", background: "rgba(0,0,0,0.8)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ color: "#fff", fontSize: "13px", fontWeight: "bold" }}>تصوير بطاقة الرقم القومي</span>
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          width: "100vw",
+          height: "100dvh",
+          maxHeight: "100dvh",
+          background: "#000",
+          zIndex: 999999,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          direction: "rtl"
+        }}>
+          {/* شريط العنوان وزر الإلغاء */}
+          <div style={{
+            flexShrink: 0,
+            padding: "12px 16px",
+            background: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+            zIndex: 10
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>🪪</span>
+              <span style={{ color: "#fff", fontSize: "14px", fontWeight: "bold" }}>تصوير بطاقة الرقم القومي</span>
+            </div>
             <button
               type="button"
               onClick={() => { stopCamera(); setShowIdCamera(false); }}
-              className="btn-compact"
-              style={{ background: "#ef4444", color: "#fff", border: "none", padding: "4px 8px", cursor: "pointer" }}
+              style={{
+                background: "rgba(239, 68, 68, 0.25)",
+                color: "#ef4444",
+                border: "1px solid rgba(239, 68, 68, 0.5)",
+                borderRadius: "8px",
+                padding: "6px 12px",
+                fontSize: "12px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
             >
               إلغاء ✕
             </button>
           </div>
-          <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <video ref={setVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <div style={{ position: "absolute", width: "85%", height: "55%", border: "2px dashed #38bdf8", borderRadius: "12px", pointerEvents: "none" }} />
+
+          {/* منطقة الكاميرا الحية مع إطار توجيه البطاقة */}
+          <div style={{
+            flex: "1 1 0%",
+            minHeight: 0,
+            position: "relative",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#05070f"
+          }}>
+            <video
+              ref={setVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            {/* إطار توجيه بطاقة الهوية */}
+            <div style={{
+              position: "absolute",
+              width: "84%",
+              maxWidth: "380px",
+              height: "56%",
+              maxHeight: "240px",
+              border: "3px dashed #38bdf8",
+              borderRadius: "14px",
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.45), 0 0 25px rgba(56, 189, 248, 0.4)",
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}>
+              <span style={{
+                color: "#38bdf8",
+                fontSize: "11px",
+                fontWeight: "bold",
+                background: "rgba(0, 0, 0, 0.65)",
+                padding: "4px 10px",
+                borderRadius: "6px"
+              }}>
+                ضع البطاقة داخل الإطار 🪪
+              </span>
+            </div>
           </div>
-          <div style={{ padding: "16px", background: "#000", textAlign: "center" }}>
+
+          {/* شريط التحكم السفلي الثابت مع زر الالتقاط الكبير البارز */}
+          <div style={{
+            flexShrink: 0,
+            padding: "16px 20px",
+            paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
+            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95), #070a12)",
+            borderTop: "1px solid rgba(56, 189, 248, 0.2)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            zIndex: 10
+          }}>
             <button
               type="button"
               onClick={async () => {
@@ -4774,8 +4869,28 @@ export default function SystemPage() {
                   setShowIdCamera(false);
                 }
               }}
-              style={{ width: "60px", height: "60px", borderRadius: "50%", background: "#fff", border: "4px solid #38bdf8", cursor: "pointer", margin: "0 auto" }}
-            />
+              style={{
+                width: "72px",
+                height: "72px",
+                borderRadius: "50%",
+                background: "#ffffff",
+                border: "5px solid #38bdf8",
+                boxShadow: "0 0 25px rgba(56, 189, 248, 0.8)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                outline: "none",
+                transition: "transform 0.15s ease",
+                margin: "0 auto"
+              }}
+              title="التقاط صورة البطاقة"
+            >
+              <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#0284c7" }} />
+            </button>
+            <span style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold" }}>
+              اضغط هنا لالتقاط الصورة 📸
+            </span>
           </div>
         </div>
       )}
