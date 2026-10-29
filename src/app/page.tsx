@@ -2,6 +2,7 @@
 
 import { preloadFacultyData } from "@/lib/preloadFacultyData";
 import { normalizeAcademicDegree } from "@/lib/academicHelper";
+import { isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -99,8 +100,41 @@ export default function Home() {
         const hasStudentSession = !!localStorage.getItem('fania_student_session');
 
         if (!isFaculty && hasStudentSession) {
+          let savedCode = '';
+          try {
+            const s = localStorage.getItem('fania_student_session');
+            if (s) {
+              const parsed = JSON.parse(s);
+              if (parsed?.student_code) savedCode = parsed.student_code;
+            }
+          } catch (e) {}
+          if (!savedCode) {
+            savedCode = localStorage.getItem('fania_student_code') || '';
+          }
+
+          const isNativeApp = isAndroidAppClient();
+          const isPWA = isInstalledPWA();
+          const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
+          const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1';
+
           setIsRedirectingToStudent(true);
-          window.location.replace('/system');
+
+          if (!isNativeApp && isPWA && !hasWebParam) {
+            window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
+            return;
+          }
+
+          if (isNativeApp) {
+            window.location.replace('/system');
+            return;
+          }
+
+          if (!isBypassed && !hasWebParam) {
+            window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
+            return;
+          }
+
+          window.location.replace('/system?web=1');
           return;
         }
       }

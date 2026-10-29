@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { isInstalledPWA } from "@/lib/deviceFingerprint";
 import { 
   Smartphone, 
   Download, 
@@ -46,6 +47,11 @@ export default function StudentMigrationNotice({
   const [showPin, setShowPin] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [customTestCode, setCustomTestCode] = useState("");
+  const [isPwa, setIsPwa] = useState(false);
+
+  useEffect(() => {
+    setIsPwa(isInstalledPWA());
+  }, []);
 
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
@@ -237,6 +243,30 @@ export default function StudentMigrationNotice({
               </>
             )}
           </p>
+
+          {/* PWA Legacy Alert */}
+          {isPwa && (
+            <div style={{
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.4)",
+              borderRadius: "14px",
+              padding: "10px 14px",
+              marginTop: "16px",
+              fontSize: "12.5px",
+              color: "#fde68a",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              lineHeight: 1.5,
+              textAlign: "right"
+            }}>
+              <AlertCircle size={20} color="#fbbf24" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <div>
+                <b style={{ color: "#fbbf24" }}>تنبيه لمستخدمي النسخة المثبتة سابقاً (PWA):</b><br />
+                لقد تم إيقاف الاعتماد على هذه النسخة القديمة من الشاشة الرئيسية، ويجب عليك الآن تثبيت التطبيق الرسمي الجديد (APK) بالأسفل لضمان استلام إشعارات التقييمات والحضور.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* CASE 1: Student is recognized on this device (show credentials) */}

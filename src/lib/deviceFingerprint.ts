@@ -102,31 +102,46 @@ export function isAndroidAppRequest(request?: Request | null, body?: any): boole
 export function isAndroidAppClient(): boolean {
   if (typeof window === 'undefined') return false;
   try {
+    // 1. Direct Java Bridge Object from official Android MainActivity
+    if (Boolean((window as any).ArtEduNativeBridge)) {
+      return true;
+    }
+    // 2. Custom User-Agent tag added in Android MainActivity
     const ua = (navigator.userAgent || '').toLowerCase();
     if (ua.includes('artedustudentapp') || ua.includes('artedu')) {
-      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
       return true;
     }
-    if (ua.includes('wv') && ua.includes('android')) {
-      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
-      return true;
-    }
-    if (ua.includes('version/4.0') && ua.includes('chrome') && ua.includes('mobile safari') && ua.includes('android')) {
-      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
-      return true;
-    }
+    // 3. Explicit window flag or query param injected by Android webview
     if ((window as any).isAndroidApp === true) {
-      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
-      return true;
-    }
-    if (localStorage.getItem('fania_is_android_app') === '1') {
       return true;
     }
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('app') === 'android' || urlParams.get('is_app') === '1') {
-      try { localStorage.setItem('fania_is_android_app', '1'); } catch (e) {}
       return true;
     }
+    // Clean up stale or poisoned storage key if present in normal web/PWA
+    if (localStorage.getItem('fania_is_android_app') === '1') {
+      localStorage.removeItem('fania_is_android_app');
+    }
+  } catch (e) {}
+  return false;
+}
+
+export function isInstalledPWA(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    // 1. Standalone display-mode (Android WebAPK, Chrome Add to Home Screen, iOS Safari Standalone)
+    const isStandaloneDisplay = typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
+    const isIosStandalone = (window.navigator as any).standalone === true;
+    
+    // 2. Launched via WebAPK / Android home screen shortcut referrer
+    const isWebApkReferrer = typeof document !== 'undefined' && (document.referrer || '').includes('android-app://');
+    
+    // 3. PWA query indicators or explicit PWA storage marker
+    const isPwaParam = window.location.search.includes('source=pwa') || window.location.search.includes('pwa=1');
+    const isPwaStored = localStorage.getItem('fania_pwa_installed') === '1' || localStorage.getItem('fania_app_mode') === 'student_pwa';
+    
+    return Boolean(isStandaloneDisplay || isIosStandalone || isWebApkReferrer || isPwaParam || isPwaStored);
   } catch (e) {}
   return false;
 }

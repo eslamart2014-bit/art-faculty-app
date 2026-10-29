@@ -37,7 +37,7 @@ import {
   KeyRound
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
-import { getOrCreateDeviceInfo } from "@/lib/deviceFingerprint";
+import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
 import { compressImageToWebP } from "@/lib/imageCompressor";
 import StudentLockerTab from "@/components/lockers/StudentLockerTab";
 import QRCode from "react-qr-code";
@@ -775,25 +775,53 @@ export default function SystemPage() {
 
       const isTestUpdate = params.get("test_update") === "1" || params.get("preview_update") === "1" || params.get("preview") === "1";
       const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
+      const hasWebParam = params.get("web") === "1" || params.get("bypass") === "1";
+      const isNativeApp = isAndroidAppClient();
+      const isPWA = isInstalledPWA();
 
+      // استخراج كود الطالب المحفوظ إن وُجد
+      let savedStudentCode = "";
+      try {
+        const s = localStorage.getItem("fania_student_session");
+        if (s) {
+          const parsed = JSON.parse(s);
+          if (parsed?.student_code) savedStudentCode = parsed.student_code;
+        }
+      } catch (e) {}
+      if (!savedStudentCode) {
+        savedStudentCode = localStorage.getItem("fania_student_code") || "";
+      }
+
+      // أ) وضع المعاينة التجريبي
       if (isTestUpdate) {
         setIsTestMigrationMode(true);
-        const testCode = params.get("code") || localStorage.getItem("fania_student_code") || "0687";
+        const testCode = params.get("code") || savedStudentCode || "0687";
         fetchMigrationInfo(testCode);
         setShowMigrationModal(true);
-      } else if (!isBypassed) {
-        fetch("/api/public/settings", { cache: "no-store" })
-          .then(r => r.json())
-          .then(settings => {
+        return;
+      }
+
+      // ب) إذا كان الطالب يفتح من اختصار PWA المثبت سابقاً على الهاتف (وليس تطبيق الأندرويد الأصلي):
+      // التوجيه الحتمي والفوري لشاشة ترقية الأندرويد لكي يحصل على كوده والباسورد وزر تحميل الـ APK
+      if (!isNativeApp && isPWA && !hasWebParam) {
+        const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
+        window.location.replace(targetUrl);
+        return;
+      }
+
+      // ج) إذا كان في متصفح عادي ولم يقم بالتجاوز مسبقاً، نفحص إعداد الترقية قبل أي دخول تلقائي للوحة القديمة
+      if (!isNativeApp && !isBypassed && !hasWebParam) {
+        try {
+          const settingsRes = await fetch("/api/public/settings", { cache: "no-store" });
+          if (settingsRes.ok) {
+            const settings = await settingsRes.json();
             if (settings?.student_migration_screen) {
-              const code = localStorage.getItem("fania_student_code");
-              if (code) {
-                fetchMigrationInfo(code);
-                setShowMigrationModal(true);
-              }
+              const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
+              window.location.replace(targetUrl);
+              return;
             }
-          })
-          .catch(() => {});
+          }
+        } catch (e) {}
       }
     }
 

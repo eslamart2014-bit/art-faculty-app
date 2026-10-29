@@ -35,9 +35,20 @@ export default function StudentUpdateNoticePage() {
         }
       }
 
-      // Default to representative active student for preview if nothing is in localStorage
+      // Default to representative active student only if explicitly requested in test/preview mode
       if (!activeCode) {
-        activeCode = "0687"; // روان محمد رمضان محمد (active student - PIN: 667849)
+        if (searchParams.get("test_update") === "1" || searchParams.get("preview") === "1") {
+          activeCode = "0687"; // روان محمد رمضان محمد (active student preview)
+        } else {
+          // No student logged in on this browser: render general welcome migration notice cleanly
+          setStudentInfo(null);
+          setApkInfo({
+            downloadUrl: "https://github.com/eslamart2014-bit/art-faculty-app/releases/download/student-app-v1.0.6/ArtEdu-Student-Portal-Release.apk",
+            version: "1.0.6"
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       const res = await fetch(`/api/students/migration-info?code=${encodeURIComponent(activeCode)}&test_update=1`);
@@ -89,7 +100,7 @@ export default function StudentUpdateNoticePage() {
         } catch (e) {}
       }
       
-      window.location.href = "/system";
+      window.location.href = "/system?web=1";
     }
   };
 
@@ -129,7 +140,7 @@ export default function StudentUpdateNoticePage() {
     );
   }
 
-  if (error || !studentInfo) {
+  if (error) {
     return (
       <div 
         dir="rtl"
