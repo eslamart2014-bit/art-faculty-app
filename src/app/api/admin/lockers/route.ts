@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { lockerStore } from '@/lib/lockerStore';
 import { requireCoordinator } from '@/lib/serverAuth';
+import { sendPushToStudents } from '@/lib/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,6 +131,19 @@ export async function POST(request: Request) {
       const { bookingId, confirmedBy } = body;
       const ok = await lockerStore.confirmBooking(bookingId, confirmedBy || 'م/ إسلام عبداللطيف');
       if (!ok) return NextResponse.json({ error: 'تعذر العثور على الحجز' }, { status: 404 });
+      try {
+        const booking = lockerStore.getBookings('confirmed').find((b) => b.id === bookingId);
+        if (booking && booking.student_codes && booking.student_codes.length) {
+          await sendPushToStudents(booking.student_codes, {
+            title: '🔐 تم اعتماد الدولاب',
+            body: 'تم اعتماد حجز الدولاب رقم (' + booking.locker_code + ') وتخصيصه لك رسميًا.',
+            type: 'locker',
+            id: 'locker_approved_' + booking.locker_code + '_' + booking.id,
+          });
+        }
+      } catch (pushErr) {
+        console.error('[push locker]', pushErr);
+      }
       return NextResponse.json({ success: true, message: 'تم تأكيد الحجز بنجاح' });
     }
 

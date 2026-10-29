@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1092521123200",
+    "project_id": "artedu-student",
+    "storage_bucket": "artedu-student.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1092521123200:android:fcee6eda2ff2fbf7a2b565",
+        "android_client_info": {
+          "package_name": "com.artedu.studentportal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD5NAtzsOAJb6xlgf3YieoDb_kDizi-CNM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

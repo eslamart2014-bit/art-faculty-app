@@ -11,6 +11,7 @@
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.3",
     "@yudiel/react-qr-scanner": "^2.1.2",
+    "firebase-admin": "^14.5.0",
     "html2pdf.js": "^0.14.0",
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.3",

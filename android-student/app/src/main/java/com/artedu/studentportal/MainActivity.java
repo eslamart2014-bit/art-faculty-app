@@ -134,6 +134,7 @@ public class MainActivity extends AppCompatActivity {
         setupBackNavigation();
         checkAndRequestPermissions();
         checkBatteryOptimization();
+        fetchFcmToken();
 
         // 2. Check for APK updates from server
         checkAppUpdates();
@@ -143,6 +144,18 @@ public class MainActivity extends AppCompatActivity {
         } else {
             webView.loadUrl(TARGET_URL);
         }
+    }
+
+    private void fetchFcmToken() {
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+                    .addOnSuccessListener(token -> {
+                        if (token != null && !token.isEmpty()) {
+                            getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE)
+                                    .edit().putString(StudentFcmService.KEY_FCM_TOKEN, token).apply();
+                        }
+                    });
+        } catch (Exception ignored) {}
     }
 
     @SuppressLint("BatteryLife")
@@ -383,6 +396,12 @@ public class MainActivity extends AppCompatActivity {
                 OneTimeWorkRequest checkRequest = new OneTimeWorkRequest.Builder(StudentNotificationWorker.class).build();
                 WorkManager.getInstance(MainActivity.this).enqueue(checkRequest);
             }
+        }
+
+        @JavascriptInterface
+        public String getPushToken() {
+            return getSharedPreferences(StudentNotificationWorker.PREFS_NAME, MODE_PRIVATE)
+                    .getString(StudentFcmService.KEY_FCM_TOKEN, "");
         }
 
         @JavascriptInterface

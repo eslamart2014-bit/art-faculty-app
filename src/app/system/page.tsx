@@ -760,6 +760,23 @@ export default function SystemPage() {
         if (currentStudent?.student_code) {
           const token = localStorage.getItem("fania_student_token") || "";
           bridge.saveStudentSession(currentStudent.student_code, currentStudent.full_name || "", token);
+          const registerPush = (tries: number) => {
+            try {
+              const pt = typeof bridge.getPushToken === "function" ? bridge.getPushToken() : "";
+              if (pt) {
+                localStorage.setItem("fania_push_token", pt);
+                fetch("/api/students/push-token", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify({ token: pt })
+                }).catch(() => {});
+              } else if (tries > 0) {
+                setTimeout(() => registerPush(tries - 1), 3000);
+              }
+            } catch (e) {}
+          };
+          registerPush(8);
         } else {
           bridge.clearStudentSession();
         }
@@ -1637,7 +1654,17 @@ export default function SystemPage() {
 
   // Handle Logout
   const handleLogout = () => {
-    fetch("/api/students/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+    const doLogoutRequest = () => fetch("/api/students/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+    let pushTok = "";
+    try { pushTok = localStorage.getItem("fania_push_token") || ""; localStorage.removeItem("fania_push_token"); localStorage.removeItem("fania_student_token"); } catch (e) {}
+    if (pushTok) {
+      // احذف رمز الجهاز قبل مسح الجلسة حتى لا تصل إشعارات الحساب السابق
+      fetch("/api/students/push-token", { method: "DELETE", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ token: pushTok }) })
+        .catch(() => {})
+        .finally(doLogoutRequest);
+    } else {
+      doLogoutRequest();
+    }
     localStorage.removeItem("fania_student_session");
     localStorage.removeItem("fania_student_code");
     localStorage.removeItem("fania_pending_reg_code");
