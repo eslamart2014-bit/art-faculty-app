@@ -18,7 +18,7 @@ import {
   ArrowRight,
   ShieldCheck
 } from "lucide-react";
-import { printLockerReceipt } from "@/lib/lockerReceipt";
+import { printLockerReceipt, downloadLockerReceiptPdf } from "@/lib/lockerReceipt";
 
 interface StudentLockerTabProps {
   student: {
@@ -48,6 +48,8 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
   const [successBooking, setSuccessBooking] = useState<any>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfStatusMsg, setPdfStatusMsg] = useState("");
 
   const fetchLockerStatus = async () => {
     setLoading(true);
@@ -176,17 +178,28 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
     }
   };
 
-  const handlePrint = (booking: any) => {
-    if (!booking) return;
-    printLockerReceipt({
-      bookingId: booking.id,
-      lockerCode: booking.locker_code,
-      cohort: booking.cohort,
-      phone: booking.representative_phone,
-      studentNames: booking.student_names,
-      studentCodes: booking.student_codes,
-      supervisorName: 'م/ إسلام عبداللطيف'
-    });
+  const handlePrint = async (booking: any) => {
+    if (!booking || downloadingPdf) return;
+    setDownloadingPdf(true);
+    setPdfStatusMsg("جاري تجهيز الاستمارة...");
+    try {
+      await downloadLockerReceiptPdf({
+        bookingId: booking.id,
+        lockerCode: booking.locker_code,
+        cohort: booking.cohort,
+        phone: booking.representative_phone,
+        studentNames: booking.student_names,
+        studentCodes: booking.student_codes,
+        supervisorName: 'م/ إسلام عبداللطيف'
+      }, (status) => setPdfStatusMsg(status));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => {
+        setDownloadingPdf(false);
+        setPdfStatusMsg("");
+      }, 2500);
+    }
   };
 
   if (loading) {
@@ -332,10 +345,11 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           <div style={{ display: "flex", justifyContent: "center" }}>
             <button
               onClick={() => handlePrint(booking)}
+              disabled={downloadingPdf}
               style={{
-                background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                background: downloadingPdf ? "#1e293b" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
                 color: "#fff",
-                border: "none",
+                border: downloadingPdf ? "1px solid #38bdf8" : "none",
                 padding: "14px 28px",
                 borderRadius: "12px",
                 fontWeight: "bold",
@@ -343,12 +357,12 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
-                cursor: "pointer",
+                cursor: downloadingPdf ? "wait" : "pointer",
                 boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)"
               }}
             >
               <Printer size={20} />
-              <span>طباعة الاستمارة الرسمية (PDF)</span>
+              <span>{downloadingPdf ? (pdfStatusMsg || "جاري تنزيل ملف الـ PDF...") : "تحميل الاستمارة الرسمية (PDF)"}</span>
             </button>
           </div>
         </div>
@@ -659,10 +673,11 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                     <div style={{ marginTop: "20px" }}>
                       <button
                         onClick={() => handlePrint(successBooking.booking)}
+                        disabled={downloadingPdf}
                         style={{
-                          background: "#2563eb",
+                          background: downloadingPdf ? "#1e293b" : "#2563eb",
                           color: "#fff",
-                          border: "none",
+                          border: downloadingPdf ? "1px solid #38bdf8" : "none",
                           padding: "12px 24px",
                           borderRadius: "10px",
                           fontWeight: "bold",
@@ -670,11 +685,11 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "8px",
-                          cursor: "pointer"
+                          cursor: downloadingPdf ? "wait" : "pointer"
                         }}
                       >
                         <Printer size={18} />
-                        <span>طباعة الاستمارة فوراً</span>
+                        <span>{downloadingPdf ? (pdfStatusMsg || "جاري التنزيل...") : "تحميل الاستمارة فوراً (PDF)"}</span>
                       </button>
                     </div>
                   </div>

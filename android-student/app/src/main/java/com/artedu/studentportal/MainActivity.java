@@ -417,6 +417,44 @@ public class MainActivity extends AppCompatActivity {
                 CookieManager.getInstance().flush();
             } catch (Exception ignored) {}
         }
+
+        @JavascriptInterface
+        public void saveBase64File(String base64Data, String filename, String mimeType) {
+            try {
+                String cleanBase64 = base64Data;
+                if (cleanBase64 != null && cleanBase64.contains(",")) {
+                    cleanBase64 = cleanBase64.substring(cleanBase64.indexOf(",") + 1);
+                }
+                if (cleanBase64 == null || cleanBase64.trim().isEmpty()) return;
+                byte[] pdfBytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT);
+                File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs();
+                }
+                String safeName = (filename != null && !filename.isEmpty()) ? filename : "استمارة_دولاب.pdf";
+                File destFile = new File(downloadsDir, safeName);
+                FileOutputStream fos = new FileOutputStream(destFile);
+                fos.write(pdfBytes);
+                fos.flush();
+                fos.close();
+
+                DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    dm.addCompletedDownload(
+                            safeName,
+                            "استمارة تسجيل الدولاب الرسمية",
+                            true,
+                            (mimeType != null && !mimeType.isEmpty()) ? mimeType : "application/pdf",
+                            destFile.getAbsolutePath(),
+                            destFile.length(),
+                            true
+                    );
+                }
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "تم تنزيل الاستمارة في مجلد التحميلات: " + safeName, Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "تعذر حفظ الملف محلياً", Toast.LENGTH_SHORT).show());
+            }
+        }
     }
 
     /**
