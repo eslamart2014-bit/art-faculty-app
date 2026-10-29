@@ -51,11 +51,11 @@ export async function getStaffAuthToken(): Promise<string | null> {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+      if (key && (key.startsWith('sb-') && key.endsWith('-auth-token') || key === 'supabase.auth.token')) {
         const val = localStorage.getItem(key);
         if (val) {
           const parsed = JSON.parse(val);
-          const t = parsed?.access_token || parsed?.currentSession?.access_token;
+          const t = parsed?.access_token || parsed?.currentSession?.access_token || parsed?.session?.access_token || parsed?.[0]?.access_token;
           if (t) return t;
         }
       }
@@ -92,10 +92,15 @@ export async function syncStaffSessionClient(forceToken?: string): Promise<boole
   return false;
 }
 
+export function notifyStaffAuthRequired(email?: string) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('staff-auth-required', { detail: { email } }));
+}
+
 /**
  * Universal authenticated fetch for faculty/admin routes.
  * Automatically injects the staff Bearer token and sets credentials: 'same-origin'.
- * Retries once with token refresh on 401.
+ * Retries once with token refresh on 401. If still 401, prompts re-auth modal.
  */
 export async function staffFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await getStaffAuthToken();
@@ -122,8 +127,18 @@ export async function staffFetch(url: string, init?: RequestInit): Promise<Respo
         await syncStaffSessionClient(newToken);
         headers.set('Authorization', `Bearer ${newToken}`);
         res = await fetch(url, { ...mergedInit, headers });
+      } else {
+        // Refresh token failed: trigger reauth prompt
+        notifyStaffAuthRequired();
       }
-    } catch (e) {}
+    } catch (e) {
+      notifyStaffAuthRequired();
+    }
+  }
+
+  // If still 401, trigger re-authentication modal
+  if (res.status === 401 && typeof window !== 'undefined') {
+    notifyStaffAuthRequired();
   }
 
   return res;

@@ -19,6 +19,7 @@ import SuggestionsChatModal from "@/components/SuggestionsChatModal";
 import AdminUsersModal from "@/components/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
 import StudentPortalHubModal from "@/components/StudentPortalHubModal";
+import StaffReauthModal from "@/components/StaffReauthModal";
 import { syncStaffSessionClient } from "@/lib/staffAuthFetch";
 
 function syncStaffSession(accessToken?: string | null) {
@@ -482,6 +483,8 @@ export default function Home() {
         user={user}
         onOpenIdentityModal={() => window.open('/coordinator', '_blank')}
       />
+
+      <StaffReauthModal />
     </div>
   );
 }

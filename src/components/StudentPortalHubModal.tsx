@@ -42,6 +42,7 @@ import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
 import { staffFetch } from "@/lib/staffAuthFetch";
+import StaffReauthModal from "@/components/StaffReauthModal";
 
 interface StudentPortalHubModalProps {
   isOpen: boolean;
@@ -3256,6 +3257,7 @@ export default function StudentPortalHubModal({
         </div>
       )}
 
+      <StaffReauthModal onSuccess={() => { fetchPortalStats(); fetchPortalSettings(); fetchCoordinatorStats(); }} />
     </div>
   );
 }

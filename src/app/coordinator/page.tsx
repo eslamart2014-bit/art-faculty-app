@@ -23,7 +23,8 @@ import {
   UserCheck
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { staffFetch, syncStaffSessionClient } from "@/lib/staffAuthFetch";
+import { staffFetch, syncStaffSessionClient, notifyStaffAuthRequired } from "@/lib/staffAuthFetch";
+import StaffReauthModal from "@/components/StaffReauthModal";
 import { formatStudentCode } from "@/lib/codeHelper";
 import QRScanner from "@/components/QRScanner";
 import { extractStudentCode } from "@/lib/scannerHelper";
@@ -121,6 +122,10 @@ export default function CoordinatorPortalPage() {
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data?.error?.includes("غير مصرح")) {
+          notifyStaffAuthRequired(user?.email || "eslam.art.2014@gmail.com");
+          return;
+        }
         alert(data.error || "تعذر البحث عن الطالب");
       } else {
         setSearchResult(data);
@@ -1010,6 +1015,7 @@ export default function CoordinatorPortalPage() {
         جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
 
+      <StaffReauthModal onSuccess={() => handleLookup()} />
     </div>
   );
 }
