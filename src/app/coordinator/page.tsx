@@ -55,10 +55,68 @@ export default function CoordinatorPortalPage() {
     };
   }, []);
 
+  // دالة موحدة لإرسال عمليات المنسق مع التوكن المعتمد
+  const sendCoordinatorAction = async (payload: any) => {
+    let token = "";
+    try {
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token || "";
+    } catch (e) {}
+
+    // فحص بديل مباشر من localStorage لتوكن Supabase
+    if (!token && typeof window !== "undefined") {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+            const val = localStorage.getItem(key);
+            if (val) {
+              const parsed = JSON.parse(val);
+              token = parsed?.access_token || parsed?.currentSession?.access_token || "";
+              if (token) break;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return fetch("/api/coordinator/action", {
+      method: "POST",
+      headers,
+      credentials: "same-origin",
+      body: JSON.stringify(payload),
+    });
+  };
+
   // التحقق من صلاحية المستخدم
   useEffect(() => {
     const checkAuth = async () => {
+      // تحميل فوري من الملف الشخصي المحفوظ
+      try {
+        const cached = localStorage.getItem('cached_profile');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setUser(parsed);
+          setCoordinatorName(parsed.full_name || "منسق معتمد");
+        }
+      } catch (e) {}
+
       const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          credentials: 'same-origin',
+        }).catch(() => {});
+      }
+
       if (!session) return;
 
       const { data: profile } = await supabase
@@ -88,14 +146,10 @@ export default function CoordinatorPortalPage() {
     setShowRegQr(false);
 
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "lookup",
-          student_code: code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "lookup",
+        student_code: code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
@@ -117,14 +171,10 @@ export default function CoordinatorPortalPage() {
 
     setActivatingAnim(true);
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "activate_student",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "activate_student",
+        student_code: searchResult.student.student_code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
@@ -163,14 +213,10 @@ export default function CoordinatorPortalPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "reject_incorrect_data",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "reject_incorrect_data",
+        student_code: searchResult.student.student_code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
@@ -194,14 +240,10 @@ export default function CoordinatorPortalPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "reset_other_sessions",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "reset_other_sessions",
+        student_code: searchResult.student.student_code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
@@ -223,14 +265,10 @@ export default function CoordinatorPortalPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "logout_all_devices",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "logout_all_devices",
+        student_code: searchResult.student.student_code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
@@ -253,14 +291,10 @@ export default function CoordinatorPortalPage() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/coordinator/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "reset_pin",
-          student_code: searchResult.student.student_code,
-          coordinator_name: coordinatorName || "منسق النظام",
-        })
+      const res = await sendCoordinatorAction({
+        action: "reset_pin",
+        student_code: searchResult.student.student_code,
+        coordinator_name: coordinatorName || "منسق النظام",
       });
 
       const data = await res.json();
