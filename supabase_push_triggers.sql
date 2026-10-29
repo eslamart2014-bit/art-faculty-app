@@ -4,10 +4,18 @@
 -- Supabase Dashboard > SQL Editor > New Query > اضغط Run
 -- =========================================================================
 
--- 1. تفعيل مكتبة الطلبات الشبكية السريعة في سوبابيس
+-- 1. جدول توكنات أجهزة الطلاب
+CREATE TABLE IF NOT EXISTS public.device_tokens (
+  token text PRIMARY KEY,
+  student_code text NOT NULL,
+  updated_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_student_code ON public.device_tokens(student_code);
+
+-- 2. تفعيل مكتبة الطلبات الشبكية السريعة في سوبابيس (pg_net)
 CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
--- 2. دالة إرسال الإشعار الفوري إلى سيرفر Vercel
+-- 3. دالة إرسال الإشعار الفوري إلى سيرفر Vercel
 CREATE OR REPLACE FUNCTION public.notify_push_webhook()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -38,14 +46,14 @@ BEGIN
 END;
 $$;
 
--- 3. تشغيل الإشعار الفوري عند تسجيل أو تعديل الحضور
+-- 4. تشغيل الإشعار الفوري عند تسجيل أو تعديل الحضور
 DROP TRIGGER IF EXISTS tr_push_attendance ON public.attendance;
 CREATE TRIGGER tr_push_attendance
 AFTER INSERT OR UPDATE ON public.attendance
 FOR EACH ROW
 EXECUTE FUNCTION public.notify_push_webhook();
 
--- 4. تشغيل الإشعار الفوري عند رصد تقييم جديد أو تحديث الدرجات
+-- 5. تشغيل الإشعار الفوري عند رصد تقييم جديد أو تحديث الدرجات
 DROP TRIGGER IF EXISTS tr_push_evaluations ON public.evaluations;
 CREATE TRIGGER tr_push_evaluations
 AFTER INSERT OR UPDATE ON public.evaluations

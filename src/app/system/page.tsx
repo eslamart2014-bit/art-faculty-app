@@ -767,9 +767,12 @@ export default function SystemPage() {
                 localStorage.setItem("fania_push_token", pt);
                 fetch("/api/students/push-token", {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { "x-student-token": token, "Authorization": "Bearer " + token } : {})
+                  },
                   credentials: "same-origin",
-                  body: JSON.stringify({ token: pt })
+                  body: JSON.stringify({ token: pt, student_code: currentStudent.student_code })
                 }).catch(() => {});
               } else if (tries > 0) {
                 setTimeout(() => registerPush(tries - 1), 3000);

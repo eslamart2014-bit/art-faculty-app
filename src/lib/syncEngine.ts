@@ -117,6 +117,13 @@ export const processQueue = async () => {
 
           if (toInsert.length > 0) {
             await supabase.from("attendance").insert(toInsert);
+            try {
+              fetch('/api/push/notify-attendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ student_ids: students.map((s: any) => s.id), course_id, date })
+              }).catch(() => {});
+            } catch (_) {}
           }
         }
         success = true;

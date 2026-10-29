@@ -511,6 +511,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             teacher_id: course.teacher_id
           }));
           await supabase.from("attendance").insert(inserts);
+          try {
+            fetch('/api/push/notify-attendance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ student_ids: toInsertIds, course_id: course.id, date: saveDate })
+            }).catch(() => {});
+          } catch (_) {}
         }
       } catch (err) {
         addToQueue('BULK_ATTENDANCE', { course_id: course.id, date: saveDate, presentIds: toInsertIds, absentIds: toDeleteIds, teacher_id: course.teacher_id });
@@ -799,6 +806,17 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           teacher_id: course.teacher_id
         }, { onConflict: 'course_id,student_id,date' });
       }
+      try {
+        fetch('/api/push/notify-attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_ids: scannedStudents.map((s: any) => s.id),
+            course_id: course.id,
+            date: saveDate
+          })
+        }).catch(() => {});
+      } catch (_) {}
     } catch (err) {
       addToQueue('CAMERA_ATTENDANCE', { course_id: course.id, date: saveDate, students: scannedStudents, teacher_id: course.teacher_id });
     }

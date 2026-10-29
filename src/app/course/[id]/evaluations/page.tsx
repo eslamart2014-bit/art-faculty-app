@@ -379,6 +379,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     };
 
     await supabase.from("courses").update({ custom_week_names: updatedCustomWeekNames }).eq("id", course.id);
+    try {
+      fetch('/api/push/notify-project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          course_id: course.id,
+          project_name: newProject.name,
+          max_score: newProject.max_score
+        })
+      }).catch(() => {});
+    } catch (_) {}
     
     setProjects(updatedProjects);
     setCourse({ ...course, custom_week_names: updatedCustomWeekNames });
@@ -902,6 +913,18 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         teacher_id: course.teacher_id,
         created_at: new Date().toISOString()
       }, { onConflict: 'course_id,student_id,project_name' });
+      try {
+        fetch('/api/push/notify-evaluation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_id: student.id,
+            course_id: course.id,
+            project_name: selectedProject.name,
+            score: scoreNum
+          })
+        }).catch(() => {});
+      } catch (_) {}
 
       // 2. Mark attendance if checked
       if (markAttendanceWithEval) {
