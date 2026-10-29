@@ -220,30 +220,30 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       {/* رأس التبويب */}
       <div style={{ 
         background: "linear-gradient(135deg, #1e293b, #0f172a)", 
-        padding: "18px 20px", 
-        borderRadius: "16px", 
+        padding: "12px 14px", 
+        borderRadius: "14px", 
         border: "1px solid #334155",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: "12px"
+        gap: "10px"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ background: "rgba(56, 189, 248, 0.15)", padding: "10px", borderRadius: "12px" }}>
-            <Archive size={26} color="#38bdf8" />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ background: "rgba(56, 189, 248, 0.15)", padding: "8px", borderRadius: "10px" }}>
+            <Archive size={20} color="#38bdf8" />
           </div>
           <div>
-            <h3 style={{ margin: 0, color: "#fff", fontSize: "17px", fontWeight: "bold" }}>
+            <h3 style={{ margin: 0, color: "#fff", fontSize: "14px", fontWeight: "bold" }}>
               منظومة دواليب الطلاب
             </h3>
-            <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "13px" }}>
+            <p style={{ margin: "2px 0 0 0", color: "#94a3b8", fontSize: "11px" }}>
               قسم التربية الفنية - كلية التربية النوعية - جامعة قنا
             </p>
           </div>
         </div>
 
-        <div style={{ fontSize: "12px", background: "rgba(255,255,255,0.05)", padding: "6px 14px", borderRadius: "20px", color: "#cbd5e1" }}>
+        <div style={{ fontSize: "11px", background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "20px", color: "#cbd5e1" }}>
           منسق الدواليب: <span style={{ color: "#38bdf8", fontWeight: "bold" }}>م/ إسلام عبداللطيف</span>
         </div>
       </div>
@@ -350,18 +350,18 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 background: downloadingPdf ? "#1e293b" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
                 color: "#fff",
                 border: downloadingPdf ? "1px solid #38bdf8" : "none",
-                padding: "14px 28px",
-                borderRadius: "12px",
+                padding: "10px 20px",
+                borderRadius: "10px",
                 fontWeight: "bold",
-                fontSize: "15px",
+                fontSize: "13px",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "8px",
                 cursor: downloadingPdf ? "wait" : "pointer",
                 boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)"
               }}
             >
-              <Printer size={20} />
+              <Printer size={16} />
               <span>{downloadingPdf ? (pdfStatusMsg || "جاري تنزيل ملف الـ PDF...") : "تحميل الاستمارة الرسمية (PDF)"}</span>
             </button>
           </div>
@@ -477,13 +477,13 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                 background: "linear-gradient(135deg, #d97706, #b45309)",
                 color: "#fff",
                 border: "none",
-                padding: "14px 28px",
-                borderRadius: "12px",
+                padding: "10px 20px",
+                borderRadius: "10px",
                 fontWeight: "bold",
-                fontSize: "15px",
+                fontSize: "13px",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "8px",
                 cursor: "pointer",
                 boxShadow: "0 4px 14px rgba(217, 119, 6, 0.35)"
               }}
@@ -678,10 +678,10 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                           background: downloadingPdf ? "#1e293b" : "#2563eb",
                           color: "#fff",
                           border: downloadingPdf ? "1px solid #38bdf8" : "none",
-                          padding: "12px 24px",
+                          padding: "10px 20px",
                           borderRadius: "10px",
                           fontWeight: "bold",
-                          fontSize: "14px",
+                          fontSize: "13px",
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "8px",

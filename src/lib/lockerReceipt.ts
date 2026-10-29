@@ -44,8 +44,9 @@ export function getLockerReceiptPaperHtml(data: LockerReceiptData): string {
     .join('');
 
   // توليد محتوى مستطيل الأسماء للقص واللصق على الدولاب
+  const rowHeight = Math.floor(160 / capacity);
   const namesBoxHtml = names
-    .map((name) => `<div style="border-bottom: 2px solid #000; height: calc(100% / ${capacity}); display: flex; align-items: center; justify-content: center; padding: 0 8px; font-weight: 800; font-size: 15px; color: #000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box;">${name}</div>`)
+    .map((name) => `<div style="border-bottom: 2px solid #000; height: ${rowHeight}px; line-height: ${rowHeight}px; display: flex; align-items: center; justify-content: center; padding: 0 8px; font-weight: 800; font-size: 14px; color: #000; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box;">${name}</div>`)
     .join('');
 
   return `
@@ -218,26 +219,60 @@ export async function downloadLockerReceiptPdf(
 
   notify('جاري إعداد استمارة الـ PDF...');
 
+  // 1. إنشاء الحاوية في أعلى طبقة DOM مرئية وبخلفية معتمة خفيفة
+  // هذا يضمن أن يلتقط html2canvas المحتوى الحقيقي الفعلي كاملاً بدون أي صفحات بيضاء فارغة
+  const overlay = document.createElement('div');
+  overlay.id = 'locker-pdf-render-overlay';
+  overlay.style.position = 'fixed';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.92)';
+  overlay.style.zIndex = '9999999';
+  overlay.style.display = 'flex';
+  overlay.style.flexDirection = 'column';
+  overlay.style.alignItems = 'center';
+  overlay.style.justifyContent = 'flex-start';
+  overlay.style.overflowY = 'auto';
+  overlay.style.padding = '16px 8px';
+  overlay.style.direction = 'rtl';
+
+  // شريط الإشعار للمستخدم
+  const banner = document.createElement('div');
+  banner.style.background = '#1e293b';
+  banner.style.color = '#38bdf8';
+  banner.style.border = '1.5px solid #0284c7';
+  banner.style.padding = '10px 18px';
+  banner.style.borderRadius = '10px';
+  banner.style.marginBottom = '12px';
+  banner.style.fontWeight = 'bold';
+  banner.style.fontSize = '13px';
+  banner.style.display = 'flex';
+  banner.style.alignItems = 'center';
+  banner.style.gap = '8px';
+  banner.style.boxShadow = '0 4px 20px rgba(0,0,0,0.5)';
+  banner.innerHTML = `<span>⏳</span><span>جاري إنشاء استمارة الدولاب وتحميلها كملف PDF عالي الدقة...</span>`;
+  overlay.appendChild(banner);
+
+  // وعاء الورقة الفعلي المرئي بالكامل
+  const paperTarget = document.createElement('div');
+  paperTarget.id = 'locker-paper-pdf-target';
+  paperTarget.style.width = '794px';
+  paperTarget.style.minWidth = '794px';
+  paperTarget.style.background = '#ffffff';
+  paperTarget.style.color = '#000000';
+  paperTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+  paperTarget.style.borderRadius = '4px';
+  paperTarget.style.overflow = 'hidden';
+  paperTarget.innerHTML = getLockerReceiptPaperHtml(data);
+  overlay.appendChild(paperTarget);
+
+  document.body.appendChild(overlay);
+
   try {
-    // 1. إنشاء الحاوية عند النقطة (0,0) بدون إزاحة x سالبة لتفادي الصفحات الفارغة في html2canvas
-    const container = document.createElement('div');
-    container.id = 'locker-pdf-render-temp';
-    container.style.position = 'fixed';
-    container.style.top = '0';
-    container.style.left = '0';
-    container.style.width = '794px';
-    container.style.background = '#ffffff';
-    container.style.color = '#000000';
-    container.style.direction = 'rtl';
-    container.style.zIndex = '-9999'; // خلف محتوى الصفحة ليختفي عن عيني المستخدم
-    container.style.pointerEvents = 'none';
-
-    // حقن كود الورقة النقي
-    container.innerHTML = getLockerReceiptPaperHtml(data);
-    document.body.appendChild(container);
-
-    // انتظار لحظي لضمان معالجة الخطوط وحساب أبعاد العناصر في الـ DOM
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // انتظار 300ms لضمان اكتمال بناء وتصيير الـ DOM والخطوط
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     notify('جاري توليد ملف الـ PDF عالي الدقة...');
     const html2pdf = (await import('html2pdf.js')).default;
@@ -250,13 +285,10 @@ export async function downloadLockerReceiptPdf(
       html2canvas: {
         scale: 2,
         useCORS: true,
-        letterRendering: true,
+        backgroundColor: '#ffffff',
         logging: false,
-        windowWidth: 800,
-        x: 0,
-        y: 0,
-        scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        scrollX: 0
       },
       jsPDF: {
         unit: 'mm' as const,
@@ -265,7 +297,7 @@ export async function downloadLockerReceiptPdf(
       }
     };
 
-    const worker = html2pdf().set(opt).from(container);
+    const worker = html2pdf().set(opt).from(paperTarget);
 
     const isApp = isAndroidAppClient();
 
@@ -280,7 +312,13 @@ export async function downloadLockerReceiptPdf(
         try {
           nativeBridge.saveBase64File(pdfBase64, safeFilename, 'application/pdf');
           notify('تم بدء تنزيل الملف بنجاح!');
-          if (document.body.contains(container)) document.body.removeChild(container);
+          banner.style.background = '#065f46';
+          banner.style.color = '#34d399';
+          banner.style.borderColor = '#10b981';
+          banner.innerHTML = `<span>✅</span><span>تم تنزيل استمارة الدولاب بنجاح!</span>`;
+          setTimeout(() => {
+            if (document.body.contains(overlay)) document.body.removeChild(overlay);
+          }, 800);
           return true;
         } catch (e) {}
       }
@@ -298,7 +336,16 @@ export async function downloadLockerReceiptPdf(
 
       const resJson = await res.json();
       if (resJson?.downloadUrl) {
-        window.location.href = resJson.downloadUrl;
+        const a = document.createElement('a');
+        a.href = resJson.downloadUrl;
+        a.download = safeFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => {
+          window.location.href = resJson.downloadUrl;
+        }, 150);
         notify('تم بدء تنزيل الاستمارة بنجاح!');
       } else {
         await worker.save();
@@ -310,16 +357,24 @@ export async function downloadLockerReceiptPdf(
       notify('تم تنزيل الاستمارة بنجاح!');
     }
 
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
+    // إشعار اكتمال الإجراء
+    banner.style.background = '#065f46';
+    banner.style.color = '#34d399';
+    banner.style.borderColor = '#10b981';
+    banner.innerHTML = `<span>✅</span><span>تم تنزيل استمارة الدولاب بنجاح!</span>`;
+
+    setTimeout(() => {
+      if (document.body.contains(overlay)) {
+        document.body.removeChild(overlay);
+      }
+    }, 900);
+
     return true;
   } catch (err: any) {
     console.error('[downloadLockerReceiptPdf] Failed:', err);
     notify('حدث خطأ أثناء تنزيل الاستمارة');
-    const container = document.getElementById('locker-pdf-render-temp');
-    if (container && document.body.contains(container)) {
-      document.body.removeChild(container);
+    if (document.body.contains(overlay)) {
+      document.body.removeChild(overlay);
     }
     previewLockerReceipt(data);
     return false;
