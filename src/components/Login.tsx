@@ -17,7 +17,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
-import { getOrCreateDeviceInfo, isAndroidAppClient } from "@/lib/deviceFingerprint";
+import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
 import { normalizeAcademicDegree } from "@/lib/academicHelper";
 
 const LEVELS = [
@@ -38,9 +38,30 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
   // Main role mode switcher: Student vs Faculty (Students first)
   const [roleMode, setRoleMode] = useState<"student" | "faculty">("student");
   const [isAndroidApp, setIsAndroidApp] = useState(false);
+  const [isPwaClient, setIsPwaClient] = useState(false);
 
   useEffect(() => {
     const isApp = isAndroidAppClient();
+    const isPWA = isInstalledPWA();
+    const isFaculty = Boolean(localStorage.getItem('cached_profile'));
+
+    if (isPWA) {
+      setIsPwaClient(true);
+      // إذا كان يفتح من اختصار PWA المثبت وليس دكتور: التوجيه فوراً لشاشة ترقية الأندرويد
+      if (!isApp && !isFaculty) {
+        let savedCode = localStorage.getItem("fania_student_code") || "";
+        try {
+          const s = localStorage.getItem("fania_student_session");
+          if (s) {
+            const parsed = JSON.parse(s);
+            if (parsed?.student_code) savedCode = parsed.student_code;
+          }
+        } catch (e) {}
+        window.location.replace(`/student-portal/update-notice${savedCode ? `?code=${encodeURIComponent(savedCode)}` : ""}`);
+        return;
+      }
+    }
+
     if (isApp) {
       setIsAndroidApp(true);
       setRoleMode("student");
@@ -53,7 +74,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         setStudentTab(tabParam as any);
       }
       const modeParam = params.get("mode");
-      if (modeParam === "faculty" && !isApp) {
+      if (modeParam === "faculty" && !isApp && !isPWA) {
         setRoleMode("faculty");
       } else if (modeParam === "student") {
         setRoleMode("student");
@@ -513,8 +534,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
           </div>
         )}
 
-        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) - HIDDEN IN ANDROID APK */}
-        {!isAndroidApp && (
+        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) - HIDDEN IN ANDROID APK & PWA */}
+        {!isAndroidApp && !isPwaClient && (
           <div style={{
           display: "flex",
           background: "rgba(255, 255, 255, 0.08)",

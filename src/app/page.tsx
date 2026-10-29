@@ -70,9 +70,15 @@ export default function Home() {
         localStorage.setItem('fania_app_mode', 'faculty');
         return false;
       }
-      const isFaculty = !!localStorage.getItem('cached_profile');
-      const hasStudentSession = !!localStorage.getItem('fania_student_session');
-      if (!isFaculty && hasStudentSession) {
+      const isFaculty = Boolean(localStorage.getItem('cached_profile'));
+      const isNativeApp = isAndroidAppClient();
+      const isPWA = isInstalledPWA();
+      const hasStudentSession = Boolean(localStorage.getItem('fania_student_session'));
+      const hasStudentCode = Boolean(localStorage.getItem('fania_student_code'));
+      const wasStudentPortal = localStorage.getItem('fania_last_portal') === '/system' || localStorage.getItem('fania_app_mode') === 'student';
+
+      // إذا لم يكن دكتور / مسؤول، وكان يفتح من اختصار PWA أو تطبيق أندرويد أو لديه أي أثر طالب سابق:
+      if (!isFaculty && (isPWA || isNativeApp || hasStudentSession || hasStudentCode || wasStudentPortal)) {
         return true;
       }
     }
@@ -92,48 +98,55 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const isFacultyMode = urlParams.get('faculty') === '1' || urlParams.get('mode') === 'faculty';
+      const isFaculty = Boolean(localStorage.getItem('cached_profile'));
+      const isNativeApp = isAndroidAppClient();
+      const isPWA = isInstalledPWA();
+      const hasStudentSession = Boolean(localStorage.getItem('fania_student_session'));
+      const hasStudentCode = Boolean(localStorage.getItem('fania_student_code'));
+      const wasStudentPortal = localStorage.getItem('fania_last_portal') === '/system' || localStorage.getItem('fania_app_mode') === 'student';
+
       if (isFacultyMode) {
         localStorage.removeItem('fania_last_portal');
         localStorage.setItem('fania_app_mode', 'faculty');
-      } else {
-        const isFaculty = !!localStorage.getItem('cached_profile');
-        const hasStudentSession = !!localStorage.getItem('fania_student_session');
-
-        if (!isFaculty && hasStudentSession) {
-          let savedCode = '';
-          try {
-            const s = localStorage.getItem('fania_student_session');
-            if (s) {
-              const parsed = JSON.parse(s);
-              if (parsed?.student_code) savedCode = parsed.student_code;
-            }
-          } catch (e) {}
-          if (!savedCode) {
-            savedCode = localStorage.getItem('fania_student_code') || '';
+      } else if (!isFaculty) {
+        // استخراج كود الطالب المحفوظ إن وُجد
+        let savedCode = '';
+        try {
+          const s = localStorage.getItem('fania_student_session');
+          if (s) {
+            const parsed = JSON.parse(s);
+            if (parsed?.student_code) savedCode = parsed.student_code;
           }
+        } catch (e) {}
+        if (!savedCode) {
+          savedCode = localStorage.getItem('fania_student_code') || '';
+        }
 
-          const isNativeApp = isAndroidAppClient();
-          const isPWA = isInstalledPWA();
-          const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
-          const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1';
+        const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
+        const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1';
 
+        // 1. اختصار PWA المثبت سابقاً على الهاتف (وليس تطبيق الأندرويد الأصلي):
+        // يوجه فوراً وبشكل حتمي لشاشة ترقية الأندرويد دائماً وأبداً دون إظهار أي شاشة دخول!
+        if (isPWA && !isNativeApp && !hasWebParam) {
           setIsRedirectingToStudent(true);
+          window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
+          return;
+        }
 
-          if (!isNativeApp && isPWA && !hasWebParam) {
-            window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
-            return;
-          }
+        // 2. تطبيق الأندرويد الأصلي:
+        if (isNativeApp) {
+          setIsRedirectingToStudent(true);
+          window.location.replace('/system');
+          return;
+        }
 
-          if (isNativeApp) {
-            window.location.replace('/system');
-            return;
-          }
-
+        // 3. أي طالب على المتصفح العادي (له كود أو جلسة أو فتح بوابة الطلاب سابقاً):
+        if (hasStudentSession || hasStudentCode || wasStudentPortal) {
+          setIsRedirectingToStudent(true);
           if (!isBypassed && !hasWebParam) {
             window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
             return;
           }
-
           window.location.replace('/system?web=1');
           return;
         }
