@@ -48,9 +48,19 @@ export default function StudentMigrationNotice({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [customTestCode, setCustomTestCode] = useState("");
   const [isPwa, setIsPwa] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     setIsPwa(isInstalledPWA());
+    try {
+      const p = localStorage.getItem("cached_profile");
+      if (p) {
+        const parsed = JSON.parse(p);
+        if (["مدير", "مدير مساعد", "admin", "أدمن"].includes(parsed?.role)) {
+          setIsAdmin(true);
+        }
+      }
+    } catch (e) {}
   }, []);
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -100,7 +110,7 @@ export default function StudentMigrationNotice({
       }}
     >
       {/* Test Mode Banner (Only visible in explicit preview/test mode for admin) */}
-      {isTestMode && (
+      {isTestMode && isAdmin && (
         <div style={{
           width: "100%",
           maxWidth: "480px",

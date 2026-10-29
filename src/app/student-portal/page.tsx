@@ -14,7 +14,15 @@ export default function StudentPortalUnifiedPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      const isTestUpdate = urlParams.get("test_update") === "1" || urlParams.get("preview_update") === "1" || urlParams.get("preview") === "1";
+      let isAdminUser = false;
+      try {
+        const p = localStorage.getItem("cached_profile");
+        if (p) {
+          const parsed = JSON.parse(p);
+          isAdminUser = ["مدير", "مدير مساعد", "admin", "أدمن"].includes(parsed?.role);
+        }
+      } catch (e) {}
+      const isTestUpdate = isAdminUser && (urlParams.get("test_update") === "1" || urlParams.get("preview_update") === "1" || urlParams.get("preview") === "1");
       if (isTestUpdate) {
         setIsRedirecting(true);
         window.location.replace(`/student-portal/update-notice${window.location.search}`);

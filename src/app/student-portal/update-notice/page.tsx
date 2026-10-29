@@ -13,7 +13,23 @@ export default function StudentUpdateNoticePage() {
   const [error, setError] = useState<string | null>(null);
 
   const queryCode = searchParams.get("code");
-  const isTestMode = true; // This dedicated page is always in test/preview mode for verification
+  // وضع المعاينة والتجربة مخصص فقط للمسؤولين عند وجود بارامتر المعاينة صراحة
+  const [isTestMode, setIsTestMode] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isTestParam = searchParams.get("test_update") === "1" || searchParams.get("preview") === "1" || searchParams.get("preview_update") === "1";
+      let isAdminUser = false;
+      try {
+        const p = localStorage.getItem("cached_profile");
+        if (p) {
+          const parsed = JSON.parse(p);
+          isAdminUser = ["مدير", "مدير مساعد", "admin", "أدمن"].includes(parsed?.role);
+        }
+      } catch (e) {}
+      setIsTestMode(Boolean(isTestParam && isAdminUser));
+    }
+  }, [searchParams]);
 
   const fetchStudentInfo = async (codeToFetch?: string) => {
     setLoading(true);
@@ -35,12 +51,23 @@ export default function StudentUpdateNoticePage() {
         }
       }
 
-      // Default to representative active student only if explicitly requested in test/preview mode
+      // Default to representative active student only if explicitly requested in test/preview mode BY AN AUTHENTICATED ADMIN
       if (!activeCode) {
-        if (searchParams.get("test_update") === "1" || searchParams.get("preview") === "1") {
-          activeCode = "0687"; // روان محمد رمضان محمد (active student preview)
+        let isAdminUser = false;
+        try {
+          const p = typeof window !== "undefined" ? localStorage.getItem("cached_profile") : null;
+          if (p) {
+            const parsed = JSON.parse(p);
+            isAdminUser = ["مدير", "مدير مساعد", "admin", "أدمن"].includes(parsed?.role);
+          }
+        } catch (e) {}
+
+        const isTestParam = searchParams.get("test_update") === "1" || searchParams.get("preview") === "1" || searchParams.get("preview_update") === "1";
+
+        if (isTestParam && isAdminUser) {
+          activeCode = "0687"; // Only for verified admin preview
         } else {
-          // No student logged in on this browser: render general welcome migration notice cleanly
+          // Real student with no account on this phone: render general welcome migration notice cleanly
           setStudentInfo(null);
           setApkInfo({
             downloadUrl: "https://github.com/eslamart2014-bit/art-faculty-app/releases/download/student-app-v1.0.6/ArtEdu-Student-Portal-Release.apk",
@@ -171,23 +198,25 @@ export default function StudentUpdateNoticePage() {
             {error || "لم يتم العثور على حساب مفعل بهذا الكود على هذا المتصفح."}
           </p>
           <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+            {isTestMode && (
+              <button
+                onClick={() => handleSwitchCode("0732")}
+                style={{
+                  background: "#38bdf8",
+                  color: "#000",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  cursor: "pointer"
+                }}
+              >
+                معاينة بحساب تجريبي (0732)
+              </button>
+            )}
             <button
-              onClick={() => handleSwitchCode("0732")}
-              style={{
-                background: "#38bdf8",
-                color: "#000",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: "bold",
-                cursor: "pointer"
-              }}
-            >
-              معاينة بحساب تجريبي (0732)
-            </button>
-            <button
-              onClick={() => router.push("/system")}
+              onClick={handleContinueToWeb}
               style={{
                 background: "#1e293b",
                 color: "#fff",
@@ -198,7 +227,7 @@ export default function StudentUpdateNoticePage() {
                 cursor: "pointer"
               }}
             >
-              الذهاب للرئيسية
+              الذهاب لتسجيل الدخول
             </button>
           </div>
         </div>
@@ -213,7 +242,7 @@ export default function StudentUpdateNoticePage() {
       apkVersion={apkInfo?.version}
       isTestMode={isTestMode}
       onContinueToWeb={handleContinueToWeb}
-      onSwitchStudentCode={handleSwitchCode}
+      onSwitchStudentCode={isTestMode ? handleSwitchCode : undefined}
     />
   );
 }

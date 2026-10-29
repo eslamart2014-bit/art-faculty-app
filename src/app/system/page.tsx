@@ -773,7 +773,16 @@ export default function SystemPage() {
         return;
       }
 
-      const isTestUpdate = params.get("test_update") === "1" || params.get("preview_update") === "1" || params.get("preview") === "1";
+      let isAdminUser = false;
+      try {
+        const p = localStorage.getItem("cached_profile");
+        if (p) {
+          const parsed = JSON.parse(p);
+          isAdminUser = ["مدير", "مدير مساعد", "admin", "أدمن"].includes(parsed?.role);
+        }
+      } catch (e) {}
+
+      const isTestUpdate = isAdminUser && (params.get("test_update") === "1" || params.get("preview_update") === "1" || params.get("preview") === "1");
       const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
       const hasWebParam = params.get("web") === "1" || params.get("bypass") === "1";
       const isNativeApp = isAndroidAppClient();
