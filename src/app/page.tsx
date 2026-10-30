@@ -2,7 +2,7 @@
 
 import { preloadFacultyData } from "@/lib/preloadFacultyData";
 import { normalizeAcademicDegree } from "@/lib/academicHelper";
-import { isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
+import { isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/deviceFingerprint";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -70,6 +70,7 @@ export default function Home() {
       }
       const isFaculty = Boolean(localStorage.getItem('cached_profile'));
       const isNativeApp = isAndroidAppClient();
+      const isIOS = isIOSClient();
       const isPWA = isInstalledPWA();
       const hasStudentSession = Boolean(localStorage.getItem('fania_student_session'));
       const hasStudentCode = Boolean(localStorage.getItem('fania_student_code'));
@@ -98,6 +99,7 @@ export default function Home() {
       const isFacultyMode = urlParams.get('faculty') === '1' || urlParams.get('mode') === 'faculty';
       const isFaculty = Boolean(localStorage.getItem('cached_profile'));
       const isNativeApp = isAndroidAppClient();
+      const isIOS = isIOSClient();
       const isPWA = isInstalledPWA();
       const hasStudentSession = Boolean(localStorage.getItem('fania_student_session'));
       const hasStudentCode = Boolean(localStorage.getItem('fania_student_code'));
@@ -123,28 +125,32 @@ export default function Home() {
         const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
         const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1';
 
-        // 1. اختصار PWA المثبت سابقاً على الهاتف (وليس تطبيق الأندرويد الأصلي):
-        // يوجه فوراً وبشكل حتمي لشاشة ترقية الأندرويد دائماً وأبداً دون إظهار أي شاشة دخول!
-        if (isPWA && !isNativeApp && !hasWebParam) {
-          setIsRedirectingToStudent(true);
-          window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
-          return;
-        }
-
-        // 2. تطبيق الأندرويد الأصلي:
+        // 1. تطبيق أندرويد الأصلي:
         if (isNativeApp) {
           setIsRedirectingToStudent(true);
           window.location.replace('/system');
           return;
         }
 
-        // 3. أي طالب على المتصفح العادي (له كود أو جلسة أو فتح بوابة الطلاب سابقاً):
+        // 2. أجهزة آيفون (iOS):
+        // تفتح بوابة الويب مباشرة بدون تحويل لشاشة APK الأندرويد ليفضل على وضعه
+        if (isIOS) {
+          setIsRedirectingToStudent(true);
+          window.location.replace('/system');
+          return;
+        }
+
+        // 3. أجهزة أندرويد خارج التطبيق الأصلي (PWA مثبت سابقاً أو متصفح فتح اللينك):
+        // يوجه فوراً لشاشة تحميل الـ APK وتثبيت التطبيق الجديد
+        if (!hasWebParam && !isBypassed) {
+          setIsRedirectingToStudent(true);
+          window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
+          return;
+        }
+
+        // 4. أي طالب على المتصفح العادي مع تجاوز معتمد (?web=1):
         if (hasStudentSession || hasStudentCode || wasStudentPortal) {
           setIsRedirectingToStudent(true);
-          if (!isBypassed && !hasWebParam) {
-            window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
-            return;
-          }
           window.location.replace('/system?web=1');
           return;
         }

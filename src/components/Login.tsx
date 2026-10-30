@@ -316,11 +316,50 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       ctx.font = "20px Cairo, sans-serif";
       ctx.fillText("نظام التربية الفنية الجديد • مطور المنظومة: د/ إسلام عبد اللطيف حسن", 500, 1340);
 
-      // التنزيل المباشر
-      const link = document.createElement("a");
-      link.download = `بطاقة_طالب_${selectedStudent.student_code}_${selectedStudent.full_name.split(" ")[0]}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
+      // التنزيل والتسليم الذكي حسب نوع الجهاز
+      const dataUrl = canvas.toDataURL("image/png");
+      const fileName = `بطاقة_طالب_${selectedStudent.student_code}_${selectedStudent.full_name.split(" ")[0]}.png`;
+
+      // 1. تطبيق أندرويد الأصلي (APK)
+      if (typeof window !== "undefined" && (window as any).ArtEduNativeBridge?.saveBase64File) {
+        try {
+          (window as any).ArtEduNativeBridge.saveBase64File(dataUrl, fileName, "image/png");
+          return;
+        } catch (bridgeErr) {}
+      }
+
+      // 2. أجهزة iOS أو المتصفحات الداعمة لـ Web Share
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob && typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        try {
+          const file = new File([blob], fileName, { type: "image/png" });
+          if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: `بطاقة الطالب QR - ${selectedStudent.student_code}`,
+              text: `بطاقة الطالب: ${selectedStudent.full_name} (${selectedStudent.student_code})`
+            });
+            return;
+          }
+        } catch (shareErr: any) {
+          if (shareErr.name === "AbortError") return;
+        }
+      }
+
+      // 3. التنزيل المباشر في المتصفح
+      if (blob) {
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = fileName;
+        link.href = blobUrl;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 3000);
+      }
     } catch (e) {
       console.error(e);
       alert("تعذر تنزيل الصورة، يرجى أخذ لقطة شاشة (Screenshot)");

@@ -145,3 +145,27 @@ export function isInstalledPWA(): boolean {
   } catch (e) {}
   return false;
 }
+
+/**
+ * فحص ما إذا كان المستخدم يفتح من جهاز أبل (آيفون أو آيباد أو آيبود)
+ * يدعم أيضاً أجهزة iPad الحديثة بنظام iPadOS التي تطلب عرض سطح المكتب
+ */
+export function isIOSClient(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ua = navigator.userAgent || '';
+    // 1. كشف أجهزة iPhone / iPad / iPod من الـ User-Agent
+    if (/iPhone|iPod|iPad/i.test(ua)) {
+      return true;
+    }
+    // 2. كشف أجهزة iPad بنظام iPadOS 13+ (المتصفح يقدم نفسه كـ MacIntel ويدعم اللمس المتعدد)
+    if (
+      navigator.platform === 'MacIntel' &&
+      typeof navigator.maxTouchPoints === 'number' &&
+      navigator.maxTouchPoints > 1
+    ) {
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}

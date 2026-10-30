@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Login from "@/components/Login";
 import StudentMigrationNotice from "@/components/StudentMigrationNotice";
-import { isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
+import { isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/deviceFingerprint";
 
 export default function StudentPortalUnifiedPage() {
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -51,57 +51,38 @@ export default function StudentPortalUnifiedPage() {
       }
 
       const isNativeApp = isAndroidAppClient();
+      const isIOS = isIOSClient();
       const isPWA = isInstalledPWA();
       const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
       const hasWebParam = urlParams.get("web") === "1" || urlParams.get("bypass") === "1";
 
-      // 2. إذا كان المستخدم يفتح من اختصار PWA المثبت سابقاً (وليس تطبيق الأندرويد الأصلي):
-      // يوجه فوراً وبشكل حتمي لشاشة تحديث الأندرويد
-      if (!isNativeApp && isPWA && !hasWebParam) {
+      // 2. إذا كان الجهاز آيفون (iOS):
+      // لا يوجه لتحميل APK أبداً، بل يفضل على وضعه في بوابة الويب
+      if (isIOS) {
         setIsRedirecting(true);
-        window.location.replace(`/student-portal/update-notice${savedCode ? `?code=${encodeURIComponent(savedCode)}` : ""}`);
+        window.location.replace(savedCode ? "/system" : "/system?web=1");
         return;
       }
 
       // 3. داخل تطبيق الأندرويد الرسمي:
       if (isNativeApp) {
-        if (savedCode) {
-          setIsRedirecting(true);
-          window.location.replace("/system");
-          return;
-        }
-        // إذا لم يكن مسجل دخول داخل تطبيق الأندرويد، يعرض شاشة الدخول المدمجة
-        return;
-      }
-
-      // 4. في المتصفح العادي: فحص إعدادات التحويل لتطبيق الأندرويد
-      if (!isBypassed && !hasWebParam) {
-        fetch("/api/public/settings", { cache: "no-store" })
-          .then(r => r.json())
-          .then(settings => {
-            if (settings?.student_migration_screen) {
-              setIsRedirecting(true);
-              window.location.replace(`/student-portal/update-notice${savedCode ? `?code=${encodeURIComponent(savedCode)}` : ""}`);
-            } else if (savedCode) {
-              setIsRedirecting(true);
-              window.location.replace("/system");
-            }
-          })
-          .catch(() => {
-            if (savedCode) {
-              setIsRedirecting(true);
-              window.location.replace("/system");
-            }
-          });
-        return;
-      }
-
-      // 5. متصفح عادي مع تجاوز معتمد
-      if (savedCode) {
         setIsRedirecting(true);
-        window.location.replace("/system?web=1");
+        window.location.replace("/system");
         return;
       }
+
+      // 4. أجهزة الأندرويد خارج التطبيق الأصلي (PWA مثبت سابقاً أو متصفح فتح اللينك):
+      // التوجيه الفوري لشاشة ترقية الأندرويد وتثبيت التطبيق الجديد
+      if (!hasWebParam && !isBypassed) {
+        setIsRedirecting(true);
+        window.location.replace(`/student-portal/update-notice${savedCode ? `?code=${encodeURIComponent(savedCode)}` : ""}`);
+        return;
+      }
+
+      // 5. متصفح عادي مع طلب صريح للدخول على الويب (?web=1)
+      setIsRedirecting(true);
+      window.location.replace("/system?web=1");
+      return;
     }
   }, []);
 

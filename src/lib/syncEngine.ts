@@ -131,6 +131,13 @@ export const processQueue = async () => {
       else if (action.type === 'CANCEL_ATTENDANCE') {
         const { course_id, student_id, date } = action.payload;
         await supabase.from("attendance").delete().eq("course_id", course_id).eq("student_id", student_id).eq("date", date);
+        try {
+          fetch('/api/push/notify-attendance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_ids: [student_id], course_id, date, action: 'cancelled' })
+          }).catch(() => {});
+        } catch (_) {}
         success = true;
       }
       else if (action.type === 'MANUAL_EVALUATION') {
@@ -143,6 +150,13 @@ export const processQueue = async () => {
         } else {
           await supabase.from("evaluations").insert({ course_id, student_id, project_name, score, max_score, teacher_id, created_at: action.timestamp });
         }
+        try {
+          fetch('/api/push/notify-evaluation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_id, course_id, project_name, score })
+          }).catch(() => {});
+        } catch (_) {}
         success = true;
       }
       else if (action.type === 'CAMERA_EVALUATION') {
@@ -154,6 +168,13 @@ export const processQueue = async () => {
           } else {
             await supabase.from("evaluations").insert({ course_id, student_id: s.id, project_name, score: s.score, max_score, teacher_id, created_at: action.timestamp });
           }
+          try {
+            fetch('/api/push/notify-evaluation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ student_id: s.id, course_id, project_name, score: s.score })
+            }).catch(() => {});
+          } catch (_) {}
           if (markAttendance) {
             const { data: attEx } = await supabase.from("attendance").select("id, status").eq("course_id", course_id).eq("student_id", s.id).eq("date", date).maybeSingle();
             if (attEx) {

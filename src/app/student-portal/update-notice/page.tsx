@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import StudentMigrationNotice, { MigrationStudentInfo } from "@/components/StudentMigrationNotice";
+import { isIOSClient } from "@/lib/deviceFingerprint";
 
 export default function StudentUpdateNoticePage() {
   const router = useRouter();
@@ -18,6 +19,12 @@ export default function StudentUpdateNoticePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // 1. إذا كان الجهاز آيفون (iOS)، نوجهه فوراً لبوابة الويب ليعمل على وضعه الطبيعي دون إزعاجه بتحميل APK
+      if (isIOSClient()) {
+        window.location.replace("/system?web=1");
+        return;
+      }
+
       const isTestParam = searchParams.get("test_update") === "1" || searchParams.get("preview") === "1" || searchParams.get("preview_update") === "1";
       let isAdminUser = false;
       try {

@@ -37,7 +37,8 @@ import {
   KeyRound
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
-import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA } from "@/lib/deviceFingerprint";
+import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/deviceFingerprint";
+import { saveStudentQrCard } from "@/lib/qrCardDownloader";
 import { compressImageToWebP } from "@/lib/imageCompressor";
 import StudentLockerTab from "@/components/lockers/StudentLockerTab";
 import QRCode from "react-qr-code";
@@ -824,27 +825,18 @@ export default function SystemPage() {
         return;
       }
 
-      // ب) إذا كان الطالب يفتح من اختصار PWA المثبت سابقاً على الهاتف (وليس تطبيق الأندرويد الأصلي):
-      // التوجيه الحتمي والفوري لشاشة ترقية الأندرويد لكي يحصل على كوده والباسورد وزر تحميل الـ APK
-      if (!isNativeApp && isPWA && !hasWebParam) {
-        const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
-        window.location.replace(targetUrl);
-        return;
-      }
+      // ب) فحص أجهزة آيفون (iOS):
+      // إذا كان الطالب على آيفون، يفضل على وضعه في لوحة الويب ولا يوجه أبداً لشاشة الـ APK
+      const isIOS = isIOSClient();
 
-      // ج) إذا كان في متصفح عادي ولم يقم بالتجاوز مسبقاً، نفحص إعداد الترقية قبل أي دخول تلقائي للوحة القديمة
-      if (!isNativeApp && !isBypassed && !hasWebParam) {
-        try {
-          const settingsRes = await fetch("/api/public/settings", { cache: "no-store" });
-          if (settingsRes.ok) {
-            const settings = await settingsRes.json();
-            if (settings?.student_migration_screen) {
-              const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
-              window.location.replace(targetUrl);
-              return;
-            }
-          }
-        } catch (e) {}
+      if (!isIOS) {
+        // ج) إذا كان الجهاز أندرويد وفتح من اختصار PWA المثبت سابقاً أو فتح الرابط في المتصفح (وليس تطبيق الأندرويد الأصلي):
+        // التوجيه الحتمي والفوري لشاشة ترقية الأندرويد لكي يحصل على كوده والباسورد وزر تحميل الـ APK
+        if (!isNativeApp && !hasWebParam && !isBypassed) {
+          const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
+          window.location.replace(targetUrl);
+          return;
+        }
       }
     }
 
@@ -1927,27 +1919,31 @@ export default function SystemPage() {
     }
   };
 
-  const handleDownloadQR = () => {
-    const svg = document.getElementById('student-qr-code');
-    if (!svg) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const img = new Image();
-    img.onload = () => {
-      canvas.width = img.width + 40;
-      canvas.height = img.height + 40;
-      ctx.fillStyle = "white"; 
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 20, 20);
-      const pngFile = canvas.toDataURL("image/png");
-      const downloadLink = document.createElement("a");
-      downloadLink.download = `QR_${currentStudent?.student_code}.png`;
-      downloadLink.href = pngFile;
-      downloadLink.click();
-    };
-    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  const [isSavingQr, setIsSavingQr] = useState(false);
+  const [qrSavedSuccess, setQrSavedSuccess] = useState(false);
+
+  const handleDownloadQR = async () => {
+    if (!currentStudent) return;
+    setIsSavingQr(true);
+    setQrSavedSuccess(false);
+    try {
+      const res = await saveStudentQrCard({
+        student_code: currentStudent.student_code,
+        full_name: currentStudent.full_name || '',
+        academic_year: currentStudent.academic_year || '',
+        section: currentStudent.section || '',
+        svgElementId: 'student-qr-code'
+      });
+      if (res.success && res.method !== 'share_aborted') {
+        setQrSavedSuccess(true);
+        setTimeout(() => setQrSavedSuccess(false), 3500);
+      }
+    } catch (err: any) {
+      console.error('QR download failed:', err);
+      alert('تعذر حفظ كارت الـ QR تلقائياً، يمكنك أخذ لقطة شاشة (Screenshot) للرمز.');
+    } finally {
+      setIsSavingQr(false);
+    }
   };
 
   // Handle Logout
@@ -4325,10 +4321,15 @@ export default function SystemPage() {
             <div style={{ display: "flex", gap: "10px", marginTop: "25px", width: "100%" }}>
               <button 
                 onClick={handleDownloadQR}
+                disabled={isSavingQr}
                 style={{
                   flex: 1,
                   padding: "12px",
-                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                  background: qrSavedSuccess
+                    ? "linear-gradient(135deg, #10b981, #059669)"
+                    : isSavingQr
+                    ? "#64748b"
+                    : "linear-gradient(135deg, #0ea5e9, #0284c7)",
                   color: "#fff",
                   border: "none",
                   borderRadius: "12px",
@@ -4337,11 +4338,36 @@ export default function SystemPage() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
-                  cursor: "pointer"
+                  cursor: isSavingQr ? "wait" : "pointer",
+                  boxShadow: qrSavedSuccess
+                    ? "0 4px 14px rgba(16, 185, 129, 0.4)"
+                    : "0 4px 14px rgba(14, 165, 233, 0.3)",
+                  transition: "all 0.2s ease"
                 }}
               >
-                <Download size={16} />
-                <span>تحميل الصورة</span>
+                {isSavingQr ? (
+                  <>
+                    <div style={{
+                      width: "16px",
+                      height: "16px",
+                      border: "2px solid #fff",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                      animation: "spin 0.8s linear infinite"
+                    }} />
+                    <span>جاري حفظ الكارت...</span>
+                  </>
+                ) : qrSavedSuccess ? (
+                  <>
+                    <Check size={18} />
+                    <span>تم حفظ الكارت بنجاح ✓</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} />
+                    <span>حفظ كارت الـ QR</span>
+                  </>
+                )}
               </button>
               
               <button 
