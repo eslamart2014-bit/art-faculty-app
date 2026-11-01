@@ -40,6 +40,14 @@
         android:usesCleartextTraffic="false"
         tools:targetApi="34">
 
+        <!-- Default notification icon and color for Firebase push notifications -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/primary" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

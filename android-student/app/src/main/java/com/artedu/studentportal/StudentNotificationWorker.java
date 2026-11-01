@@ -149,7 +149,7 @@ public class StudentNotificationWorker extends Worker {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.app_icon)
+                .setSmallIcon(R.drawable.ic_stat_notification)
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.app_icon))
                 .setContentTitle(title)
                 .setContentText(message)

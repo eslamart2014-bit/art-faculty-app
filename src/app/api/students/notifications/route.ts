@@ -93,32 +93,26 @@ export async function GET(request: Request) {
           try {
             const { data: studentCourses } = await supabaseAdmin
               .from('courses')
-              .select('id, name')
+              .select('id, name, custom_week_names')
               .eq('academic_year', student.academic_year);
 
-            const courseIds = (studentCourses || []).map((c: any) => c.id);
-            if (courseIds.length > 0) {
-              const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-              const { data: recentProjects } = await supabaseAdmin
-                .from('projects')
-                .select('id, name, course_id, created_at, courses(name)')
-                .in('course_id', courseIds)
-                .gte('created_at', sevenDaysAgo)
-                .order('created_at', { ascending: false })
-                .limit(3);
-
-              if (recentProjects && recentProjects.length > 0) {
-                recentProjects.forEach((proj: any) => {
-                  const courseName = proj.courses?.name || 'مقرر دراسي';
-                  notifications.push({
-                    id: `proj_new_${proj.id}`,
-                    title: '📌 تم إضافة مشروع جديد مطلوب تسليمه',
-                    message: `تم إضافة مشروع جديد "${proj.name}" في مقرر ${courseName}`,
-                    type: 'deadline',
-                    timestamp: proj.created_at || new Date().toISOString()
-                  });
+            if (studentCourses && studentCourses.length > 0) {
+              const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+              studentCourses.forEach((c: any) => {
+                const assigned = (c.custom_week_names?.__projects__ || []).filter((p: any) => !p.is_archived);
+                assigned.forEach((proj: any) => {
+                  const createdAt = proj.created_at ? new Date(proj.created_at).getTime() : 0;
+                  if (createdAt >= sevenDaysAgo) {
+                    notifications.push({
+                      id: `proj_new_${proj.id || proj.name}`,
+                      title: '📌 تم إضافة مشروع جديد مطلوب تسليمه',
+                      message: `تم إضافة مشروع جديد "${proj.name}" في مقرر ${c.name}`,
+                      type: 'deadline',
+                      timestamp: proj.created_at || new Date().toISOString()
+                    });
+                  }
                 });
-              }
+              });
             }
           } catch (projErr) {}
 

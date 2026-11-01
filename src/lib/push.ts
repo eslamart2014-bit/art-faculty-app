@@ -164,7 +164,7 @@ export async function sendPushToStudents(
             defaultVibrateTimings: true,
             priority: 'high',
             visibility: 'public',
-            icon: 'app_icon',
+            icon: 'ic_stat_notification',
           },
         },
       });
@@ -248,6 +248,8 @@ export async function broadcastPushToAll(
           defaultSound: true,
           defaultVibrateTimings: true,
           priority: 'high',
+          visibility: 'public',
+          icon: 'ic_stat_notification',
         },
       },
     });
