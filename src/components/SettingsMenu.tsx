@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { notifyStaffAuthRequired } from "@/lib/staffAuthFetch";
 
 interface SettingsMenuProps {
   isOpen: boolean;
@@ -146,17 +145,6 @@ export default function SettingsMenu({
 
         <div className="settings-item" onClick={() => { onClose(); onOpenSuggestions(); }}>
           <span style={{ marginLeft: "10px" }}>💡</span> اقتراحات التطوير
-        </div>
-
-        <div
-          className="settings-item"
-          onClick={() => {
-            onClose();
-            notifyStaffAuthRequired();
-          }}
-          style={{ color: "#38bdf8", borderTop: "1px dashed #444", marginTop: "10px" }}
-        >
-          <span style={{ marginLeft: "10px" }}>🔐</span> تأكيد / تجديد جلسة الدخول
         </div>
 
         <div
