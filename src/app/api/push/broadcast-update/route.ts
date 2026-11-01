@@ -25,15 +25,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const version = body?.version || '1.0.6';
-    const changelog = body?.changelog || 'يتوفر إصدار جديد لبوابة الطلاب بميزات محسّنة وسرعة فائقة.';
+    const version = body?.version || '1.0.7';
+    const title = body?.title || '⚡ يتوفر تحديث جديد';
+    const message = body?.changelog || body?.message || 'يتوفر تحديث جديد للتطبيق.';
 
     const result = await broadcastPushToAll({
-      title: `⚡ يتوفر تحديث جديد للتطبيق (v${version})`,
-      body: changelog,
+      title,
+      body: message,
       type: 'announcement',
       id: `app_update_${version}`,
-      tag: `app_update_${version}`,
+      tag: 'app_update',
       url: '/system',
     });
 

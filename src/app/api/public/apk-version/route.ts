@@ -7,7 +7,7 @@ export async function GET() {
     versionCode: 8,
     versionName: '1.0.7',
     downloadUrl: 'https://github.com/eslamart2014-bit/art-faculty-app/releases/download/student-app-v1.0.7/ArtEdu-Student-Portal-Release.apk',
-    changelog: '🔔 v1.0.7: تحديث أيقونة الإشعارات في شريط الحالة لتظهر كلمة "فنية" مفرغة وبدقة فائقة، مع تحسينات الأداء واستقرار الإشعارات.',
+    changelog: 'يتوفر تحديث جديد للتطبيق.',
     minRequiredVersionCode: 1,
     forceUpdate: false,
     updatedAt: new Date().toISOString()

@@ -85,14 +85,10 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/security/emergency-hardening'
         with:
           tag_name: student-app-v1.0.7
-          name: "⚡ تطبيق بوابة الطلاب - الإصدار الأصلي v1.0.7 (أيقونة إشعارات مفرغة)"
+          name: "⚡ تطبيق بوابة الطلاب - v1.0.7"
           make_latest: true
           body: |
-            ### تطبيق بوابة الطالب — قسم التربية الفنية 🎓 (الإصدار v1.0.7)
-            - **أيقونة إشعارات مفرغة (Silhouette) في شريط الحالة:** تظهر كلمة "فنية" وشعار الكلية بدقة فائقة أعلى شاشة الهاتف بدون أي مربع أبيض مصمت.
-            - **إشعارات فورية دقيقة بدون تكرار:** عند تسجيل الحضور وإلغاؤه، اعتماد الدواليب، وإضافة المشاريع والدرجات.
-            - **دعم كامل للعمل بدون نت (Offline-First):** استعراض بيانات الحساب وبطاقة الـ QR دون الحاجة للاتصال بالإنترنت.
-            - **أمان معتمد ومفتاح توقيع رسمي.**
+            يتوفر تحديث جديد للتطبيق.
           files: dist-apk/*.apk
           prerelease: false
           draft: false
@@ -105,4 +101,4 @@ jobs:
           curl -s -X POST https://art-faculty-app.vercel.app/api/push/broadcast-update \
             -H "Content-Type: application/json" \
             -H "x-webhook-secret: b8d48d9d6c9ebe4d7b675be4c795d7d0a405707b37a7dc39" \
-            -d '{"version":"1.0.7","changelog":"⚡ يتوفر تحديث جديد لبوابة الطلاب (v1.0.7) بتحسينات للأيقونة وشريط الإشعارات!"}' || true
+            -d '{"version":"1.0.7","title":"⚡ يتوفر تحديث جديد","changelog":"يتوفر تحديث جديد للتطبيق."}' || true

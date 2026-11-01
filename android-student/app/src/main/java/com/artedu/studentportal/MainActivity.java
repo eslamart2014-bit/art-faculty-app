@@ -520,8 +520,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void promptUpdateDialog(String versionName, String changelog, String downloadUrl, boolean forceUpdate) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(getString(R.string.update_available_title) + " (v" + versionName + ")");
-        builder.setMessage(changelog + "\n\nهل ترغب في التحديث الآن للاستفادة من أحدث الميزات؟");
+        builder.setTitle(R.string.update_available_title);
+        builder.setMessage("يتوفر تحديث جديد للتطبيق.\n\nهل ترغب في التحديث الآن؟");
         builder.setCancelable(!forceUpdate);
 
         builder.setPositiveButton(R.string.btn_update_now, (dialog, which) -> {

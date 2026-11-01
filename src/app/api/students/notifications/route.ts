@@ -24,12 +24,12 @@ export async function GET(request: Request) {
       timestamp: string;
     }> = [];
 
-    // 1. App Update Notification (if client version is older than current 5)
-    if (clientVer && parseInt(clientVer, 10) < 5) {
+    // 1. App Update Notification (if client version is older than current 8)
+    if (clientVer && parseInt(clientVer, 10) < 8) {
       notifications.push({
-        id: 'apk_update_v1_0_4',
-        title: '⚡ يتوفر تحديث جديد فائق السرعة (v1.0.4)',
-        message: 'يتوفر إصدار جديد يعمل محلياً في ذاكرة الهاتف ويوفر البيانات. انقر للتحديث الآن!',
+        id: 'apk_update_new',
+        title: '⚡ يتوفر تحديث جديد',
+        message: 'يتوفر تحديث جديد للتطبيق.',
         type: 'announcement',
         timestamp: new Date().toISOString()
       });
