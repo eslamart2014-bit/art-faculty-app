@@ -28,20 +28,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Prepare Signing Keystore
+      - name: Verify Permanent Release Keystore
         working-directory: android-student/app
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "Using production keystore from repository secrets..."
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > artedu-official-release.jks
-          else
-            echo "Generating high-security official release keystore for CI build..."
-            keytool -genkeypair -v -keystore artedu-official-release.jks -alias artedu_release \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "artedu2026portal_secure" \
-              -keypass "artedu2026portal_secure" \
-              -storetype PKCS12 \
-              -dname "CN=Faculty of Art Education, OU=Helwan University, O=Faculty of Art Education, L=Zamalek, ST=Cairo, C=EG"
+          echo "Verifying permanent official release keystore..."
+          if [ ! -f "artedu-official-release.jks" ]; then
+            if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+              echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > artedu-official-release.jks
+            else
+              echo "Error: Permanent keystore artedu-official-release.jks not found!"
+              exit 1
+            fi
           fi
           ls -la artedu-official-release.jks
 
@@ -84,8 +81,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/security/emergency-hardening'
         with:
-          tag_name: student-app-v1.0.7
-          name: "⚡ تطبيق بوابة الطلاب - v1.0.7"
+          tag_name: student-app-v1.0.8
+          name: "⚡ تطبيق بوابة الطلاب - v1.0.8"
           make_latest: true
           body: |
             يتوفر تحديث جديد للتطبيق.
@@ -101,4 +98,4 @@ jobs:
           curl -s -X POST https://art-faculty-app.vercel.app/api/push/broadcast-update \
             -H "Content-Type: application/json" \
             -H "x-webhook-secret: b8d48d9d6c9ebe4d7b675be4c795d7d0a405707b37a7dc39" \
-            -d '{"version":"1.0.7","title":"⚡ يتوفر تحديث جديد","changelog":"يتوفر تحديث جديد للتطبيق."}' || true
+            -d '{"version":"1.0.8","title":"⚡ يتوفر تحديث جديد","changelog":"يتوفر تحديث جديد للتطبيق."}' || true

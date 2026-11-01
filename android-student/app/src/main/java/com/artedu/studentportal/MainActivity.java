@@ -525,13 +525,7 @@ public class MainActivity extends AppCompatActivity {
         builder.setCancelable(!forceUpdate);
 
         builder.setPositiveButton(R.string.btn_update_now, (dialog, which) -> {
-            try {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-            } catch (Exception e) {
-                Toast.makeText(this, "تعذر فتح رابط التحديث", Toast.LENGTH_SHORT).show();
-            }
+            startInAppUpdate(downloadUrl);
         });
 
         if (!forceUpdate) {
@@ -539,6 +533,88 @@ public class MainActivity extends AppCompatActivity {
         }
 
         builder.show();
+    }
+
+    private void startInAppUpdate(String downloadUrl) {
+        try {
+            Toast.makeText(this, R.string.downloading_update, Toast.LENGTH_SHORT).show();
+
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(downloadUrl));
+            request.setTitle("تحديث بوابة الطلاب");
+            request.setDescription("جاري تنزيل التحديث وتثبيته...");
+            request.setMimeType("application/vnd.android.package-archive");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ArtEdu-Student-Portal-Update.apk");
+
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            if (dm != null) {
+                long downloadId = dm.enqueue(request);
+
+                BroadcastReceiver onComplete = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                        if (id == downloadId) {
+                            try {
+                                unregisterReceiver(this);
+                            } catch (Exception ignored) {}
+
+                            triggerInstallApk(context, downloadId, downloadUrl);
+                        }
+                    }
+                };
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED);
+                } else {
+                    registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+                }
+            } else {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(browserIntent);
+            }
+        } catch (Exception e) {
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(browserIntent);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void triggerInstallApk(Context context, long downloadId, String fallbackUrl) {
+        try {
+            File apkFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ArtEdu-Student-Portal-Update.apk");
+            if (apkFile.exists()) {
+                Uri contentUri = FileProvider.getUriForFile(context, getApplicationContext().getPackageName() + ".fileprovider", apkFile);
+                Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                installIntent.setDataAndType(contentUri, "application/vnd.android.package-archive");
+                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(installIntent);
+                return;
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            DownloadManager dm = (DownloadManager) context.getSystemService(DOWNLOAD_SERVICE);
+            if (dm != null) {
+                Uri fileUri = dm.getUriForDownloadedFile(downloadId);
+                if (fileUri != null) {
+                    Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                    installIntent.setDataAndType(fileUri, "application/vnd.android.package-archive");
+                    installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(installIntent);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+            browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(browserIntent);
+        } catch (Exception ignored) {}
     }
 
     private boolean handleUrlScheme(Uri uri) {

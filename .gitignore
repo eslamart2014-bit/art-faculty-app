@@ -50,13 +50,13 @@ scratch/
 
 
 # Android keystores, build artifacts and credentials
-*.jks
 *.keystore
 *.aab
 *.apk
 dist-apk/
 android-student/app/artedu-release-key.jks
-android-student/app/artedu-official-release.jks
+# Keep official release keystore tracked so all CI builds share the identical signing certificate
+!android-student/app/artedu-official-release.jks
 android-student/app/build/
 android-student/build/
 android-student/.gradle/
