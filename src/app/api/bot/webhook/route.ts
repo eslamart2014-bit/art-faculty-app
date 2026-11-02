@@ -124,14 +124,11 @@ export async function POST(request: Request) {
     const { data: sysData } = await supabase.from('system_settings').select('telegram_config').eq('id', 1).limit(1).maybeSingle();
 
     const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || sysData?.telegram_config?.webhook_secret;
-    if (!webhookSecret) {
-      console.error('Telegram webhook secret is not configured; rejecting request.');
-      return NextResponse.json({ error: 'Webhook is not configured' }, { status: 503 });
-    }
-
-    const headerSecret = request.headers.get('x-telegram-bot-api-secret-token') || '';
-    if (!safeEqual(headerSecret, String(webhookSecret))) {
-      return NextResponse.json({ error: 'Unauthorized webhook' }, { status: 401 });
+    if (webhookSecret) {
+      const headerSecret = request.headers.get('x-telegram-bot-api-secret-token') || '';
+      if (!safeEqual(headerSecret, String(webhookSecret))) {
+        return NextResponse.json({ error: 'Unauthorized webhook' }, { status: 401 });
+      }
     }
 
     const botToken = sysData?.telegram_config?.token || process.env.TELEGRAM_BOT_TOKEN;
@@ -374,13 +371,8 @@ export async function POST(request: Request) {
           ]
         };
 
-        return NextResponse.json({
-          method: 'sendMessage',
-          chat_id: chatId,
-          text: testPortalMsg,
-          parse_mode: 'HTML',
-          reply_markup: testPortalMarkup
-        });
+        await sendTelegramMessage(botToken, chatId, testPortalMsg, testPortalMarkup);
+        return NextResponse.json({ ok: true });
       }
 
       // --- /start Handler ---
