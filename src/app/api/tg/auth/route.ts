@@ -48,17 +48,18 @@ export async function GET(request: Request) {
       });
     }
 
-    const tgId = (searchParams.get('tg_id') || searchParams.get('telegram_id') || '').trim();
+    const rawTgId = (searchParams.get('tg_id') || searchParams.get('telegram_id') || '').trim();
+    const cleanTgId = rawTgId.replace(/\D/g, '');
 
-    if (!tgId) {
-      return noStoreJson({ authenticated: false, message: 'telegram_id is required' }, { status: 400 });
+    if (!cleanTgId) {
+      return noStoreJson({ authenticated: false, needs_link: true, message: 'telegram_id is required' });
     }
 
     // 1. Check if telegram_id is linked in students table
     const { data: student, error } = await supabaseAdmin
       .from('students')
       .select('id, student_code, full_name, academic_year, section, telegram_id, is_active')
-      .eq('telegram_id', tgId.toString())
+      .eq('telegram_id', cleanTgId)
       .limit(1)
       .maybeSingle();
 
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
       return noStoreJson({
         authenticated: false,
         needs_link: true,
-        telegram_id: tgId
+        telegram_id: cleanTgId
       });
     }
 
@@ -94,12 +95,13 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const rawCode = (body.student_code || '').trim();
     const rawTgId = (body.telegram_id || '').toString().trim();
+    const cleanTgId = rawTgId.replace(/\D/g, '');
     const tgUsername = (body.telegram_username || '').trim();
     const tgFirstName = (body.telegram_first_name || '').trim();
     const isAdminOverride = body.admin_override === true;
 
-    if (!rawCode || !rawTgId) {
-      return noStoreJson({ success: false, error: 'يرجى إدخال كود الطالب' }, { status: 400 });
+    if (!rawCode || !cleanTgId) {
+      return noStoreJson({ success: false, error: 'يرجى إدخال كود الطالب ومعرف التيليجرام' }, { status: 400 });
     }
 
     const cleanCode = formatStudentCode(rawCode);
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
     const { data: otherStudent } = await supabaseAdmin
       .from('students')
       .select('id, full_name, student_code')
-      .eq('telegram_id', rawTgId)
+      .eq('telegram_id', cleanTgId)
       .neq('id', student.id)
       .limit(1)
       .maybeSingle();
@@ -136,7 +138,7 @@ export async function POST(request: Request) {
     }
 
     // 3. Prevent overwriting an already linked student from another Telegram (unless admin override)
-    if (student.telegram_id && student.telegram_id !== rawTgId && !isAdminOverride) {
+    if (student.telegram_id && student.telegram_id.toString() !== cleanTgId && !isAdminOverride) {
       return noStoreJson({
         success: false,
         error: '⚠️ هذا الكود مربوط مسبقاً بحساب تيليجرام آخر! يرجى مراجعة إدارة الكلية أو المنسق لفك الارتباط.'
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
 
     // 4. Update student record with telegram_id (safe against nonexistent columns)
     const updatePayload: Record<string, any> = {
-      telegram_id: rawTgId
+      telegram_id: cleanTgId
     };
     if (tgUsername) updatePayload.telegram_username = tgUsername;
     if (tgFirstName) updatePayload.telegram_first_name = tgFirstName;
@@ -157,7 +159,7 @@ export async function POST(request: Request) {
 
     if (updateErr) {
       console.error('Update student error:', updateErr);
-      return noStoreJson({ success: false, error: 'تعذر حفظ بيانات الدخول، يرجى المحاولة لاحقاً' }, { status: 500 });
+      return noStoreJson({ success: false, error: 'تعذر حفظ بيانات الدخول: ' + updateErr.message }, { status: 500 });
     }
 
     // 5. Update student_accounts status to active if table exists

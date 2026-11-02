@@ -40,7 +40,7 @@ export default function TelegramPortalEntryPage() {
 
         // Fallback for browser testing
         if (!resolvedTgUser) {
-          const testId = searchParams.get("tg_id") || "admin_test_user_777";
+          const testId = searchParams.get("tg_id") || "777888999";
           resolvedTgUser = {
             id: testId,
             first_name: "مستخدم تجريبي",
