@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     const { data: student } = await supabaseAdmin
       .from('students')
-      .select('student_code')
+      .select('id, student_code, full_name, telegram_id')
       .eq('id', student_id)
       .maybeSingle();
 
@@ -42,6 +42,35 @@ export async function POST(request: Request) {
       id: evalTag,
       tag: evalTag,
     });
+
+    // Dispatch direct Telegram message if student has telegram_id
+    if (student.telegram_id) {
+      try {
+        const { data: sysData } = await supabaseAdmin
+          .from('system_settings')
+          .select('telegram_config')
+          .eq('id', 1)
+          .limit(1)
+          .maybeSingle();
+
+        const botToken = sysData?.telegram_config?.token || process.env.TELEGRAM_BOT_TOKEN;
+        if (botToken) {
+          const tgMsg = `🎨 <b>رصد تقييم جديد — قسم التربية الفنية</b>\n\nمرحباً <b>${student.full_name}</b> 👨‍🎓\nتم رصد تقييم عملك لمشروع:\n📋 <b>${project_name}</b>\n📚 المقرر: <b>${courseName}</b>\n${score !== undefined && score !== null ? `⭐️ الدرجة: <b>${score}</b>\n` : ''}\n<i>يمكنك الاطلاع على تفاصيل أعمالك عبر بوابة فنية 🚀</i>`;
+
+          fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: student.telegram_id,
+              text: tgMsg,
+              parse_mode: 'HTML'
+            })
+          }).catch(() => {});
+        }
+      } catch (tgErr) {
+        console.error('[notify-evaluation] telegram error:', tgErr);
+      }
+    }
 
     return NextResponse.json({ success: true, result: pushResult });
   } catch (error: any) {

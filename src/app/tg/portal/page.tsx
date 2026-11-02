@@ -6,6 +6,37 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn, CheckCircle2, UserCheck, AlertCircle } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 
+function extractTelegramUser(): { id: string | number; first_name?: string; username?: string } | null {
+  if (typeof window === "undefined") return null;
+
+  // 1. Check window.Telegram.WebApp.initDataUnsafe.user
+  try {
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.initDataUnsafe?.user?.id) {
+      return tg.initDataUnsafe.user;
+    }
+  } catch (e) {}
+
+  // 2. Direct parsing from window.location.hash
+  try {
+    const rawHash = window.location.hash.startsWith("#") ? window.location.hash.substring(1) : window.location.hash;
+    if (rawHash) {
+      const hashParams = new URLSearchParams(rawHash);
+      const tgWebAppData = hashParams.get("tgWebAppData");
+      if (tgWebAppData) {
+        const dataParams = new URLSearchParams(tgWebAppData);
+        const userStr = dataParams.get("user");
+        if (userStr) {
+          const userObj = JSON.parse(userStr);
+          if (userObj?.id) return userObj;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
 export default function TelegramPortalEntryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,58 +54,63 @@ export default function TelegramPortalEntryPage() {
 
   // Initialize and check Telegram WebApp
   useEffect(() => {
+    let attempts = 0;
+    const maxAttempts = 12;
+
     const initTg = async () => {
-      let resolvedTgUser: any = null;
+      if (typeof window === "undefined") return;
 
-      if (typeof window !== "undefined") {
-        const tg = (window as any).Telegram?.WebApp;
-        if (tg) {
-          try {
-            tg.ready();
-            tg.expand();
-            if (tg.initDataUnsafe?.user?.id) {
-              resolvedTgUser = tg.initDataUnsafe.user;
-            }
-          } catch (e) {}
-        }
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        try {
+          tg.ready();
+          tg.expand();
+        } catch (e) {}
+      }
 
-        // Fallback for browser testing
-        if (!resolvedTgUser) {
-          const testId = searchParams.get("tg_id") || "777888999";
-          resolvedTgUser = {
-            id: testId,
-            first_name: "مستخدم تجريبي",
-            username: "preview"
-          };
-        }
+      let resolvedTgUser = extractTelegramUser();
+      if (!resolvedTgUser && attempts < maxAttempts) {
+        attempts++;
+        setTimeout(initTg, 100);
+        return;
+      }
 
-        setTgUser(resolvedTgUser);
+      // Fallback for browser testing (only if opened outside Telegram)
+      if (!resolvedTgUser) {
+        const testId = searchParams.get("tg_id") || "777888999";
+        resolvedTgUser = {
+          id: testId,
+          first_name: "مستخدم تجريبي",
+          username: "preview"
+        };
+      }
 
-        if (resolvedTgUser?.id) {
-          try {
-            const res = await fetch(`/api/tg/auth?tg_id=${encodeURIComponent(resolvedTgUser.id)}`);
-            const data = await res.json();
+      setTgUser(resolvedTgUser);
 
-            if (data.authenticated && data.student) {
-              // Student is already bound! Store session and launch dashboard immediately!
-              try {
-                localStorage.setItem("fania_student_session", JSON.stringify({
-                  student_code: data.student.student_code,
-                  full_name: data.student.full_name,
-                  academic_year: data.student.academic_year,
-                  section: data.student.section,
-                  status: "active"
-                }));
-                localStorage.setItem("fania_student_code", data.student.student_code);
-                if (data.token) localStorage.setItem("fania_student_token", data.token);
-                localStorage.setItem("fania_bypass_update_notice", "1");
-              } catch (e) {}
+      if (resolvedTgUser?.id) {
+        try {
+          const res = await fetch(`/api/tg/auth?tg_id=${encodeURIComponent(resolvedTgUser.id)}`);
+          const data = await res.json();
 
-              window.location.replace("/system?tg=1&bypass=1&web=1");
-              return;
-            }
-          } catch (err) {}
-        }
+          if (data.authenticated && data.student) {
+            // Student is already bound! Store session and launch dashboard immediately!
+            try {
+              localStorage.setItem("fania_student_session", JSON.stringify({
+                student_code: data.student.student_code,
+                full_name: data.student.full_name,
+                academic_year: data.student.academic_year,
+                section: data.student.section,
+                status: "active"
+              }));
+              localStorage.setItem("fania_student_code", data.student.student_code);
+              if (data.token) localStorage.setItem("fania_student_token", data.token);
+              localStorage.setItem("fania_bypass_update_notice", "1");
+            } catch (e) {}
+
+            window.location.replace("/system?tg=1&bypass=1&web=1");
+            return;
+          }
+        } catch (err) {}
       }
 
       setLoading(false);
@@ -119,7 +155,13 @@ export default function TelegramPortalEntryPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentCode.trim() || !tgUser?.id || submitting) return;
+    if (!studentCode.trim() || submitting) return;
+
+    const currentTgUser = extractTelegramUser() || tgUser;
+    if (!currentTgUser?.id) {
+      setErrorMsg("لم يتم التعرف على حساب التيليجرام، يرجى فتح البوابة من داخل تيليجرام");
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg(null);
@@ -131,9 +173,9 @@ export default function TelegramPortalEntryPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_code: studentCode.trim(),
-          telegram_id: tgUser.id,
-          telegram_username: tgUser.username || "",
-          telegram_first_name: tgUser.first_name || "",
+          telegram_id: currentTgUser.id,
+          telegram_username: currentTgUser.username || "",
+          telegram_first_name: currentTgUser.first_name || "",
           admin_override: true
         })
       });
