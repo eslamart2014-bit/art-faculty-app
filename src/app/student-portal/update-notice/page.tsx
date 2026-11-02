@@ -19,9 +19,13 @@ export default function StudentUpdateNoticePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // 1. إذا كان الجهاز آيفون (iOS)، نوجهه فوراً لبوابة الويب ليعمل على وضعه الطبيعي دون إزعاجه بتحميل APK
-      if (isIOSClient()) {
-        window.location.replace("/system?web=1");
+      const isTg = searchParams.get("tg") === "1" || searchParams.get("bypass") === "1" || Boolean((window as any).Telegram?.WebApp?.initData || (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id);
+      const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
+
+      // إذا كان الجهاز آيفون (iOS) أو داخل تيليجرام أو تم تخطي التحديث، نوجهه فوراً للنظام
+      if (isIOSClient() || isTg || isBypassed) {
+        try { localStorage.setItem("fania_bypass_update_notice", "1"); } catch (e) {}
+        window.location.replace("/system?web=1&bypass=1&tg=1");
         return;
       }
 

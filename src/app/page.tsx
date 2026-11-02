@@ -123,7 +123,8 @@ export default function Home() {
         }
 
         const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
-        const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1';
+        const isTg = urlParams.get('tg') === '1' || (typeof window !== 'undefined' && Boolean((window as any).Telegram?.WebApp?.initData || (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id));
+        const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1' || urlParams.get('tg') === '1' || isTg;
 
         // 1. تطبيق أندرويد الأصلي:
         if (isNativeApp) {

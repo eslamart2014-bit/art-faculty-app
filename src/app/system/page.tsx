@@ -784,10 +784,14 @@ export default function SystemPage() {
       } catch (e) {}
 
       const isTestUpdate = isAdminUser && (params.get("test_update") === "1" || params.get("preview_update") === "1" || params.get("preview") === "1");
-      const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1";
-      const hasWebParam = params.get("web") === "1" || params.get("bypass") === "1";
+      const isTelegramClient = params.get("tg") === "1" || (typeof window !== "undefined" && Boolean((window as any).Telegram?.WebApp?.initData || (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id));
+      const isBypassed = localStorage.getItem("fania_bypass_update_notice") === "1" || isTelegramClient;
+      const hasWebParam = params.get("web") === "1" || params.get("bypass") === "1" || params.get("tg") === "1" || isTelegramClient;
       const isNativeApp = isAndroidAppClient();
       const isPWA = isInstalledPWA();
+      if (isTelegramClient) {
+        try { localStorage.setItem("fania_bypass_update_notice", "1"); } catch (e) {}
+      }
 
       // استخراج كود الطالب المحفوظ إن وُجد
       let savedStudentCode = "";
@@ -832,7 +836,7 @@ export default function SystemPage() {
       if (!isIOS) {
         // ج) إذا كان الجهاز أندرويد وفتح من اختصار PWA المثبت سابقاً أو فتح الرابط في المتصفح (وليس تطبيق الأندرويد الأصلي):
         // التوجيه الحتمي والفوري لشاشة ترقية الأندرويد لكي يحصل على كوده والباسورد وزر تحميل الـ APK
-        if (!isNativeApp && !hasWebParam && !isBypassed) {
+        if (!isNativeApp && !hasWebParam && !isBypassed && !isTelegramClient) {
           const targetUrl = `/student-portal/update-notice${savedStudentCode ? `?code=${encodeURIComponent(savedStudentCode)}` : ""}`;
           window.location.replace(targetUrl);
           return;

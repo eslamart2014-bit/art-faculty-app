@@ -67,9 +67,10 @@ export default function TelegramPortalEntryPage() {
                 }));
                 localStorage.setItem("fania_student_code", data.student.student_code);
                 if (data.token) localStorage.setItem("fania_student_token", data.token);
+                localStorage.setItem("fania_bypass_update_notice", "1");
               } catch (e) {}
 
-              window.location.replace("/system?tg=1");
+              window.location.replace("/system?tg=1&bypass=1&web=1");
               return;
             }
           } catch (err) {}
@@ -156,12 +157,13 @@ export default function TelegramPortalEntryPage() {
         }));
         localStorage.setItem("fania_student_code", data.student.student_code);
         if (data.token) localStorage.setItem("fania_student_token", data.token);
+        localStorage.setItem("fania_bypass_update_notice", "1");
       } catch (e) {}
 
       setSuccessMsg(`أهلاً بك يا ${data.student.full_name}! جاري الدخول...`);
 
       setTimeout(() => {
-        window.location.replace("/system?tg=1");
+        window.location.replace("/system?tg=1&bypass=1&web=1");
       }, 700);
     } catch (err: any) {
       setErrorMsg(err?.message || "حدث خطأ في الاتصال بالسيرفر");
