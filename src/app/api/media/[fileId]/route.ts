@@ -42,11 +42,28 @@ export async function GET(
   }
 
   try {
-    const fileRes = await fetch(
-      `https://api.telegram.org/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`,
+    let activeToken = token;
+    let fileRes = await fetch(
+      `https://api.telegram.org/bot${activeToken}/getFile?file_id=${encodeURIComponent(fileId)}`,
       { cache: 'no-store' }
     );
-    const fileData = await fileRes.json();
+    let fileData = await fileRes.json();
+
+    // If active bot cannot find legacy file, fallback to legacy bot token
+    if (!fileData.ok) {
+      const legacyToken = process.env.LEGACY_TELEGRAM_BOT_TOKEN || '8940498495:AAFHtv0y9sEmyJ46Y4pAg1lvM0MOExO7gnA';
+      if (legacyToken && legacyToken !== activeToken) {
+        const legacyRes = await fetch(
+          `https://api.telegram.org/bot${legacyToken}/getFile?file_id=${encodeURIComponent(fileId)}`,
+          { cache: 'no-store' }
+        );
+        const legacyData = await legacyRes.json();
+        if (legacyData.ok && legacyData.result?.file_path) {
+          activeToken = legacyToken;
+          fileData = legacyData;
+        }
+      }
+    }
 
     if (!fileData.ok || !fileData.result?.file_path) {
       return new NextResponse('Media not available', { status: 404 });
@@ -57,7 +74,7 @@ export async function GET(
       return new NextResponse('Media not available', { status: 404 });
     }
 
-    const imgRes = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, {
+    const imgRes = await fetch(`https://api.telegram.org/file/bot${activeToken}/${filePath}`, {
       cache: 'no-store',
     });
 
