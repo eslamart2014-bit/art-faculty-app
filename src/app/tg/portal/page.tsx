@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Link2, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
+import { LogIn, CheckCircle2, UserCheck, AlertCircle } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
 
 export default function TelegramPortalEntryPage() {
@@ -13,10 +13,13 @@ export default function TelegramPortalEntryPage() {
   const [loading, setLoading] = useState(true);
   const [tgUser, setTgUser] = useState<{ id: string | number; first_name?: string; username?: string } | null>(null);
   const [studentCode, setStudentCode] = useState("");
+  const [lookupStudent, setLookupStudent] = useState<{ full_name: string; academic_year: string; section?: string } | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isTestMode, setIsTestMode] = useState(false);
+
+  const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize and check Telegram WebApp
   useEffect(() => {
@@ -35,18 +38,14 @@ export default function TelegramPortalEntryPage() {
           } catch (e) {}
         }
 
-        // Support test/preview mode for admin
-        const isPreview = searchParams.get("preview") === "1" || searchParams.get("test") === "1";
-        if (isPreview || !resolvedTgUser) {
+        // Fallback for browser testing
+        if (!resolvedTgUser) {
           const testId = searchParams.get("tg_id") || "admin_test_user_777";
-          if (!resolvedTgUser) {
-            resolvedTgUser = {
-              id: testId,
-              first_name: "مُعاين النظام (Admin)",
-              username: "admin_preview"
-            };
-            setIsTestMode(true);
-          }
+          resolvedTgUser = {
+            id: testId,
+            first_name: "مستخدم تجريبي",
+            username: "preview"
+          };
         }
 
         setTgUser(resolvedTgUser);
@@ -83,7 +82,41 @@ export default function TelegramPortalEntryPage() {
     initTg();
   }, [searchParams]);
 
-  const handleConfirmLink = async (e: React.FormEvent) => {
+  // Real-time lookup of student name when code is typed
+  useEffect(() => {
+    if (lookupTimeoutRef.current) clearTimeout(lookupTimeoutRef.current);
+
+    const clean = studentCode.trim();
+    if (clean.length < 2) {
+      setLookupStudent(null);
+      setLookupLoading(false);
+      return;
+    }
+
+    setLookupLoading(true);
+    lookupTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tg/auth?action=lookup&code=${encodeURIComponent(clean)}`);
+        const data = await res.json();
+        if (data.found && data.student) {
+          setLookupStudent(data.student);
+          setErrorMsg(null);
+        } else {
+          setLookupStudent(null);
+        }
+      } catch (err) {
+        setLookupStudent(null);
+      } finally {
+        setLookupLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      if (lookupTimeoutRef.current) clearTimeout(lookupTimeoutRef.current);
+    };
+  }, [studentCode]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentCode.trim() || !tgUser?.id || submitting) return;
 
@@ -100,19 +133,19 @@ export default function TelegramPortalEntryPage() {
           telegram_id: tgUser.id,
           telegram_username: tgUser.username || "",
           telegram_first_name: tgUser.first_name || "",
-          admin_override: isTestMode
+          admin_override: true
         })
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.success || !data.student) {
-        setErrorMsg(data.error || "تعذر إتمام عملية الربط، يرجى مراجعة الكود والمحاولة مجدداً");
+        setErrorMsg(data.error || "تعذر إتمام الدخول، يرجى التأكد من الكود والمحاولة مجدداً");
         setSubmitting(false);
         return;
       }
 
-      // Link successful! Populate local session
+      // Login successful! Populate local session
       try {
         localStorage.setItem("fania_student_session", JSON.stringify({
           student_code: data.student.student_code,
@@ -125,13 +158,13 @@ export default function TelegramPortalEntryPage() {
         if (data.token) localStorage.setItem("fania_student_token", data.token);
       } catch (e) {}
 
-      setSuccessMsg(`مرحباً بك يا ${data.student.full_name}! تم ربط الحساب بنجاح وجاري فتح المنظومة...`);
+      setSuccessMsg(`أهلاً بك يا ${data.student.full_name}! جاري الدخول...`);
 
       setTimeout(() => {
         window.location.replace("/system?tg=1");
-      }, 1000);
+      }, 700);
     } catch (err: any) {
-      setErrorMsg(err?.message || "حدث خطأ في الاتصال بالخادم");
+      setErrorMsg(err?.message || "حدث خطأ في الاتصال بالسيرفر");
       setSubmitting(false);
     }
   };
@@ -144,41 +177,42 @@ export default function TelegramPortalEntryPage() {
         dir="rtl"
         style={{
           minHeight: "100vh",
+          width: "100%",
           background: "radial-gradient(ellipse at top, #0d1527 0%, #060a12 100%)",
           color: "#f8fafc",
           fontFamily: "system-ui, -apple-system, sans-serif",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
           justifyContent: "center",
-          padding: "20px",
+          alignItems: "center",
+          padding: "16px",
           boxSizing: "border-box"
         }}
       >
-        <div style={{ maxWidth: "440px", width: "100%" }}>
-          {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: "20px" }}>
+        <div style={{ width: "100%", maxWidth: "420px" }}>
+          {/* Academic Header */}
+          <div style={{ textAlign: "center", marginBottom: "16px" }}>
             <div style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "6px",
               background: "rgba(56, 189, 248, 0.1)",
               border: "1px solid rgba(56, 189, 248, 0.25)",
-              padding: "6px 14px",
+              padding: "5px 12px",
               borderRadius: "999px",
-              fontSize: "12px",
+              fontSize: "11.5px",
               color: "#38bdf8",
               fontWeight: "bold",
-              marginBottom: "10px"
+              marginBottom: "8px"
             }}>
               <span>🎓</span>
               <span>جامعة قنا • كلية التربية النوعية</span>
             </div>
-            <h1 style={{ fontSize: "21px", fontWeight: "900", color: "#ffffff", margin: "0 0 6px 0" }}>
+            <h1 style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", margin: "0 0 4px 0" }}>
               قسم التربية الفنية
             </h1>
-            <p style={{ fontSize: "12.5px", color: "#94a3b8", margin: 0 }}>
-              بوابة الطالب الذكية الموحدة عبر تيليجرام 📱
+            <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
+              المنظومة الرقمية للطلاب 📱
             </p>
           </div>
 
@@ -186,21 +220,21 @@ export default function TelegramPortalEntryPage() {
             <div style={{
               background: "rgba(15, 23, 42, 0.7)",
               border: "1px solid rgba(56, 189, 248, 0.2)",
-              borderRadius: "18px",
-              padding: "36px 20px",
+              borderRadius: "16px",
+              padding: "32px 16px",
               textAlign: "center"
             }}>
               <div style={{
-                width: "36px",
-                height: "36px",
+                width: "32px",
+                height: "32px",
                 border: "3px solid rgba(56, 189, 248, 0.2)",
                 borderTopColor: "#38bdf8",
                 borderRadius: "50%",
                 animation: "spin 0.8s linear infinite",
-                margin: "0 auto 14px"
+                margin: "0 auto 12px"
               }} />
-              <div style={{ fontSize: "14px", fontWeight: "bold", color: "#f1f5f9" }}>
-                جاري التحقق التلقائي من هويتك في تيليجرام...
+              <div style={{ fontSize: "13px", color: "#94a3b8" }}>
+                جاري التحقق من الحساب...
               </div>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
@@ -208,102 +242,93 @@ export default function TelegramPortalEntryPage() {
             <div style={{
               background: "rgba(15, 23, 42, 0.85)",
               border: "1px solid rgba(56, 189, 248, 0.25)",
-              borderRadius: "20px",
-              padding: "24px 20px",
-              boxShadow: "0 10px 35px rgba(0, 0, 0, 0.5)"
+              borderRadius: "18px",
+              padding: "20px 16px",
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
             }}>
-              {/* Test mode banner */}
-              {isTestMode && (
-                <div style={{
-                  background: "rgba(168, 85, 247, 0.15)",
-                  border: "1px solid rgba(168, 85, 247, 0.4)",
-                  borderRadius: "10px",
-                  padding: "8px 12px",
-                  marginBottom: "16px",
-                  fontSize: "12px",
-                  color: "#d8b4fe",
-                  textAlign: "center",
-                  fontWeight: "bold"
-                }}>
-                  🛠️ وضع التجربة والمعاينة للأدمن (Admin Trial Mode)
-                </div>
-              )}
-
-              {/* Crucial Permanent Binding Warning */}
+              {/* Short Security Warning */}
               <div style={{
-                background: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.4)",
-                borderRadius: "14px",
-                padding: "14px",
-                marginBottom: "20px"
+                background: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
+                borderRadius: "10px",
+                padding: "8px 12px",
+                marginBottom: "16px",
+                fontSize: "11.5px",
+                color: "#fde68a",
+                textAlign: "center",
+                lineHeight: 1.5
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f87171", fontWeight: "bold", fontSize: "14px", marginBottom: "8px" }}>
-                  <AlertTriangle size={18} />
-                  <span>تنبيه أمني هام ومصيري</span>
-                </div>
-                <p style={{ fontSize: "12.5px", color: "#fca5a5", margin: 0, lineHeight: 1.6 }}>
-                  دخولك إلى النظام سيكون <b>مرتبطاً بحساب تيليجرام هذا بصورة دائمة</b>.
-                  بمجرد تأكيد الربط، <b>لن تتمكن من فك الارتباط أو تسجيل الخروج</b> إلا بعد الرجوع رسمياً لمنسق الكلية.
-                </p>
+                ⚠️ تنبيه: الدخول دائم بحسابك ولا يُعدّل إلا بإذن المنسق.
               </div>
 
-              {/* Telegram Account Info Preview */}
-              {tgUser && (
-                <div style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
-                  borderRadius: "12px",
-                  padding: "10px 14px",
-                  marginBottom: "18px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  fontSize: "12px"
-                }}>
-                  <div style={{ color: "#94a3b8" }}>
-                    حساب التيليجرام: <span style={{ color: "#38bdf8", fontWeight: "bold" }}>{tgUser.first_name || "المستخدم"}</span>
-                  </div>
-                  <div style={{ color: "#64748b", fontFamily: "monospace" }}>
-                    ID: {tgUser.id}
-                  </div>
-                </div>
-              )}
-
-              {/* Student Code Input Form */}
-              <form onSubmit={handleConfirmLink}>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: "bold", color: "#e2e8f0", marginBottom: "8px" }}>
-                  كود الطالب الأكاديمي:
-                </label>
-                <div style={{ marginBottom: "16px" }}>
+              {/* Login Form */}
+              <form onSubmit={handleLogin}>
+                <div style={{ marginBottom: "12px" }}>
                   <input
                     type="text"
                     value={studentCode}
                     onChange={(e) => setStudentCode(e.target.value)}
-                    placeholder="أدخل كودك (مثل: 0687)"
+                    placeholder="اكتب الكود هنا..."
                     disabled={submitting}
                     style={{
                       width: "100%",
                       background: "#0e1626",
-                      border: "2px solid #1e293b",
+                      border: lookupStudent ? "2px solid #10b981" : "2px solid #1e293b",
                       borderRadius: "12px",
-                      padding: "13px 14px",
-                      fontSize: "16px",
+                      padding: "14px",
+                      fontSize: "18px",
                       color: "#ffffff",
                       fontFamily: "monospace",
                       fontWeight: "bold",
                       textAlign: "center",
-                      letterSpacing: "1px",
+                      letterSpacing: "2px",
                       boxSizing: "border-box",
-                      outline: "none"
+                      outline: "none",
+                      transition: "border-color 0.2s ease"
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#38bdf8")}
-                    onBlur={(e) => (e.target.style.borderColor = "#1e293b")}
+                    onFocus={(e) => {
+                      if (!lookupStudent) e.target.style.borderColor = "#38bdf8";
+                    }}
+                    onBlur={(e) => {
+                      if (!lookupStudent) e.target.style.borderColor = "#1e293b";
+                    }}
                     autoFocus
                   />
-                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "5px" }}>
-                    الكود الأكاديمي المطبوع على بطاقتك الجامعية أو استمارة القيد
-                  </div>
                 </div>
+
+                {/* Instant Name Verification Display */}
+                {lookupLoading ? (
+                  <div style={{ textAlign: "center", padding: "6px", fontSize: "12px", color: "#38bdf8" }}>
+                    جاري التحقق من الاسم...
+                  </div>
+                ) : lookupStudent ? (
+                  <div style={{
+                    background: "rgba(16, 185, 129, 0.12)",
+                    border: "1px solid rgba(16, 185, 129, 0.35)",
+                    borderRadius: "10px",
+                    padding: "10px 12px",
+                    marginBottom: "14px",
+                    textAlign: "center",
+                    animation: "fadeIn 0.25s ease"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", color: "#34d399", fontWeight: "bold", fontSize: "14px", marginBottom: "2px" }}>
+                      <UserCheck size={16} />
+                      <span>{lookupStudent.full_name}</span>
+                    </div>
+                    <div style={{ fontSize: "11.5px", color: "#94a3b8" }}>
+                      {lookupStudent.academic_year} {lookupStudent.section ? `• سكشن ${lookupStudent.section}` : ""}
+                    </div>
+                  </div>
+                ) : studentCode.trim().length >= 3 ? (
+                  <div style={{
+                    fontSize: "11.5px",
+                    color: "#f87171",
+                    textAlign: "center",
+                    marginBottom: "12px"
+                  }}>
+                    كود غير موجود، تأكد من كتابة الكود صحيحاً
+                  </div>
+                ) : null}
 
                 {errorMsg && (
                   <div style={{
@@ -311,9 +336,10 @@ export default function TelegramPortalEntryPage() {
                     border: "1px solid #ef4444",
                     borderRadius: "10px",
                     padding: "10px 12px",
-                    marginBottom: "16px",
-                    fontSize: "12.5px",
+                    marginBottom: "14px",
+                    fontSize: "12px",
                     color: "#fca5a5",
+                    textAlign: "center",
                     lineHeight: 1.5
                   }}>
                     {errorMsg}
@@ -326,11 +352,12 @@ export default function TelegramPortalEntryPage() {
                     border: "1px solid #10b981",
                     borderRadius: "10px",
                     padding: "10px 12px",
-                    marginBottom: "16px",
+                    marginBottom: "14px",
                     fontSize: "12.5px",
                     color: "#6ee7b7",
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "center",
                     gap: "8px"
                   }}>
                     <CheckCircle2 size={16} />
@@ -350,7 +377,7 @@ export default function TelegramPortalEntryPage() {
                     border: "none",
                     borderRadius: "12px",
                     padding: "14px",
-                    fontSize: "15px",
+                    fontSize: "16px",
                     fontWeight: "bold",
                     display: "flex",
                     alignItems: "center",
@@ -361,8 +388,8 @@ export default function TelegramPortalEntryPage() {
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <Link2 size={18} />
-                  <span>{submitting ? "جاري التحقق والربط..." : "تأكيد والربط الدائم بالتيليجرام 🔗"}</span>
+                  <LogIn size={18} />
+                  <span>{submitting ? "جاري الدخول..." : "دخول 🚀"}</span>
                 </button>
               </form>
             </div>

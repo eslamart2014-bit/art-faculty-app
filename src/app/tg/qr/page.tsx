@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Script from "next/script";
 import QRCode from "react-qr-code";
 import { Search, Download, CheckCircle2, RotateCcw } from "lucide-react";
 import { formatStudentCode } from "@/lib/codeHelper";
@@ -222,8 +223,10 @@ export default function TelegramQrLookupPage() {
   };
 
   return (
-    <div
-      dir="rtl"
+    <>
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
+      <div
+        dir="rtl"
       style={{
         minHeight: "100vh",
         background: "radial-gradient(ellipse at top, #0d1527 0%, #060a12 100%)",
@@ -553,5 +556,6 @@ export default function TelegramQrLookupPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -7,13 +7,47 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Telegram Authentication & Binding API:
- * 1. GET: Check if a telegram_id is already bound to a student
+ * 1. GET: 
+ *    - Check if a telegram_id is already bound to a student
+ *    - OR if ?action=lookup&code=0713, instantly returns the student's name for verification
  * 2. POST: Bind a telegram_id permanently to a student code and create session
  */
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
+
+    // Live Student Name Lookup by code
+    if (action === 'lookup') {
+      const code = (searchParams.get('code') || '').trim();
+      if (!code || code.length < 2) {
+        return noStoreJson({ found: false });
+      }
+      const cleanCode = formatStudentCode(code);
+      const { data: st } = await supabaseAdmin
+        .from('students')
+        .select('id, full_name, student_code, academic_year, section, telegram_id')
+        .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (!st) {
+        return noStoreJson({ found: false });
+      }
+
+      return noStoreJson({
+        found: true,
+        student: {
+          full_name: st.full_name,
+          student_code: st.student_code,
+          academic_year: st.academic_year,
+          section: st.section,
+          is_linked: !!st.telegram_id
+        }
+      });
+    }
+
     const tgId = (searchParams.get('tg_id') || searchParams.get('telegram_id') || '').trim();
 
     if (!tgId) {
@@ -65,11 +99,10 @@ export async function POST(request: Request) {
     const isAdminOverride = body.admin_override === true;
 
     if (!rawCode || !rawTgId) {
-      return noStoreJson({ success: false, error: 'يرجى إدخال كود الطالب ومعرف التيليجرام' }, { status: 400 });
+      return noStoreJson({ success: false, error: 'يرجى إدخال كود الطالب' }, { status: 400 });
     }
 
     const cleanCode = formatStudentCode(rawCode);
-    const variants = getStudentCodeVariants(rawCode);
 
     // 1. Verify student exists in database
     const { data: student, error: stErr } = await supabaseAdmin
@@ -82,11 +115,11 @@ export async function POST(request: Request) {
     if (stErr || !student) {
       return noStoreJson({
         success: false,
-        error: 'عفواً، لم يتم العثور على طالب بهذا الكود الأكاديمي. يرجى التأكد من الكود المكتوب في الكارنيه أو كشوف الكلية.'
+        error: 'عفواً، لم يتم العثور على طالب بهذا الكود. يرجى التأكد من الكود الصحيح.'
       }, { status: 404 });
     }
 
-    // 2. Prevent one Telegram account from taking multiple student identities
+    // 2. Prevent one Telegram account from taking multiple student identities (unless admin override)
     const { data: otherStudent } = await supabaseAdmin
       .from('students')
       .select('id, full_name, student_code')
@@ -106,23 +139,25 @@ export async function POST(request: Request) {
     if (student.telegram_id && student.telegram_id !== rawTgId && !isAdminOverride) {
       return noStoreJson({
         success: false,
-        error: '⚠️ هذا الكود الأكاديمي مربوط مسبقاً بحساب تيليجرام آخر! إذا كنت تواجه مشكلة، يرجى التوجه لمنسق الكلية لفك الارتباط.'
+        error: '⚠️ هذا الكود مربوط مسبقاً بحساب تيليجرام آخر! يرجى مراجعة إدارة الكلية أو المنسق لفك الارتباط.'
       }, { status: 409 });
     }
 
-    // 4. Update student record with telegram_id
+    // 4. Update student record with telegram_id (safe against nonexistent columns)
+    const updatePayload: Record<string, any> = {
+      telegram_id: rawTgId
+    };
+    if (tgUsername) updatePayload.telegram_username = tgUsername;
+    if (tgFirstName) updatePayload.telegram_first_name = tgFirstName;
+
     const { error: updateErr } = await supabaseAdmin
       .from('students')
-      .update({
-        telegram_id: rawTgId,
-        telegram_username: tgUsername || null,
-        telegram_first_name: tgFirstName || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updatePayload)
       .eq('id', student.id);
 
     if (updateErr) {
-      return noStoreJson({ success: false, error: 'تعذر حفظ بيانات الربط، يرجى المحاولة لاحقاً' }, { status: 500 });
+      console.error('Update student error:', updateErr);
+      return noStoreJson({ success: false, error: 'تعذر حفظ بيانات الدخول، يرجى المحاولة لاحقاً' }, { status: 500 });
     }
 
     // 5. Update student_accounts status to active if table exists
@@ -131,8 +166,7 @@ export async function POST(request: Request) {
         .from('student_accounts')
         .update({
           status: 'active',
-          is_pin_used: true,
-          updated_at: new Date().toISOString()
+          is_pin_used: true
         })
         .or(`student_code.eq.${student.student_code},student_code.eq.${cleanCode}`);
     } catch (_) {}
@@ -140,7 +174,7 @@ export async function POST(request: Request) {
     // 6. Issue Semester-long Session (180 days)
     const response = noStoreJson({
       success: true,
-      message: 'تم ربط الحساب بنجاح ودخول المنظومة!',
+      message: 'تم تسجيل الدخول بنجاح!',
       student: {
         student_code: student.student_code,
         full_name: student.full_name,
