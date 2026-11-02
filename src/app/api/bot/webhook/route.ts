@@ -351,6 +351,38 @@ export async function POST(request: Request) {
         }
       }
 
+      // --- /test_portal Handler (Isolated Admin Trial for Telegram Mini Apps) ---
+      if (text.startsWith('/test_portal') || text === '/portal_test') {
+        const testPortalMsg = `🎓 <b>أهلاً بك في منظومة التربية الفنية — جامعة قنا</b>\n\n` +
+          `المنظومة الرقمية الموحدة للطلاب.\n` +
+          `اختر الخدمة المطلوبة من الأزرار المباشرة أدناه:`;
+
+        const testPortalMarkup = {
+          inline_keyboard: [
+            [
+              {
+                text: '🎨 الدخول لبوابة فنية',
+                web_app: { url: 'https://art-faculty-app.vercel.app/tg/portal' }
+              }
+            ],
+            [
+              {
+                text: '🪪 سحب الكيو آر كود (QR Code)',
+                web_app: { url: 'https://art-faculty-app.vercel.app/tg/qr' }
+              }
+            ]
+          ]
+        };
+
+        return NextResponse.json({
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: testPortalMsg,
+          parse_mode: 'HTML',
+          reply_markup: testPortalMarkup
+        });
+      }
+
       // --- /start Handler ---
       if (text.startsWith('/start')) {
         const parts = text.split(' ');

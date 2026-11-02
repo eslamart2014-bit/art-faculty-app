@@ -226,7 +226,7 @@ function getStudentSecret(): string {
   return secret;
 }
 
-export function createStudentSessionToken(code: string, ttlSeconds = 12 * 60 * 60): string {
+export function createStudentSessionToken(code: string, ttlSeconds = 180 * 24 * 60 * 60): string {
   const payload = Buffer.from(
     JSON.stringify({ code, exp: Math.floor(Date.now() / 1000) + ttlSeconds })
   ).toString('base64url');
@@ -290,10 +290,11 @@ function cookieBase(request?: Request) {
   };
 }
 
-export function setStudentSession(response: NextResponse, code: string, request?: Request) {
-  response.cookies.set(STUDENT_COOKIE, createStudentSessionToken(code), {
+export function setStudentSession(response: NextResponse, code: string, request?: Request, maxAgeSeconds?: number) {
+  const ttl = maxAgeSeconds && maxAgeSeconds > 0 ? maxAgeSeconds : 180 * 24 * 3600;
+  response.cookies.set(STUDENT_COOKIE, createStudentSessionToken(code, ttl), {
     ...cookieBase(request),
-    maxAge: 12 * 60 * 60,
+    maxAge: ttl,
   });
 }
 
