@@ -350,9 +350,7 @@ export async function POST(request: Request) {
 
       // --- /test_portal Handler (Isolated Admin Trial for Telegram Mini Apps) ---
       if (text.startsWith('/test_portal') || text === '/portal_test') {
-        const testPortalMsg = `🎓 <b>أهلاً بك في منظومة التربية الفنية — جامعة قنا</b>\n\n` +
-          `المنظومة الرقمية الموحدة للطلاب.\n` +
-          `اختر الخدمة المطلوبة من الأزرار المباشرة أدناه:`;
+        const testPortalMsg = `من خلال هذا البوت يمكن للطلاب متابعة حضور وغياب ومشاريع وتقييمات وانضمام للدواليب.\n\nاختر الخدمة المطلوبة:`;
 
         const testPortalMarkup = {
           inline_keyboard: [
@@ -448,7 +446,13 @@ export async function POST(request: Request) {
               replyText = `مرحباً بك يا <b>${knownStudent.full_name}</b> 👨‍🎓\n\nماذا تريد أن تفعل اليوم؟`;
               replyMarkup = studentMainMenuMarkup;
             } else {
-              replyText = `مرحباً بك في المنظومة الأكاديمية! للحصول على رابط ربط حسابك، يرجى مسح بطاقتك أو الدخول من بوابة الطالب.`;
+              replyText = 'من خلال هذا البوت يمكن للطلاب متابعة حضور وغياب ومشاريع وتقييمات وانضمام للدواليب.\n\nاختر الخدمة المطلوبة:';
+              replyMarkup = {
+                inline_keyboard: [
+                  [{ text: '🎨 الدخول لبوابة فنية', web_app: { url: 'https://art-faculty-app.vercel.app/tg/portal' } }],
+                  [{ text: '🪪 سحب الكيو آر كود (QR Code)', web_app: { url: 'https://art-faculty-app.vercel.app/tg/qr' } }]
+                ]
+              };
             }
           }
         }
