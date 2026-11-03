@@ -249,7 +249,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     if (!course) setLoading(true);
     try {
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 8000)
       );
 
       const { data } = await Promise.race([
@@ -284,7 +284,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       }
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 8000)
       );
 
       const [studentsRes, evalsRes] = await Promise.race([
