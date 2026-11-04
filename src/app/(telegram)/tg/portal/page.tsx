@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
-import { useSearchParams } from "next/navigation";
 import { LogIn, CheckCircle2, UserCheck } from "lucide-react";
 
 function extractTelegramUser(): { id: string | number; first_name?: string; username?: string } | null {
@@ -37,8 +36,6 @@ function extractTelegramUser(): { id: string | number; first_name?: string; user
 }
 
 export default function TelegramPortalEntryPage() {
-  const searchParams = useSearchParams();
-
   const [loading, setLoading] = useState(true);
   const [tgUser, setTgUser] = useState<{ id: string | number; first_name?: string; username?: string } | null>(null);
   const [studentCode, setStudentCode] = useState("");
@@ -78,8 +75,9 @@ export default function TelegramPortalEntryPage() {
         const isLocalhost =
           typeof window !== "undefined" &&
           (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+        const urlParams = new URLSearchParams(window.location.search);
         const explicitTgId =
-          searchParams.get("tg_id") ||
+          urlParams.get("tg_id") ||
           (isLocalhost ? localStorage.getItem("fania_local_test_tg_id") || "999888777" : null);
 
         if (explicitTgId) {
@@ -167,7 +165,7 @@ export default function TelegramPortalEntryPage() {
     };
 
     initTg();
-  }, [searchParams]);
+  }, []);
 
   // Real-time lookup of student name when code is typed
   useEffect(() => {

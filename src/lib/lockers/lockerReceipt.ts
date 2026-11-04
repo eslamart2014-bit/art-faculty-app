@@ -600,7 +600,21 @@ export async function downloadLockerReceiptPdf(
       if (tg?.initDataUnsafe?.user?.id) {
         telegramId = String(tg.initDataUnsafe.user.id);
       } else {
-        telegramId = localStorage.getItem('fania_tg_id');
+        const rawHash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : window.location.hash;
+        if (rawHash) {
+          const hashParams = new URLSearchParams(rawHash);
+          const tgWebAppData = hashParams.get('tgWebAppData');
+          if (tgWebAppData) {
+            const userStr = new URLSearchParams(tgWebAppData).get('user');
+            if (userStr) {
+              const userObj = JSON.parse(userStr);
+              if (userObj?.id) telegramId = String(userObj.id);
+            }
+          }
+        }
+        if (!telegramId) {
+          telegramId = localStorage.getItem('fania_tg_id');
+        }
       }
     } catch {}
 
@@ -646,12 +660,19 @@ export async function downloadLockerReceiptPdf(
       : resJson?.publicUrl || null;
 
     // 3. تشغيل التنزيل الفعلي حسب البيئة (تليجرام بوت / أندرويد / متصفح)
+    const sentToTelegram = Boolean(resJson?.sentToTelegram);
+
     if (isInsideTelegramWebApp) {
       // داخل تطبيق تليجرام (Mini App):
       // أ) إذا كان تليجرام يدعم downloadFile الأصلية (الإصدارات الحديثة)
       if (fullDownloadUrl && typeof tg?.downloadFile === 'function') {
         try {
           tg.downloadFile({ url: fullDownloadUrl, file_name: safeFilename });
+        } catch {}
+      } else if (fullDownloadUrl && !sentToTelegram && typeof tg?.openLink === 'function') {
+        // إذا لم يتم إرسالها للشات وكان الإصدار لا يدعم downloadFile، افتح الرابط الخارجي لتحميل الـ PDF مباشرة
+        try {
+          tg.openLink(fullDownloadUrl);
         } catch {}
       }
 
@@ -684,7 +705,6 @@ export async function downloadLockerReceiptPdf(
       pdf.save(safeFilename);
     }
 
-    const sentToTelegram = Boolean(resJson?.sentToTelegram);
     notify(
       sentToTelegram
         ? 'تم التنزيل وإرسال نسخة PDF لمحادثة البوت!'
