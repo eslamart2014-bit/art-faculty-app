@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { lockerStore } from '@/lib/lockerStore';
-import { requireCoordinator } from '@/lib/serverAuth';
-import { sendPushToStudents } from '@/lib/push';
+import { lockerStore } from '@/lib/lockers/lockerStore';
+import { requireCoordinator } from '@/lib/auth/serverAuth';
+import { sendPushToStudents } from '@/lib/telegram/push';
 
 export const dynamic = 'force-dynamic';
 

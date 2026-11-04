@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { supabaseAdmin } from '@/lib/supabase';
-import { sendPushToStudents } from '@/lib/push';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { sendPushToStudents } from '@/lib/telegram/push';
 
 export const dynamic = 'force-dynamic';
 

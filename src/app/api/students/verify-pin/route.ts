@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
-import { localStore } from '@/lib/localFallbackStore';
-import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/serverAuth';
-import { getClientIp, isRateLimited } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode } from '@/lib/students/codeHelper';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/auth/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 

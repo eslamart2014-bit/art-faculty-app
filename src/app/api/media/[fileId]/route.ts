@@ -5,7 +5,7 @@ import {
   getStaffContext,
   getStudentSession,
   parseCookies,
-} from '@/lib/serverAuth';
+} from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

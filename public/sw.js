@@ -1,5 +1,5 @@
-// Service Worker v3.7.4 - Next.js offline shell (authenticated routes are network-only)
-const CACHE_VERSION = 'v3.7.4';
+// Service Worker v4.0.0 - Next.js offline shell (authenticated routes & localhost are network-only)
+const CACHE_VERSION = 'v4.0.0';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -20,7 +20,8 @@ const AUTH_ROUTE_PREFIXES = [
   '/admin-portal',
   '/camera',
   '/course',
-  '/bot'
+  '/bot',
+  '/tg'
 ];
 
 function isAuthenticatedRoute(pathname) {
@@ -68,32 +69,38 @@ function offlineHtmlResponse() {
 
 // Install: pre-cache core app shell and immediately activate
 self.addEventListener('install', event => {
-  console.log('[SW] Installing ' + CACHE_VERSION + '...');
   self.skipWaiting();
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    return;
+  }
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => {
-      return cache.addAll(CORE_ASSETS).catch(err => {
-        console.warn('[SW] Pre-cache initial warning:', err);
-      });
+      return cache.addAll(CORE_ASSETS).catch(() => {});
     })
   );
 });
 
 // Activate: delete old caches and claim all clients immediately
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating ' + CACHE_VERSION + ', clearing all old caches...');
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') {
+    event.waitUntil(
+      caches.keys()
+        .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+        .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION })))
+    );
+    return;
+  }
+
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(k => k !== STATIC_CACHE && k !== DYNAMIC_CACHE).map(k => {
-          console.log('[SW] Deleting obsolete cache:', k);
-          return caches.delete(k);
-        })
+        keys.filter(k => k !== STATIC_CACHE && k !== DYNAMIC_CACHE).map(k => caches.delete(k))
       );
     }).then(() => self.clients.claim()).then(() => {
       return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     }).then(clients => {
-      console.log('[SW] Notifying', clients.length, 'clients of update');
       clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
     })
   );
@@ -104,6 +111,11 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
+  // Never cache anything on localhost / 127.0.0.1 (prevents stale Turbopack dev chunks)
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    return;
+  }
+
   // Skip non-GET requests
   if (req.method !== 'GET') return;
 
@@ -113,7 +125,6 @@ self.addEventListener('fetch', event => {
   }
 
   // 1. Next.js Static Chunks & Build Artifacts (/_next/static/...)
-  // These files have unique build hashes and NEVER change: Cache-First!
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async cache => {
@@ -138,7 +149,6 @@ self.addEventListener('fetch', event => {
   const isRSC = url.searchParams.has('_rsc') || req.headers.get('RSC') === '1';
 
   if (isNavigation || isRSC) {
-    // Personal/staff areas must never be stored or served from a shared cache.
     if (isAuthenticatedRoute(url.pathname)) {
       event.respondWith((async () => {
         try {
@@ -153,9 +163,7 @@ self.addEventListener('fetch', event => {
       return;
     }
 
-    // Public login shell: fast network with offline fallback.
     event.respondWith((async () => {
-      // 1. Try to fetch with a fast 1500ms timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1500);
 
@@ -165,7 +173,6 @@ self.addEventListener('fetch', event => {
         if (res && res.status === 200) {
           const cache = await caches.open(DYNAMIC_CACHE);
           cache.put(req, res.clone());
-          // Also save clean pathname for offline matching
           if (url.pathname) {
             cache.put(url.pathname, res.clone());
           }
@@ -178,16 +185,12 @@ self.addEventListener('fetch', event => {
       } catch (err) {
         clearTimeout(timeoutId);
 
-        // OFFLINE / SLOW NETWORK MODE:
-        // A. Try exact requested URL in cache
         const cachedPage = await caches.match(req);
         if (cachedPage) return cachedPage;
 
-        // B. Try matching without query params
         const cachedClean = await caches.match(url.pathname);
         if (cachedClean) return cachedClean;
 
-        // C. Fallback to the public app shell
         const rootShell = await caches.match('/');
         if (rootShell) return rootShell;
 
@@ -221,7 +224,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 4. Other internal assets: Cache-Falling-Back-to-Network or Stale-While-Revalidate
+  // 4. Other internal assets
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(req).then(async cached => {

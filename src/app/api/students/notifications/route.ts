@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { lockerStore } from '@/lib/lockerStore';
-import { getStudentSession } from '@/lib/serverAuth';
-import { getStudentCodeVariants } from '@/lib/codeHelper';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { lockerStore } from '@/lib/lockers/lockerStore';
+import { getStudentSession } from '@/lib/auth/serverAuth';
+import { getStudentCodeVariants } from '@/lib/students/codeHelper';
 
 export const dynamic = 'force-dynamic';
 

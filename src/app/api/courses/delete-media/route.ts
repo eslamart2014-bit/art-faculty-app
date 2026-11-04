@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { requireStaff } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { requireStaff } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

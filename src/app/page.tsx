@@ -1,26 +1,26 @@
 "use client";
 
-import { preloadFacultyData } from "@/lib/preloadFacultyData";
-import { normalizeAcademicDegree } from "@/lib/academicHelper";
-import { isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/deviceFingerprint";
+import { preloadFacultyData } from "@/lib/admin/preloadFacultyData";
+import { normalizeAcademicDegree } from "@/lib/courses/academicHelper";
+import { isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/auth/deviceFingerprint";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import Login from "@/components/Login";
+import { supabase } from "@/lib/core/supabase";
+import Login from "@/components/auth/Login";
 
-import AppBar from "@/components/AppBar";
-import SettingsMenu from "@/components/SettingsMenu";
+import AppBar from "@/components/layout/AppBar";
+import SettingsMenu from "@/components/layout/SettingsMenu";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AddCourseModal from "@/components/courses/AddCourseModal";
 import CoursesList from "@/components/courses/CoursesList";
-import ProfileModal from "@/components/ProfileModal";
-import ArchiveModal from "@/components/ArchiveModal";
-import SuggestionsChatModal from "@/components/SuggestionsChatModal";
-import AdminUsersModal from "@/components/AdminUsersModal";
-import AdvancedSettingsModal from "@/components/AdvancedSettingsModal";
-import StudentPortalHubModal from "@/components/StudentPortalHubModal";
-import StaffReauthModal from "@/components/StaffReauthModal";
-import { syncStaffSessionClient } from "@/lib/staffAuthFetch";
+import ProfileModal from "@/components/auth/ProfileModal";
+import ArchiveModal from "@/components/admin/ArchiveModal";
+import SuggestionsChatModal from "@/components/admin/SuggestionsChatModal";
+import AdminUsersModal from "@/components/admin/AdminUsersModal";
+import AdvancedSettingsModal from "@/components/admin/AdvancedSettingsModal";
+import StudentPortalHubModal from "@/components/portal-hub/StudentPortalHubModal";
+import StaffReauthModal from "@/components/auth/StaffReauthModal";
+import { syncStaffSessionClient } from "@/lib/auth/staffAuthFetch";
 
 function syncStaffSession(accessToken?: string | null) {
   if (typeof window === 'undefined') return;
@@ -108,53 +108,34 @@ export default function Home() {
       if (isFacultyMode) {
         localStorage.removeItem('fania_last_portal');
         localStorage.setItem('fania_app_mode', 'faculty');
-      } else if (!isFaculty) {
-        // استخراج كود الطالب المحفوظ إن وُجد
-        let savedCode = '';
-        try {
-          const s = localStorage.getItem('fania_student_session');
-          if (s) {
-            const parsed = JSON.parse(s);
-            if (parsed?.student_code) savedCode = parsed.student_code;
-          }
-        } catch (e) {}
-        if (!savedCode) {
-          savedCode = localStorage.getItem('fania_student_code') || '';
-        }
+      } else if (!isFaculty && (isNativeApp || isPWA || hasStudentSession || hasStudentCode || wasStudentPortal)) {
+        // أي طالب يفتح الرابط الرئيسي من تطبيق الأندرويد APK أو الـ PWA القديم أو المتصفح يوجه فوراً لشاشة الانتقال لتليجرام
+        setIsRedirectingToStudent(true);
+        window.location.replace('/student-portal');
+        return;
+      }
 
-        const isBypassed = localStorage.getItem('fania_bypass_update_notice') === '1';
-        const isTg = urlParams.get('tg') === '1' || (typeof window !== 'undefined' && Boolean((window as any).Telegram?.WebApp?.initData || (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id));
-        const hasWebParam = urlParams.get('web') === '1' || urlParams.get('bypass') === '1' || urlParams.get('tg') === '1' || isTg;
+      const openTarget = urlParams.get('open');
+      if (openTarget === 'telegram_students' || openTarget === 'portal_hub') {
+        setIsPortalHubOpen(true);
+      } else if (openTarget === 'advanced_settings') {
+        setIsAdvancedSettingsOpen(true);
+      }
 
-        // 1. تطبيق أندرويد الأصلي:
-        if (isNativeApp) {
-          setIsRedirectingToStudent(true);
-          window.location.replace('/system');
-          return;
-        }
-
-        // 2. أجهزة آيفون (iOS):
-        // تفتح بوابة الويب مباشرة بدون تحويل لشاشة APK الأندرويد ليفضل على وضعه
-        if (isIOS) {
-          setIsRedirectingToStudent(true);
-          window.location.replace('/system');
-          return;
-        }
-
-        // 3. أجهزة أندرويد خارج التطبيق الأصلي (PWA مثبت سابقاً أو متصفح فتح اللينك):
-        // يوجه فوراً لشاشة تحميل الـ APK وتثبيت التطبيق الجديد
-        if (!hasWebParam && !isBypassed) {
-          setIsRedirectingToStudent(true);
-          window.location.replace('/student-portal/update-notice' + (savedCode ? '?code=' + encodeURIComponent(savedCode) : ''));
-          return;
-        }
-
-        // 4. أي طالب على المتصفح العادي مع تجاوز معتمد (?web=1):
-        if (hasStudentSession || hasStudentCode || wasStudentPortal) {
-          setIsRedirectingToStudent(true);
-          window.location.replace('/system?web=1');
-          return;
-        }
+      const isLocalPreview =
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+        (isFacultyMode || Boolean(openTarget));
+      if (isLocalPreview && !localStorage.getItem('cached_profile')) {
+        const localAdmin = {
+          id: 'local-admin-preview',
+          full_name: 'د. إسلام عبد اللطيف حسن',
+          role: 'مدير',
+          degree: 'د',
+          can_verify_students: true,
+        };
+        setUser(localAdmin);
+        setOriginalAdminUser(localAdmin);
+        setLoading(false);
       }
     }
 

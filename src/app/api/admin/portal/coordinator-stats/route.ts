@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { localStore } from '@/lib/localFallbackStore';
-import { requireCoordinator } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { requireCoordinator } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

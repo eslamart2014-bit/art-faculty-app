@@ -1,11 +1,11 @@
-import { isAndroidAppRequest } from '@/lib/deviceFingerprint';
+import { isAndroidAppRequest } from '@/lib/auth/deviceFingerprint';
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
-import { localStore } from '@/lib/localFallbackStore';
-import { lockerStore } from '@/lib/lockerStore';
-import { formatInstructorTitle } from '@/lib/academicHelper';
-import { getStudentSession, requireCoordinator, noStoreJson } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, getStudentCodeVariants } from '@/lib/students/codeHelper';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { lockerStore } from '@/lib/lockers/lockerStore';
+import { formatInstructorTitle } from '@/lib/courses/academicHelper';
+import { getStudentSession, requireCoordinator, noStoreJson } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     // 1. جلب بيانات الطالب
     const { data: student, error: stErr } = await supabaseAdmin
       .from('students')
-      .select('id, full_name, student_code, academic_year, section, telegram_browser_id')
+      .select('id, full_name, student_code, academic_year, section, telegram_id, is_active, telegram_browser_id')
       .or(`student_code.eq.${code},student_code.eq.${cleanCode}`)
       .maybeSingle();
 
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // التحقق الأمني: جلب بيانات الحساب المعتمد (جدول الحسابات هو المصدر الأساسي)
+    // التحقق الأمني: جلب بيانات الحساب المعتمد
     let accountData: any = null;
     try {
       const { data: acc } = await supabaseAdmin
@@ -83,32 +83,29 @@ export async function GET(request: Request) {
       accountData = localStore.getAccount(cleanCode) || localStore.getAccount(code);
     }
 
-    // التحقق مما إذا كان الحساب قد تم تفعيله على تطبيق الأندرويد، وهذا الطلب من متصفح بجهاز مختلف
-    const requestDeviceId = (searchParams.get('deviceId') || request.headers.get('x-device-id') || '').trim();
-    const isFromApk = isAndroidAppRequest(request, null);
-
-    if (!isFromApk && accountData?.bound_device_platform === 'apk') {
-      if (requestDeviceId && accountData.bound_device_id && accountData.bound_device_id !== requestDeviceId) {
-        return noStoreJson(
-          {
-            error: 'تم تسجيل الدخول بنجاح من تطبيق الأندرويد الجديد 📱. تم إنهاء الجلسة على هذا المتصفح لحماية حسابك.',
-            app_migrated: true,
-            device_locked: true
-          },
-          { status: 401 }
-        );
-      }
-    }
-
-    // التحقق من تعليق الحساب
-    if (accountData?.status === 'suspended') {
+    // التحقق من تعليق الحساب (سواء في جدول الطلاب أو جدول الحسابات)
+    if (student.is_active === false || accountData?.status === 'suspended') {
       return noStoreJson(
-        { error: 'تم تعليق هذا الحساب مؤقتاً من قِبل إدارة المنظومة. يرجى مراجعة إدارة الكلية.' },
+        {
+          error: '⛔ تم تعليق هذا الحساب مؤقتاً من قِبل إدارة الكلية. يرجى مراجعة المشرف.',
+          suspended: true,
+        },
         { status: 403 }
       );
     }
 
-    const isActivated = Boolean(accountData?.is_pin_used || accountData?.status === 'active' || accountData?.activated_by);
+    // تسجيل آخر نشاط للطالب في البوت تلقائياً (دون تأخير الاستجابة)
+    if (!isImpersonate) {
+      supabaseAdmin
+        .from('portal_audit_logs')
+        .insert({
+          student_code: student.student_code,
+          action: 'bot_portal_open',
+          details: { source: 'telegram_bot', telegram_id: student.telegram_id || null },
+        })
+        .then(() => {})
+        .catch(() => {});
+    }
 
     let studentAvatar: string | null = null;
     if (student.telegram_browser_id) {
@@ -118,14 +115,14 @@ export async function GET(request: Request) {
       } catch (e) {}
     }
 
-    // كائن طالب آمن ومجرد من أي بيانات حساسة
+    // كائن طالب آمن ومجرد من أي بيانات حساسة (جميع طلاب البوت غير المعلقين نشطون تلقائياً)
     const safeStudent = {
       id: student.id,
       full_name: student.full_name,
       student_code: student.student_code,
       academic_year: student.academic_year,
       section: student.section,
-      status: isActivated ? 'active' : (accountData?.status || 'pending'),
+      status: 'active',
       avatar_url: studentAvatar,
     };
 

@@ -1,5 +1,5 @@
-import { supabaseAdmin } from '@/lib/supabase';
-import { noStoreJson } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { noStoreJson } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

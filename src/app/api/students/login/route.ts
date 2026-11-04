@@ -1,11 +1,11 @@
-import { isAndroidAppRequest } from '@/lib/deviceFingerprint';
+import { isAndroidAppRequest } from '@/lib/auth/deviceFingerprint';
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
-import { localStore } from '@/lib/localFallbackStore';
-import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
-import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/serverAuth';
-import { getClientIp, isRateLimited } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode } from '@/lib/students/codeHelper';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { safeUpdateStudentAccounts } from '@/lib/students/studentAccountHelper';
+import { noStoreJson, setStudentSession, createStudentSessionToken } from '@/lib/auth/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 

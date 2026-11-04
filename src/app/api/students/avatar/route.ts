@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
-import { uploadImageToStorage } from '@/lib/telegramStorage';
-import { noStoreJson } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, getStudentCodeVariants } from '@/lib/students/codeHelper';
+import { uploadImageToStorage } from '@/lib/telegram/telegramStorage';
+import { noStoreJson } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

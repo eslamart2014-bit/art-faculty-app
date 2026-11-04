@@ -1,6 +1,6 @@
-import { getStudentSession, noStoreJson } from '@/lib/serverAuth';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants } from '@/lib/codeHelper';
+import { getStudentSession, noStoreJson } from '@/lib/auth/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, getStudentCodeVariants } from '@/lib/students/codeHelper';
 
 export const dynamic = 'force-dynamic';
 

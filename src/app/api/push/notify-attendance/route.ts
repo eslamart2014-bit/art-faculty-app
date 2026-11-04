@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { sendPushToStudents } from '@/lib/push';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { sendPushToStudents } from '@/lib/telegram/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,15 +25,14 @@ export async function POST(request: Request) {
       if (course?.name) courseName = course.name;
     }
 
-    // 2. Fetch student codes and telegram_ids for the marked student IDs
+    // 2. Fetch student codes and names for the marked student IDs
     const { data: students } = await supabaseAdmin
       .from('students')
       .select('id, student_code, full_name, telegram_id')
       .in('id', student_ids);
 
-    const codes = (students || []).map((s: any) => s.student_code).filter(Boolean);
-    if (codes.length === 0) {
-      return NextResponse.json({ success: true, sent: 0, message: 'No student codes found' });
+    if (!students || students.length === 0) {
+      return NextResponse.json({ success: true, sent: 0, message: 'No students found' });
     }
 
     const displayDate = date || new Date().toISOString().split('T')[0];
@@ -45,51 +44,23 @@ export async function POST(request: Request) {
 
     let totalSent = 0;
 
-    // Send push per student so that the tag is unique per student & date
-    for (const code of codes) {
-      const dedupTag = `att_${code}_${displayDate}_${course_id || 'course'}`;
-      const res = await sendPushToStudents([code], {
+    // Send push & Telegram notification per student (with fixed portal buttons & deduplication)
+    for (const st of students) {
+      if (!st.student_code) continue;
+      const dedupTag = `att_${st.student_code}_${displayDate}_${course_id || 'course'}`;
+      const tgHtml = isCancelled
+        ? `ℹ️ <b>تنبيه من قسم التربية الفنية:</b>\n\nعزيزي الطالب <b>${st.full_name}</b>، تم إلغاء تسجيل حضورك في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>`
+        : `✅ <b>تسجيل حضور معتمد — قسم التربية الفنية</b>\n\nمرحباً <b>${st.full_name}</b> 👨‍🎓\nتم تسجيل حضورك اليوم بنجاح في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>\n\n<i>نتمنى لك دوام التوفيق والتميز 🌟</i>`;
+
+      const res = await sendPushToStudents([st.student_code], {
         title,
         body: messageBody,
         type: 'attendance',
         id: dedupTag,
         tag: dedupTag,
+        telegramHtml: tgHtml,
       });
       totalSent += res.sent;
-    }
-
-    // 3. Dispatch instant Telegram notification to students with linked accounts
-    try {
-      const { data: sysData } = await supabaseAdmin
-        .from('system_settings')
-        .select('telegram_config')
-        .eq('id', 1)
-        .limit(1)
-        .maybeSingle();
-
-      const botToken = sysData?.telegram_config?.token || process.env.TELEGRAM_BOT_TOKEN;
-
-      if (botToken) {
-        for (const st of (students || [])) {
-          if (st.telegram_id) {
-            const tgMsg = isCancelled
-              ? `ℹ️ <b>تنبيه من قسم التربية الفنية:</b>\n\nعزيزي الطالب <b>${st.full_name}</b>، تم إلغاء تسجيل حضورك في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>`
-              : `✅ <b>تسجيل حضور معتمد — قسم التربية الفنية</b>\n\nمرحباً <b>${st.full_name}</b> 👨‍🎓\nتم تسجيل حضورك اليوم بنجاح في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>\n\n<i>نتمنى لك دوام التوفيق والتميز 🌟</i>`;
-
-            fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: st.telegram_id,
-                text: tgMsg,
-                parse_mode: 'HTML'
-              })
-            }).catch(() => {});
-          }
-        }
-      }
-    } catch (tgErr) {
-      console.error('[notify-attendance] telegram error:', tgErr);
     }
 
     return NextResponse.json({

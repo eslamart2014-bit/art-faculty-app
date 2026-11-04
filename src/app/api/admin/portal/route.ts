@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, generatePinCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
-import { compareDHashes } from '@/lib/imageCompressor';
-import { localStore } from '@/lib/localFallbackStore';
-import { requireCoordinator, noStoreJson } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, generatePinCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/students/codeHelper';
+import { compareDHashes } from '@/lib/students/imageCompressor';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { requireCoordinator, noStoreJson } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +12,6 @@ export async function GET(request: Request) {
   if (!guard.ok) return guard.response;
 
   const { searchParams } = new URL(request.url);
-  const action = searchParams.get('action') || 'inspect';
   const code = (searchParams.get('code') || '').trim();
 
   if (!code || !/^[A-Za-z0-9\-_]{1,20}$/.test(code)) {
@@ -36,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'طالب غير موجود بالمنظومة' }, { status: 404 });
     }
 
-    // 2. جلب الحساب في بوابة فنية
+    // 2. جلب الحساب في بوابة فنية / بوت تليجرام
     const accVariants = getStudentCodeVariants(student.student_code || cleanCode);
     const accFilter = buildStudentCodeFilter(accVariants);
     let account: any = null;
@@ -50,13 +49,21 @@ export async function GET(request: Request) {
       account = data;
     } catch (e) {}
 
-    // التحقق من الحساب المخزن في جدول students (telegram_browser_id)
     let telegramAccount: any = null;
     if (student.telegram_browser_id) {
       try {
         telegramAccount = JSON.parse(student.telegram_browser_id);
       } catch (e) {}
     }
+
+    const isSuspended =
+      student.is_active === false ||
+      account?.status === 'suspended' ||
+      telegramAccount?.status === 'suspended';
+
+    const tgId = student.telegram_id
+      ? String(student.telegram_id)
+      : (telegramAccount?.telegram_id ? String(telegramAccount.telegram_id) : null);
 
     if (!account) {
       account = telegramAccount;
@@ -66,19 +73,27 @@ export async function GET(request: Request) {
           if (f) { account = f; break; }
         }
       }
-    } else if (telegramAccount) {
-      // دمج البيانات الذكي لاستعادة أي حقول اعتماد مفقودة
+      if (!account && (tgId || isSuspended)) {
+        account = {
+          student_code: student.student_code,
+          full_name: student.full_name,
+          telegram_id: tgId,
+          status: isSuspended ? 'suspended' : 'active',
+          created_at: student.created_at || new Date().toISOString()
+        };
+      }
+    }
+
+    if (account) {
       account = {
-        ...telegramAccount,
+        ...(telegramAccount || {}),
         ...account,
-        activated_by: account.activated_by || telegramAccount.activated_by || telegramAccount.pin_issued_by || null,
-        activated_at: account.activated_at || telegramAccount.activated_at || telegramAccount.pin_issued_at || null,
-        status: (account.status === 'suspended' || telegramAccount.status === 'suspended')
-          ? 'suspended'
-          : (account.status === 'active' || telegramAccount.status === 'active' || telegramAccount.is_pin_used)
-            ? 'active'
-            : (account.status || telegramAccount.status || 'pending'),
-        created_at: account.created_at || telegramAccount.created_at || telegramAccount.activated_at || null
+        telegram_id: tgId,
+        telegram_username: telegramAccount?.telegram_username || null,
+        telegram_first_name: telegramAccount?.telegram_first_name || null,
+        linked_at: telegramAccount?.linked_at || account.created_at || student.created_at || null,
+        last_login_at: telegramAccount?.last_login_at || account.last_login_at || null,
+        status: isSuspended ? 'suspended' : 'active'
       };
     }
 
@@ -98,78 +113,7 @@ export async function GET(request: Request) {
       auditLogs = localStore.getAuditLogs(student.student_code);
     }
 
-    // 4. التحقق الأمني من تعدد الأجهزة ومشاركة الهواتف
-    let deviceSecurity: any = {
-      totalDevices: 0,
-      multipleDevicesDetected: false,
-      devices: [],
-      sharedPhonesWithStudents: [],
-    };
-
-    if (account && account.devices && Array.isArray(account.devices)) {
-      deviceSecurity.devices = account.devices;
-      deviceSecurity.totalDevices = account.devices.length;
-      deviceSecurity.multipleDevicesDetected = account.devices.length > 1;
-
-      // فحص مشاركة الهواتف: البحث عن أي طالب آخر سجل من نفس الـ deviceId
-      const deviceIds = account.devices.map((d: any) => d.deviceId).filter(Boolean);
-      if (deviceIds.length > 0) {
-        let allAccounts: any[] = [];
-        try {
-          const res = await supabaseAdmin
-            .from('student_accounts')
-            .select('student_code, full_name, devices')
-            .neq('student_code', student.student_code);
-          allAccounts = res.data || [];
-        } catch (e) {}
-
-        // جلب الحسابات أيضاً من جدول students لمن سجلوا عبر telegram_browser_id
-        try {
-          const { data: stAll } = await supabaseAdmin
-            .from('students')
-            .select('student_code, full_name, telegram_browser_id')
-            .neq('student_code', student.student_code)
-            .not('telegram_browser_id', 'is', null);
-
-          (stAll || []).forEach((stItem: any) => {
-            if (!allAccounts.some(a => a.student_code === stItem.student_code)) {
-              try {
-                const parsed = JSON.parse(stItem.telegram_browser_id);
-                if (parsed && parsed.devices) {
-                  allAccounts.push({
-                    student_code: stItem.student_code,
-                    full_name: stItem.full_name,
-                    devices: parsed.devices,
-                  });
-                }
-              } catch (e) {}
-            }
-          });
-        } catch (e) {}
-
-        if (allAccounts.length === 0) {
-          allAccounts = localStore.getAllAccounts().filter(a => a.student_code !== student.student_code);
-        }
-
-        const sharedList: any[] = [];
-        allAccounts.forEach((other: any) => {
-          if (Array.isArray(other.devices)) {
-            const hasSharedDevice = other.devices.some((od: any) =>
-              deviceIds.includes(od.deviceId)
-            );
-            if (hasSharedDevice) {
-              sharedList.push({
-                student_code: other.student_code,
-                full_name: other.full_name,
-              });
-            }
-          }
-        });
-        deviceSecurity.sharedPhonesWithStudents = sharedList;
-      }
-    }
-
-    // 5. جلب أعمال ومشاريع الطالب من student_submissions ومن evaluations
+    // 4. جلب أعمال ومشاريع الطالب من student_submissions ومن evaluations
     let studentSubmissions: any[] = [];
     try {
       const res = await supabaseAdmin
@@ -183,7 +127,6 @@ export async function GET(request: Request) {
       studentSubmissions = localStore.getSubmissions(student.student_code);
     }
 
-    // دمج أعمال الطالب المسجلة في evaluations بصور أو تقييمات
     try {
       const { data: evals } = await supabaseAdmin
         .from('evaluations')
@@ -217,10 +160,9 @@ export async function GET(request: Request) {
       }
     } catch (e) {}
 
-    // 6. محرك الذكاء الاصطناعي لفحص تشابه اللوحات الفنية (AI Art Plagiarism Engine)
+    // 5. محرك الذكاء الاصطناعي لفحص تشابه اللوحات الفنية (AI Art Plagiarism Engine)
     const plagiarismMatches: any[] = [];
     if (studentSubmissions && studentSubmissions.length > 0) {
-      // جلب جميع تسليمات الطلاب الآخرين للمقارنة
       let otherSubmissions: any[] = [];
       try {
         const res = await supabaseAdmin
@@ -236,7 +178,6 @@ export async function GET(request: Request) {
         );
       }
 
-      // دمج أعمال الطلاب الآخرين في evaluations
       try {
         const { data: otherEvals } = await supabaseAdmin
           .from('evaluations')
@@ -246,14 +187,14 @@ export async function GET(request: Request) {
 
         if (otherEvals && otherEvals.length > 0) {
           otherEvals.forEach((oEv: any) => {
-            const oCode = oEv.students?.student_code;
+            const oCode = (oEv.students as any)?.student_code;
             if (oCode && !otherSubmissions.some((os: any) => os.student_code === oCode && os.project_name === oEv.project_name)) {
               const oPhotoClean = oEv.photo_url.startsWith('AgAC') ? `/api/media/${oEv.photo_url}` : oEv.photo_url;
               const oDhashClean = (oEv.ai_status || '').replace(/^hash:/i, '').trim();
               otherSubmissions.push({
                 id: oEv.id,
                 student_code: oCode,
-                student_name: oEv.students?.full_name || 'طالب',
+                student_name: (oEv.students as any)?.full_name || 'طالب',
                 course_id: oEv.course_id,
                 course_name: 'مقرر دراسي',
                 project_name: oEv.project_name,
@@ -268,20 +209,15 @@ export async function GET(request: Request) {
       if (otherSubmissions && otherSubmissions.length > 0) {
         studentSubmissions.forEach((mySub: any) => {
           const myImages = Array.isArray(mySub.images) ? mySub.images : [];
-
           myImages.forEach((myImg: any, myIdx: number) => {
             const myDhash = (myImg.dhash || '').replace(/^hash:/i, '').trim();
             if (!myDhash) return;
-
             otherSubmissions.forEach((otherSub: any) => {
               const otherImages = Array.isArray(otherSub.images) ? otherSub.images : [];
-
               otherImages.forEach((otherImg: any, otherIdx: number) => {
                 const otherDhash = (otherImg.dhash || '').replace(/^hash:/i, '').trim();
                 if (!otherDhash) return;
-
                 const comparison = compareDHashes(myDhash, otherDhash);
-                // إذا كانت نسبة التشابه 80% فأكثر، نعتبرها شبهة تطابق أو سرقة عمل
                 if (comparison.similarityPercent >= 80) {
                   const myCleanUrl = myImg.url && myImg.url.startsWith('AgAC') ? `/api/media/${myImg.url}` : myImg.url;
                   const otherCleanUrl = otherImg.url && otherImg.url.startsWith('AgAC') ? `/api/media/${otherImg.url}` : otherImg.url;
@@ -308,10 +244,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       student,
-      isRegistered: !!account,
+      isRegistered: Boolean(tgId || account),
       account: account || null,
       auditLogs: auditLogs || [],
-      deviceSecurity,
       submissions: studentSubmissions || [],
       plagiarismMatches,
     });
@@ -331,133 +266,49 @@ export async function POST(request: Request) {
       return noStoreJson({ error: 'يرجى تحديد كود طالب صالح' }, { status: 400 });
     }
     const cleanCode = formatStudentCode(student_code);
+    const variants = getStudentCodeVariants(cleanCode || student_code);
+    const filter = buildStudentCodeFilter(variants);
 
     if ((action === 'delete_account' || action === 'wipe_account') && !guard.ctx.isAdmin) {
       return noStoreJson({ error: 'صلاحية حذف الحساب مقصورة على الإدارة' }, { status: 403 });
     }
 
-    // 0. اعتماد وتفعيل الحساب مباشرة
-    if (action === 'activate_account') {
-      const nowIso = new Date().toISOString();
-      const coordName = extra?.coordinator_name || 'إدارة المنظومة';
+    // 1. تعليق أو تفعيل الحساب
+    if (action === 'toggle_status' || action === 'activate_account') {
+      const newStatus = action === 'activate_account' ? 'active' : (extra?.status || 'active');
 
       try {
         await supabaseAdmin
           .from('student_accounts')
-          .update({
-            status: 'active',
-            is_pin_used: true,
-            id_card_verified: true,
-            activated_by: coordName,
-            activated_at: nowIso,
-            pin_issued_by: coordName,
-            pin_issued_at: nowIso,
-            failed_attempts: 0,
-            locked_until: null,
-          })
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-      } catch (e) {
-        try {
-          await supabaseAdmin
-            .from('student_accounts')
-            .update({ status: 'active', is_pin_used: true, failed_attempts: 0, locked_until: null })
-            .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-        } catch (e2) {}
-      }
+          .update({ status: newStatus })
+          .or(filter);
+      } catch (e) {}
 
       try {
         const { data: st } = await supabaseAdmin
           .from('students')
           .select('id, student_code, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+          .or(filter)
+          .limit(1)
           .maybeSingle();
 
         if (st) {
           let parsed: any = {};
-          try { parsed = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
-          const merged = {
-            ...parsed,
-            student_code: st.student_code,
-            status: 'active',
-            is_pin_used: true,
-            id_card_verified: true,
-            activated_by: coordName,
-            activated_at: nowIso,
-            pin_issued_by: coordName,
-            pin_issued_at: nowIso,
-            failed_attempts: 0,
-            locked_until: null,
-          };
+          if (st.telegram_browser_id) {
+            try { parsed = JSON.parse(st.telegram_browser_id); } catch (e) {}
+          }
+          parsed.student_code = st.student_code;
+          parsed.status = newStatus;
           await supabaseAdmin
             .from('students')
-            .update({ telegram_browser_id: JSON.stringify(merged) })
+            .update({
+              is_active: newStatus !== 'suspended',
+              telegram_browser_id: JSON.stringify(parsed)
+            })
             .eq('id', st.id);
         }
       } catch (e) {}
 
-      try {
-        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
-        if (localAcc) {
-          localAcc.status = 'active';
-          localAcc.is_pin_used = true;
-          localAcc.activated_by = coordName;
-          localAcc.activated_at = nowIso;
-          localAcc.failed_attempts = 0;
-          localAcc.locked_until = null;
-          localStore.upsertAccount(localAcc);
-        }
-      } catch (e) {}
-
-      try {
-        await supabaseAdmin.from('portal_audit_logs').insert({
-          student_code: cleanCode,
-          action: 'account_activated_by_admin',
-          details: { activatedBy: coordName, timestamp: nowIso },
-        });
-      } catch (e) {}
-
-      return NextResponse.json({
-        success: true,
-        status: 'active',
-        activated_by: coordName,
-        activated_at: nowIso,
-        message: 'تم اعتماد وتفعيل حساب الطالب بنجاح! أصبح الحساب نشطاً بالكامل.'
-      });
-    }
-
-    // 1. تعليق أو تفعيل الحساب
-    if (action === 'toggle_status') {
-      const newStatus = extra?.status || 'active'; // 'active' or 'suspended'
-
-      // تحديث في student_accounts
-      try {
-        await supabaseAdmin
-          .from('student_accounts')
-          .update({ status: newStatus })
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-      } catch (e) {}
-
-      // تحديث في students.telegram_browser_id
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-
-        if (st && st.telegram_browser_id) {
-          try {
-            const parsed = JSON.parse(st.telegram_browser_id);
-            parsed.status = newStatus;
-            await supabaseAdmin
-              .from('students')
-              .update({ telegram_browser_id: JSON.stringify(parsed) })
-              .eq('id', st.id);
-          } catch (e) {}
-        }
-      } catch (e) {}
-
-      // تحديث في المخزن المحلي
       try {
         const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
         if (localAcc) {
@@ -466,7 +317,6 @@ export async function POST(request: Request) {
         }
       } catch (e) {}
 
-      // تسجيل العملية في سجل الأمان
       try {
         await supabaseAdmin.from('portal_audit_logs').insert({
           student_code: cleanCode,
@@ -478,8 +328,8 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         status: newStatus,
-        message: newStatus === 'suspended' 
-          ? 'تم تعليق وقفل حساب الطالب بنجاح 🔒 (لا يمكن للطالب الدخول حتى يتم إلغاء التعليق)' 
+        message: newStatus === 'suspended'
+          ? 'تم تعليق وقفل حساب الطالب بنجاح ⛔ (لا يمكن للطالب الدخول عبر البوت حتى يتم إلغاء التعليق)'
           : 'تم تفعيل الحساب وإلغاء التعليق بنجاح ✅'
       });
     }
@@ -489,7 +339,7 @@ export async function POST(request: Request) {
       const { error } = await supabaseAdmin
         .from('student_submissions')
         .delete()
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+        .or(filter);
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -504,125 +354,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, message: 'تم تصفير أعمال ومشاريع الطالب بنجاح، ويمكنه الآن تصويرها ورفعها من جديد.' });
     }
 
-    // 3. إعادة توليد رقم سري جديد وفك قفل الحساب فوراً
-    if (action === 'reset_pin') {
-      const newPin = generatePinCode();
-      const variants = getStudentCodeVariants(cleanCode || student_code);
-      const filter = buildStudentCodeFilter(variants);
-
-      try {
-        await supabaseAdmin
-          .from('student_accounts')
-          .update({
-            pin_code: newPin,
-            failed_attempts: 0,
-            locked_until: null,
-            status: 'active',
-            is_pin_used: true,
-            pin_issued_by: 'إدارة النظام (إعادة تعيين)',
-            pin_issued_at: new Date().toISOString(),
-          })
-          .or(filter);
-      } catch (e) {}
-
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, student_code, telegram_browser_id')
-          .or(filter)
-          .maybeSingle();
-
-        if (st) {
-          let parsed: any = {};
-          try { parsed = JSON.parse(st.telegram_browser_id || '{}'); } catch (e) {}
-          parsed.pin_code = newPin;
-          parsed.failed_attempts = 0;
-          parsed.locked_until = null;
-          parsed.status = 'active';
-          parsed.is_pin_used = true;
-          parsed.pin_issued_by = 'إدارة النظام (إعادة تعيين)';
-          parsed.pin_issued_at = new Date().toISOString();
-          await supabaseAdmin
-            .from('students')
-            .update({ telegram_browser_id: JSON.stringify(parsed) })
-            .eq('id', st.id);
-        }
-      } catch (e) {}
-
-      try {
-        for (const v of variants) {
-          const localAcc = localStore.getAccount(v);
-          if (localAcc) {
-            localAcc.pin_code = newPin;
-            localAcc.failed_attempts = 0;
-            localAcc.locked_until = null;
-            localAcc.status = 'active';
-            localAcc.is_pin_used = true;
-            localStore.upsertAccount(localAcc);
-          }
-        }
-      } catch (e) {}
-
-      return NextResponse.json({
-        success: true,
-        message: `تم إعادة توليد الرقم السري بنجاح وفك قفل الحساب: ${newPin}`,
-        newPin,
-        pin_code: newPin
-      });
-    }
-
-    // 4. حذف وتصفير حساب الطالب من البوابة بالكامل
+    // 3. حذف وتصفير حساب الطالب من البوت بالكامل وفك ربط تليجرام
     if (action === 'delete_account' || action === 'wipe_account') {
-      // جلب بيانات الطالب
       const { data: student } = await supabaseAdmin
         .from('students')
         .select('id, full_name, student_code')
-        .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
+        .or(filter)
+        .limit(1)
         .maybeSingle();
 
       if (!student) {
         return NextResponse.json({ error: 'الطالب غير موجود في المنظومة' }, { status: 404 });
       }
 
-      // حذف الأعمال المرفوعة
-      try {
-        await supabaseAdmin
-          .from('student_submissions')
-          .delete()
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-      } catch (e) {}
-
-      // تصفير روابط الصور في جدول evaluations
-      try {
-        await supabaseAdmin
-          .from('evaluations')
-          .update({ photo_url: null })
-          .eq('student_id', student.id);
-      } catch (e) {}
-
-      // تصفير بيانات الحساب في جدول students
       try {
         await supabaseAdmin
           .from('students')
-          .update({ telegram_browser_id: null })
+          .update({
+            telegram_id: null,
+            is_active: true,
+            telegram_browser_id: null
+          })
           .eq('id', student.id);
       } catch (e) {}
 
-      // حذف الحساب من جدول student_accounts
       try {
         await supabaseAdmin
           .from('student_accounts')
           .delete()
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
+          .or(filter);
       } catch (e) {}
 
-      // حذف من المخزن المحلي
       try {
         localStore.deleteAccount(cleanCode);
         localStore.deleteAccount(student_code);
       } catch (e) {}
 
-      // تسجيل العملية في سجل الأمان
       try {
         await supabaseAdmin.from('portal_audit_logs').insert({
           student_code: student.student_code,
@@ -636,82 +403,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        message: `تم حذف حساب الطالب (${student.full_name}) من البوابة بنجاح! أصبح الحساب غير مسجل ويمكن للطالب التسجيل من جديد.`
-      });
-    }
-
-    // 5. تسجيل الخروج من جميع الأجهزة وفك ارتباط الجهاز المقيّد وإلغاء أي قفل مؤقت
-    const normalizedAction = (action || '').toString().trim().toLowerCase();
-    if (
-      normalizedAction === 'logout_all_devices' ||
-      normalizedAction === 'logout_all' ||
-      normalizedAction === 'unbind_device' ||
-      normalizedAction === 'force_logout' ||
-      normalizedAction === 'logout'
-    ) {
-      const nowIso = new Date().toISOString();
-
-      // تصفير سجل الأجهزة وفك ارتباط الجهاز وإلغاء القفل الزمني وتصفير المحاولات في student_accounts
-      try {
-        await supabaseAdmin
-          .from('student_accounts')
-          .update({
-            devices: [],
-            bound_device_id: null,
-            last_login_at: nowIso,
-            failed_attempts: 0,
-            locked_until: null,
-          })
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`);
-      } catch (e) {}
-
-      // تحديث في students.telegram_browser_id
-      try {
-        const { data: st } = await supabaseAdmin
-          .from('students')
-          .select('id, telegram_browser_id')
-          .or(`student_code.eq.${student_code},student_code.eq.${cleanCode}`)
-          .maybeSingle();
-
-        if (st && st.telegram_browser_id) {
-          try {
-            const parsed = JSON.parse(st.telegram_browser_id);
-            parsed.devices = [];
-            parsed.bound_device_id = null;
-            parsed.failed_attempts = 0;
-            parsed.locked_until = null;
-            await supabaseAdmin
-              .from('students')
-              .update({ telegram_browser_id: JSON.stringify(parsed) })
-              .eq('id', st.id);
-          } catch (e) {}
-        }
-      } catch (e) {}
-
-      // تحديث في المخزن المحلي
-      try {
-        const localAcc = localStore.getAccount(cleanCode) || localStore.getAccount(student_code);
-        if (localAcc) {
-          localAcc.devices = [];
-          localAcc.bound_device_id = null;
-          localAcc.failed_attempts = 0;
-          localAcc.locked_until = null;
-          localStore.upsertAccount(localAcc);
-        }
-      } catch (e) {}
-
-      // تسجيل العملية في سجل الأمان
-      try {
-        await supabaseAdmin.from('portal_audit_logs').insert({
-          student_code: cleanCode,
-          action: 'logout_all_devices',
-          details: { timestamp: nowIso },
-        });
-      } catch (e) {}
-
-      return NextResponse.json({
-        success: true,
-        message: 'تم تسجيل الخروج من جميع الأجهزة وفك ارتباط الجهاز المقيّد وإلغاء القفل المؤقت بنجاح 🔓 يمكن للطالب الآن الدخول من أي جهاز جديد.'
+        message: `تم حذف حساب الطالب (${student.full_name}) وفك ربط تليجرام بنجاح 🗑️ يمكن للطالب التسجيل من جديد عبر البوت.`
       });
     }
 

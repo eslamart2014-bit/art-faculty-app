@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getActiveTelegramBotToken, getStudentTelegramButtons } from '@/lib/telegram/push';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -7,7 +8,6 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(req: Request) {
   try {
-    // CRIT-6 FIX: Verify caller is an authenticated admin/teacher
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -19,7 +19,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    // Only teachers and admins can send warnings
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('role')
@@ -36,38 +35,44 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing warnings list' }, { status: 400 });
     }
 
-    // Read bot token from DB (not from env — token is stored in system_settings)
-    const { data: sysData } = await supabaseAdmin
-      .from('system_settings')
-      .select('telegram_config')
-      .eq('id', 1)
-      .maybeSingle();
-
-    const botToken = process.env.TELEGRAM_BOT_TOKEN || sysData?.telegram_config?.token;
+    const botToken = await getActiveTelegramBotToken();
     if (!botToken) {
       return NextResponse.json({ error: 'Bot token not configured' }, { status: 500 });
     }
 
+    const replyMarkup = getStudentTelegramButtons();
     let successCount = 0;
-    
-    for (const w of warnings) {
+
+    for (let i = 0; i < warnings.length; i++) {
+      const w = warnings[i];
       if (!w.telegram_id) continue;
 
-      const message = `⚠️ *إنذار غياب* ⚠️\n\nعزيزي الطالب / *${w.full_name}*\n\nنلفت انتباهك إلى تجاوزك لنسبة الغياب المقررة في مقرر:\n📚 *${courseName}*\n\nعدد مرات الغياب: *${w.absences}* (الحد الأقصى: ${limit})\n\nيرجى مراجعة أستاذ المقرر لتسوية موقفك وتجنب الحرمان.`;
+      const message =
+        `⚠️ <b>إنذار غياب — قسم التربية الفنية</b> ⚠️\n\n` +
+        `عزيزي الطالب / <b>${w.full_name}</b>\n\n` +
+        `نلفت انتباهك إلى تجاوزك لنسبة الغياب المقررة في مقرر:\n` +
+        `📚 <b>${courseName}</b>\n\n` +
+        `❌ عدد مرات الغياب: <b>${w.absences}</b> (الحد الأقصى: ${limit})\n\n` +
+        `<i>يرجى مراجعة أستاذ المقرر لتسوية موقفك وتجنب الحرمان، أو متابعة سجل حضورك عبر بوابة فنية بالأسفل 👇</i>`;
 
       try {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chat_id: w.telegram_id,
             text: message,
-            parse_mode: 'Markdown'
-          })
+            parse_mode: 'HTML',
+            reply_markup: replyMarkup,
+          }),
         });
-        successCount++;
+        if (res.ok) successCount++;
       } catch (err) {
         console.error('Failed to notify student', w.id, err);
+      }
+
+      if ((i + 1) % 15 === 0) {
+        await new Promise((r) => setTimeout(r, 600));
       }
     }
 

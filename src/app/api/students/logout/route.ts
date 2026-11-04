@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { clearStudentSession } from '@/lib/serverAuth';
+import { clearStudentSession } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

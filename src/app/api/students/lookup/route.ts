@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/codeHelper';
-import { localStore } from '@/lib/localFallbackStore';
-import { isAccountActivated, parseTelegramBrowserId } from '@/lib/studentAccountHelper';
-import { getClientIp, isRateLimited } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter } from '@/lib/students/codeHelper';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { isAccountActivated, parseTelegramBrowserId } from '@/lib/students/studentAccountHelper';
+import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 

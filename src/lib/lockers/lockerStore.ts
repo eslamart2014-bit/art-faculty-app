@@ -1,0 +1,2841 @@
+import fs from 'fs';
+import path from 'path';
+import { supabaseAdmin } from '@/lib/core/supabase';
+
+const DB_PATH = path.join(process.cwd(), '.lockers_db.json');
+
+export interface LockerItem {
+  id: string;
+  locker_code: string;
+  letter: 'A' | 'B' | 'C' | 'D' | string;
+  number: number;
+  capacity: number;
+  is_enabled: boolean;
+  is_admin_reserved?: boolean;
+  status: 'empty' | 'pending' | 'confirmed';
+  current_booking_id: string | null;
+  notes?: string;
+  updated_at?: string;
+}
+
+export interface LockerBooking {
+  id: string;
+  locker_code: string;
+  cohort: string;
+  representative_phone: string;
+  student_names: string[];
+  student_codes: string[];
+  status: 'pending' | 'confirmed' | 'rejected';
+  created_at: string;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  responsible?: string;
+  notes?: string;
+}
+
+export interface LockerWaitlistEntry {
+  id: string;
+  cohort: string;
+  representative_phone: string;
+  student_names: string[];
+  student_codes: string[];
+  created_at: string;
+  status: 'waiting' | 'fulfilled' | 'cancelled';
+  priority?: number;
+}
+
+export interface CohortAllocationInfo {
+  cohortKey: string;      // '1' | '2' | '3' | '4'
+  cohortName: string;     // 'الفرقة الأولى' | 'الفرقة الثانية' | 'الفرقة الثالثة' | 'الفرقة الرابعة'
+  quota: number;          // العدد المخصص (0 = غير محدد)
+  bookedLockers: number;  // عدد الدواليب المحجوزة حالياً (confirmed + pending)
+  remainingQuota: number; // المتبقي المحجوز حصرياً للفرقة
+  isQuotaFull: boolean;   // هل استنفذت الفرقة حصتها
+}
+
+export const STANDARD_COHORTS = [
+  { key: '1', name: 'الفرقة الأولى' },
+  { key: '2', name: 'الفرقة الثانية' },
+  { key: '3', name: 'الفرقة الثالثة' },
+  { key: '4', name: 'الفرقة الرابعة' },
+];
+
+export interface LockerSettings {
+  google_sheet_url: string;
+  supervisor_name: string;
+  default_capacity: number;
+  auto_waitlist: boolean;
+  cohort_quotas?: { [cohortKey: string]: number }; // تخصيص كوتا الدواليب لكل فرقة دراسية
+}
+
+export interface ParsedPreviewRow {
+  id: string;
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  status: 'confirmed' | 'pending';
+  is_existing: boolean;
+  current_status?: string;
+  current_students?: string[];
+  conflict_warning?: string;
+}
+
+export interface PreviewDataResult {
+  success: boolean;
+  rows: ParsedPreviewRow[];
+  total: number;
+  confirmedCount: number;
+  pendingCount: number;
+  uniqueLockers: number;
+  conflictCount: number;
+  errors: string[];
+  scannedTabs?: string[];
+  discoveredTabs?: string[];
+}
+
+export interface SheetSyncResult {
+  success: boolean;
+  importedConfirmed: number;
+  importedPending: number;
+  adminReservedCount: number;
+  totalLockers: number;
+  ranges?: { [key: string]: number };
+  message: string;
+  errors?: string[];
+  scannedTabs?: string[];
+  discoveredTabs?: string[];
+}
+
+interface LocalLockersDB {
+  lockers: LockerItem[];
+  bookings: LockerBooking[];
+  waitlist: LockerWaitlistEntry[];
+  settings: LockerSettings;
+}
+
+// دالة تحليل ومعالجة ملفات وجداول CSV و TSV باحترافية وتدعم علامات التنصيص والفواصل المختلفة
+export function parseCSV(text: string): string[][] {
+  const p: string[][] = [];
+  let row: string[] = [];
+  let inQuotes = false;
+  let cur = '';
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i + 1];
+
+    if (c === '"') {
+      if (inQuotes && next === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if ((c === ',' || c === '\t' || c === ';') && !inQuotes) {
+      row.push(cur.trim());
+      cur = '';
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') {
+        i++;
+      }
+      row.push(cur.trim());
+      cur = '';
+      if (row.some(x => x.length > 0)) {
+        p.push(row);
+      }
+      row = [];
+    } else {
+      cur += c;
+    }
+  }
+  if (cur.length > 0 || row.length > 0) {
+    row.push(cur.trim());
+    if (row.some(x => x.length > 0)) {
+      p.push(row);
+    }
+  }
+  return p;
+}
+
+// استخراج معرّف ملف جوجل شيت من الرابط كاملاً أو المعرف المنفرد
+export function extractSpreadsheetId(input: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  const urlMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch) return urlMatch[1];
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return null;
+}
+
+// استخراج معرف الورقة (gid) من الرابط إذا وجد
+export function extractGid(input: string): string | null {
+  if (!input) return null;
+  const match = input.match(/[?&#]gid=([0-9]+)/);
+  return match ? match[1] : null;
+}
+
+// توحيد وتنسيق كود الدولاب ودعم الحروف العربية والبادئات والترتيب العكسي
+export function normalizeLockerCode(raw: string): { code: string; letter: string; number: number } | null {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  s = s.replace(/^(دولاب|Locker|رقم|كود|دولاب رقم|كود الدولاب)\s*[:#-]?\s*/i, '').trim();
+
+  // النمط 1: الحرف ثم الرقم (مثال: A12, أ-12, A 12, B_5)
+  const prefixMatch = s.match(/^([A-Da-dأإآابجدهـ])\s*[-_./]?\s*(\d+)$/i);
+  if (prefixMatch) {
+    let char = prefixMatch[1].toUpperCase();
+    if (/[أإآا]/.test(char)) char = 'A';
+    else if (char === 'ب') char = 'B';
+    else if (char === 'ج') char = 'C';
+    else if (char === 'د') char = 'D';
+    else if (char === 'ه' || char === 'هـ') char = 'E';
+    const number = parseInt(prefixMatch[2], 10);
+    return { code: `${char}${number}`, letter: char, number };
+  }
+
+  // النمط 2: الرقم ثم الحرف (مثال: 15A, 15-ج, 15 ج)
+  const suffixMatch = s.match(/^(\d+)\s*[-_./]?\s*([A-Da-dأإآابجدهـ])$/i);
+  if (suffixMatch) {
+    let char = suffixMatch[2].toUpperCase();
+    if (/[أإآا]/.test(char)) char = 'A';
+    else if (char === 'ب') char = 'B';
+    else if (char === 'ج') char = 'C';
+    else if (char === 'د') char = 'D';
+    else if (char === 'ه' || char === 'هـ') char = 'E';
+    const number = parseInt(suffixMatch[1], 10);
+    return { code: `${char}${number}`, letter: char, number };
+  }
+
+  return null;
+}
+
+// تنظيف وتوحيد النصوص والأسماء العربية بدقة لمعالجة اختلاف كتابة الهمزات والتاء المربوطة والياء والألف اللينة
+export function cleanArabicText(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\u064B-\u065F]/g, '') // إزالة التشكيل
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/عبد\s+/g, 'عبد')
+    .replace(/منه\s+الله/g, 'منةالله')
+    .replace(/منة\s+الله/g, 'منةالله')
+    .replace(/نور\s+الدين/g, 'نورالدين')
+    .replace(/سيف\s+الدين/g, 'سيفالدين')
+    .replace(/حسام\s+الدين/g, 'حسامالدين')
+    .replace(/علاء\s+الدين/g, 'علاءالدين')
+    .replace(/[-_.,/\\()#*]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// خوارزمية مطابقة الأسماء العربية الذكية بدون خلط بين الطلاب
+export function isArabicNameMatch(name1: string, name2: string): boolean {
+  const n1 = cleanArabicText(name1);
+  const n2 = cleanArabicText(name2);
+  if (!n1 || !n2) return false;
+  if (n1 === n2) return true;
+
+  const w1 = n1.split(' ').filter(Boolean);
+  const w2 = n2.split(' ').filter(Boolean);
+  if (w1.length === 0 || w2.length === 0) return false;
+
+  // إذا كان أحد الاسمين مطابقاً للآخر تماماً
+  if (w1.join(' ') === w2.join(' ')) return true;
+
+  const minWords = Math.min(w1.length, w2.length);
+
+  // إذا كان كلاهما 3 كلمات على الأقل
+  if (minWords >= 3) {
+    let matchAllMin = true;
+    for (let i = 0; i < minWords; i++) {
+      if (w1[i] !== w2[i]) {
+        matchAllMin = false;
+        break;
+      }
+    }
+    // إذا تطابقت كل الكلمات حتى طول الاسم الأقصر (مثلاً ثلاثي متطابق مع بداية رباعي)
+    if (matchAllMin) return true;
+
+    // إذا كان كلاهما 4 كلمات أو أكثر واختلف الاسم الأخير، فهما ليسا نفس الشخص
+    if (w1.length >= 4 && w2.length >= 4) {
+      return w1[0] === w2[0] && w1[1] === w2[1] && w1[2] === w2[2] && w1[3] === w2[3];
+    }
+
+    // إذا كان كلاهما 3 كلمات: يجب تطابق الكلمات الثلاث تماماً
+    if (w1.length === 3 && w2.length === 3) {
+      return w1[0] === w2[0] && w1[1] === w2[1] && w1[2] === w2[2];
+    }
+  }
+
+  // إذا كان كلاهما كلمتين فقط
+  if (w1.length === 2 && w2.length === 2) {
+    return w1[0] === w2[0] && w1[1] === w2[1];
+  }
+
+  return false;
+}
+
+// توحيد ومطابقة أسماء الفرق الدراسية بمختلف صيغها (مع كلمة "الفرقة" أو بدونها)
+export function normalizeCohortName(c: string = ''): string {
+  const norm = String(c || '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\s\-_]/g, '')
+    .toLowerCase();
+
+  if (norm.includes('اول') || norm.includes('1')) return '1';
+  if (norm.includes('ثان') || norm.includes('تان') || norm.includes('2')) return '2';
+  if (norm.includes('ثالث') || norm.includes('تالت') || norm.includes('3')) return '3';
+  if (norm.includes('رابع') || norm.includes('4')) return '4';
+  return norm;
+}
+
+export function isCohortMatch(c1: string = '', c2: string = ''): boolean {
+  if (!c1 || !c2) return false;
+  const k1 = normalizeCohortName(c1);
+  const k2 = normalizeCohortName(c2);
+  if (k1 === k2) return true;
+  return c1.trim() === c2.trim();
+}
+
+// استكشاف كافة تبويبات وأوراق العمل الموجودة في ملف جوجل شيت تلقائياً
+export async function discoverAllSheetTabs(sheetId: string): Promise<string[]> {
+  const tabs = new Set<string>();
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    const res = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (res.ok) {
+      const html = await res.text();
+      
+      // النمط 1: فحص أسماء التبويبات الظاهرة في شريط أوراق العمل
+      const regex1 = /class="[^"]*docs-sheet-tab-caption[^"]*">([^<]+)<\/div>/g;
+      let m: RegExpExecArray | null;
+      while ((m = regex1.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name) tabs.add(name);
+      }
+
+      // النمط 2: فحص مصفوفات البيانات العامة [gid, null, "SheetName"]
+      const regex2 = /\[\d+,\d+,"([^"]+)",\d+\]/g;
+      while ((m = regex2.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name && !name.startsWith('http') && name.length < 60) {
+          tabs.add(name);
+        }
+      }
+
+      // النمط 3: كائنات JSON المضمنة باسم الورقة
+      const regex3 = /"name"\s*:\s*"([^"\\]+)"/g;
+      while ((m = regex3.exec(html)) !== null) {
+        const name = m[1].trim();
+        if (name && !name.startsWith('http') && !name.startsWith('user') && name.length < 60 && !name.includes('googleapis') && !name.includes('{')) {
+          tabs.add(name);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[LockerStore] فشل الاستكشاف التلقائي لأسماء الأوراق:', err.message);
+  }
+
+  return Array.from(tabs);
+}
+
+// دمج الحجوزات المتعددة لنفس الدولاب لمنع حذف الطلاب
+export function mergeBookings(rawBookings: Array<{
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  student_codes?: string[];
+  status: 'confirmed' | 'pending';
+  notes?: string;
+}>): Array<{
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  student_codes?: string[];
+  status: 'confirmed' | 'pending';
+  notes?: string;
+}> {
+  const map = new Map<string, any>();
+
+  for (const b of rawBookings) {
+    const norm = normalizeLockerCode(b.locker_code);
+    const code = norm ? norm.code : (b.locker_code || '').toUpperCase().trim();
+    if (!code) continue;
+
+    const letter = norm ? norm.letter : b.letter;
+    const number = norm ? norm.number : b.number;
+
+    if (!map.has(code)) {
+      map.set(code, {
+        locker_code: code,
+        letter,
+        number,
+        cohort: b.cohort || 'الفرقة الرابعة',
+        phone: b.phone || '',
+        student_names: [...(b.student_names || [])].map(n => String(n || '').trim()).filter(Boolean),
+        student_codes: [...(b.student_codes || [])].map(c => String(c || '').trim()).filter(Boolean),
+        status: b.status || 'confirmed',
+        notes: b.notes || ''
+      });
+    } else {
+      const existing = map.get(code)!;
+      // دمج أسماء الطلاب دون تكرار
+      for (const name of (b.student_names || [])) {
+        const trimmed = String(name || '').trim();
+        if (trimmed && !existing.student_names.includes(trimmed)) {
+          existing.student_names.push(trimmed);
+        }
+      }
+      // دمج أكواد الطلاب
+      for (const c of (b.student_codes || [])) {
+        const trimmed = String(c || '').trim();
+        if (trimmed && !existing.student_codes.includes(trimmed)) {
+          existing.student_codes.push(trimmed);
+        }
+      }
+      // إذا كان أي سطر مؤكداً، تصبح حالة الحجز مؤكدة
+      if (b.status === 'confirmed') existing.status = 'confirmed';
+      if (!existing.phone && b.phone) existing.phone = b.phone;
+      if ((!existing.cohort || existing.cohort === 'الفرقة الرابعة') && b.cohort) existing.cohort = b.cohort;
+      if (b.notes && (!existing.notes || existing.notes.length < b.notes.length)) existing.notes = b.notes;
+    }
+  }
+
+  const result: any[] = [];
+  for (const [, item] of map) {
+    item.student_names = item.student_names.slice(0, 4);
+    result.push(item);
+  }
+  return result;
+}
+
+// تحليل البيانات الخام إلى حجوزات معيارية
+export function parseRawDataToBookings(
+  rawData: string,
+  defaultStatus: 'confirmed' | 'pending' = 'confirmed',
+  tabLetterHint?: string
+): Array<{
+  locker_code: string;
+  letter: string;
+  number: number;
+  cohort: string;
+  phone: string;
+  student_names: string[];
+  student_codes?: string[];
+  status: 'confirmed' | 'pending';
+  notes?: string;
+}> {
+  if (!rawData || !rawData.trim()) return [];
+  const table = parseCSV(rawData);
+  if (!table || table.length === 0) return [];
+
+  const firstRow = table[0].map(c => (c || '').trim());
+  const isDataRow = firstRow.some(cell => 
+    /^[A-Da-d]\s*\d+$/.test(cell) || 
+    /^(01[0125]\d{8}|\+?201[0125]\d{8})$/.test(cell.replace(/\s+/g, '')) ||
+    normalizeLockerCode(cell) !== null
+  );
+
+  const hasHeader = !isDataRow && firstRow.some(c => {
+    const lower = c.toLowerCase();
+    return lower === 'id' || lower === 'الدولاب' || lower === 'رمز الدولاب' || lower === 'كود الدولاب' || lower === 'locker' ||
+           lower === 'الحرف' || lower === 'الرقم' || lower === 'ممثل الهاتف' || lower === 'اسم1' || lower === 'اسم' || lower === 'name' ||
+           lower.includes('طالب') || lower.includes('دولاب') || lower.includes('كود');
+  });
+
+  const headerIndices = {
+    lockerCode: -1,
+    letter: -1,
+    number: -1,
+    cohort: -1,
+    phone: -1,
+    status: -1,
+    notes: -1,
+    nameCols: [] as number[]
+  };
+
+  let startIndex = 0;
+  if (hasHeader) {
+    startIndex = 1;
+    table[0].forEach((col, idx) => {
+      const lower = col.trim().toLowerCase();
+      if (lower === 'الدولاب' || lower === 'رمز الدولاب' || lower === 'كود الدولاب' || lower === 'locker' || lower === 'code' || lower.includes('رقم الدولاب')) {
+        headerIndices.lockerCode = idx;
+      } else if (lower === 'الحرف' || lower === 'letter' || lower === 'السكشن') {
+        headerIndices.letter = idx;
+      } else if (lower === 'الرقم' || lower === 'number' || lower === 'رقم') {
+        headerIndices.number = idx;
+      } else if (lower.includes('فرقة') || lower === 'cohort') {
+        headerIndices.cohort = idx;
+      } else if (lower.includes('هاتف') || lower.includes('موبايل') || lower === 'phone') {
+        headerIndices.phone = idx;
+      } else if (lower.includes('حالة') || lower === 'status') {
+        headerIndices.status = idx;
+      } else if (lower.includes('ملاحظ') || lower.includes('إدارة') || lower.includes('note')) {
+        headerIndices.notes = idx;
+      } else if (lower.includes('اسم') || lower.includes('طالب') || lower.includes('name')) {
+        headerIndices.nameCols.push(idx);
+      }
+    });
+  }
+
+  const results: Array<{
+    locker_code: string;
+    letter: string;
+    number: number;
+    cohort: string;
+    phone: string;
+    student_names: string[];
+    student_codes?: string[];
+    status: 'confirmed' | 'pending';
+    notes?: string;
+  }> = [];
+
+  for (let i = startIndex; i < table.length; i++) {
+    const row = table[i];
+    if (!row || row.length === 0) continue;
+
+    let lockerCode = '';
+    let letter = '';
+    let number = 0;
+    let cohort = '';
+    let phone = '';
+    let rowNotes = '';
+    let status: 'confirmed' | 'pending' = defaultStatus;
+    const names: string[] = [];
+
+    if (hasHeader && (headerIndices.lockerCode !== -1 || (headerIndices.letter !== -1 && headerIndices.number !== -1))) {
+      if (headerIndices.lockerCode !== -1 && row[headerIndices.lockerCode]) {
+        const rawCode = row[headerIndices.lockerCode];
+        const norm = normalizeLockerCode(rawCode);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
+        } else {
+          lockerCode = rawCode.toUpperCase().replace(/\s+/g, '');
+        }
+      } else if (headerIndices.letter !== -1 && headerIndices.number !== -1) {
+        const lRaw = row[headerIndices.letter] || '';
+        const nRaw = row[headerIndices.number] || '';
+        const norm = normalizeLockerCode(`${lRaw}${nRaw}`);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
+        } else {
+          lockerCode = `${lRaw.toUpperCase()}${nRaw}`.replace(/\s+/g, '');
+        }
+      }
+
+      if (headerIndices.cohort !== -1 && row[headerIndices.cohort]) {
+        cohort = row[headerIndices.cohort];
+      }
+      if (headerIndices.phone !== -1 && row[headerIndices.phone]) {
+        phone = row[headerIndices.phone].replace(/\s+/g, '');
+      }
+      if (headerIndices.notes !== -1 && row[headerIndices.notes]) {
+        rowNotes = row[headerIndices.notes].trim();
+      }
+      if (headerIndices.status !== -1 && row[headerIndices.status]) {
+        const st = row[headerIndices.status];
+        if (st.includes('مؤكد') || st.includes('تأكيد')) status = 'confirmed';
+        else if (st.includes('مؤقت') || st.includes('تسجيل') || st.includes('معلق')) status = 'pending';
+      }
+      headerIndices.nameCols.forEach(idx => {
+        const val = (row[idx] || '').trim();
+        if (val && val.length > 2 && !val.includes('إدارة') && !val.includes('حجز إداري')) {
+          names.push(val);
+        }
+      });
+    }
+
+    if (!lockerCode) {
+      for (const p of row) {
+        const norm = normalizeLockerCode(p);
+        if (norm) {
+          lockerCode = norm.code;
+          letter = norm.letter;
+          number = norm.number;
+          break;
+        }
+      }
+      if (!lockerCode) {
+        const lIndex = row.findIndex(p => /^[A-Da-dأإآابجدهـ]$/.test(p.trim()));
+        if (lIndex >= 0) {
+          const lNorm = normalizeLockerCode(`${row[lIndex]}1`);
+          letter = lNorm ? lNorm.letter : row[lIndex].toUpperCase();
+          const nIndex = row.findIndex((p, idx) => idx !== lIndex && /^\d+$/.test(p.trim()) && parseInt(p, 10) < 500);
+          if (nIndex >= 0) {
+            number = parseInt(row[nIndex].trim(), 10);
+            lockerCode = `${letter}${number}`;
+          }
+        }
+      }
+
+      // إذا لم يتوفر رمز الدولاب ولكن تم تمرير تلميح الحرف (مثل أوراق A, B, C, D)
+      if (!lockerCode && tabLetterHint) {
+        const normHint = normalizeLockerCode(`${tabLetterHint}1`);
+        const hintLetter = normHint ? normHint.letter : tabLetterHint.toUpperCase();
+        for (const p of row) {
+          const trimmedP = p.trim();
+          if (/^\d+$/.test(trimmedP)) {
+            const num = parseInt(trimmedP, 10);
+            if (num > 0 && num <= 500) {
+              number = num;
+              letter = hintLetter;
+              lockerCode = `${letter}${number}`;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!lockerCode) continue;
+
+    if (!letter || !number) {
+      const norm = normalizeLockerCode(lockerCode);
+      if (norm) {
+        letter = norm.letter;
+        number = norm.number;
+      }
+    }
+
+    if (!phone) {
+      const phonePart = row.find(p => /^(01[0125]\d{8}|\+?201[0125]\d{8})$/.test(p.replace(/\s+/g, '')));
+      if (phonePart) phone = phonePart.replace(/\s+/g, '');
+    }
+
+    if (!cohort) {
+      const cohortPart = row.find(p => p.includes('فرقة') || p.includes('أولى') || p.includes('ثانية') || p.includes('ثالثة') || p.includes('رابعة'));
+      cohort = cohortPart || 'الفرقة الرابعة';
+    }
+
+    // فحص الملاحظات إذا لم يتم استخراجها من الترويسة
+    if (!rowNotes) {
+      for (const p of row) {
+        if (p.includes('إدارة') || p.includes('محجوز للإدارة') || p.includes('تخصيص')) {
+          rowNotes = 'مخصص للإدارة';
+          break;
+        }
+      }
+    }
+
+    if (names.length === 0) {
+      for (const p of row) {
+        if (!p || p === lockerCode || p === phone || p === cohort || p === letter || String(number) === p) continue;
+        if (/^(R\d+|\d{10,}|\d{4}-\d{2}-\d{2}|http|تم التأكيد|قيد التسجيل|سعة|مخصص للإدارة)/.test(p)) continue;
+        if (/[\u0600-\u06FF]{3,}/.test(p) && !p.includes('فرقة') && !p.includes('تأكيد') && !p.includes('تسجيل') && !p.includes('إدارة')) {
+          const splitNames = p.split(/[\n|\-–,،]/).map(n => n.trim()).filter(n => n.length > 2);
+          if (splitNames.length > 1) {
+            splitNames.forEach(n => names.push(n));
+          } else {
+            names.push(p.trim());
+          }
+        }
+      }
+    }
+
+    results.push({
+      locker_code: lockerCode,
+      letter,
+      number,
+      cohort,
+      phone,
+      student_names: names.slice(0, 4),
+      status,
+      notes: rowNotes || undefined
+    });
+  }
+
+  return results;
+}
+
+// إنشاء الدواليب الافتراضية لأول مرة
+function generateInitialLockers(): LockerItem[] {
+  const letters = ['A', 'B', 'C', 'D'];
+  const lockers: LockerItem[] = [];
+
+  for (const letter of letters) {
+    for (let i = 1; i <= 40; i++) {
+      const code = `${letter}${i}`;
+      // دواليب سعة 2 افتراضياً لبعض الأرقام، والباقي سعة 4
+      const isTwoPerson = (letter === 'A' && i <= 5) || (letter === 'D' && i > 35);
+      lockers.push({
+        id: `L_${code}`,
+        locker_code: code,
+        letter,
+        number: i,
+        capacity: isTwoPerson ? 2 : 4,
+        is_enabled: true,
+        status: 'empty',
+        current_booking_id: null,
+      });
+    }
+  }
+
+  return lockers;
+}
+
+let memoryDB: LocalLockersDB | null = null;
+let lastCloudFetchTime = 0;
+const CACHE_TTL_MS = 10000; // 10 seconds memory cache
+
+function readLocalFileDB(): LocalLockersDB {
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      const content = fs.readFileSync(DB_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (parsed.lockers && parsed.bookings) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('[LockerStore] Error reading lockers db file:', e);
+  }
+
+  const initial: LocalLockersDB = {
+    lockers: generateInitialLockers(),
+    bookings: [],
+    waitlist: [],
+    settings: {
+      google_sheet_url: 'https://script.google.com/macros/s/AKfycbwSM7et9hEz5T9Lff1VGYWhpJ3XBYitTQE82g6IiEunFU3R8LQi8gQOkU2P3gypX7fL/exec',
+      supervisor_name: 'م/ إسلام عبداللطيف',
+      default_capacity: 4,
+      auto_waitlist: true
+    }
+  };
+
+  writeLocalFileDB(initial);
+  return initial;
+}
+
+function writeLocalFileDB(data: LocalLockersDB) {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    // Vercel serverless / readonly environment handling
+    console.warn('[LockerStore] Local write skipped (read-only environment):', (e as any)?.message);
+  }
+}
+
+async function loadFromCloud(force: boolean = false): Promise<LocalLockersDB> {
+  if (!force && memoryDB && (Date.now() - lastCloudFetchTime < CACHE_TTL_MS)) {
+    return memoryDB;
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('system_settings')
+      .select('telegram_config')
+      .eq('id', 1)
+      .single();
+
+    if (!error && data?.telegram_config?.lockers_data?.lockers?.length) {
+      memoryDB = data.telegram_config.lockers_data;
+      lastCloudFetchTime = Date.now();
+      writeLocalFileDB(memoryDB!);
+      return memoryDB!;
+    }
+  } catch (err: any) {
+    console.warn('[LockerStore] Cloud fetch warning:', err?.message || err);
+  }
+
+  if (!memoryDB) {
+    memoryDB = readLocalFileDB();
+    lastCloudFetchTime = Date.now();
+    // Proactively persist initial data to cloud
+    persistDB(memoryDB).catch(() => {});
+  }
+  return memoryDB;
+}
+
+async function persistDB(data: LocalLockersDB): Promise<void> {
+  memoryDB = data;
+  lastCloudFetchTime = Date.now();
+  writeLocalFileDB(data);
+
+  try {
+    const { data: current } = await supabaseAdmin
+      .from('system_settings')
+      .select('telegram_config')
+      .eq('id', 1)
+      .single();
+
+    const updatedConfig = {
+      ...(current?.telegram_config || {}),
+      lockers_data: data
+    };
+
+    const { error: updErr } = await supabaseAdmin
+      .from('system_settings')
+      .update({ telegram_config: updatedConfig })
+      .eq('id', 1);
+
+    if (updErr) {
+      console.error('[LockerStore] Supabase cloud save error:', updErr.message);
+    } else {
+      console.log(`[LockerStore] Cloud persistence OK: ${data.lockers.length} lockers, ${data.bookings.length} bookings saved.`);
+    }
+  } catch (cloudErr: any) {
+    console.error('[LockerStore] Supabase cloud persist error:', cloudErr?.message || cloudErr);
+  }
+}
+
+function readLocalDB(): LocalLockersDB {
+  if (memoryDB) return memoryDB;
+  memoryDB = readLocalFileDB();
+  return memoryDB;
+}
+
+function writeLocalDB(data: LocalLockersDB) {
+  memoryDB = data;
+  lastCloudFetchTime = Date.now();
+  writeLocalFileDB(data);
+  persistDB(data).catch(e => console.error('[LockerStore] Background persist error:', e));
+}
+
+export const lockerStore = {
+  // التأكد من جلب أحدث نسخة سحابية من Supabase
+  async ensureLoaded(force: boolean = false): Promise<LocalLockersDB> {
+    return await loadFromCloud(force);
+  },
+
+  // جلب كائن قاعدة البيانات الحالي
+  getDB(): LocalLockersDB {
+    return readLocalDB();
+  },
+
+  // حفظ كائن قاعدة البيانات يدوياً في السحابة
+  async saveDB(data?: LocalLockersDB): Promise<void> {
+    await persistDB(data || readLocalDB());
+  },
+
+  // 1. جلب كافة الدواليب أو حسب الحرف
+  getLockers(letter?: string): LockerItem[] {
+    const db = readLocalDB();
+    if (!letter || letter === 'ALL') {
+      return db.lockers;
+    }
+    return db.lockers.filter(l => l.letter.toUpperCase() === letter.toUpperCase());
+  },
+
+  // 2. جلب دولاب محدد
+  getLocker(code: string): LockerItem | null {
+    const db = readLocalDB();
+    return db.lockers.find(l => l.locker_code.toUpperCase() === code.toUpperCase()) || null;
+  },
+
+  // 3. جلب كافة الحجوزات
+  getBookings(status?: string): LockerBooking[] {
+    const db = readLocalDB();
+    if (!status || status === 'ALL') {
+      return db.bookings;
+    }
+    return db.bookings.filter(b => b.status === status);
+  },
+
+  // 4. جلب حجز بواسطة المعرف
+  getBooking(bookingId: string): LockerBooking | null {
+    const db = readLocalDB();
+    return db.bookings.find(b => b.id === bookingId) || null;
+  },
+
+  // 5. جلب قائمة الانتظار
+  getWaitlist(): LockerWaitlistEntry[] {
+    const db = readLocalDB();
+    return db.waitlist.filter(w => w.status === 'waiting');
+  },
+
+  // 6. التحقق من حالة الطالب الذكي (هل هو مسكن أو في الانتظار؟)
+  getStudentLockerStatus(studentCodeOrName: string | { code?: string; name?: string }): {
+    status: 'confirmed' | 'pending' | 'waitlist' | 'none';
+    booking: LockerBooking | null;
+    waitlist: LockerWaitlistEntry | null;
+    locker: LockerItem | null;
+  } {
+    const db = readLocalDB();
+    let codeQuery = '';
+    let nameQuery = '';
+
+    if (typeof studentCodeOrName === 'string') {
+      const q = studentCodeOrName.trim();
+      if (/^\d+$/.test(q)) {
+        codeQuery = q;
+      } else {
+        nameQuery = q;
+        codeQuery = q;
+      }
+    } else if (studentCodeOrName && typeof studentCodeOrName === 'object') {
+      codeQuery = (studentCodeOrName.code || '').trim();
+      nameQuery = (studentCodeOrName.name || '').trim();
+    }
+
+    const normCodeQuery = codeQuery.replace(/^0+/, '');
+
+    const matchesStudent = (codes: string[] = [], names: string[] = []): boolean => {
+      // 1. فحص الكود إن وجد
+      if (codeQuery) {
+        const codeMatch = codes.some(c => {
+          if (!c) return false;
+          const cleanC = String(c).trim();
+          return cleanC.toLowerCase() === codeQuery.toLowerCase() ||
+                 cleanC.replace(/^0+/, '') === normCodeQuery;
+        });
+        if (codeMatch) return true;
+      }
+
+      // 2. فحص الاسم بمطابقة النصوص والأسماء العربية الذكية
+      if (nameQuery) {
+        const nameMatch = names.some(n => {
+          if (!n) return false;
+          return isArabicNameMatch(n, nameQuery);
+        });
+        if (nameMatch) return true;
+      }
+
+      return false;
+    };
+
+    // البحث في الحجوزات المؤكدة والمعلقة
+    const activeBooking = db.bookings.find(b => 
+      (b.status === 'confirmed' || b.status === 'pending') &&
+      matchesStudent(b.student_codes, b.student_names)
+    );
+
+    if (activeBooking) {
+      const locker = db.lockers.find(l => l.locker_code === activeBooking.locker_code) || null;
+      return {
+        status: activeBooking.status as 'confirmed' | 'pending',
+        booking: activeBooking,
+        waitlist: null,
+        locker
+      };
+    }
+
+    // البحث في قائمة الانتظار
+    const waitEntry = db.waitlist.find(w => 
+      w.status === 'waiting' &&
+      matchesStudent(w.student_codes, w.student_names)
+    );
+
+    if (waitEntry) {
+      return {
+        status: 'waitlist',
+        booking: null,
+        waitlist: waitEntry,
+        locker: null
+      };
+    }
+
+    return {
+      status: 'none',
+      booking: null,
+      waitlist: null,
+      locker: null
+    };
+  },
+
+  // 7. حجز دولاب جديد للطلاب
+  async bookLocker(params: {
+    cohort: string;
+    representative_phone: string;
+    student_names: string[];
+    student_codes: string[];
+    preferred_letter?: string;
+  }): Promise<{
+    success: boolean;
+    isWaitlist: boolean;
+    booking?: LockerBooking;
+    waitlist?: LockerWaitlistEntry;
+    locker?: LockerItem;
+    message: string;
+  }> {
+    const db = readLocalDB();
+
+    if (!params.student_names || params.student_names.length !== 4) {
+      return {
+        success: false,
+        isWaitlist: false,
+        message: 'يشترط حجز الدولاب لـ 4 طلاب بالتمام والكمال (مقدم الطلب + 3 زملاء)'
+      };
+    }
+
+    // 1. التحقق من عدم تكرار أي طالب داخل نفس الطلب
+    const cleanCodes = (params.student_codes || [])
+      .map(c => String(c || '').trim().replace(/^#/, '').replace(/^0+/, ''))
+      .filter(Boolean);
+    if (new Set(cleanCodes).size !== cleanCodes.length) {
+      return {
+        success: false,
+        isWaitlist: false,
+        message: 'يوجد كود طالب مكرر أكثر من مرة في نفس الطلب!'
+      };
+    }
+
+    for (let i = 0; i < params.student_names.length; i++) {
+      for (let j = i + 1; j < params.student_names.length; j++) {
+        if (isArabicNameMatch(params.student_names[i], params.student_names[j])) {
+          return {
+            success: false,
+            isWaitlist: false,
+            message: `اسم الطالب (${params.student_names[i]}) مكرر في نفس الطلب!`
+          };
+        }
+      }
+    }
+
+    // 2. التحقق من أن أياً من الطلاب ليس مسجلاً بالفعل في أي حجز سابق أو قائمة انتظار
+    for (let i = 0; i < params.student_names.length; i++) {
+      const name = params.student_names[i];
+      const code = params.student_codes?.[i] || '';
+      const check = this.getStudentLockerStatus({ code, name });
+      if (check.status !== 'none') {
+        const studentName = name || code;
+        const lockerInfo = check.booking 
+          ? `في دولاب (${check.booking.locker_code}) بحالة ${check.booking.status === 'confirmed' ? 'معتمد' : 'معلق'}` 
+          : 'في قائمة الانتظار';
+        return {
+          success: false,
+          isWaitlist: false,
+          message: `عذراً، الطالب (${studentName}) مسجل بالفعل مسبقاً ${lockerInfo} ولا يمكن تكراره!`
+        };
+      }
+    }
+
+    // البحث عن جميع الدواليب الشاغرة المتاحة
+    const emptyLockers = db.lockers.filter(l => 
+      l.status === 'empty' && 
+      l.is_enabled === true && 
+      !l.is_admin_reserved
+    );
+
+    // 3. التحقق من كوتا وتخصيص الفرقة الدراسية لمقدم الطلب (نظام التخصيص والأولوية الذكي)
+    const studentCohortKey = normalizeCohortName(params.cohort);
+    const allocationState = this.getCohortAllocations();
+    const myCohortAlloc = allocationState.allocations.find(a => a.cohortKey === studentCohortKey);
+    
+    // أ) هل فرقة الطالب محدد لها كوتا واستنفذت حصتها بالفعل؟ (مثلاً: رابعة مخصص 50 ومسجل 50)
+    if (myCohortAlloc && myCohortAlloc.quota > 0 && myCohortAlloc.isQuotaFull) {
+      // إيقاف الحجز التلقائي المباشر لهذه الفرقة وتحويلها لقائمة الانتظار بأولوية، بينما تستمر الفرق الأخرى في الحجز عادي
+      const waitEntry: LockerWaitlistEntry = {
+        id: `W_${Date.now()}`,
+        cohort: params.cohort,
+        representative_phone: params.representative_phone,
+        student_names: params.student_names,
+        student_codes: params.student_codes,
+        created_at: new Date().toISOString(),
+        status: 'waiting',
+        priority: 1 // أولوية قصوى لأن كوتا الفرقة اكتملت
+      };
+
+      db.waitlist.push(waitEntry);
+      await persistDB(db);
+
+      return {
+        success: true,
+        isWaitlist: true,
+        waitlist: waitEntry,
+        message: `تم استنفاد كوتا الدواليب المخصصة لـ (${params.cohort}) البالغة (${myCohortAlloc.quota} دولاب)! تم تسجيل طلبكم في قائمة الانتظار بأولوية فورية عند إخلاء أو توفر أي دواليب.`
+      };
+    }
+
+    // ب) هل الدواليب الشاغرة كافية بعد خصم الحصص المحجوزة حصرياً للفرق الأخرى؟
+    // نحسب كم دولاب محجوز حصرياً للفرق الأخرى (غير فرقة مقدم الطلب)
+    let reservedForOtherCohorts = 0;
+    for (const alloc of allocationState.allocations) {
+      if (alloc.cohortKey !== studentCohortKey && alloc.quota > 0) {
+        reservedForOtherCohorts += alloc.remainingQuota;
+      }
+    }
+
+    // إذا كانت فرقة مقدم الطلب ليس لها كوتا خاصة، وكان رصيد الشواغر لا يغطي سوى حصص الفرق الأخرى المحجوزة:
+    const isSpecialQuotaCohort = myCohortAlloc && myCohortAlloc.quota > 0 && !myCohortAlloc.isQuotaFull;
+    if (!isSpecialQuotaCohort && (emptyLockers.length - reservedForOtherCohorts) <= 0) {
+      const waitEntry: LockerWaitlistEntry = {
+        id: `W_${Date.now()}`,
+        cohort: params.cohort,
+        representative_phone: params.representative_phone,
+        student_names: params.student_names,
+        student_codes: params.student_codes,
+        created_at: new Date().toISOString(),
+        status: 'waiting',
+        priority: db.waitlist.filter(w => w.status === 'waiting').length + 1
+      };
+
+      db.waitlist.push(waitEntry);
+      await persistDB(db);
+
+      return {
+        success: true,
+        isWaitlist: true,
+        waitlist: waitEntry,
+        message: 'عذراً، الدواليب الشاغرة حالياً محجوزة كحصص مخصصة لفرق دراسية أخرى ذات كوتا معتمدة. تم حفظ طلبكم في قائمة الانتظار بأولوية فورية.'
+      };
+    }
+
+    let availableLocker: LockerItem | undefined;
+    if (emptyLockers.length > 0) {
+      // تخصيص عشوائي تماماً من الدواليب المتاحة
+      const randomIndex = Math.floor(Math.random() * emptyLockers.length);
+      availableLocker = emptyLockers[randomIndex];
+    }
+
+    // إذا لم تتوفر دواليب شاغرة مطلقا -> تحويل تلقائي لقائمة الانتظار!
+    if (!availableLocker) {
+      const waitEntry: LockerWaitlistEntry = {
+        id: `W_${Date.now()}`,
+        cohort: params.cohort,
+        representative_phone: params.representative_phone,
+        student_names: params.student_names,
+        student_codes: params.student_codes,
+        created_at: new Date().toISOString(),
+        status: 'waiting',
+        priority: db.waitlist.filter(w => w.status === 'waiting').length + 1
+      };
+
+      db.waitlist.push(waitEntry);
+      await persistDB(db);
+
+      return {
+        success: true,
+        isWaitlist: true,
+        waitlist: waitEntry,
+        message: 'عذراً، جميع الدواليب مشغولة حالياً بالكامل! تم حفظ طلبكم في قائمة الانتظار بأولوية فورية عند إخلاء أي دولاب.'
+      };
+    }
+
+    // إذا توفر دولاب -> إنشاء حجز جديد في انتظار الاعتماد (pending)
+    const bookingId = `B_${Date.now()}`;
+    const newBooking: LockerBooking = {
+      id: bookingId,
+      locker_code: availableLocker.locker_code,
+      cohort: params.cohort,
+      representative_phone: params.representative_phone,
+      student_names: params.student_names,
+      student_codes: params.student_codes,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      responsible: 'ONLINE'
+    };
+
+    // تحديث حالة الدولاب
+    availableLocker.status = 'pending';
+    availableLocker.current_booking_id = bookingId;
+    availableLocker.updated_at = new Date().toISOString();
+
+    db.bookings.push(newBooking);
+    await persistDB(db);
+
+    return {
+      success: true,
+      isWaitlist: false,
+      booking: newBooking,
+      locker: availableLocker,
+      message: 'تم تسجيل حجز الدولاب بنجاح! يرجى طباعة الاستمارة وتواجد جميع الطلاب لدى المشرف للاستلام.'
+    };
+  },
+
+  // 8. تأكيد واعتماد حجز (من قبل المشرف)
+  async confirmBooking(bookingId: string, confirmedBy: string = 'م/ إسلام عبداللطيف'): Promise<boolean> {
+    const db = readLocalDB();
+    const booking = db.bookings.find(b => b.id === bookingId);
+    if (!booking) return false;
+
+    booking.status = 'confirmed';
+    booking.confirmed_at = new Date().toISOString();
+    booking.confirmed_by = confirmedBy;
+
+    const locker = db.lockers.find(l => l.locker_code === booking.locker_code);
+    if (locker) {
+      locker.status = 'confirmed';
+      locker.updated_at = new Date().toISOString();
+    }
+
+    await persistDB(db);
+    return true;
+  },
+
+  // 9. رفض أو إلغاء حجز
+  async rejectBooking(bookingId: string, reason?: string): Promise<boolean> {
+    const db = readLocalDB();
+    const booking = db.bookings.find(b => b.id === bookingId);
+    if (!booking) return false;
+
+    booking.status = 'rejected';
+    booking.notes = reason || 'تم الإلغاء';
+
+    const locker = db.lockers.find(l => l.locker_code === booking.locker_code);
+    if (locker) {
+      locker.status = 'empty';
+      locker.current_booking_id = null;
+      locker.updated_at = new Date().toISOString();
+      
+      // فحص قائمة الانتظار لإشغال الدولاب الشاغر تلقائياً
+      this.checkAndFulfillWaitlist(locker.locker_code, db);
+    }
+
+    await persistDB(db);
+    return true;
+  },
+
+  // 9.5 تعديل بيانات حجز قائم من لوحة الإدارة
+  async updateBookingDetails(params: {
+    bookingId: string;
+    lockerCode?: string;
+    cohort?: string;
+    phone?: string;
+    studentNames: string[];
+    studentCodes?: string[];
+    notes?: string;
+    status?: 'pending' | 'confirmed' | 'rejected';
+  }): Promise<{ success: boolean; message: string; booking?: LockerBooking }> {
+    const db = readLocalDB();
+    const booking = db.bookings.find(b => b.id === params.bookingId);
+    if (!booking) {
+      return { success: false, message: 'تعذر العثور على الحجز المطلوب تعديله' };
+    }
+
+    const oldLockerCode = booking.locker_code.toUpperCase();
+    const newLockerCode = (params.lockerCode || booking.locker_code).trim().toUpperCase();
+
+    // إذا تغير كود الدولاب:
+    if (newLockerCode && newLockerCode !== oldLockerCode) {
+      // 1. فك ارتباط الدولاب القديم
+      const oldLocker = db.lockers.find(l => l.locker_code.toUpperCase() === oldLockerCode);
+      if (oldLocker && oldLocker.current_booking_id === booking.id) {
+        oldLocker.status = 'empty';
+        oldLocker.current_booking_id = null;
+        oldLocker.updated_at = new Date().toISOString();
+      }
+
+      // 2. البحث عن الدولاب الجديد أو إنشاؤه
+      let newLocker = db.lockers.find(l => l.locker_code.toUpperCase() === newLockerCode);
+      if (!newLocker) {
+        const match = newLockerCode.match(/^([A-Za-z])\s*(\d+)$/);
+        const letter = match ? match[1].toUpperCase() : 'A';
+        const number = match ? parseInt(match[2], 10) : 1;
+        newLocker = {
+          id: `L_${newLockerCode}`,
+          locker_code: newLockerCode,
+          letter,
+          number,
+          capacity: 4,
+          is_enabled: true,
+          is_admin_reserved: false,
+          status: 'empty',
+          current_booking_id: null
+        };
+        db.lockers.push(newLocker);
+      } else {
+        // إذا كان الدولاب الجديد مرتبطاً بحجز آخر مختلف
+        if (newLocker.current_booking_id && newLocker.current_booking_id !== booking.id) {
+          const prevBooking = db.bookings.find(b => b.id === newLocker!.current_booking_id);
+          if (prevBooking) {
+            prevBooking.status = 'rejected';
+            prevBooking.notes = `تم استبدال الحجز لنقل الحجز ${booking.id} لهذا الدولاب`;
+          }
+        }
+      }
+
+      const targetStatus = params.status || booking.status || 'confirmed';
+      newLocker.status = targetStatus === 'rejected' ? 'empty' : targetStatus;
+      if (targetStatus === 'rejected') {
+        newLocker.current_booking_id = null;
+      } else {
+        newLocker.current_booking_id = booking.id;
+      }
+      newLocker.updated_at = new Date().toISOString();
+      booking.locker_code = newLockerCode;
+    } else {
+      // نفس الدولاب، نحدث حالته إذا تغيرت حالة الحجز
+      const currLocker = db.lockers.find(l => l.locker_code.toUpperCase() === oldLockerCode);
+      if (currLocker) {
+        if (params.status) {
+          currLocker.status = params.status === 'rejected' ? 'empty' : params.status;
+          if (params.status === 'rejected') {
+            currLocker.current_booking_id = null;
+          }
+        }
+        currLocker.updated_at = new Date().toISOString();
+      }
+    }
+
+    if (params.cohort) {
+      booking.cohort = params.cohort;
+    }
+    if (params.phone !== undefined) {
+      booking.representative_phone = params.phone.trim();
+    }
+    if (params.studentNames && Array.isArray(params.studentNames)) {
+      const validNames = params.studentNames.map(n => String(n || '').trim()).filter(Boolean);
+      booking.student_names = validNames;
+      
+      const codes = [...(params.studentCodes || [])];
+      while (codes.length < validNames.length) codes.push('');
+      booking.student_codes = codes.slice(0, validNames.length);
+
+      // محاولة مطابقة أكواد الطلاب الناقصة
+      try {
+        for (let i = 0; i < validNames.length; i++) {
+          if (!booking.student_codes[i] || !booking.student_codes[i].trim()) {
+            const sName = validNames[i];
+            const firstWord = sName.split(' ')[0];
+            const { data: stRows } = await supabaseAdmin
+              .from('students')
+              .select('student_code, full_name')
+              .ilike('full_name', `%${firstWord}%`)
+              .limit(20);
+
+            if (stRows && stRows.length > 0) {
+              const matched = stRows.find((s: any) => isArabicNameMatch(s.full_name, sName));
+              if (matched) {
+                booking.student_codes[i] = matched.student_code;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[LockerStore] updateBookingDetails auto-resolve error:', e);
+      }
+    }
+
+    if (params.status) {
+      booking.status = params.status;
+      if (params.status === 'confirmed' && !booking.confirmed_at) {
+        booking.confirmed_at = new Date().toISOString();
+        booking.confirmed_by = 'إدارة الكلية';
+      }
+    }
+
+    if (params.notes !== undefined) {
+      booking.notes = params.notes;
+    }
+
+    await persistDB(db);
+
+    return {
+      success: true,
+      message: `تم تحديث بيانات الحجز للدولاب ${booking.locker_code} بنجاح وحفظه سحابياً`,
+      booking
+    };
+  },
+
+  // 10. إخلاء دولاب بالكامل (Admin Vacate)
+  async vacateLocker(lockerCode: string): Promise<boolean> {
+    const db = readLocalDB();
+    const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
+    if (!locker) return false;
+
+    if (locker.current_booking_id) {
+      const booking = db.bookings.find(b => b.id === locker.current_booking_id);
+      if (booking) {
+        booking.status = 'rejected';
+        booking.notes = 'تم إخلاء الدولاب يدوياً من لوحة التحكم';
+      }
+    }
+
+    locker.status = 'empty';
+    locker.current_booking_id = null;
+    locker.updated_at = new Date().toISOString();
+
+    // فحص قائمة الانتظار
+    this.checkAndFulfillWaitlist(locker.locker_code, db);
+
+    await persistDB(db);
+    return true;
+  },
+
+  // 11. إقصاء طالب محدد من الدولاب دون إخلاء باقي زملائه
+  async removeStudentFromLocker(bookingId: string, studentCodeOrName: string): Promise<{ success: boolean; message: string; remaining: number }> {
+    const db = readLocalDB();
+    const booking = db.bookings.find(b => b.id === bookingId);
+    if (!booking) return { success: false, message: 'الحجز غير موجود', remaining: 0 };
+
+    const target = studentCodeOrName.trim().toLowerCase();
+    const idx = booking.student_codes.findIndex(c => c.toLowerCase() === target || c.replace(/^0+/, '') === target.replace(/^0+/, '')) >= 0
+      ? booking.student_codes.findIndex(c => c.toLowerCase() === target || c.replace(/^0+/, '') === target.replace(/^0+/, ''))
+      : booking.student_names.findIndex(n => n.toLowerCase().includes(target));
+
+    if (idx < 0) {
+      return { success: false, message: 'لم يتم العثور على الطالب بالدولاب', remaining: booking.student_names.length };
+    }
+
+    // إزالة الطالب
+    booking.student_names.splice(idx, 1);
+    if (booking.student_codes.length > idx) {
+      booking.student_codes.splice(idx, 1);
+    }
+
+    // إذا لم يتبق أي طالب، نخلي الدولاب بالكامل
+    if (booking.student_names.length === 0) {
+      booking.status = 'rejected';
+      const locker = db.lockers.find(l => l.locker_code === booking.locker_code);
+      if (locker) {
+        locker.status = 'empty';
+        locker.current_booking_id = null;
+      }
+      await persistDB(db);
+      return { success: true, message: 'تم إقصاء الطالب، وتم تفريغ الدولاب لعدم وجود طلاب آخرين', remaining: 0 };
+    }
+
+    await persistDB(db);
+    return { success: true, message: 'تم إقصاء الطالب بنجاح وبقاء زملائه', remaining: booking.student_names.length };
+  },
+
+  // 12. تبديل حالة الدولاب (تفعيل / تعطيل بالحجز) - للضغط المطول
+  async toggleLockerEnabled(lockerCode: string): Promise<boolean> {
+    const db = readLocalDB();
+    const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
+    if (!locker) return false;
+
+    locker.is_enabled = !locker.is_enabled;
+    locker.updated_at = new Date().toISOString();
+    await persistDB(db);
+    return locker.is_enabled;
+  },
+
+  // 13. تعديل سعة الدولاب (2 أو 4 أو مخصص)
+  async updateLockerCapacity(lockerCode: string, capacity: number): Promise<boolean> {
+    const db = readLocalDB();
+    const locker = db.lockers.find(l => l.locker_code.toUpperCase() === lockerCode.toUpperCase());
+    if (!locker) return false;
+
+    locker.capacity = Math.max(1, capacity);
+    locker.updated_at = new Date().toISOString();
+    await persistDB(db);
+    return true;
+  },
+
+  // 14. تفريغ دفعة بالكامل (مثلاً الفرقة الرابعة بعد التخرج)
+  async clearCohort(cohort: string): Promise<{ clearedCount: number }> {
+    await this.ensureLoaded(true);
+    const db = readLocalDB();
+    let count = 0;
+    const clearedLockerCodes = new Set<string>();
+
+    for (const booking of db.bookings) {
+      if ((booking.status === 'confirmed' || booking.status === 'pending') && isCohortMatch(booking.cohort, cohort)) {
+        booking.status = 'rejected';
+        booking.notes = `تم تفريغ الدفعة بالكامل (${cohort})`;
+        clearedLockerCodes.add(booking.locker_code.toUpperCase());
+        count++;
+      }
+    }
+
+    // إخلاء جميع الدواليب المرتبطة بالحجوزات المفرغة
+    for (const locker of db.lockers) {
+      if (clearedLockerCodes.has(locker.locker_code.toUpperCase())) {
+        locker.status = 'empty';
+        locker.current_booking_id = null;
+        locker.updated_at = new Date().toISOString();
+      } else if (locker.current_booking_id) {
+        const b = db.bookings.find(x => x.id === locker.current_booking_id);
+        if (b && isCohortMatch(b.cohort, cohort)) {
+          locker.status = 'empty';
+          locker.current_booking_id = null;
+          locker.updated_at = new Date().toISOString();
+        }
+      }
+    }
+
+    // إلغاء أي طلبات في قائمة الانتظار تخص هذه الفرقة
+    for (const wait of db.waitlist) {
+      if (wait.status === 'waiting' && isCohortMatch(wait.cohort, cohort)) {
+        wait.status = 'cancelled';
+      }
+    }
+
+    await persistDB(db);
+    return { clearedCount: count };
+  },
+
+  // 15. فحص وتسكين رأس قائمة الانتظار تلقائياً عند فراغ دولاب
+  checkAndFulfillWaitlist(lockerCode: string, db: LocalLockersDB) {
+    const waitingIndex = db.waitlist.findIndex(w => w.status === 'waiting');
+    if (waitingIndex >= 0) {
+      const nextInLine = db.waitlist[waitingIndex];
+      nextInLine.status = 'fulfilled';
+
+      const bookingId = `B_${Date.now()}`;
+      const newBooking: LockerBooking = {
+        id: bookingId,
+        locker_code: lockerCode,
+        cohort: nextInLine.cohort,
+        representative_phone: nextInLine.representative_phone,
+        student_names: nextInLine.student_names,
+        student_codes: nextInLine.student_codes,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+        responsible: 'WAITLIST_AUTO_PROMOTED'
+      };
+
+      db.bookings.push(newBooking);
+
+      const locker = db.lockers.find(l => l.locker_code === lockerCode);
+      if (locker) {
+        locker.status = 'pending';
+        locker.current_booking_id = bookingId;
+        locker.updated_at = new Date().toISOString();
+      }
+    }
+  },
+
+  // 16. تخصيص الدولاب للإدارة أو إلغاء التخصيص
+  async setAdminReserved(lockerCode: string, reserved: boolean, notes?: string): Promise<{ success: boolean; is_admin_reserved: boolean; locker?: LockerItem; message: string }> {
+    const db = readLocalDB();
+    const code = lockerCode.trim().toUpperCase();
+    const locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
+    if (!locker) return { success: false, is_admin_reserved: false, message: 'تعذر العثور على الدولاب' };
+
+    locker.is_admin_reserved = reserved;
+    locker.is_enabled = !reserved;
+    locker.notes = reserved ? (notes || 'مخصص للإدارة') : '';
+
+    if (reserved) {
+      // إخلاء أي حجز مسكن في هذا الدولاب
+      if (locker.current_booking_id) {
+        const b = db.bookings.find(bk => bk.id === locker.current_booking_id);
+        if (b) {
+          b.status = 'rejected';
+          b.notes = 'تم إخلاء الدولاب وتخصيصه للإدارة';
+        }
+        locker.current_booking_id = null;
+      }
+      locker.status = 'empty';
+    } else {
+      locker.status = 'empty';
+      locker.current_booking_id = null;
+    }
+
+    locker.updated_at = new Date().toISOString();
+    await persistDB(db);
+    return {
+      success: true,
+      is_admin_reserved: reserved,
+      locker,
+      message: reserved ? `تم تخصيص الدولاب ${code} للإدارة بنجاح وحجبه عن الطلاب 🔒` : `تم إلغاء تخصيص الإدارة وإتاحة الدولاب ${code} للطلاب 🟢`
+    };
+  },
+
+  // 17. جلب نطاقات وأعداد الدواليب لكل حرف
+  getInventoryRanges(): { [letter: string]: number } {
+    const db = readLocalDB();
+    const ranges: { [letter: string]: number } = { A: 0, B: 0, C: 0, D: 0 };
+    for (const l of db.lockers) {
+      const letter = l.letter.toUpperCase();
+      if (ranges[letter] !== undefined) {
+        ranges[letter] = Math.max(ranges[letter], l.number);
+      } else {
+        ranges[letter] = l.number;
+      }
+    }
+    return ranges;
+  },
+
+  // 18. تحديث وضبط أعداد ونطاقات دواليب الأقسام
+  async updateInventoryRanges(ranges: { [letter: string]: number }): Promise<{ success: boolean; total: number; ranges: { [letter: string]: number }; message: string }> {
+    const db = readLocalDB();
+    const letters = ['A', 'B', 'C', 'D'];
+
+    for (const letter of letters) {
+      const rawTarget = ranges[letter] !== undefined ? ranges[letter] : ranges[letter.toUpperCase()];
+      if (rawTarget === undefined || rawTarget === null) continue;
+      const targetMax = Math.max(1, parseInt(String(rawTarget), 10) || 0);
+
+      const currentLockers = db.lockers.filter(l => l.letter.toUpperCase() === letter);
+      const currentMax = currentLockers.reduce((max, l) => Math.max(max, l.number), 0);
+
+      if (targetMax > currentMax) {
+        // إضافة دواليب جديدة
+        for (let num = currentMax + 1; num <= targetMax; num++) {
+          const code = `${letter}${num}`;
+          if (!db.lockers.some(l => l.locker_code.toUpperCase() === code)) {
+            db.lockers.push({
+              id: `L_${code}`,
+              locker_code: code,
+              letter,
+              number: num,
+              capacity: 4,
+              is_enabled: true,
+              is_admin_reserved: false,
+              status: 'empty',
+              current_booking_id: null,
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      } else if (targetMax < currentMax) {
+        // تقليص الدواليب الشاغرة فقط التي تزيد عن الحد الأقصى الجديد مع الحفاظ على المسكن
+        db.lockers = db.lockers.filter(l => {
+          if (l.letter.toUpperCase() !== letter) return true;
+          if (l.number <= targetMax) return true;
+          // الإبقاء على الدولاب إذا كان مسكناً أو به حجز أو مخصصاً للإدارة
+          if (l.status !== 'empty' || l.current_booking_id || l.is_admin_reserved) return true;
+          return false;
+        });
+      }
+    }
+
+    // ترتيب منطقي: الحرف ثم الرقم
+    db.lockers.sort((a, b) => {
+      if (a.letter !== b.letter) return a.letter.localeCompare(b.letter);
+      return a.number - b.number;
+    });
+
+    await persistDB(db);
+    const newRanges = this.getInventoryRanges();
+    return {
+      success: true,
+      total: db.lockers.length,
+      ranges: newRanges,
+      message: `تم تحديث شبكة الدواليب بنجاح وحفظها سحابياً. إجمالي الدواليب: ${db.lockers.length}`
+    };
+  },
+
+  // 19. تسكين طلاب يدوياً في دولاب
+  async manualAssignBooking(params: {
+    lockerCode: string;
+    cohort: string;
+    phone: string;
+    studentNames: string[];
+    studentCodes?: string[];
+    notes?: string;
+    status?: 'confirmed' | 'pending';
+  }): Promise<{ success: boolean; message: string; booking?: LockerBooking; locker?: LockerItem }> {
+    await this.ensureLoaded(true);
+    const db = readLocalDB();
+    const code = params.lockerCode.trim().toUpperCase();
+    let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
+
+    // إذا لم يكن الدولاب موجوداً، ننشئه تلقائياً
+    if (!locker) {
+      const match = code.match(/^([A-Za-z])\s*(\d+)$/);
+      const letter = match ? match[1].toUpperCase() : 'A';
+      const number = match ? parseInt(match[2], 10) : 1;
+      locker = {
+        id: `L_${code}`,
+        locker_code: code,
+        letter,
+        number,
+        capacity: params.studentNames.length > 2 ? 4 : 2,
+        is_enabled: true,
+        is_admin_reserved: false,
+        status: 'empty',
+        current_booking_id: null
+      };
+      db.lockers.push(locker);
+    }
+
+    // إخلاء أي حجز سابق مرتبط
+    if (locker.current_booking_id) {
+      const prevB = db.bookings.find(b => b.id === locker!.current_booking_id);
+      if (prevB) {
+        prevB.status = 'rejected';
+        prevB.notes = 'تم استبدال الحجز يدوياً';
+      }
+    }
+
+    const bookingStatus = params.status || 'confirmed';
+    const bookingId = `B_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const validNames = (params.studentNames || []).map(n => String(n || '').trim()).filter(Boolean);
+
+    const finalCodes: string[] = [...(params.studentCodes || [])];
+    while (finalCodes.length < validNames.length) {
+      finalCodes.push('');
+    }
+
+    // مطابقة وتعبئة أكواد الطلاب تلقائياً إن كانت غير مكتملة
+    try {
+      for (let i = 0; i < validNames.length; i++) {
+        if (!finalCodes[i] || !finalCodes[i].trim()) {
+          const sName = validNames[i];
+          const firstWord = sName.split(' ')[0];
+          const { data: stRows } = await supabaseAdmin
+            .from('students')
+            .select('student_code, full_name')
+            .ilike('full_name', `%${firstWord}%`)
+            .limit(25);
+
+          if (stRows && stRows.length > 0) {
+            const matched = stRows.find((s: any) => isArabicNameMatch(s.full_name, sName));
+            if (matched) {
+              finalCodes[i] = matched.student_code;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[LockerStore] Auto-resolve student codes error:', e);
+    }
+
+    const newBooking: LockerBooking = {
+      id: bookingId,
+      locker_code: code,
+      cohort: params.cohort || 'الفرقة الرابعة',
+      representative_phone: params.phone || '',
+      student_names: validNames,
+      student_codes: finalCodes,
+      status: bookingStatus,
+      created_at: new Date().toISOString(),
+      confirmed_at: bookingStatus === 'confirmed' ? new Date().toISOString() : undefined,
+      confirmed_by: bookingStatus === 'confirmed' ? 'إدارة الكلية' : undefined,
+      responsible: 'ADMIN_MANUAL',
+      notes: params.notes || 'تسكين يدوي من لوحة الإدارة'
+    };
+
+    locker.status = bookingStatus;
+    locker.current_booking_id = bookingId;
+    locker.is_admin_reserved = false;
+    locker.is_enabled = true;
+    if (validNames.length > 0 && validNames.length <= 2) {
+      locker.capacity = 2;
+    }
+    locker.updated_at = new Date().toISOString();
+
+    db.bookings.push(newBooking);
+    await persistDB(db);
+
+    return {
+      success: true,
+      message: `تم تسكين الدولاب ${code} بنجاح (${bookingStatus === 'confirmed' ? 'معتمد' : 'معلق'}) وحفظه سحابياً`,
+      booking: newBooking,
+      locker
+    };
+  },
+
+  // 20. معاينة تفاعلية لبيانات الشيت المنسوخة أو المرفوعة قبل التسكين الفعلي
+  parseRawDataToPreview(rawData: string): PreviewDataResult {
+    if (!rawData || !rawData.trim()) {
+      return {
+        success: false,
+        rows: [],
+        total: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        uniqueLockers: 0,
+        conflictCount: 0,
+        errors: ['لا توجد بيانات صالحة للمعاينة']
+      };
+    }
+
+    const parsed = parseRawDataToBookings(rawData);
+    if (parsed.length === 0) {
+      return {
+        success: false,
+        rows: [],
+        total: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        uniqueLockers: 0,
+        conflictCount: 0,
+        errors: ['تعذر استخراج بيانات الدواليب، يرجى التأكد من احتواء النص على رمز الدولاب وأسماء الطلاب']
+      };
+    }
+
+    // دمج الصفوف المتعددة لنفس الدولاب لضمان عدم إسقاط الطلاب
+    const merged = mergeBookings(parsed);
+    const db = readLocalDB();
+    const rows: ParsedPreviewRow[] = [];
+    const lockerSet = new Set<string>();
+
+    for (let i = 0; i < merged.length; i++) {
+      const b = merged[i];
+      lockerSet.add(b.locker_code);
+      const existingLocker = db.lockers.find(l => l.locker_code.toUpperCase() === b.locker_code.toUpperCase());
+
+      let conflictWarning: string | undefined = undefined;
+      let existingStudents: string[] | undefined = undefined;
+
+      if (existingLocker) {
+        if (existingLocker.is_admin_reserved) {
+          conflictWarning = 'الدولاب مخصص للإدارة حالياً';
+        } else if (existingLocker.status === 'confirmed' && existingLocker.current_booking_id) {
+          const exBk = db.bookings.find(bk => bk.id === existingLocker.current_booking_id);
+          if (exBk && exBk.student_names && exBk.student_names.length > 0) {
+            existingStudents = exBk.student_names;
+            const hasOverlap = b.student_names.some(n => exBk.student_names.includes(n));
+            if (!hasOverlap) {
+              conflictWarning = `مسكن بالفعل لـ: ${exBk.student_names.slice(0, 2).join('، ')}`;
+            }
+          }
+        }
+      }
+
+      rows.push({
+        id: `prev_${Date.now()}_${i}`,
+        locker_code: b.locker_code,
+        letter: b.letter,
+        number: b.number,
+        cohort: b.cohort,
+        phone: b.phone,
+        student_names: b.student_names,
+        status: b.status,
+        is_existing: !!existingLocker,
+        current_status: existingLocker ? existingLocker.status : 'new',
+        current_students: existingStudents,
+        conflict_warning: conflictWarning
+      });
+    }
+
+    return {
+      success: true,
+      rows,
+      total: rows.length,
+      confirmedCount: rows.filter(r => r.status === 'confirmed').length,
+      pendingCount: rows.filter(r => r.status === 'pending').length,
+      uniqueLockers: lockerSet.size,
+      conflictCount: rows.filter(r => !!r.conflict_warning).length,
+      errors: []
+    };
+  },
+
+  // 21. اعتماد وتسكين البيانات بعد المعاينة أو من ملف
+  async commitParsedBookings(rows: any[], options?: { cleanBeforeSync?: boolean }): Promise<{
+    success: boolean;
+    importedCount: number;
+    updatedLockersCount: number;
+    message: string;
+  }> {
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return { success: false, importedCount: 0, updatedLockersCount: 0, message: 'لا توجد بيانات لاعتمادها' };
+    }
+
+    // دمج الصفوف المتكررة لنفس الدولاب لمنع مسح أي طالب مسجل بسطر منفصل
+    const mergedRows = mergeBookings(rows);
+    const db = readLocalDB();
+    const clean = options?.cleanBeforeSync === true;
+    let importedCount = 0;
+    let updatedLockersCount = 0;
+
+    if (clean) {
+      // إخلاء جميع الحجوزات السابقة غير الإدارية
+      db.bookings = [];
+      db.lockers.forEach(l => {
+        l.current_booking_id = null;
+        if (!l.is_admin_reserved) {
+          l.status = 'empty';
+        }
+      });
+    }
+
+    // تتبع الطلاب المسكنين لمنع تكرار أي طالب في أكثر من دولاب عبر الأوراق المختلفة
+    const seenStudentNames = new Set<string>();
+
+    for (let i = 0; i < mergedRows.length; i++) {
+      const r = mergedRows[i];
+      const norm = normalizeLockerCode(r.locker_code);
+      const code = norm ? norm.code : (r.locker_code || '').trim().toUpperCase();
+      if (!code) continue;
+
+      let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
+      if (!locker) {
+        const letter = norm ? norm.letter : code.charAt(0).toUpperCase();
+        const number = norm ? norm.number : (parseInt(code.slice(1), 10) || 1);
+        locker = {
+          id: `L_${code}`,
+          locker_code: code,
+          letter,
+          number,
+          capacity: (r.student_names && r.student_names.length > 2) ? 4 : 2,
+          is_enabled: true,
+          is_admin_reserved: false,
+          status: 'empty',
+          current_booking_id: null,
+          updated_at: new Date().toISOString()
+        };
+        db.lockers.push(locker);
+        updatedLockersCount++;
+      }
+
+      // فحص هل السطر مخصص للإدارة
+      const isReserved = (r.notes && (r.notes.includes('إدارة') || r.notes.includes('حجز إداري') || r.notes.includes('مخصص للإدارة'))) ||
+                         (r.student_names && r.student_names.some((n: string) => n.includes('إدارة') || n.includes('حجز إداري')));
+
+      if (isReserved) {
+        locker.is_admin_reserved = true;
+        locker.is_enabled = false;
+        locker.status = 'empty';
+        locker.notes = 'مخصص للإدارة (مستورد من الشيت)';
+        locker.current_booking_id = null;
+        locker.updated_at = new Date().toISOString();
+        continue;
+      }
+
+      // تنقية أسماء الطلاب واستبعاد المكررين مسبقاً
+      const rawNames = (r.student_names || []).map((n: any) => String(n || '').trim()).filter((n: string) => n.length > 1 && !n.includes('إدارة'));
+      const validNames: string[] = [];
+      const validCodes: string[] = [];
+
+      for (let sIdx = 0; sIdx < rawNames.length; sIdx++) {
+        const sName = rawNames[sIdx];
+        const sClean = cleanArabicText(sName);
+        if (seenStudentNames.has(sClean)) {
+          continue; // تخطي الطالب المكرر
+        }
+        seenStudentNames.add(sClean);
+        validNames.push(sName);
+        if (r.student_codes && r.student_codes[sIdx]) {
+          validCodes.push(r.student_codes[sIdx]);
+        }
+      }
+
+      // إذا لم يكن هناك أي أسماء للطلاب، لا ننشئ حجوزات وهمية فارغة
+      if (validNames.length === 0) {
+        if (clean) {
+          locker.status = 'empty';
+          locker.current_booking_id = null;
+        }
+        continue;
+      }
+
+      // في حالة عدم التنظيف المسبق، نتأكد من إخلاء الحجز السابق لهذا الدولاب
+      if (!clean && locker.current_booking_id) {
+        const prevB = db.bookings.find(b => b.id === locker!.current_booking_id);
+        if (prevB) {
+          prevB.status = 'rejected';
+          prevB.notes = 'تم استبداله باستيراد جديد';
+        }
+      }
+
+      const bookingStatus: 'confirmed' | 'pending' = r.status === 'pending' ? 'pending' : 'confirmed';
+      const bookingId = `B_IMP_${Date.now()}_${i}`;
+
+      const booking: LockerBooking = {
+        id: bookingId,
+        locker_code: code,
+        cohort: r.cohort || 'الفرقة الرابعة',
+        representative_phone: r.phone || '',
+        student_names: validNames.slice(0, 4),
+        student_codes: validCodes,
+        status: bookingStatus,
+        created_at: new Date().toISOString(),
+        confirmed_at: bookingStatus === 'confirmed' ? new Date().toISOString() : undefined,
+        confirmed_by: bookingStatus === 'confirmed' ? 'استيراد جوجل شيت' : undefined,
+        responsible: 'SHEET_SYNC',
+        notes: r.notes || 'مستورد عبر أداة مزامنة شيت جوجل'
+      };
+
+      locker.status = bookingStatus;
+      locker.current_booking_id = bookingId;
+      locker.is_admin_reserved = false;
+      locker.is_enabled = true;
+      if (validNames.length > 0 && validNames.length <= 2) {
+        locker.capacity = 2;
+      } else if (validNames.length > 2) {
+        locker.capacity = 4;
+      }
+      locker.updated_at = new Date().toISOString();
+
+      db.bookings.push(booking);
+      importedCount++;
+    }
+
+    // إعادة ترتيب الدواليب
+    db.lockers.sort((a, b) => {
+      if (a.letter !== b.letter) return a.letter.localeCompare(b.letter);
+      return a.number - b.number;
+    });
+
+    await persistDB(db);
+
+    // مطابقة الحجوزات مع قاعدة بيانات الطلاب تلقائياً لتسجيل الأكواد
+    await this.reconcileWithStudentsDB();
+
+    return {
+      success: importedCount > 0,
+      importedCount,
+      updatedLockersCount,
+      message: `تم تسكين واعتماد ${importedCount} حجزاً بنجاح في النظام وحفظها ومطابقتها سحابياً!`
+    };
+  },
+
+  // 21. ب. مطابقة الحجوزات مع قاعدة بيانات الطلاب وتعبئة الأكواد الرسمية تلقائياً
+  async reconcileWithStudentsDB(): Promise<{
+    success: boolean;
+    matched: number;
+    totalNames: number;
+    updatedBookings: number;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    try {
+      // 1. جلب كافة الطلاب النشطين فقط من جدول students (استثناء الخريجين والمؤرشفين is_active = false)
+      const { data: b1, error: err1 } = await supabaseAdmin
+        .from('students')
+        .select('student_code, full_name, academic_year, is_active')
+        .eq('is_active', true)
+        .range(0, 999);
+      
+      const { data: b2, error: err2 } = await supabaseAdmin
+        .from('students')
+        .select('student_code, full_name, academic_year, is_active')
+        .eq('is_active', true)
+        .range(1000, 2999);
+
+      if (err1 && !b1) {
+        console.error('[LockerStore] فشل جلب الطلاب للمطابقة:', err1);
+        return { success: false, matched: 0, totalNames: 0, updatedBookings: 0, message: 'فشل جلب سجلات الطلاب من قاعدة البيانات' };
+      }
+
+      const allStudents = [...(b1 || []), ...(b2 || [])].filter(s => s.is_active !== false);
+      console.log(`[LockerStore] بدء المطابقة مع ${allStudents.length} طالب نشط من قاعدة البيانات الحالية...`);
+
+      const codeMap = new Map();
+      const nameMap = new Map();
+
+      allStudents.forEach(s => {
+        if (s.student_code) {
+          codeMap.set(String(s.student_code).trim().replace(/^#/, '').replace(/^0+/, ''), s);
+        }
+        if (s.full_name) {
+          nameMap.set(s.full_name.trim(), s);
+        }
+      });
+
+      let matchedCount = 0;
+      let totalNames = 0;
+      let updatedBookings = 0;
+
+      for (const booking of db.bookings) {
+        let bookingChanged = false;
+        if (!booking.student_codes) {
+          booking.student_codes = [];
+        }
+
+        let detectedCohort = null;
+
+        for (let i = 0; i < (booking.student_names || []).length; i++) {
+          totalNames++;
+          const name = booking.student_names[i];
+          if (!name) continue;
+
+          // إذا كان الكود موجود وصحيح
+          if (booking.student_codes[i] && booking.student_codes[i].trim() !== '') {
+            matchedCount++;
+            const cleanC = String(booking.student_codes[i]).trim().replace(/^#/, '').replace(/^0+/, '');
+            const foundByCode = codeMap.get(cleanC);
+            if (foundByCode && foundByCode.academic_year && !detectedCohort) {
+              detectedCohort = foundByCode.academic_year;
+            }
+            continue;
+          }
+
+          // البحث عن الطالب في جدول الطلاب باستخدام خوارزمية المطابقة الذكية
+          let found = nameMap.get(name.trim());
+          if (!found) {
+            found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          }
+
+          if (found && found.student_code) {
+            booking.student_codes[i] = found.student_code;
+            matchedCount++;
+            bookingChanged = true;
+            if (found.academic_year && !detectedCohort) {
+              detectedCohort = found.academic_year;
+            }
+          } else {
+            if (!booking.student_codes[i]) {
+              booking.student_codes[i] = '';
+            }
+          }
+        }
+
+        // تحديث وتصحيح الفرقة الدراسية للحجز بناءً على قاعدة البيانات الحالية بعد ترحيل الدفع
+        if (detectedCohort) {
+          let normalized = detectedCohort.trim();
+          if (!normalized.startsWith('الفرقة')) {
+            normalized = `الفرقة ${normalized}`;
+          }
+          if (booking.cohort !== normalized) {
+            booking.cohort = normalized;
+            bookingChanged = true;
+          }
+        }
+
+        if (bookingChanged) {
+          updatedBookings++;
+        }
+      }
+
+      // مطابقة قائمة الانتظار إن وجدت
+      for (const wait of db.waitlist) {
+        if (!wait.student_codes) wait.student_codes = [];
+        for (let i = 0; i < (wait.student_names || []).length; i++) {
+          const name = wait.student_names[i];
+          if (!name) continue;
+          if (wait.student_codes[i] && wait.student_codes[i].trim() !== '') continue;
+          const found = allStudents.find(s => isArabicNameMatch(s.full_name, name));
+          if (found && found.student_code) {
+            wait.student_codes[i] = found.student_code;
+          }
+        }
+      }
+
+      // حفظ التغييرات سحابياً ومحلياً
+      await persistDB(db);
+
+      const percent = totalNames > 0 ? Math.round((matchedCount / totalNames) * 100) : 0;
+      const msg = `تمت مطابقة وربط ${matchedCount} من أصل ${totalNames} طالباً (${percent}%) بنجاح مع قاعدة البيانات، وتحديث ${updatedBookings} حجوزات!`;
+      console.log(`[LockerStore] ${msg}`);
+
+      return {
+        success: true,
+        matched: matchedCount,
+        totalNames,
+        updatedBookings,
+        message: msg
+      };
+    } catch (err: any) {
+      console.error('[LockerStore] خطأ استثنائي أثناء المطابقة:', err);
+      return { success: false, matched: 0, totalNames: 0, updatedBookings: 0, message: err.message || 'حدث خطأ أثناء المطابقة' };
+    }
+  },
+
+  // 22. محرك استكشاف وجلب كافة أوراق وبيانات ملف Google Sheets
+  async harvestGoogleSheet(params: {
+    sheetUrl: string;
+    mode?: 'full' | 'confirmed_only' | 'custom';
+    customTab?: string;
+  }): Promise<{
+    success: boolean;
+    sheetId: string;
+    discoveredTabs: string[];
+    scannedTabs: string[];
+    mergedBookings: any[];
+    detectedRanges: { [key: string]: number };
+    adminReservedCodes: string[];
+    capacityUpdates: { [code: string]: number };
+    authRequired?: boolean;
+    error?: string;
+  }> {
+    const { sheetUrl, mode = 'full', customTab } = params;
+    const sheetId = extractSpreadsheetId(sheetUrl);
+
+    if (!sheetId) {
+      return {
+        success: false,
+        sheetId: '',
+        discoveredTabs: [],
+        scannedTabs: [],
+        mergedBookings: [],
+        detectedRanges: {},
+        adminReservedCodes: [],
+        capacityUpdates: {},
+        error: 'رابط جوجل شيت غير صالح. يرجى لصق الرابط كاملاً من المتصفح أو إدخال معرف الشيت (ID).'
+      };
+    }
+
+    const urlGid = extractGid(sheetUrl);
+
+    // دالة مساعدة لجلب محتوى أي ورقة باسمها عبر GViz
+    const fetchGVizCSV = async (tabName: string): Promise<string | null> => {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+        const res = await fetch(url, { redirect: 'follow' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
+          throw new Error('AUTH_REQUIRED');
+        }
+        return text;
+      } catch (e: any) {
+        if (e.message === 'AUTH_REQUIRED') throw e;
+        return null;
+      }
+    };
+
+    // دالة مساعدة لجلب محتوى الورقة عبر gid مباشرة
+    const fetchGidCSV = async (gid: string): Promise<string | null> => {
+      try {
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${encodeURIComponent(gid)}`;
+        const res = await fetch(url, { redirect: 'follow' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
+          throw new Error('AUTH_REQUIRED');
+        }
+        return text;
+      } catch (e: any) {
+        if (e.message === 'AUTH_REQUIRED') throw e;
+        return null;
+      }
+    };
+
+    // دالة مساعدة لتنزيل الكشف الافتراضي العام
+    const fetchExportCSV = async (): Promise<string | null> => {
+      try {
+        const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+        const res = await fetch(exportUrl, { redirect: 'follow' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        if (text.includes('accounts.google.com') || (text.includes('<html') && text.includes('Sign in'))) {
+          throw new Error('AUTH_REQUIRED');
+        }
+        return text;
+      } catch (e: any) {
+        if (e.message === 'AUTH_REQUIRED') throw e;
+        return null;
+      }
+    };
+
+    try {
+      // 1. استكشاف كافة التبويبات الحقيقية الموجودة في المستند تلقائياً
+      const discoveredTabs = await discoverAllSheetTabs(sheetId);
+
+      // التبويبات الشائعة المرشحة
+      const standardCandidates = [
+        'A', 'B', 'C', 'D',
+        'أ', 'ب', 'ج', 'د',
+        'التسجيلات_المؤكدة', 'التسجيلات المؤكدة',
+        'التسجيلات_المؤقتة', 'التسجيلات المؤقتة',
+        'المؤكدة', 'المؤقتة', 'الحجوزات', 'الحجوزات المؤكدة', 'كشف الدواليب', 'الدواليب',
+        'الفرقة الرابعة', 'الفرقة الثالثة', 'الفرقة الثانية', 'الفرقة الأولى',
+        'فرقة رابعة', 'فرقة ثالثة', 'فرقة ثانية', 'فرقة أولى',
+        'بيانات الطلاب', 'تسكين الدواليب', 'تسكين',
+        'Sheet1', 'Sheet2', 'Sheet3', 'Sheet4', 'ورقة1', 'ورقة2', 'ورقة3', 'ورقة4'
+      ];
+
+      let tabsToScan: string[] = [];
+      if (mode === 'custom' && customTab) {
+        tabsToScan = [customTab.trim()];
+      } else if (mode === 'confirmed_only') {
+        const confirmedDiscovered = discoveredTabs.filter(t => t.includes('مؤكد') || t.includes('تأكيد'));
+        if (confirmedDiscovered.length > 0) {
+          tabsToScan = confirmedDiscovered;
+        } else {
+          tabsToScan = ['التسجيلات المؤكدة', 'التسجيلات_المؤكدة', 'المؤكدة', 'الحجوزات المؤكدة'];
+        }
+      } else {
+        // نمط المسح الشامل الكامل
+        if (discoveredTabs.length > 0) {
+          // نبدأ بالتبويبات المكتشفة فعلياً من هيكل المستند
+          tabsToScan = [...discoveredTabs];
+          // نضيف التبويبات القياسية التي لم تكتشف بعد
+          for (const cand of standardCandidates) {
+            if (!tabsToScan.includes(cand)) tabsToScan.push(cand);
+          }
+        } else {
+          tabsToScan = standardCandidates;
+        }
+      }
+
+      const scannedTabs: string[] = [];
+      const rawBookings: any[] = [];
+      const detectedRanges: { [key: string]: number } = {};
+      const adminReservedCodes: string[] = [];
+      const capacityUpdates: { [code: string]: number } = {};
+      const seenContentSignatures = new Set<string>();
+
+      // 2. إذا وجد معرف ورقة محدد في الرابط (?gid=...) نفحصه أولاً
+      if (urlGid) {
+        const gidCSV = await fetchGidCSV(urlGid);
+        if (gidCSV && gidCSV.trim().length > 10) {
+          const sig = `${gidCSV.length}_${gidCSV.slice(0, 80)}`;
+          seenContentSignatures.add(sig);
+          scannedTabs.push(`الورقة المحددة في الرابط (gid: ${urlGid})`);
+
+          const parsedGid = parseRawDataToBookings(gidCSV, 'confirmed');
+          rawBookings.push(...parsedGid);
+
+          // فحص الملاحظات والنطاقات في ورقة الـ gid
+          const table = parseCSV(gidCSV);
+          for (const row of table) {
+            const rowText = row.join(' ');
+            const codeNorm = normalizeLockerCode(row[0]);
+            if (codeNorm) {
+              if (codeNorm.number > (detectedRanges[codeNorm.letter] || 0)) {
+                detectedRanges[codeNorm.letter] = codeNorm.number;
+              }
+              if (rowText.includes('إدارة') || rowText.includes('مخصص للإدارة') || rowText.includes('حجز إداري')) {
+                if (!adminReservedCodes.includes(codeNorm.code)) adminReservedCodes.push(codeNorm.code);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. مسح التبويبات المحددة واحداً تلو الآخر
+      for (const tabName of tabsToScan) {
+        const csvText = await fetchGVizCSV(tabName);
+        if (!csvText || csvText.trim().length < 5) continue;
+
+        // التحقق من أن المحتوى حقيقي وليس تكراراً للورقة الافتراضية
+        const sig = `${csvText.length}_${csvText.slice(0, 80)}`;
+        if (seenContentSignatures.has(sig) && !discoveredTabs.includes(tabName)) {
+          // هذا التبويب غير حقيقي وأرجع جوجل الورقة الافتراضية كبديل
+          continue;
+        }
+        seenContentSignatures.add(sig);
+        scannedTabs.push(tabName);
+
+        // تحديد تلميح السكشن (A, B, C, D)
+        const tabNorm = normalizeLockerCode(`${tabName}1`);
+        const letterHint = tabNorm ? tabNorm.letter : (['A', 'B', 'C', 'D'].includes(tabName.toUpperCase()) ? tabName.toUpperCase() : undefined);
+
+        // تحديد الحالة الافتراضية للورقة
+        const defaultStatus: 'confirmed' | 'pending' = (tabName.includes('مؤقت') || tabName.includes('معلق') || tabName.includes('تسجيلات_مؤقتة')) ? 'pending' : 'confirmed';
+
+        // استخراج أعداد المخزون والتخصيص الإداري والسعة
+        const table = parseCSV(csvText);
+        for (const row of table) {
+          const rowText = row.join(' ');
+          let codeNorm = normalizeLockerCode(row[0]);
+          if (!codeNorm && letterHint && /^\d+$/.test(row[0]?.trim() || '')) {
+            codeNorm = normalizeLockerCode(`${letterHint}${row[0].trim()}`);
+          }
+
+          if (codeNorm) {
+            if (codeNorm.number > (detectedRanges[codeNorm.letter] || 0)) {
+              detectedRanges[codeNorm.letter] = codeNorm.number;
+            }
+            if (rowText.includes('إدارة') || rowText.includes('مخصص للإدارة') || rowText.includes('حجز إداري')) {
+              if (!adminReservedCodes.includes(codeNorm.code)) {
+                adminReservedCodes.push(codeNorm.code);
+              }
+            }
+            if (rowText.includes('شخصين') || rowText.includes('سعة 2') || rowText.includes('2 طالب') || rowText.includes('طالبين')) {
+              capacityUpdates[codeNorm.code] = 2;
+            } else if (rowText.includes('أربعة') || rowText.includes('سعة 4') || rowText.includes('4 طلاب')) {
+              capacityUpdates[codeNorm.code] = 4;
+            }
+          }
+        }
+
+        // استخراج حجوزات الطلاب من هذه الورقة
+        const bookingsFromTab = parseRawDataToBookings(csvText, defaultStatus, letterHint);
+        rawBookings.push(...bookingsFromTab);
+      }
+
+      // 4. إذا لم يتم استخراج أي حجوزات من التبويبات الفردية، نحاول التنزيل العام الافتراضي
+      if (rawBookings.length === 0) {
+        const exportText = await fetchExportCSV();
+        if (exportText && exportText.trim().length > 10) {
+          scannedTabs.push('الكشف الافتراضي العام (Default Export)');
+          const exportBookings = parseRawDataToBookings(exportText, 'confirmed');
+          rawBookings.push(...exportBookings);
+        }
+      }
+
+      // 5. دمج كافة الحجوزات المستخرجة عبر جميع الأوراق لدمج الطلاب المسكنين في نفس الدواليب
+      const mergedBookings = mergeBookings(rawBookings);
+
+      return {
+        success: true,
+        sheetId,
+        discoveredTabs,
+        scannedTabs,
+        mergedBookings,
+        detectedRanges,
+        adminReservedCodes,
+        capacityUpdates
+      };
+    } catch (err: any) {
+      if (err.message === 'AUTH_REQUIRED') {
+        return {
+          success: false,
+          sheetId,
+          discoveredTabs: [],
+          scannedTabs: [],
+          mergedBookings: [],
+          detectedRanges: {},
+          adminReservedCodes: [],
+          capacityUpdates: {},
+          authRequired: true,
+          error: 'الشيت يتطلب تسجيل دخول Google أو غير متاح للعامة. يرجى ضبط مشاركة الشيت على "أي شخص لديه الرابط يمكنه العرض" (Anyone with the link can view)، أو تنزيل الشيت كملف CSV ورفعه في تبويب "رفع ملف CSV".'
+        };
+      }
+      return {
+        success: false,
+        sheetId,
+        discoveredTabs: [],
+        scannedTabs: [],
+        mergedBookings: [],
+        detectedRanges: {},
+        adminReservedCodes: [],
+        capacityUpdates: {},
+        error: 'خطأ أثناء الاتصال بجوجل شيت: ' + (err.message || 'خطأ غير معروف')
+      };
+    }
+  },
+
+  // 23. معاينة تفاعلية لكامل بيانات رابط شيت جوجل قبل التسكين الفعلي
+  async previewGoogleSheetUrl(params: {
+    sheetUrl: string;
+    mode?: 'full' | 'confirmed_only' | 'custom';
+    customTab?: string;
+  }): Promise<PreviewDataResult> {
+    const harvest = await this.harvestGoogleSheet(params);
+
+    if (!harvest.success) {
+      return {
+        success: false,
+        rows: [],
+        total: 0,
+        confirmedCount: 0,
+        pendingCount: 0,
+        uniqueLockers: 0,
+        conflictCount: 0,
+        discoveredTabs: harvest.discoveredTabs,
+        scannedTabs: harvest.scannedTabs,
+        errors: [harvest.error || 'تعذر استخراج بيانات الشيت']
+      };
+    }
+
+    const db = readLocalDB();
+    const rows: ParsedPreviewRow[] = [];
+    const lockerSet = new Set<string>();
+
+    for (let i = 0; i < harvest.mergedBookings.length; i++) {
+      const b = harvest.mergedBookings[i];
+      lockerSet.add(b.locker_code);
+      const existingLocker = db.lockers.find(l => l.locker_code.toUpperCase() === b.locker_code.toUpperCase());
+
+      let conflictWarning: string | undefined = undefined;
+      let existingStudents: string[] | undefined = undefined;
+
+      if (existingLocker) {
+        if (existingLocker.is_admin_reserved || harvest.adminReservedCodes.includes(b.locker_code)) {
+          conflictWarning = 'الدولاب مخصص للإدارة حالياً';
+        } else if (existingLocker.status === 'confirmed' && existingLocker.current_booking_id) {
+          const exBk = db.bookings.find(bk => bk.id === existingLocker.current_booking_id);
+          if (exBk && exBk.student_names && exBk.student_names.length > 0) {
+            existingStudents = exBk.student_names;
+            const hasOverlap = b.student_names.some((n: string) => exBk.student_names.includes(n));
+            if (!hasOverlap) {
+              conflictWarning = `مسكن بالفعل لـ: ${exBk.student_names.slice(0, 2).join('، ')}`;
+            }
+          }
+        }
+      }
+
+      rows.push({
+        id: `prev_url_${Date.now()}_${i}`,
+        locker_code: b.locker_code,
+        letter: b.letter,
+        number: b.number,
+        cohort: b.cohort,
+        phone: b.phone,
+        student_names: b.student_names,
+        status: b.status,
+        is_existing: !!existingLocker,
+        current_status: existingLocker ? existingLocker.status : 'new',
+        current_students: existingStudents,
+        conflict_warning: conflictWarning
+      });
+    }
+
+    return {
+      success: true,
+      rows,
+      total: rows.length,
+      confirmedCount: rows.filter(r => r.status === 'confirmed').length,
+      pendingCount: rows.filter(r => r.status === 'pending').length,
+      uniqueLockers: lockerSet.size,
+      conflictCount: rows.filter(r => !!r.conflict_warning).length,
+      discoveredTabs: harvest.discoveredTabs,
+      scannedTabs: harvest.scannedTabs,
+      errors: rows.length === 0 ? ['تم مسح الأوراق بنجاح لكن لم يتم العثور على أسطر تسكين صالحة'] : []
+    };
+  },
+
+  // 24. المزامنة المباشرة الشاملة والذكية مع رابط Google Sheets
+  async syncFromGoogleSheetUrl(params: {
+    sheetUrl: string;
+    mode?: 'full' | 'confirmed_only' | 'custom';
+    customTab?: string;
+    cleanBeforeSync?: boolean;
+  }): Promise<SheetSyncResult> {
+    const { sheetUrl, cleanBeforeSync } = params;
+    const harvest = await this.harvestGoogleSheet(params);
+
+    if (!harvest.success) {
+      return {
+        success: false,
+        importedConfirmed: 0,
+        importedPending: 0,
+        adminReservedCount: 0,
+        totalLockers: 0,
+        discoveredTabs: harvest.discoveredTabs,
+        scannedTabs: harvest.scannedTabs,
+        message: harvest.error || 'فشلت المزامنة مع خوادم جوجل'
+      };
+    }
+
+    const db = readLocalDB();
+
+    // 1. تحديث أعداد المخزون من النطاقات المكتشفة في الأوراق
+    for (const [letter, maxNum] of Object.entries(harvest.detectedRanges)) {
+      if (maxNum > 0) {
+        for (let i = 1; i <= maxNum; i++) {
+          const code = `${letter.toUpperCase()}${i}`;
+          let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code);
+          if (!locker) {
+            locker = {
+              id: `L_${code}`,
+              locker_code: code,
+              letter: letter.toUpperCase(),
+              number: i,
+              capacity: 4,
+              is_enabled: true,
+              is_admin_reserved: false,
+              status: 'empty',
+              current_booking_id: null,
+              updated_at: new Date().toISOString()
+            };
+            db.lockers.push(locker);
+          }
+        }
+      }
+    }
+
+    // 2. تطبيق التخصيص الإداري المكتشف
+    let adminReservedCount = 0;
+    for (const code of harvest.adminReservedCodes) {
+      let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code.toUpperCase());
+      if (locker) {
+        locker.is_admin_reserved = true;
+        locker.is_enabled = false;
+        locker.notes = 'مخصص للإدارة (مستورد من شيت جوجل)';
+        adminReservedCount++;
+      }
+    }
+
+    // 3. تطبيق تحديثات السعة المكتشفة (شخصين أو 4)
+    for (const [code, cap] of Object.entries(harvest.capacityUpdates)) {
+      let locker = db.lockers.find(l => l.locker_code.toUpperCase() === code.toUpperCase());
+      if (locker) {
+        locker.capacity = cap;
+      }
+    }
+
+    writeLocalDB(db);
+
+    // 4. اعتماد وتسكين كافة الحجوزات المدمجة وحفظها سحابياً
+    const commitRes = await this.commitParsedBookings(harvest.mergedBookings, { cleanBeforeSync });
+
+    // 5. حفظ رابط الشيت في الإعدادات سحابياً
+    const currentDb = readLocalDB();
+    currentDb.settings.google_sheet_url = sheetUrl;
+    await persistDB(currentDb);
+
+    const confirmedCount = harvest.mergedBookings.filter(b => b.status === 'confirmed').length;
+    const pendingCount = harvest.mergedBookings.filter(b => b.status === 'pending').length;
+
+    const scannedSummary = harvest.scannedTabs.length > 0
+      ? `تم مسح ${harvest.scannedTabs.length} أوراق عمل: [${harvest.scannedTabs.join(', ')}].`
+      : '';
+
+    return {
+      success: true,
+      importedConfirmed: confirmedCount,
+      importedPending: pendingCount,
+      adminReservedCount,
+      totalLockers: currentDb.lockers.length,
+      ranges: harvest.detectedRanges,
+      scannedTabs: harvest.scannedTabs,
+      discoveredTabs: harvest.discoveredTabs,
+      message: `تمت المزامنة الشاملة بنجاح وحفظها سحابياً! ${scannedSummary} تم استيراد وتسكين ${harvest.mergedBookings.length} حجوزات (${confirmedCount} مؤكد، ${pendingCount} معلق) وتأكيد ${adminReservedCount} دواليب مخصصة للإدارة.`
+    };
+  },
+
+  // 23. استيراد فوري سريع (للتوافق مع الواجهات السابقة)
+  async importBookings(rawData: string): Promise<{ success: boolean; importedCount: number; updatedLockersCount: number; errors: string[] }> {
+    if (!rawData || !rawData.trim()) {
+      return { success: false, importedCount: 0, updatedLockersCount: 0, errors: ['لا توجد بيانات صالحة للاستيراد'] };
+    }
+    const parsed = parseRawDataToBookings(rawData);
+    if (parsed.length === 0) {
+      return { success: false, importedCount: 0, updatedLockersCount: 0, errors: ['تعذر استخراج بيانات الدواليب والطلاب'] };
+    }
+    const res = await this.commitParsedBookings(parsed, { cleanBeforeSync: false });
+    return {
+      success: res.success,
+      importedCount: res.importedCount,
+      updatedLockersCount: res.updatedLockersCount,
+      errors: []
+    };
+  },
+
+  // 21. إحصائيات عامة محدثة بدقة
+  getStats() {
+    const db = readLocalDB();
+    const total = db.lockers.length;
+    const confirmed = db.lockers.filter(l => l.status === 'confirmed').length;
+    const pending = db.lockers.filter(l => l.status === 'pending').length;
+    const adminReserved = db.lockers.filter(l => l.is_admin_reserved || (!l.is_enabled && !l.current_booking_id && (l.notes || '').includes('إدارة'))).length;
+    const empty = db.lockers.filter(l => l.status === 'empty' && l.is_enabled && !l.is_admin_reserved).length;
+    const disabled = db.lockers.filter(l => !l.is_enabled && !l.is_admin_reserved && !(l.notes || '').includes('إدارة')).length;
+    const waitlistCount = db.waitlist.filter(w => w.status === 'waiting').length;
+
+    return {
+      total,
+      confirmed,
+      pending,
+      adminReserved,
+      empty,
+      disabled,
+      waitlistCount,
+      occupancyRate: total > 0 ? Math.round(((confirmed + pending) / total) * 100) : 0
+    };
+  },
+
+  // 24. كشف الطلاب المكررين عبر كافة الحجوزات النشطة
+  getDuplicateStudents(): {
+    totalDuplicates: number;
+    duplicates: Array<{
+      key: string;
+      studentName: string;
+      studentCode: string;
+      occurrences: Array<{
+        lockerCode: string;
+        bookingId: string;
+        cohort: string;
+        status: string;
+      }>;
+    }>;
+  } {
+    const db = readLocalDB();
+    const studentMap = new Map<string, Array<{
+      name: string;
+      code: string;
+      lockerCode: string;
+      bookingId: string;
+      cohort: string;
+      status: string;
+    }>>();
+
+    const activeBookings = db.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+
+    for (const b of activeBookings) {
+      for (let i = 0; i < (b.student_names || []).length; i++) {
+        const name = (b.student_names[i] || '').trim();
+        const code = (b.student_codes && b.student_codes[i] ? String(b.student_codes[i]).trim() : '');
+        if (!name && !code) continue;
+
+        // مفتاح تمييز الطالب
+        const key = code ? `code:${code.replace(/^#/, '').replace(/^0+/, '')}` : `name:${cleanArabicText(name)}`;
+        if (!studentMap.has(key)) {
+          studentMap.set(key, []);
+        }
+        studentMap.get(key)!.push({
+          name,
+          code,
+          lockerCode: b.locker_code,
+          bookingId: b.id,
+          cohort: b.cohort,
+          status: b.status
+        });
+      }
+    }
+
+    const duplicates: any[] = [];
+    for (const [key, list] of studentMap.entries()) {
+      if (list.length > 1) {
+        duplicates.push({
+          key,
+          studentName: list[0].name,
+          studentCode: list.find(x => x.code)?.code || '',
+          occurrences: list.map(x => ({
+            lockerCode: x.lockerCode,
+            bookingId: x.bookingId,
+            cohort: x.cohort,
+            status: x.status
+          }))
+        });
+      }
+    }
+
+    return {
+      totalDuplicates: duplicates.length,
+      duplicates
+    };
+  },
+
+  // 25. تصفية وحذف التكرارات تلقائياً (إبقاء أول حجز معتمد وإزالة التكرار من الدواليب الأخرى)
+  async resolveDuplicateStudents(): Promise<{
+    success: boolean;
+    resolvedCount: number;
+    cleanedLockersCount: number;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    const dupInfo = this.getDuplicateStudents();
+    if (dupInfo.totalDuplicates === 0) {
+      return { success: true, resolvedCount: 0, cleanedLockersCount: 0, message: 'لا توجد أي تكرارات، جميع الدواليب مفلترة بنجاح ✅' };
+    }
+
+    let resolvedCount = 0;
+    const cleanedLockers = new Set<string>();
+
+    for (const dup of dupInfo.duplicates) {
+      // إبقاء أول ظهور (خاصة المؤكد أولاً) وإزالة الطالب من باقي الظهورات
+      const sortedOccurrences = [...dup.occurrences].sort((a, b) => {
+        if (a.status === 'confirmed' && b.status !== 'confirmed') return -1;
+        if (b.status === 'confirmed' && a.status !== 'confirmed') return 1;
+        return a.bookingId.localeCompare(b.bookingId);
+      });
+
+      const secondaryOccurrences = sortedOccurrences.slice(1);
+
+      for (const sec of secondaryOccurrences) {
+        const targetBooking = db.bookings.find(b => b.id === sec.bookingId);
+        if (!targetBooking) continue;
+
+        // إزالة الطالب من الحجز الثانوي
+        const removeIdx = targetBooking.student_names.findIndex(n => 
+          isArabicNameMatch(n, dup.studentName) || 
+          (dup.studentCode && targetBooking.student_codes && targetBooking.student_codes[targetBooking.student_names.indexOf(n)]?.replace(/^0+/, '') === dup.studentCode.replace(/^0+/, ''))
+        );
+
+        if (removeIdx !== -1) {
+          targetBooking.student_names.splice(removeIdx, 1);
+          if (targetBooking.student_codes && targetBooking.student_codes.length > removeIdx) {
+            targetBooking.student_codes.splice(removeIdx, 1);
+          }
+
+          cleanedLockers.add(sec.lockerCode);
+          resolvedCount++;
+
+          // إذا أصبح الحجز فارغاً بدون طلاب، يتم إلغاؤه وإخلاء الدولاب
+          if (targetBooking.student_names.length === 0) {
+            targetBooking.status = 'rejected';
+            targetBooking.notes = 'تم إخلاء الحجز لإزالة تكرار الطالب';
+            const locker = db.lockers.find(l => l.locker_code.toUpperCase() === sec.lockerCode.toUpperCase());
+            if (locker && locker.current_booking_id === targetBooking.id) {
+              locker.status = 'empty';
+              locker.current_booking_id = null;
+              locker.updated_at = new Date().toISOString();
+            }
+          }
+        }
+      }
+    }
+
+    await persistDB(db);
+
+    return {
+      success: true,
+      resolvedCount,
+      cleanedLockersCount: cleanedLockers.size,
+      message: `تمت تصفية ${resolvedCount} حالة تكرار وتحديث ${cleanedLockers.size} دواليب وحفظ التعديلات سحابياً بنجاح! 🧹`
+    };
+  },
+
+  // 25. حساب وتلخيص تخصيص كوتا الدواليب للفرق الدراسية
+  getCohortAllocations(): {
+    allocations: CohortAllocationInfo[];
+    totalQuotas: number;
+    totalReservedExclusive: number;
+    availableGeneralEmpty: number;
+    totalEmpty: number;
+  } {
+    const db = readLocalDB();
+    const quotas = db.settings?.cohort_quotas || {};
+
+    // عدد الدواليب الشاغرة الكلية في الكلية
+    const totalEmpty = db.lockers.filter(l => l.status === 'empty' && l.is_enabled && !l.is_admin_reserved).length;
+
+    // حساب عدد الحجوزات النشطة (confirmed + pending) لكل فرقة دراسية
+    const activeBookings = db.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+    const bookedCountByCohortKey: { [key: string]: number } = { '1': 0, '2': 0, '3': 0, '4': 0 };
+
+    for (const b of activeBookings) {
+      const k = normalizeCohortName(b.cohort);
+      if (bookedCountByCohortKey[k] !== undefined) {
+        bookedCountByCohortKey[k]++;
+      } else {
+        bookedCountByCohortKey[k] = (bookedCountByCohortKey[k] || 0) + 1;
+      }
+    }
+
+    let totalQuotas = 0;
+    let totalReservedExclusive = 0;
+
+    const allocations: CohortAllocationInfo[] = STANDARD_COHORTS.map(sc => {
+      const rawQuota = quotas[sc.key] !== undefined ? quotas[sc.key] : quotas[sc.name];
+      const quota = Math.max(0, parseInt(String(rawQuota || 0), 10));
+      const booked = bookedCountByCohortKey[sc.key] || 0;
+      const remaining = quota > 0 ? Math.max(0, quota - booked) : 0;
+      const isFull = quota > 0 && booked >= quota;
+
+      if (quota > 0) {
+        totalQuotas += quota;
+        totalReservedExclusive += remaining;
+      }
+
+      return {
+        cohortKey: sc.key,
+        cohortName: sc.name,
+        quota,
+        bookedLockers: booked,
+        remainingQuota: remaining,
+        isQuotaFull: isFull
+      };
+    });
+
+    // الدواليب الشاغرة المتاحة للفرق العامة (غير المحجوزة كحصص حصرية متبقية لفرق أخرى)
+    const availableGeneralEmpty = Math.max(0, totalEmpty - totalReservedExclusive);
+
+    return {
+      allocations,
+      totalQuotas,
+      totalReservedExclusive,
+      availableGeneralEmpty,
+      totalEmpty
+    };
+  },
+
+  // 26. تحديث وحفظ تخصيص كوتا الفرق
+  async updateCohortQuotas(newQuotas: { [cohortKey: string]: number }): Promise<{
+    success: boolean;
+    allocations: any;
+    message: string;
+  }> {
+    const db = readLocalDB();
+    if (!db.settings) {
+      db.settings = {
+        google_sheet_url: '',
+        supervisor_name: 'م/ إسلام عبداللطيف',
+        default_capacity: 4,
+        auto_waitlist: true
+      };
+    }
+
+    const cleanQuotas: { [key: string]: number } = {};
+    for (const [k, v] of Object.entries(newQuotas || {})) {
+      const normKey = normalizeCohortName(k) || k;
+      cleanQuotas[normKey] = Math.max(0, parseInt(String(v || 0), 10));
+    }
+
+    db.settings.cohort_quotas = cleanQuotas;
+    await persistDB(db);
+
+    return {
+      success: true,
+      allocations: this.getCohortAllocations(),
+      message: 'تم حفظ وتحديث تخصيص كوتا الدواليب للفرق بنجاح سحابياً ومحلياً 💾'
+    };
+  }
+};

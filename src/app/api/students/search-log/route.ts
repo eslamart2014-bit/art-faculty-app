@@ -1,7 +1,7 @@
-import { supabaseAdmin } from '@/lib/supabase';
-import { localStore } from '@/lib/localFallbackStore';
-import { noStoreJson } from '@/lib/serverAuth';
-import { getClientIp, isRateLimited } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { noStoreJson } from '@/lib/auth/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 

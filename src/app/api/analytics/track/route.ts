@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/core/supabase';
 
 function clean(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;

@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
-import MaintenanceGuard from "@/components/MaintenanceGuard";
-import BackButtonHandler from "@/components/BackButtonHandler";
-import OfflineSyncManager from "@/components/OfflineSyncManager";
-import SWRProvider from "@/components/SWRProvider";
-import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
-import GlobalHaptics from "@/components/GlobalHaptics";
-import PwaInstallPrompt from "@/components/PwaInstallPrompt";
+import MaintenanceGuard from "@/components/layout/MaintenanceGuard";
+import BackButtonHandler from "@/components/layout/BackButtonHandler";
+import OfflineSyncManager from "@/components/pwa/OfflineSyncManager";
+import SWRProvider from "@/components/pwa/SWRProvider";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import GlobalHaptics from "@/components/layout/GlobalHaptics";
+import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 
 const cairo = Cairo({ subsets: ["arabic", "latin"], preload: false });
 

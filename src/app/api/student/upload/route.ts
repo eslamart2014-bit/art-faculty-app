@@ -1,9 +1,9 @@
-import { supabaseAdmin } from '@/lib/supabase';
-import { checkAndNotifyPlagiarism } from '@/lib/plagiarismNotifier';
-import { getStudentCodeVariants } from '@/lib/codeHelper';
-import { isStudentEnrolledInCourse } from '@/lib/courseEnrollment';
-import { getStudentSession, noStoreJson } from '@/lib/serverAuth';
-import { verifyTelegramInitData } from '@/lib/telegramAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { checkAndNotifyPlagiarism } from '@/lib/students/plagiarismNotifier';
+import { getStudentCodeVariants } from '@/lib/students/codeHelper';
+import { isStudentEnrolledInCourse } from '@/lib/courses/courseEnrollment';
+import { getStudentSession, noStoreJson } from '@/lib/auth/serverAuth';
+import { verifyTelegramInitData } from '@/lib/telegram/telegramAuth';
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 

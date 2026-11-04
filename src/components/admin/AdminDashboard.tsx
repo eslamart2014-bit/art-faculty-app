@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/core/supabase";
 import Papa from "papaparse";
-import { generatePrintableHtml } from "@/lib/pdfHelper";
-import { downloadPdf } from "@/lib/downloadPdf";
-import { normalizeAcademicYear } from "@/lib/codeHelper";
+import { generatePrintableHtml } from "@/lib/courses/pdfHelper";
+import { downloadPdf } from "@/lib/courses/downloadPdf";
+import { normalizeAcademicYear } from "@/lib/students/codeHelper";
 
 interface AdminDashboardProps {
   activeModal: "users" | "roster" | null;

@@ -5,7 +5,7 @@ import {
   getStaffContext,
   noStoreJson,
   setStaffSession,
-} from '@/lib/serverAuth';
+} from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

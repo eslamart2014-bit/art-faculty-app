@@ -28,7 +28,7 @@ import {
   Target,
   PieChart
 } from "lucide-react";
-import { printLockerReceipt } from "@/lib/lockerReceipt";
+import { printLockerReceipt } from "@/lib/lockers/lockerReceipt";
 
 export default function LockerAdminTab() {
   const [activeSubTab, setActiveSubTab] = useState<"grid" | "pending" | "allocation" | "search" | "tools">("grid");

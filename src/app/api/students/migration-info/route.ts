@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode } from '@/lib/codeHelper';
-import { noStoreJson, getStudentSession, getStaffContext } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode } from '@/lib/students/codeHelper';
+import { noStoreJson, getStudentSession, getStaffContext } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

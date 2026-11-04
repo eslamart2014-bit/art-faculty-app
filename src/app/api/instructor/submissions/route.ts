@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { localStore } from '@/lib/localFallbackStore';
-import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, getAcademicYearVariants } from '@/lib/codeHelper';
-import { requireStaff } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { sanitizeScannedString, getStudentCodeVariants, buildStudentCodeFilter, getAcademicYearVariants } from '@/lib/students/codeHelper';
+import { requireStaff } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

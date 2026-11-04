@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { normalizeAcademicDegree } from '@/lib/academicHelper';
+import { normalizeAcademicDegree } from '@/lib/courses/academicHelper';
 
 export async function POST(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';

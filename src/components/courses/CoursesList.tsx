@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/core/supabase";
 import { Camera, MoreVertical, Download, CheckCircle2, Zap } from "lucide-react";
-import { forceDownloadFacultyOfflinePack } from "@/lib/preloadFacultyData";
+import { forceDownloadFacultyOfflinePack } from "@/lib/admin/preloadFacultyData";
 
 interface CoursesListProps {
   user: any;
@@ -102,7 +102,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         lastAutoSync = now;
         try {
           // 1. Process any pending queue actions (attendance/evaluations recorded while offline)
-          const { processQueue } = await import("@/lib/syncEngine");
+          const { processQueue } = await import("@/lib/admin/syncEngine");
           await processQueue();
 
           // 2. Quietly update local pack in background

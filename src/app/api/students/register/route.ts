@@ -1,9 +1,9 @@
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, generatePinCode, getStudentCodeVariants } from '@/lib/codeHelper';
-import { uploadImageToStorage } from '@/lib/telegramStorage';
-import { localStore } from '@/lib/localFallbackStore';
-import { noStoreJson } from '@/lib/serverAuth';
-import { getClientIp, isRateLimited } from '@/lib/rateLimit';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, generatePinCode, getStudentCodeVariants } from '@/lib/students/codeHelper';
+import { uploadImageToStorage } from '@/lib/telegram/telegramStorage';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { noStoreJson } from '@/lib/auth/serverAuth';
+import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 

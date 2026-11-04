@@ -18,7 +18,7 @@ import {
   ArrowRight,
   ShieldCheck
 } from "lucide-react";
-import { printLockerReceipt, downloadLockerReceiptPdf } from "@/lib/lockerReceipt";
+import { printLockerReceipt, downloadLockerReceiptPdf } from "@/lib/lockers/lockerReceipt";
 
 interface StudentLockerTabProps {
   student: {
@@ -190,6 +190,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
         phone: booking.representative_phone,
         studentNames: booking.student_names,
         studentCodes: booking.student_codes,
+        studentCode: student.student_code,
         supervisorName: 'م/ إسلام عبداللطيف'
       }, (status) => setPdfStatusMsg(status));
     } catch (e) {

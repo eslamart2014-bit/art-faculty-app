@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { getFirebaseMessaging, sendPushToStudents, broadcastPushToAll } from '@/lib/push';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { getFirebaseMessaging, sendPushToStudents, broadcastPushToAll } from '@/lib/telegram/push';
 
 export const dynamic = 'force-dynamic';
 

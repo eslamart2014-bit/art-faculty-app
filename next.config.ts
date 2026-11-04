@@ -1,11 +1,13 @@
 import type { NextConfig } from 'next';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const nextConfig: NextConfig = {
   // Brotli/gzip compression for all responses – reduces ~70% size on slow mobile
   compress: true,
 
   async headers() {
-    return [
+    const rules = [
       {
         source: '/(.*)',
         headers: [
@@ -17,13 +19,6 @@ const nextConfig: NextConfig = {
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
-      // Next.js static assets are content-hashed – safe to cache for 1 year
-      {
-        source: '/_next/static/(.*)',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
       // Service worker must always revalidate
       {
         source: '/sw.js',
@@ -32,6 +27,27 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+
+    if (!isDev) {
+      // Only set 1-year immutable cache in production builds
+      rules.push({
+        source: '/_next/static/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      });
+    } else {
+      // In development on localhost, purge any previously cached immutable chunks
+      rules.push({
+        source: '/admin-preview',
+        headers: [
+          { key: 'Clear-Site-Data', value: '"cache"' },
+          { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+        ],
+      });
+    }
+
+    return rules;
   },
 };
 

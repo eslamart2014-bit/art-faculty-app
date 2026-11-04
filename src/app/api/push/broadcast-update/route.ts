@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'crypto';
-import { broadcastPushToAll } from '@/lib/push';
-import { getStaffContext } from '@/lib/serverAuth';
+import { broadcastPushToAll } from '@/lib/telegram/push';
+import { getStaffContext } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

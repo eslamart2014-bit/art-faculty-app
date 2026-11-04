@@ -1,10 +1,10 @@
-import { supabaseAdmin } from '@/lib/supabase';
-import { uploadImageToStorage } from '@/lib/telegramStorage';
-import { localStore } from '@/lib/localFallbackStore';
-import { checkAndNotifyPlagiarism } from '@/lib/plagiarismNotifier';
-import { getStudentCodeVariants } from '@/lib/codeHelper';
-import { isStudentEnrolledInCourse } from '@/lib/courseEnrollment';
-import { getStudentSession, noStoreJson } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { uploadImageToStorage } from '@/lib/telegram/telegramStorage';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { checkAndNotifyPlagiarism } from '@/lib/students/plagiarismNotifier';
+import { getStudentCodeVariants } from '@/lib/students/codeHelper';
+import { isStudentEnrolledInCourse } from '@/lib/courses/courseEnrollment';
+import { getStudentSession, noStoreJson } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 

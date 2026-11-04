@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter, generatePinCode } from '@/lib/codeHelper';
-import { localStore } from '@/lib/localFallbackStore';
-import { safeUpdateStudentAccounts } from '@/lib/studentAccountHelper';
-import { requireCoordinator } from '@/lib/serverAuth';
+import { supabaseAdmin } from '@/lib/core/supabase';
+import { formatStudentCode, getStudentCodeVariants, buildStudentCodeFilter, generatePinCode } from '@/lib/students/codeHelper';
+import { localStore } from '@/lib/students/localFallbackStore';
+import { safeUpdateStudentAccounts } from '@/lib/students/studentAccountHelper';
+import { requireCoordinator } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
