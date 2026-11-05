@@ -1,4 +1,20 @@
+
 "use client";
+
+async function fetchAllSupabaseRows(fetchPage: (from: number, to: number) => any) {
+  let all: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const res = await fetchPage(from, from + pageSize - 1);
+    const data = (res as any)?.data;
+    if ((res as any)?.error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
@@ -95,11 +111,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     }
 
     try {
-      const [courseRes, userRes, attRes, evalRes, systemTermsRes] = await Promise.all([
+      const [courseRes, userRes, systemTermsRes] = await Promise.all([
         supabase.from('courses').select('*').eq('id', resolvedParams.id).single(),
         supabase.auth.getUser(),
-        supabase.from('attendance').select('student_id, date, status, course_id, id').eq('course_id', resolvedParams.id),
-        supabase.from('evaluations').select('*').eq('course_id', resolvedParams.id),
         fetch('/api/public/settings', { cache: 'no-store' })
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null),
@@ -107,10 +121,19 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       const courseData = courseRes.data;
       if (courseData) setCourse(courseData);
 
-      const [studentsRes, makeupRes, profileRes] = await Promise.all([
+      // Fetch all attendance, evaluations, and students with auto-pagination (bypasses 1000 rows limit)
+      const [allAttendance, allEvaluations, allYearStudents, makeupRes, profileRes] = await Promise.all([
+        fetchAllSupabaseRows((from, to) =>
+          supabase.from('attendance').select('student_id, date, status, course_id, id').eq('course_id', resolvedParams.id).range(from, to)
+        ),
+        fetchAllSupabaseRows((from, to) =>
+          supabase.from('evaluations').select('*').eq('course_id', resolvedParams.id).range(from, to)
+        ),
         courseData
-          ? supabase.from('students').select('id, full_name, student_code, academic_year, section, is_active').eq('academic_year', courseData.academic_year).eq('is_active', true)
-          : Promise.resolve({ data: [] }),
+          ? fetchAllSupabaseRows((from, to) =>
+              supabase.from('students').select('id, full_name, student_code, academic_year, section, is_active').eq('academic_year', courseData.academic_year).eq('is_active', true).range(from, to)
+            )
+          : Promise.resolve([]),
         courseData?.makeup_students?.length > 0
           ? supabase.from('students').select('id, full_name, student_code, academic_year, section, is_active').in('id', courseData.makeup_students).eq('is_active', true)
           : Promise.resolve({ data: [] }),
@@ -119,13 +142,15 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
           : Promise.resolve({ data: null }),
       ]);
 
+      const studentsDataList = allYearStudents || [];
+
       const makeupIds = courseData?.makeup_students || [];
       const excluded = courseData?.excluded_students || [];
       const courseSections = Array.isArray(courseData?.sections) && courseData.sections.length > 0 
         ? courseData.sections.map((s: string) => String(s).trim()) 
         : null;
 
-      const allStudents = [...(studentsRes.data || []), ...(makeupRes.data || [])]
+      const allStudents = [...studentsDataList, ...(makeupRes.data || [])]
         .filter((s: any, index: number, self: any[]) => {
           if (s.is_active === false) return false;
           if (excluded.includes(s.id)) return false;
@@ -169,16 +194,14 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       }
 
       // Attendance
-      const attData = attRes.data;
-      setAttendance(attData || []);
+      setAttendance(allAttendance || []);
 
       // Projects
       const projData = courseData?.custom_week_names?.__projects__ || [];
       setProjects(projData);
 
       // Evaluations
-      const evalData = evalRes.data;
-      setEvaluations(evalData || []);
+      setEvaluations(allEvaluations || []);
 
       // Generate Weeks List based on official term start date from public settings
       if (courseData) {
@@ -216,7 +239,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         const { startOfWeek: currentWeekStart } = getCurrentWeekRange();
 
         let maxAttDate = new Date(currentWeekStart);
-        (attData || []).forEach((a: any) => {
+        (allAttendance || []).forEach((a: any) => {
           if (a.date) {
             const [ay, am, ad] = a.date.split('-').map(Number);
             const d = new Date(ay, am - 1, ad);
@@ -808,15 +831,21 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
   // --- Report 2: Single Project ---
   const getSingleProjectStats = () => {
-    if (!selectedProjectId) return { evaluated: [], unevaluated: [], projectEvals: [] as any[] };
+    if (!selectedProjectId) return { evaluated: [], unevaluated: [], projectEvals: [] as any[], effectiveStudents: [] as any[], isSectionFiltered: false };
     const proj = projects.find(p => p.id === selectedProjectId);
     const projectEvals = evaluations.filter(e => 
       (e.project_id && e.project_id === selectedProjectId) ||
       (proj && (e.project_name === proj.name || (e.project_name && proj.name && e.project_name.trim() === proj.name.trim())))
     );
-    const evaluated = students.filter(s => projectEvals.some(e => e.student_id === s.id));
-    const unevaluated = students.filter(s => !projectEvals.some(e => e.student_id === s.id));
-    return { evaluated, unevaluated, projectEvals };
+
+    const isSectionFiltered = selectedSections.length > 0 && selectedSections.length < availableSections.length;
+    const effectiveStudents = isSectionFiltered
+      ? students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات'))
+      : students;
+
+    const evaluated = effectiveStudents.filter(s => projectEvals.some(e => e.student_id === s.id));
+    const unevaluated = effectiveStudents.filter(s => !projectEvals.some(e => e.student_id === s.id));
+    return { evaluated, unevaluated, projectEvals, effectiveStudents, isSectionFiltered };
   };
 
   const printSingleProjectUnevaluated = async () => {
@@ -860,14 +889,19 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
   // --- Report 3: All Projects Summary ---
   const getAllProjectsStats = () => {
-    const studentStats = students.map(s => {
+    const isSectionFiltered = selectedSections.length > 0 && selectedSections.length < availableSections.length;
+    const effectiveStudents = isSectionFiltered
+      ? students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات'))
+      : students;
+
+    const studentStats = effectiveStudents.map(s => {
       const sEvals = evaluations.filter(e => e.student_id === s.id);
       return { ...s, evalCount: sEvals.length };
     });
     
     const completelyUnevaluated = studentStats.filter(s => s.evalCount === 0);
     const evaluatedSomehow = studentStats.filter(s => s.evalCount > 0);
-    return { completelyUnevaluated, evaluatedSomehow };
+    return { completelyUnevaluated, evaluatedSomehow, effectiveStudents, isSectionFiltered };
   };
 
   const printAllProjectsUnevaluated = async () => {
@@ -898,8 +932,12 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     let tableRows = '';
     
     const sortedProjects = [...projects].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const isSectionFiltered = selectedSections.length > 0 && selectedSections.length < availableSections.length;
+    const targetStudents = isSectionFiltered
+      ? students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات'))
+      : students;
     
-    students.forEach((s, i) => {
+    targetStudents.forEach((s, i) => {
       const presences = attendance.filter(a => a.student_id === s.id).length;
       let rowHtml = `<tr><td>${i + 1}</td><td style="text-align: right; white-space: nowrap;">${formatStudentNameWithBadges(s)}</td><td><strong>${presences}</strong></td>`;
       
@@ -960,8 +998,12 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     const termInfo = await getTermAndWeekInfo();
     let tableRows = '';
     const sortedProjects = [...projects].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const isSectionFiltered = selectedSections.length > 0 && selectedSections.length < availableSections.length;
+    const targetStudents = isSectionFiltered
+      ? students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات'))
+      : students;
     
-    students.forEach((s, i) => {
+    targetStudents.forEach((s, i) => {
       const presences = attendance.filter(a => a.student_id === s.id).length;
       let attendanceScoreRaw = presences * attendancePoints;
       
@@ -1359,12 +1401,14 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
             </select>
 
             {selectedProjectId && (() => {
-              const { evaluated, unevaluated } = getSingleProjectStats();
+              const { evaluated, unevaluated, isSectionFiltered } = getSingleProjectStats();
               return (
                 <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-                    <span style={{ color: "#aaa" }}>إجمالي طلاب المقرر:</span>
-                    <span style={{ color: "#fff", fontWeight: "bold" }}>{students.length} طالب</span>
+                    <span style={{ color: "#aaa" }}>
+                      {isSectionFiltered ? `طلاب السكاشن المحددة (${selectedSections.join(' ، ')}):` : "إجمالي طلاب المقرر:"}
+                    </span>
+                    <span style={{ color: "#fff", fontWeight: "bold" }}>{evaluated.length + unevaluated.length} طالب</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
                     <span style={{ color: "#aaa" }}>من تم تقييمه:</span>
@@ -1391,15 +1435,17 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
         {/* --- Tab 3: All Projects Summary --- */}
         {activeTab === "all_projects" && (() => {
-          const { evaluatedSomehow, completelyUnevaluated } = getAllProjectsStats();
+          const { evaluatedSomehow, completelyUnevaluated, isSectionFiltered } = getAllProjectsStats();
           return (
             <div>
               <h3 style={{ color: "#9C27B0", marginTop: 0 }}>📑 كشف التقييمات الشامل (إحصاء المشاريع)</h3>
               
               <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-                  <span style={{ color: "#aaa" }}>إجمالي طلاب المقرر:</span>
-                  <span style={{ color: "#fff", fontWeight: "bold" }}>{students.length} طالب</span>
+                  <span style={{ color: "#aaa" }}>
+                    {isSectionFiltered ? `طلاب السكاشن المحددة (${selectedSections.join(' ، ')}):` : "إجمالي طلاب المقرر:"}
+                  </span>
+                  <span style={{ color: "#fff", fontWeight: "bold" }}>{evaluatedSomehow.length + completelyUnevaluated.length} طالب</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
                   <span style={{ color: "#aaa" }}>قام بتقييم مشروع واحد على الأقل:</span>

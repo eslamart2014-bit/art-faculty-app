@@ -240,8 +240,7 @@ export async function GET(request: Request) {
           .from('evaluations')
           .select('*, students(full_name, student_code, section, academic_year)')
           .eq('course_id', courseId)
-          .eq('project_name', projectName)
-          .not('photo_url', 'is', null);
+          .eq('project_name', projectName);
 
         if (legacyEvals && legacyEvals.length > 0) {
           legacyEvals.forEach((ev: any) => {
@@ -255,7 +254,7 @@ export async function GET(request: Request) {
                 academic_year: ev.students?.academic_year || '',
                 course_id: courseId,
                 project_name: projectName,
-                images: [{ url: ev.photo_url, dhash: ev.ai_status || '' }],
+                images: ev.photo_url ? [{ url: ev.photo_url, dhash: ev.ai_status || '' }] : [],
                 status: ev.score !== null ? 'graded' : 'pending_evaluation',
                 score: ev.score,
                 created_at: ev.created_at,

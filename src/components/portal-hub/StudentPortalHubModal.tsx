@@ -3,38 +3,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
 import {
-  ShieldAlert,
   Search,
   Trash2,
-  Smartphone,
   RefreshCw,
   CheckCircle2,
-  AlertTriangle,
-  Copy,
-  ExternalLink,
-  Users,
-  Image as ImageIcon,
   Sparkles,
   Lock,
   Unlock,
-  RotateCcw,
-  Eye,
-  EyeOff,
-  UserCheck,
-  Maximize2,
-  Calendar,
-  Clock,
-  ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  Filter,
   Camera,
-  LogOut,
-  Settings,
-  ToggleLeft,
-  ToggleRight,
-  Download,
-  ShieldCheck,
 } from "lucide-react";
 import { formatStudentCode, extractStudentCode } from "@/lib/students/codeHelper";
 import QRScanner from "@/components/scanner/QRScanner";
@@ -50,13 +26,6 @@ interface StudentPortalHubModalProps {
 }
 
 const TELEGRAM_BOT_URL = "https://t.me/NEZAMFANYAbot";
-const _KEEP_LUCIDE_CHUNKS = [
-  ShieldAlert, Smartphone, AlertTriangle, Copy, ExternalLink, Users, ImageIcon,
-  RotateCcw, Eye, EyeOff, UserCheck, Maximize2, Calendar, Clock, ChevronRight,
-  ChevronDown, ChevronUp, Filter, LogOut, Settings, ToggleLeft, ToggleRight,
-  Download, ShieldCheck,
-];
-void _KEEP_LUCIDE_CHUNKS;
 
 export default function StudentPortalHubModal({
   isOpen,

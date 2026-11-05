@@ -1,5 +1,20 @@
 "use client";
 
+async function fetchAllSupabaseRows(fetchPage: (from: number, to: number) => any) {
+  let all: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const res = await fetchPage(from, from + pageSize - 1);
+    const data = (res as any)?.data;
+    if ((res as any)?.error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 import { useEffect, useState, use, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -94,6 +109,12 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [systemTerms, setSystemTerms] = useState<any>(() => initialEvalCache?.systemTerms || getLocalCache("cached_system_settings") || null);
   const [totalCourseStudents, setTotalCourseStudents] = useState<number>(() => initialEvalCache?.totalCourseStudents || 0);
   const [projectStats, setProjectStats] = useState<any>(() => initialEvalCache?.projectStats || {});
+  const [projectStatsBySection, setProjectStatsBySection] = useState<Record<string, Record<string, number>>>(() => initialEvalCache?.projectStatsBySection || {});
+  const [studentsCountBySection, setStudentsCountBySection] = useState<Record<string, number>>(() => initialEvalCache?.studentsCountBySection || {});
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>("ALL");
+  const [statsModalTab, setStatsModalTab] = useState<'submitted' | 'missing'>('submitted');
+  const [statsModalSectionFilter, setStatsModalSectionFilter] = useState<string>("ALL");
+  const [statsSearchQuery, setStatsSearchQuery] = useState<string>("");
   const [loading, setLoading] = useState(() => !currentEvalCourse);
 
   useEffect(() => {
@@ -103,6 +124,8 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       if (cached.projects) setProjects(cached.projects);
       if (cached.totalCourseStudents) setTotalCourseStudents(cached.totalCourseStudents);
       if (cached.projectStats) setProjectStats(cached.projectStats);
+      if (cached.projectStatsBySection) setProjectStatsBySection(cached.projectStatsBySection);
+      if (cached.studentsCountBySection) setStudentsCountBySection(cached.studentsCountBySection);
       setLoading(false); // Instant render 0ms!
     }
   }, [resolvedParams.id]);
@@ -273,32 +296,47 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
   const fetchStats = async (courseData: any, currentProjects: any[] = projects) => {
     try {
-      let studentsQuery = supabase
-        .from("students")
-        .select("id, section, is_active")
-        .eq("academic_year", courseData.academic_year)
-        .eq("is_active", true);
-
-      if (courseData.sections && Array.isArray(courseData.sections) && courseData.sections.length > 0) {
-        studentsQuery = studentsQuery.in("section", courseData.sections);
-      }
-
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 8000)
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 10000)
       );
 
-      const [studentsRes, evalsRes] = await Promise.race([
+      const [studentsData, evalsData] = await Promise.race([
         Promise.all([
-          studentsQuery,
-          supabase.from("evaluations").select("project_name, score").eq("course_id", courseData.id)
+          fetchAllSupabaseRows((from, to) => {
+            let q = supabase
+              .from("students")
+              .select("id, section, is_active, academic_year")
+              .eq("academic_year", courseData.academic_year)
+              .eq("is_active", true);
+            if (courseData.sections && Array.isArray(courseData.sections) && courseData.sections.length > 0) {
+              q = q.in("section", courseData.sections);
+            }
+            return q.range(from, to);
+          }),
+          fetchAllSupabaseRows((from, to) =>
+            supabase.from("evaluations").select("student_id, project_name, score").eq("course_id", courseData.id).range(from, to)
+          )
         ]),
         timeoutPromise
       ]) as any;
-      const studentsData = studentsRes.data || [];
-      const evalsData = evalsRes.data || [];
+
+      let combinedStudents = [...(studentsData || [])];
+      if (courseData.makeup_students && courseData.makeup_students.length > 0) {
+        const { data: makeup } = await supabase
+          .from("students")
+          .select("id, section, is_active, academic_year")
+          .in("id", courseData.makeup_students)
+          .eq("is_active", true);
+        if (makeup) {
+          const existingIds = new Set(combinedStudents.map((s: any) => s.id));
+          makeup.forEach((m: any) => {
+            if (!existingIds.has(m.id)) combinedStudents.push(m);
+          });
+        }
+      }
 
       const excluded = courseData.excluded_students || [];
-      const activeStudents = studentsData.filter((s: any) => {
+      const activeStudents = combinedStudents.filter((s: any) => {
         if (s.is_active === false) return false;
         if (excluded.includes(s.id)) return false;
         if (courseData.sections && Array.isArray(courseData.sections) && courseData.sections.length > 0) {
@@ -306,30 +344,41 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         }
         return true;
       });
-      let count = activeStudents.length;
 
-      if (courseData.makeup_students && courseData.makeup_students.length > 0) {
-        const makeupSet = new Set(courseData.makeup_students);
-        activeStudents.forEach((s: any) => makeupSet.delete(s.id));
-        const validMakeupCount = Array.from(makeupSet).filter((id: any) => !excluded.includes(id)).length;
-        count += validMakeupCount;
-      }
-      setTotalCourseStudents(count);
+      const studentSecMap = new Map<string, string>();
+      const countBySec: Record<string, number> = {};
+      activeStudents.forEach((s: any) => {
+        const sec = String(s.section || 'عام');
+        studentSecMap.set(s.id, sec);
+        countBySec[sec] = (countBySec[sec] || 0) + 1;
+      });
 
-      const stats: Record<string, number> = {};
+      setTotalCourseStudents(activeStudents.length);
+      setStudentsCountBySection(countBySec);
+
+      const statsOverall: Record<string, number> = {};
+      const statsBySec: Record<string, Record<string, number>> = {};
       (evalsData || []).forEach((ev: any) => {
         if (ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score))) {
-          stats[ev.project_name] = (stats[ev.project_name] || 0) + 1;
+          statsOverall[ev.project_name] = (statsOverall[ev.project_name] || 0) + 1;
+          const sec = studentSecMap.get(ev.student_id);
+          if (sec) {
+            if (!statsBySec[ev.project_name]) statsBySec[ev.project_name] = {};
+            statsBySec[ev.project_name][sec] = (statsBySec[ev.project_name][sec] || 0) + 1;
+          }
         }
       });
-      setProjectStats(stats);
+      setProjectStats(statsOverall);
+      setProjectStatsBySection(statsBySec);
 
       // Save to local cache
       setLocalCache(`cache_evaluations_${courseData.id}`, {
         course: courseData,
         projects: currentProjects,
-        totalCourseStudents: count,
-        projectStats: stats
+        totalCourseStudents: activeStudents.length,
+        projectStats: statsOverall,
+        projectStatsBySection: statsBySec,
+        studentsCountBySection: countBySec
       });
     } catch (e) {}
   };
@@ -525,21 +574,35 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     e.stopPropagation();
     setStatsProject(proj);
     setLoadingStatsModal(true);
+    setStatsModalTab('submitted');
+    setStatsModalSectionFilter(selectedSectionFilter);
+    setStatsSearchQuery("");
 
     try {
-      let studentsQuery = supabase
-        .from("students")
-        .select("*")
-        .eq("academic_year", course.academic_year)
-        .eq("is_active", true);
+      const [allStudents, evals] = await Promise.all([
+        fetchAllSupabaseRows((from, to) => {
+          let q = supabase
+            .from("students")
+            .select("id, full_name, student_code, section, academic_year, is_active")
+            .eq("academic_year", course.academic_year)
+            .eq("is_active", true);
+          if (course.sections && Array.isArray(course.sections) && course.sections.length > 0) {
+            q = q.in("section", course.sections);
+          }
+          return q.range(from, to);
+        }),
+        fetchAllSupabaseRows((from, to) =>
+          supabase
+            .from("evaluations")
+            .select("id, student_id, score, photo_url, created_at")
+            .eq("course_id", course.id)
+            .eq("project_name", proj.name)
+            .range(from, to)
+        )
+      ]);
 
-      if (course.sections && Array.isArray(course.sections) && course.sections.length > 0) {
-        studentsQuery = studentsQuery.in("section", course.sections);
-      }
-
-      const { data: studentsData } = await studentsQuery;
       const excluded = course.excluded_students || [];
-      let eligible = (studentsData || []).filter((s: any) => {
+      let eligible = (allStudents || []).filter((s: any) => {
         if (s.is_active === false) return false;
         if (excluded.includes(s.id)) return false;
         if (course.sections && Array.isArray(course.sections) && course.sections.length > 0) {
@@ -549,22 +612,20 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       });
 
       if (course.makeup_students && course.makeup_students.length > 0) {
-        const { data: makeup } = await supabase.from("students").select("*").in("id", course.makeup_students).eq("is_active", true);
+        const { data: makeup } = await supabase
+          .from("students")
+          .select("id, full_name, student_code, section, academic_year, is_active")
+          .in("id", course.makeup_students)
+          .eq("is_active", true);
         if (makeup) {
           const eligibleIds = new Set(eligible.map(s => s.id));
-          makeup.forEach(m => {
+          makeup.forEach((m: any) => {
             if (!eligibleIds.has(m.id) && !excluded.includes(m.id) && m.is_active !== false) eligible.push(m);
           });
         }
       }
 
-      const { data: evals } = await supabase
-        .from("evaluations")
-        .select("id, student_id, score, photo_url, created_at")
-        .eq("course_id", course.id)
-        .eq("project_name", proj.name);
-
-      const submittedMap = new Map((evals || []).map(ev => [ev.student_id, ev]));
+      const submittedMap = new Map((evals || []).map((ev: any) => [ev.student_id, ev]));
       const submittedList: any[] = [];
       const missingList: any[] = [];
 
@@ -576,12 +637,57 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         }
       });
 
+      submittedList.sort((a, b) => (a.section || '').localeCompare(b.section || '', 'ar', { numeric: true }) || a.full_name.localeCompare(b.full_name, 'ar'));
+      missingList.sort((a, b) => (a.section || '').localeCompare(b.section || '', 'ar', { numeric: true }) || a.full_name.localeCompare(b.full_name, 'ar'));
+
       setStatsData({ submitted: submittedList, missing: missingList });
     } catch (err) {
       console.error("Error loading project stats:", err);
     } finally {
       setLoadingStatsModal(false);
     }
+  };
+
+  const exportEvaluatedStudentsPdf = async (proj: Project, submittedList: any[]) => {
+    const tableRows = submittedList.map((s, idx) => `
+      <tr>
+        <td>${idx + 1}</td>
+        <td style="text-align: right; font-weight: bold;">${s.full_name}</td>
+        <td>${s.student_code}</td>
+        <td>${s.section || 'عام'}</td>
+        <td>${s.academic_year || course.academic_year}</td>
+        <td style="font-weight: bold; color: #2e7d32;">${s.eval?.score ?? '-'} / ${proj.max_score}</td>
+        <td style="font-size: 11px;">${s.eval?.created_at ? new Date(s.eval.created_at).toLocaleDateString('ar-EG') : '-'}</td>
+      </tr>
+    `).join("");
+
+    const tableHtml = `
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>اسم الطالب</th>
+            <th>كود الطالب</th>
+            <th>الشعبة / السكشن</th>
+            <th>الفرقة</th>
+            <th>الدرجة المرصودة</th>
+            <th>تاريخ التقييم</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
+
+    (await import("@/lib/courses/downloadPdf")).downloadPdf(
+      "evaluated_students.pdf",
+      course.name,
+      `تقرير الطلاب المقيمين في مشروع (${proj.name})`,
+      `إجمالي المقيمين: ${submittedList.length} طالب - الدرجة العظمى: ${proj.max_score} - تاريخ التقرير: ${new Date().toLocaleDateString('ar-EG')}`,
+      tableHtml,
+      `أستاذ المقرر: ${course.instructor_name || "...................."}`
+    );
   };
 
   const exportMissingStudentsPdf = async (proj: Project, missingList: any[]) => {
@@ -1311,10 +1417,29 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         {/* PROJECTS LIST VIEW */}
         {view === 'PROJECTS' && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <h3 style={{ color: "#FF9800", margin: 0, fontSize: "16px" }}>المشاريع المتاحة للتقييم</h3>
               <button onClick={() => setShowAddProjectModal(true)} style={{ width: "auto", margin: 0, background: "#4CAF50", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px" }}>➕ إضافة مشروع</button>
             </div>
+
+            {/* Section Filter Dropdown */}
+            {course?.sections && course.sections.length > 1 && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px", background: "#18181b", padding: "8px 12px", borderRadius: "10px", border: "1px solid #3f3f46" }}>
+                <span style={{ color: "#fbbf24", fontSize: "12px", fontWeight: "bold", whiteSpace: "nowrap" }}>🔍 تصفية بالسكشن:</span>
+                <select 
+                  value={selectedSectionFilter}
+                  onChange={(e) => setSelectedSectionFilter(e.target.value)}
+                  style={{ flex: 1, padding: "6px 10px", background: "#09090b", border: "1px solid #52525b", borderRadius: "6px", color: "#fff", fontSize: "12px", outline: "none", cursor: "pointer", fontWeight: "bold" }}
+                >
+                  <option value="ALL">جميع السكاشن (إجمالي المقرر: {totalCourseStudents} طالب)</option>
+                  {course.sections.map((sec: string) => (
+                    <option key={sec} value={sec}>
+                      سكشن {sec} ({studentsCountBySection[sec] || 0} طالب)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {projects.filter(p => !p.is_archived).length === 0 ? (
               <div style={{ textAlign: "center", padding: "35px", color: "#666", background: "#1e1e1e", borderRadius: "14px", border: "1px dashed #444", fontSize: "14px" }}>
@@ -1323,8 +1448,13 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px" }}>
                 {projects.filter(p => !p.is_archived).map(proj => {
-                  const graded = projectStats[proj.name] || 0;
-                  const ungraded = totalCourseStudents - graded;
+                  const isSecFiltered = selectedSectionFilter !== "ALL";
+                  const effectiveTotal = isSecFiltered ? (studentsCountBySection[selectedSectionFilter] || 0) : totalCourseStudents;
+                  const graded = isSecFiltered 
+                    ? ((projectStatsBySection[proj.name] && projectStatsBySection[proj.name][selectedSectionFilter]) || 0)
+                    : (projectStats[proj.name] || 0);
+                  const ungraded = Math.max(0, effectiveTotal - graded);
+
                   return (
                     <div key={proj.id} 
                       onClick={() => handleSelectProject(proj)} 
@@ -1339,14 +1469,14 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                         <div style={{ display: "flex", gap: "10px", fontSize: "11px", opacity: 0.9, flexWrap: "wrap" }}>
                           <span style={{ color: "#81C784" }}>✅ مقيّم: {graded}</span>
                           <span style={{ color: "#E57373" }}>⏳ متبقي: {ungraded}</span>
-                          <span style={{ color: "#B0BEC5" }}>👥 الإجمالي: {totalCourseStudents}</span>
+                          <span style={{ color: "#B0BEC5" }}>👥 الإجمالي: {effectiveTotal} {isSecFiltered ? `(سكشن ${selectedSectionFilter})` : ''}</span>
                         </div>
                       </div>
                       
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <button 
                           onClick={(e) => openProjectStats(proj, e)}
-                          title="إحصائية المشروع وتصدير كشف المتأخرين PDF"
+                          title="إحصائية المشروع وتصدير كشوف المقيمين والمتأخرين PDF"
                           style={{ width: "auto", margin: 0, background: "rgba(33, 150, 243, 0.15)", color: "#2196F3", border: "1px solid #2196F3", borderRadius: "8px", padding: "6px 10px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
                         >
                           📊 إحصائية
@@ -1362,20 +1492,33 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         )}
 
         {/* EVALUATION MENU */}
-        {view === 'EVAL_MENU' && selectedProject && (
-          <div style={{ textAlign: "center", marginTop: "10px" }}>
-            <div style={{ background: "#222", padding: "16px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #4CAF50" }}>
-              <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "4px" }}>المشروع المحدد:</div>
-              <div style={{ color: "#81C784", fontWeight: "bold", fontSize: "20px", marginBottom: "14px", textAlign: "center" }}>{selectedProject.name} <span style={{ color: "#888", fontSize: "14px", fontWeight: "normal" }}>({selectedProject.max_score} درجة)</span></div>
-              
-              <div style={{ display: "flex", justifyContent: "space-around", background: "#161616", padding: "12px", borderRadius: "8px", fontSize: "11px" }}>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#81C784", fontSize: "18px", fontWeight: "bold" }}>{projectStats[selectedProject.name] || 0}</div><div style={{ color: "#888", marginTop: "4px" }}>مقيّم ✅</div></div>
-                 <div style={{ width: "1px", background: "#333" }}></div>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#E57373", fontSize: "18px", fontWeight: "bold" }}>{totalCourseStudents - (projectStats[selectedProject.name] || 0)}</div><div style={{ color: "#888", marginTop: "4px" }}>متبقي ⏳</div></div>
-                 <div style={{ width: "1px", background: "#333" }}></div>
-                 <div style={{ textAlign: "center" }}><div style={{ color: "#90CAF9", fontSize: "18px", fontWeight: "bold" }}>{totalCourseStudents}</div><div style={{ color: "#888", marginTop: "4px" }}>الإجمالي 👥</div></div>
+        {view === 'EVAL_MENU' && selectedProject && (() => {
+          const isSecFiltered = selectedSectionFilter !== "ALL";
+          const effectiveTotal = isSecFiltered ? (studentsCountBySection[selectedSectionFilter] || 0) : totalCourseStudents;
+          const graded = isSecFiltered 
+            ? ((projectStatsBySection[selectedProject.name] && projectStatsBySection[selectedProject.name][selectedSectionFilter]) || 0)
+            : (projectStats[selectedProject.name] || 0);
+          const ungraded = Math.max(0, effectiveTotal - graded);
+
+          return (
+            <div style={{ textAlign: "center", marginTop: "10px" }}>
+              <div style={{ background: "#222", padding: "16px", borderRadius: "12px", marginBottom: "24px", border: "1px solid #4CAF50" }}>
+                <div style={{ color: "#aaa", fontSize: "12px", marginBottom: "4px" }}>المشروع المحدد:</div>
+                <div style={{ color: "#81C784", fontWeight: "bold", fontSize: "20px", marginBottom: "8px", textAlign: "center" }}>{selectedProject.name} <span style={{ color: "#888", fontSize: "14px", fontWeight: "normal" }}>({selectedProject.max_score} درجة)</span></div>
+                {isSecFiltered && (
+                  <div style={{ color: "#fbbf24", fontSize: "12px", marginBottom: "10px", fontWeight: "bold" }}>
+                    🎯 إحصائيات سكشن {selectedSectionFilter}
+                  </div>
+                )}
+                
+                <div style={{ display: "flex", justifyContent: "space-around", background: "#161616", padding: "12px", borderRadius: "8px", fontSize: "11px" }}>
+                   <div style={{ textAlign: "center" }}><div style={{ color: "#81C784", fontSize: "18px", fontWeight: "bold" }}>{graded}</div><div style={{ color: "#888", marginTop: "4px" }}>مقيّم ✅</div></div>
+                   <div style={{ width: "1px", background: "#333" }}></div>
+                   <div style={{ textAlign: "center" }}><div style={{ color: "#E57373", fontSize: "18px", fontWeight: "bold" }}>{ungraded}</div><div style={{ color: "#888", marginTop: "4px" }}>متبقي ⏳</div></div>
+                   <div style={{ width: "1px", background: "#333" }}></div>
+                   <div style={{ textAlign: "center" }}><div style={{ color: "#90CAF9", fontSize: "18px", fontWeight: "bold" }}>{effectiveTotal}</div><div style={{ color: "#888", marginTop: "4px" }}>الإجمالي 👥</div></div>
+                </div>
               </div>
-            </div>
 
             <h3 style={{ color: "#FF9800", marginBottom: "20px", fontSize: "16px" }}>⭐ اختر طريقة التقييم</h3>
             <button onClick={startScanner} style={{ width: "100%", margin: "0 0 12px 0", background: "#4CAF50", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
@@ -1384,8 +1527,9 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
             <button onClick={() => setView('MANUAL')} style={{ width: "100%", margin: "0 0 12px 0", background: "#2196F3", color: "#fff", padding: "16px", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
               <span style={{ fontSize: "22px" }}>📝</span> التقييم اليدوي ومراجعة اللوحات
             </button>
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
         {/* MANUAL EVALUATION VIEW */}
         {view === 'MANUAL' && (
@@ -1988,55 +2132,171 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       {/* PROJECT STATS MODAL */}
       {statsProject && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "95%", maxWidth: "550px", maxHeight: "90vh", display: "flex", flexDirection: "column", borderRadius: "15px", border: "1px solid #2196F3", direction: "rtl", padding: "16px" }}>
+          <div style={{ background: "#1e1e1e", width: "95%", maxWidth: "600px", maxHeight: "92vh", display: "flex", flexDirection: "column", borderRadius: "16px", border: "1px solid #2196F3", direction: "rtl", padding: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" }}>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "10px", marginBottom: "12px" }}>
-              <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📊 إحصائيات مشروع: {statsProject.name}</h3>
+              <div>
+                <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📊 إحصائيات: {statsProject.name}</h3>
+                <div style={{ color: "#888", fontSize: "11px", marginTop: "2px" }}>الدرجة العظمى: {statsProject.max_score} درجة</div>
+              </div>
               <button onClick={() => { setStatsProject(null); setStatsData(null); }} style={{ width: "auto", margin: 0, background: "none", border: "none", color: "#fff", fontSize: "20px", cursor: "pointer" }}>✕</button>
             </div>
 
             {loadingStatsModal ? (
-              <div style={{ textAlign: "center", padding: "30px", color: "#aaa" }}>جاري تحميل الإحصائيات...</div>
-            ) : statsData ? (
-              <div style={{ overflowY: "auto", flexGrow: 1 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px", textAlign: "center" }}>
-                  <div style={{ background: "#121212", border: "1px solid #333", borderRadius: "8px", padding: "8px" }}>
-                    <div style={{ color: "#888", fontSize: "10px" }}>المطلوب منهم</div>
-                    <div style={{ color: "#90caf9", fontSize: "18px", fontWeight: "bold" }}>{statsData.submitted.length + statsData.missing.length}</div>
-                  </div>
-                  <div style={{ background: "#121212", border: "1px solid #4CAF50", borderRadius: "8px", padding: "8px" }}>
-                    <div style={{ color: "#888", fontSize: "10px" }}>قاموا بالرفع ✅</div>
-                    <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>{statsData.submitted.length}</div>
-                  </div>
-                  <div style={{ background: "#121212", border: "1px solid #f44336", borderRadius: "8px", padding: "8px" }}>
-                    <div style={{ color: "#888", fontSize: "10px" }}>متأخرين ❌</div>
-                    <div style={{ color: "#f44336", fontSize: "18px", fontWeight: "bold" }}>{statsData.missing.length}</div>
-                  </div>
-                </div>
+              <div style={{ textAlign: "center", padding: "40px", color: "#aaa" }}>جاري تحميل إحصائيات المشروع والطلاب...</div>
+            ) : statsData ? (() => {
+              const filteredSubmitted = statsData.submitted.filter(s => {
+                if (statsModalSectionFilter !== "ALL" && String(s.section) !== statsModalSectionFilter) return false;
+                if (statsSearchQuery.trim()) {
+                  const q = statsSearchQuery.trim().toLowerCase();
+                  return (s.full_name && s.full_name.toLowerCase().includes(q)) || (s.student_code && s.student_code.includes(q));
+                }
+                return true;
+              });
 
-                {statsData.missing.length > 0 && (
-                  <button 
-                    onClick={() => exportMissingStudentsPdf(statsProject, statsData.missing)}
-                    style={{ width: "100%", margin: "0 0 12px 0", background: "#e53935", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-                  >
-                    🖨️ طباعة / تصدير كشف المتأخرين (PDF)
-                  </button>
-                )}
+              const filteredMissing = statsData.missing.filter(s => {
+                if (statsModalSectionFilter !== "ALL" && String(s.section) !== statsModalSectionFilter) return false;
+                if (statsSearchQuery.trim()) {
+                  const q = statsSearchQuery.trim().toLowerCase();
+                  return (s.full_name && s.full_name.toLowerCase().includes(q)) || (s.student_code && s.student_code.includes(q));
+                }
+                return true;
+              });
 
-                <h4 style={{ color: "#f44336", margin: "8px 0 6px 0", fontSize: "13px" }}>قائمة الطلاب المتأخرين ({statsData.missing.length}):</h4>
-                <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
-                  {statsData.missing.map((s, idx) => (
-                    <div key={idx} style={{ background: "#121212", border: "1px solid #333", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
-                      <div>
-                        <span style={{ color: "#fff", fontWeight: "bold" }}>{idx + 1}. {s.full_name}</span>
-                        <span style={{ color: "#888", fontSize: "10px", marginRight: "6px" }}>كود: {s.student_code} • س: {s.section}</span>
-                      </div>
-                      <span style={{ color: "#f44336", fontSize: "10px", fontWeight: "bold" }}>لم يرفع</span>
+              const totalInFilter = statsModalSectionFilter === "ALL" 
+                ? (statsData.submitted.length + statsData.missing.length)
+                : ((studentsCountBySection[statsModalSectionFilter] || 0) || (filteredSubmitted.length + filteredMissing.length));
+
+              return (
+                <div style={{ overflowY: "auto", flexGrow: 1, display: "flex", flexDirection: "column" }}>
+                  
+                  {/* Section & Search Controls */}
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                    {course?.sections && course.sections.length > 1 && (
+                      <select 
+                        value={statsModalSectionFilter}
+                        onChange={(e) => setStatsModalSectionFilter(e.target.value)}
+                        style={{ flex: 1, padding: "8px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", fontSize: "12px", outline: "none" }}
+                      >
+                        <option value="ALL">جميع السكاشن ({statsData.submitted.length + statsData.missing.length})</option>
+                        {course.sections.map((sec: string) => (
+                          <option key={sec} value={sec}>
+                            سكشن {sec} ({studentsCountBySection[sec] || 0} طالب)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <input 
+                      type="text"
+                      placeholder="بحث بالاسم أو الكود..."
+                      value={statsSearchQuery}
+                      onChange={(e) => setStatsSearchQuery(e.target.value)}
+                      style={{ flex: 1, padding: "8px 10px", background: "#121212", border: "1px solid #444", borderRadius: "8px", color: "#fff", fontSize: "12px", outline: "none" }}
+                    />
+                  </div>
+
+                  {/* Counts Overview */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "12px", textAlign: "center" }}>
+                    <div style={{ background: "#121212", border: "1px solid #333", borderRadius: "8px", padding: "8px" }}>
+                      <div style={{ color: "#888", fontSize: "10px" }}>المطلوب منهم</div>
+                      <div style={{ color: "#90caf9", fontSize: "18px", fontWeight: "bold" }}>{totalInFilter}</div>
                     </div>
-                  ))}
+                    <div 
+                      onClick={() => setStatsModalTab('submitted')}
+                      style={{ background: statsModalTab === 'submitted' ? "#1b3320" : "#121212", border: `1px solid ${statsModalTab === 'submitted' ? '#4CAF50' : '#2e7d32'}`, borderRadius: "8px", padding: "8px", cursor: "pointer" }}
+                    >
+                      <div style={{ color: "#81C784", fontSize: "10px" }}>تم تقييمهم ✅</div>
+                      <div style={{ color: "#4CAF50", fontSize: "18px", fontWeight: "bold" }}>{filteredSubmitted.length}</div>
+                    </div>
+                    <div 
+                      onClick={() => setStatsModalTab('missing')}
+                      style={{ background: statsModalTab === 'missing' ? "#331818" : "#121212", border: `1px solid ${statsModalTab === 'missing' ? '#f44336' : '#7f1d1d'}`, borderRadius: "8px", padding: "8px", cursor: "pointer" }}
+                    >
+                      <div style={{ color: "#E57373", fontSize: "10px" }}>متأخرين ❌</div>
+                      <div style={{ color: "#f44336", fontSize: "18px", fontWeight: "bold" }}>{filteredMissing.length}</div>
+                    </div>
+                  </div>
+
+                  {/* Tabs Selector */}
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                    <button 
+                      onClick={() => setStatsModalTab('submitted')}
+                      style={{ flex: 1, padding: "8px", background: statsModalTab === 'submitted' ? "#4CAF50" : "#222", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
+                    >
+                      ✅ قائمة المقيمين ({filteredSubmitted.length})
+                    </button>
+                    <button 
+                      onClick={() => setStatsModalTab('missing')}
+                      style={{ flex: 1, padding: "8px", background: statsModalTab === 'missing' ? "#f44336" : "#222", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
+                    >
+                      ❌ قائمة المتأخرين ({filteredMissing.length})
+                    </button>
+                  </div>
+
+                  {/* Export PDF Button */}
+                  {statsModalTab === 'submitted' && filteredSubmitted.length > 0 && (
+                    <button 
+                      onClick={() => exportEvaluatedStudentsPdf(statsProject, filteredSubmitted)}
+                      style={{ width: "100%", margin: "0 0 10px 0", background: "#2e7d32", color: "#fff", border: "none", padding: "8px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    >
+                      🖨️ طباعة / تصدير كشف المقيمين (PDF)
+                    </button>
+                  )}
+                  {statsModalTab === 'missing' && filteredMissing.length > 0 && (
+                    <button 
+                      onClick={() => exportMissingStudentsPdf(statsProject, filteredMissing)}
+                      style={{ width: "100%", margin: "0 0 10px 0", background: "#e53935", color: "#fff", border: "none", padding: "8px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    >
+                      🖨️ طباعة / تصدير كشف المتأخرين (PDF)
+                    </button>
+                  )}
+
+                  {/* Student List Render */}
+                  <div style={{ flexGrow: 1, maxHeight: "300px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "5px" }}>
+                    {statsModalTab === 'submitted' ? (
+                      filteredSubmitted.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "20px", color: "#888", fontSize: "12px" }}>لا يوجد طلاب مقيمين مطابقين للشروط الحالية.</div>
+                      ) : (
+                        filteredSubmitted.map((s, idx) => (
+                          <div key={s.id || idx} style={{ background: "#121212", border: "1px solid #2e7d32", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                            <div>
+                              <span style={{ color: "#fff", fontWeight: "bold" }}>{idx + 1}. {s.full_name}</span>
+                              <span style={{ color: "#888", fontSize: "10px", marginRight: "6px" }}>كود: {s.student_code} • س: {s.section || 'عام'}</span>
+                            </div>
+                            <div style={{ textAlign: "left", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ color: "#4CAF50", fontWeight: "bold", fontSize: "13px" }}>{s.eval?.score ?? '-'} / {statsProject.max_score}</span>
+                              {s.eval?.photo_url && (
+                                <button 
+                                  onClick={() => openZoomImage(s.eval.photo_url)}
+                                  style={{ width: "auto", margin: 0, padding: "2px 5px", background: "#333", color: "#90caf9", border: "none", borderRadius: "4px", fontSize: "10px", cursor: "pointer" }}
+                                >
+                                  🖼️
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )
+                    ) : (
+                      filteredMissing.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "20px", color: "#888", fontSize: "12px" }}>لا يوجد طلاب متأخرين مطابقين للشروط الحالية.</div>
+                      ) : (
+                        filteredMissing.map((s, idx) => (
+                          <div key={s.id || idx} style={{ background: "#121212", border: "1px solid #7f1d1d", borderRadius: "6px", padding: "6px 10px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px" }}>
+                            <div>
+                              <span style={{ color: "#fff", fontWeight: "bold" }}>{idx + 1}. {s.full_name}</span>
+                              <span style={{ color: "#888", fontSize: "10px", marginRight: "6px" }}>كود: {s.student_code} • س: {s.section || 'عام'}</span>
+                            </div>
+                            <span style={{ color: "#f44336", fontSize: "11px", fontWeight: "bold" }}>لم يرفع ❌</span>
+                          </div>
+                        ))
+                      )
+                    )}
+                  </div>
+
                 </div>
-              </div>
-            ) : null}
+              );
+            })() : null}
           </div>
         </div>
       )}
