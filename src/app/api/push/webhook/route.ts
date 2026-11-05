@@ -49,22 +49,26 @@ export async function POST(request: Request) {
       const dedupTag = `att_${student.student_code}_${targetDate}_${targetCourseId || 'course'}`;
 
       if (isCancelled) {
+        const cancelMsg = `❌ تم إلغاء تسجيل حضورك في مقرر ${courseName} (${targetDate})`;
         const sent = await sendPushToStudents([student.student_code], {
-          title: 'ℹ️ تم إلغاء تسجيل الحضور',
-          body: `تم إلغاء تسجيل حضورك في مقرر ${courseName} (${targetDate})`,
+          title: '❌ إلغاء حضور',
+          body: cancelMsg,
           type: 'attendance',
           id: dedupTag,
           tag: dedupTag,
+          telegramHtml: `<b>${cancelMsg}</b>`,
         });
         return NextResponse.json({ ok: true, action: 'cancelled', sent });
       }
 
+      const presentMsg = `✅ تم تسجيل حضورك في مقرر ${courseName} (${targetDate})`;
       const sent = await sendPushToStudents([student.student_code], {
-        title: '✅ تم تسجيل حضورك',
-        body: `تم تسجيل حضورك اليوم بنجاح في مقرر ${courseName} (${targetDate})`,
+        title: '✅ تسجيل حضور',
+        body: presentMsg,
         type: 'attendance',
         id: dedupTag,
         tag: dedupTag,
+        telegramHtml: `<b>${presentMsg}</b>`,
       });
       return NextResponse.json({ ok: true, action: 'present', sent });
     }
@@ -81,13 +85,15 @@ export async function POST(request: Request) {
       const courseName = course?.name || 'المقرر';
       const projectName = record.project_name || 'المشروع';
       const evalTag = `eval_${student.student_code}_${projectName}_${record.course_id || 'course'}`;
+      const evalMsg = `🎨 تم رصد تقييم مشروع "${projectName}" بمقرر ${courseName}${scoreText}`;
 
       const sent = await sendPushToStudents([student.student_code], {
-        title: '🎨 تم رصد تقييم جديد لأعمالك',
-        body: `تم رصد تقييم مشروع "${projectName}" بمقرر ${courseName}${scoreText}`,
+        title: '🎨 رصد تقييم جديد',
+        body: evalMsg,
         type: 'grade',
         id: evalTag,
         tag: evalTag,
+        telegramHtml: `<b>${evalMsg}</b>`,
       });
       return NextResponse.json({ ok: true, sent });
     }

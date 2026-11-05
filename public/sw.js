@@ -1,5 +1,5 @@
-// Service Worker v4.0.0 - Next.js offline shell (authenticated routes & localhost are network-only)
-const CACHE_VERSION = 'v4.0.0';
+// Service Worker v4.0.1 - Next.js offline shell (authenticated routes & localhost are network-only)
+const CACHE_VERSION = 'v4.0.1';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 
@@ -119,28 +119,8 @@ self.addEventListener('fetch', event => {
   // Skip non-GET requests
   if (req.method !== 'GET') return;
 
-  // Never cache media or API responses: they are user-specific and require cookies.
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co')) {
-    return;
-  }
-
-  // 1. Next.js Static Chunks & Build Artifacts (/_next/static/...)
-  if (url.pathname.startsWith('/_next/static/')) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then(async cache => {
-        const cached = await cache.match(req);
-        if (cached) return cached;
-        try {
-          const res = await fetch(req);
-          if (res && res.status === 200) {
-            cache.put(req, res.clone());
-          }
-          return res;
-        } catch (err) {
-          return cached || new Response('', { status: 404 });
-        }
-      })
-    );
+  // Never cache Next.js internal chunks, Turbopack bundles, or API calls: let browser fetch directly
+  if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/api/') || url.hostname.includes('supabase.co')) {
     return;
   }
 

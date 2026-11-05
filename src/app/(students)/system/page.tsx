@@ -1335,6 +1335,41 @@ export default function SystemPage() {
     }
   }, [dashboardData]);
 
+  // تسجيل تنقل الطالب بين الأقسام (المشاريع، الحضور، الدواليب، الإنذارات) في سجل نشاط البوت للإدارة
+  const lastTrackedTabRef = useRef<{ tab: string; time: number } | null>(null);
+  useEffect(() => {
+    const code = currentStudent?.student_code || (typeof window !== "undefined" ? localStorage.getItem("fania_student_code") : null);
+    if (!code || isImpersonating) return;
+
+    const actionMap: Record<string, string> = {
+      evaluation: "view_projects",
+      attendance: "view_attendance",
+      warnings: "view_warnings",
+      lockers: "view_lockers"
+    };
+
+    const action = actionMap[activeTab];
+    if (!action) return;
+
+    const now = Date.now();
+    if (lastTrackedTabRef.current && lastTrackedTabRef.current.tab === action && now - lastTrackedTabRef.current.time < 30_000) {
+      return; // منع التكرار خلال 30 ثانية
+    }
+    lastTrackedTabRef.current = { tab: action, time: now };
+
+    fetch("/api/students/search-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        student_code: code,
+        student_name: currentStudent?.full_name || "",
+        academic_year: currentStudent?.academic_year || "",
+        section: currentStudent?.section || ""
+      })
+    }).catch(() => {});
+  }, [activeTab, currentStudent?.student_code, isImpersonating]);
+
   // Real-time camera quality & anti-shake analyzer loop (Throttled, No 60fps flicker)
   const startQualityAnalysisLoop = (mode: "2d" | "3d") => {
     if (frameAnalysisIntervalRef.current) {

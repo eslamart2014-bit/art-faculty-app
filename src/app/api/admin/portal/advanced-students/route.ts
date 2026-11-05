@@ -14,6 +14,18 @@ function parseActionLabel(action: string, details?: any): string {
       return 'ربط الحساب ببوت تليجرام لأول مرة';
     case 'bot_portal_open':
       return 'فتح لوحة الطالب داخل البوت';
+    case 'view_projects':
+    case 'projects_tab':
+      return 'تصفح المشاريع والتقييمات 🎨';
+    case 'view_attendance':
+    case 'attendance_tab':
+      return 'استعراض سجل الحضور والغياب 📅';
+    case 'view_warnings':
+    case 'warnings_tab':
+      return 'استعراض سجل الإنذارات ⚠️';
+    case 'view_lockers':
+    case 'lockers_tab':
+      return 'دخول قسم الدواليب والخزائن 🗄️';
     case 'login':
     case 'student_login':
       return 'تسجيل دخول للبوابة';

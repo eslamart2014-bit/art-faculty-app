@@ -50,10 +50,16 @@ export default function TelegramPortalEntryPage() {
   // Initialize and check permanent session or Telegram WebApp binding
   useEffect(() => {
     let attempts = 0;
-    const maxAttempts = 12;
+    const maxAttempts = 5;
+    let isCancelled = false;
+
+    // Hard safety timeout: Guaranteed never to hang more than 900ms on Huawei or slow devices
+    const hardTimeout = setTimeout(() => {
+      if (!isCancelled) setLoading(false);
+    }, 900);
 
     const initTg = async () => {
-      if (typeof window === "undefined") return;
+      if (typeof window === "undefined" || isCancelled) return;
 
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
@@ -66,11 +72,11 @@ export default function TelegramPortalEntryPage() {
       let resolvedTgUser = extractTelegramUser();
       if (!resolvedTgUser && attempts < maxAttempts) {
         attempts++;
-        setTimeout(initTg, 100);
+        setTimeout(initTg, 80);
         return;
       }
 
-      // Optional explicit query param or localhost test mode (never active on production domain without tg_id)
+      // Check query parameters or local storage
       if (!resolvedTgUser) {
         const isLocalhost =
           typeof window !== "undefined" &&
@@ -83,21 +89,26 @@ export default function TelegramPortalEntryPage() {
         if (explicitTgId) {
           resolvedTgUser = {
             id: explicitTgId,
-            first_name: "تجربة محلية",
-            username: "local_test"
+            first_name: "طالب",
+            username: ""
           };
         }
       }
 
       setTgUser(resolvedTgUser);
 
-      // 1. Server-side Telegram ID binding & status check (ensures deleted/suspended accounts are enforced immediately)
+      // 1. Server-side Telegram ID binding & status check
       if (resolvedTgUser?.id && String(resolvedTgUser.id) !== "999888777") {
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 1200);
+
         try {
           const res = await fetch(`/api/tg/auth?tg_id=${encodeURIComponent(resolvedTgUser.id)}`, {
             cache: "no-store",
-            credentials: "same-origin"
+            credentials: "same-origin",
+            signal: controller.signal
           });
+          clearTimeout(fetchTimeout);
           const data = await res.json();
 
           if (data.suspended) {
@@ -132,7 +143,6 @@ export default function TelegramPortalEntryPage() {
           }
 
           if (data.needs_link) {
-            // الحساب غير مربوط أو تم حذفه من قِبل الإدارة: مسح الجلسة القديمة لكي يسجل الكود من جديد
             try {
               localStorage.removeItem("fania_student_session");
               localStorage.removeItem("fania_student_token");
@@ -142,7 +152,9 @@ export default function TelegramPortalEntryPage() {
             return;
           }
         } catch {
-          // في حال ضعف الإنترنت: استخدم الجلسة المحفوظة محلياً
+          // Timeout or connection error: proceed to local session check
+        } finally {
+          clearTimeout(fetchTimeout);
         }
       }
 
@@ -161,10 +173,15 @@ export default function TelegramPortalEntryPage() {
         }
       } catch {}
 
-      setLoading(false);
+      if (!isCancelled) setLoading(false);
     };
 
     initTg();
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(hardTimeout);
+    };
   }, []);
 
   // Real-time lookup of student name when code is typed
@@ -205,10 +222,31 @@ export default function TelegramPortalEntryPage() {
     e.preventDefault();
     if (!studentCode.trim() || submitting) return;
 
-    const currentTgUser = extractTelegramUser() || tgUser;
+    let currentTgUser = extractTelegramUser() || tgUser;
     if (!currentTgUser?.id) {
-      setErrorMsg("يرجى فتح البوابة من داخل بوت التيليجرام الرسمي للكلية لتثبيت حسابك تلقائياً");
-      return;
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTgId = urlParams.get("tg_id");
+      let storedTgId: string | null = null;
+      try {
+        storedTgId = localStorage.getItem("fania_tg_id");
+      } catch {}
+
+      if (urlTgId || storedTgId) {
+        currentTgUser = { id: urlTgId || storedTgId!, first_name: "طالب" };
+      } else {
+        // Fallback for Huawei / WebView: generate a persistent identifier so no student is ever blocked
+        let hwId = "";
+        try {
+          hwId = localStorage.getItem("fania_hw_device_id") || "";
+          if (!hwId) {
+            hwId = "hw_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+            localStorage.setItem("fania_hw_device_id", hwId);
+          }
+        } catch {
+          hwId = "hw_" + Date.now();
+        }
+        currentTgUser = { id: hwId, first_name: "مستخدم البوابة" };
+      }
     }
 
     setSubmitting(true);
@@ -265,7 +303,15 @@ export default function TelegramPortalEntryPage() {
 
   return (
     <>
-      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
+      <Script
+        src="https://telegram.org/js/telegram-web-app.js"
+        strategy="afterInteractive"
+        onLoad={() => {
+          try {
+            (window as any).Telegram?.WebApp?.ready?.();
+          } catch {}
+        }}
+      />
 
       <div
         dir="rtl"

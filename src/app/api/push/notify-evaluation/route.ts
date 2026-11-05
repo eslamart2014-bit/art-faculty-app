@@ -35,15 +35,15 @@ export async function POST(request: Request) {
 
     const scoreDisplay = score !== undefined && score !== null ? ` (الدرجة: ${score})` : '';
     const evalTag = `eval_${student.student_code}_${project_name}_${course_id || 'course'}`;
-    const tgHtml = `🎨 <b>رصد تقييم جديد — قسم التربية الفنية</b>\n\nمرحباً <b>${student.full_name}</b> 👨‍🎓\nتم رصد تقييم عملك لمشروع:\n📋 <b>${project_name}</b>\n📚 المقرر: <b>${courseName}</b>\n${score !== undefined && score !== null ? `⭐️ الدرجة: <b>${score}</b>\n` : ''}\n<i>يمكنك الاطلاع على تفاصيل أعمالك عبر بوابة فنية 🚀</i>`;
+    const evalBody = `🎨 تم رصد تقييم مشروع "${project_name}" بمقرر ${courseName}${scoreDisplay}`;
 
     const pushResult = await sendPushToStudents([student.student_code], {
-      title: '🎨 تم رصد تقييم جديد لأعمالك',
-      body: `تم رصد تقييم مشروع "${project_name}" بمقرر ${courseName}${scoreDisplay}`,
+      title: '🎨 رصد تقييم جديد',
+      body: evalBody,
       type: 'grade',
       id: evalTag,
       tag: evalTag,
-      telegramHtml: tgHtml,
+      telegramHtml: `<b>${evalBody}</b>`,
     });
 
     return NextResponse.json({ success: true, result: pushResult });

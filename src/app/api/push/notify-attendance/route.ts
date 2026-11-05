@@ -37,10 +37,10 @@ export async function POST(request: Request) {
 
     const displayDate = date || new Date().toISOString().split('T')[0];
 
-    const title = isCancelled ? 'ℹ️ تم إلغاء تسجيل الحضور' : '✅ تم تسجيل حضورك';
+    const title = isCancelled ? '❌ إلغاء حضور' : '✅ تسجيل حضور';
     const messageBody = isCancelled
-      ? `تم إلغاء تسجيل حضورك في مقرر ${courseName} (${displayDate})`
-      : `تم تسجيل حضورك اليوم بنجاح في مقرر ${courseName} (${displayDate})`;
+      ? `❌ تم إلغاء تسجيل حضورك في مقرر ${courseName} (${displayDate})`
+      : `✅ تم تسجيل حضورك في مقرر ${courseName} (${displayDate})`;
 
     let totalSent = 0;
 
@@ -48,9 +48,7 @@ export async function POST(request: Request) {
     for (const st of students) {
       if (!st.student_code) continue;
       const dedupTag = `att_${st.student_code}_${displayDate}_${course_id || 'course'}`;
-      const tgHtml = isCancelled
-        ? `ℹ️ <b>تنبيه من قسم التربية الفنية:</b>\n\nعزيزي الطالب <b>${st.full_name}</b>، تم إلغاء تسجيل حضورك في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>`
-        : `✅ <b>تسجيل حضور معتمد — قسم التربية الفنية</b>\n\nمرحباً <b>${st.full_name}</b> 👨‍🎓\nتم تسجيل حضورك اليوم بنجاح في مقرر:\n📚 <b>${courseName}</b>\n📅 بتاريخ: <code>${displayDate}</code>\n\n<i>نتمنى لك دوام التوفيق والتميز 🌟</i>`;
+      const tgHtml = `<b>${messageBody}</b>`;
 
       const res = await sendPushToStudents([st.student_code], {
         title,

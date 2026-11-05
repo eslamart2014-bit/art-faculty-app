@@ -18,19 +18,19 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 const STUDENT_INTRO_MESSAGE =
-  `من خلال هذا البوت يمكن للطلاب متابعة حضور وغياب ومشاريع وتقييمات وانضمام للدواليب.\n\n` +
-  `اختر الخدمة المطلوبة من الأزرار الثابتة بالأسفل 👇`;
+  `مرحباً بك في نظام التربية الفنية 🎨\n\n` +
+  `من فضلك استخدم الأزرار الثابتة بالأسفل للوصول لخدمات البوت 👇`;
 
 async function sendStudentWelcomeAndPinButtons(botToken: string, chatId: number | string, portalBaseUrl: string) {
   const key = String(chatId);
   const now = Date.now();
   const lastSent = recentWelcomeSent.get(key) || 0;
-  if (now - lastSent < 5000) {
+  if (now - lastSent < 4000) {
     return;
   }
   recentWelcomeSent.set(key, now);
 
-  // 1. إزالة أي زر قائمة رئيسية من أسفل يسار الشات
+  // 1. إزالة أي زر قائمة رئيسية قديم من أسفل يسار الشات
   fetch(`https://api.telegram.org/bot${botToken}/setChatMenuButton`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -92,11 +92,9 @@ export async function POST(request: Request) {
 
     const portalBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://art-faculty-app.vercel.app').replace(/\/$/, '');
 
-    // فقط الرسائل النصية المرسلة من المستخدم نفسه (وليس رسائل النظام أو البوت أو تثبيت الرسائل)
+    // الرد على أي رسالة مرسلة من الطالب (نص، صورة، صوت، ملصق، إلخ) بتثبيت الأزرار وإرشاده لاستخدامها
     if (
       update.message &&
-      typeof update.message.text === 'string' &&
-      update.message.text.trim().length > 0 &&
       !update.message.from?.is_bot &&
       !update.message.pinned_message
     ) {

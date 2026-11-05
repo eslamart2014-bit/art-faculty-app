@@ -5,7 +5,15 @@ import { getClientIp, isRateLimited } from '@/lib/auth/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_ACTIONS = new Set(['student_search', 'download_card', 'view_card']);
+const ALLOWED_ACTIONS = new Set([
+  'student_search',
+  'download_card',
+  'view_card',
+  'view_projects',
+  'view_attendance',
+  'view_warnings',
+  'view_lockers'
+]);
 const MAX_TEXT = 120;
 
 function cleanText(value: unknown): string | null {

@@ -1,13 +1,11 @@
 import type { NextConfig } from 'next';
 
-const isDev = process.env.NODE_ENV !== 'production';
-
 const nextConfig: NextConfig = {
   // Brotli/gzip compression for all responses – reduces ~70% size on slow mobile
   compress: true,
 
   async headers() {
-    const rules = [
+    return [
       {
         source: '/(.*)',
         headers: [
@@ -26,28 +24,15 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
         ],
       },
-    ];
-
-    if (!isDev) {
-      // Only set 1-year immutable cache in production builds
-      rules.push({
-        source: '/_next/static/(.*)',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      });
-    } else {
-      // In development on localhost, purge any previously cached immutable chunks
-      rules.push({
+      // Purge any stale cache on admin-preview
+      {
         source: '/admin-preview',
         headers: [
           { key: 'Clear-Site-Data', value: '"cache"' },
           { key: 'Cache-Control', value: 'no-store, must-revalidate' },
         ],
-      });
-    }
-
-    return rules;
+      },
+    ];
   },
 };
 

@@ -58,6 +58,7 @@ export function getStudentPersistentKeyboard(baseUrl = DEFAULT_PORTAL_BASE_URL, 
     ],
     resize_keyboard: true,
     is_persistent: true,
+    input_field_placeholder: 'اضغط على الأزرار بالأسفل للاستخدام 👇',
   };
 }
 
@@ -176,10 +177,9 @@ export async function sendTelegramToStudents(
 
         const htmlText =
           payload.telegramHtml ||
-          `<b>${escapeHtml(payload.title)}</b>\n\n` +
-            `مرحباً <b>${escapeHtml(st.full_name)}</b> 👨‍🎓\n` +
-            `${escapeHtml(payload.body)}\n\n` +
-            `<i>اضغط على الزر بالأسفل للدخول المباشر لبوابة فنية 👇</i>`;
+          (payload.body.startsWith('✅') || payload.body.startsWith('❌') || payload.body.startsWith('🎨') || payload.body.startsWith('📌')
+            ? escapeHtml(payload.body)
+            : `<b>${escapeHtml(payload.title)}</b>\n${escapeHtml(payload.body)}`);
 
         try {
           const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
