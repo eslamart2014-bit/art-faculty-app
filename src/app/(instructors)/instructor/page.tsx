@@ -3,26 +3,32 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { 
-  GraduationCap, 
-  Layers, 
-  Search, 
-  RotateCw, 
-  UserCheck, 
-  Sparkles, 
-  ChevronLeft, 
+import {
+  GraduationCap,
+  Layers,
+  Search,
+  RotateCw,
+  UserCheck,
+  Sparkles,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
-  CheckCircle2, 
-  ShieldAlert, 
-  RefreshCw, 
-  Eye, 
+  CheckCircle2,
+  ShieldAlert,
+  RefreshCw,
+  Eye,
   AlertTriangle,
   ExternalLink,
   BookOpen,
   Camera,
   ArrowRight,
-  FolderOpen
+  FolderOpen,
+  Download,
+  Palette,
+  Pencil,
+  User,
+  X,
+  Lightbulb
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/students/codeHelper";
 import QRScanner from "@/components/scanner/QRScanner";
@@ -135,7 +141,7 @@ export default function InstructorPage() {
           return s;
         }));
         setEditingScoreStudent(null);
-        setFeedbackMsg(`✓ تم رصد وتحديث الدرجة (${numScore}) بنجاح.`);
+        setFeedbackMsg(`تم رصد وتحديث الدرجة (${numScore}) بنجاح.`);
       }
     } catch (e: any) {
       alert("خطأ: " + e.message);
@@ -393,7 +399,7 @@ export default function InstructorPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setFeedbackMsg(`✓ ${data.message}`);
+        setFeedbackMsg(data.message);
         setSubmissions(prev => prev.filter(s => !(s.student_code === studentCode && s.project_name === projectName)));
         setSearchResults(prev => prev.map(sr => {
           if (sr.student.student_code === studentCode) {
@@ -434,9 +440,9 @@ export default function InstructorPage() {
 
   if (loadingInitial) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#38bdf8", background: "#0a0e17" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)", background: "var(--bg-deep)" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ width: "40px", height: "40px", border: "3px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+          <div style={{ width: "40px", height: "40px", border: "3px solid var(--accent-ink)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
           <div>جاري تحميل بيانات أعضاء الهيئة المعاونة والتدريس...</div>
         </div>
       </div>
@@ -444,24 +450,24 @@ export default function InstructorPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0e17", color: "#e2e8f0", padding: "16px", maxWidth: "1200px", margin: "0 auto", direction: "rtl" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg-deep)", color: "var(--text-primary)", padding: "16px", maxWidth: "1200px", margin: "0 auto", direction: "rtl" }}>
       
       {/* 1. Header & Navigation */}
-      <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 18px", background: "#141b29", borderRadius: "16px", border: "1px solid #2a374f", marginBottom: "20px", boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}>
+      <header style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px", padding: "14px 18px", background: "var(--surface)", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg, #2563eb, #10b981)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-            <GraduationCap size={24} />
+          <div style={{ width: "42px", height: "42px", borderRadius: "8px", background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+            <GraduationCap size={22} strokeWidth={1.5} />
           </div>
           <div>
-            <h1 style={{ fontSize: "17px", fontWeight: "bold", color: "#fff", margin: 0 }}>بوابة الهيئة المعاونة</h1>
-            <div style={{ color: "#94a3b8", fontSize: "12px" }}>استعراض أعمال ومشاريع الطلاب والتحقق الفوري</div>
+            <h1 style={{ fontSize: "17px", fontWeight: "600", color: "var(--text-primary)", margin: 0 }}>بوابة الهيئة المعاونة</h1>
+            <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>استعراض أعمال ومشاريع الطلاب والتحقق الفوري</div>
           </div>
         </div>
 
         {/* Instructor Identity Selector */}
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "2px" }}>الحساب النشط:</span>
+            <span style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", marginBottom: "2px" }}>الحساب النشط:</span>
             {isPrimaryAdmin ? (
               <select
                 value={selectedInstructor?.id || ""}
@@ -469,7 +475,7 @@ export default function InstructorPage() {
                   const found = instructors.find(i => i.id === e.target.value);
                   if (found) handleSelectInstructor(found);
                 }}
-                style={{ padding: "6px 12px", background: "#1e293b", border: "1px solid #3b82f6", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", outline: "none", cursor: "pointer" }}
+                style={{ padding: "6px 12px", background: "var(--surface-hover)", border: "1px solid var(--primary)", color: "var(--text-primary)", borderRadius: "8px", fontSize: "13px", fontWeight: "600", outline: "none", cursor: "pointer" }}
               >
                 {instructors.map(inst => (
                   <option key={inst.id} value={inst.id}>
@@ -478,15 +484,15 @@ export default function InstructorPage() {
                 ))}
               </select>
             ) : (
-              <div style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", padding: "6px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>👤</span>
+              <div style={{ background: "var(--surface-hover)", border: "1px solid var(--border)", color: "var(--accent-ink)", padding: "6px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
+                <User size={15} strokeWidth={1.5} />
                 <span>{selectedInstructor?.degree ? `${selectedInstructor.degree}/ ` : ""}{selectedInstructor?.full_name || currentUser?.full_name}</span>
               </div>
             )}
           </div>
 
-          <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.06)", border: "1px solid #2a374f", color: "#94a3b8", padding: "8px 12px", borderRadius: "10px", textDecoration: "none", fontSize: "12px" }}>
-            <ChevronLeft size={16} />
+          <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "var(--surface-hover)", border: "1px solid var(--border)", color: "var(--text-secondary)", padding: "8px 12px", borderRadius: "8px", textDecoration: "none", fontSize: "12px" }}>
+            <ChevronLeft size={16} strokeWidth={1.5} />
             <span>الرئيسية</span>
           </Link>
         </div>
@@ -494,23 +500,25 @@ export default function InstructorPage() {
 
       {/* Feedback message banner */}
       {feedbackMsg && (
-        <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "12px 16px", borderRadius: "12px", marginBottom: "16px", fontSize: "13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ background: "rgba(16, 185, 129, 0.14)", border: "1px solid var(--success)", color: "var(--success)", padding: "12px 16px", borderRadius: "8px", marginBottom: "16px", fontSize: "13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>{feedbackMsg}</span>
-          <button onClick={() => setFeedbackMsg(null)} style={{ background: "none", border: "none", color: "#34d399", cursor: "pointer", fontSize: "14px" }}>✕</button>
+          <button onClick={() => setFeedbackMsg(null)} style={{ background: "none", border: "none", color: "var(--success)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }} aria-label="إغلاق">
+            <X size={16} strokeWidth={1.5} />
+          </button>
         </div>
       )}
 
       {/* Tabs Navigation */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#141b29", padding: "6px", borderRadius: "14px", border: "1px solid #2a374f", marginBottom: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", background: "var(--surface)", padding: "6px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "20px" }}>
         <button
           onClick={() => setActiveTab("gallery")}
           style={{
             padding: "10px",
-            borderRadius: "10px",
+            borderRadius: "8px",
             border: "none",
-            background: activeTab === "gallery" ? "#2563eb" : "transparent",
-            color: "#fff",
-            fontWeight: "bold",
+            background: activeTab === "gallery" ? "var(--primary)" : "transparent",
+            color: activeTab === "gallery" ? "#fff" : "var(--text-secondary)",
+            fontWeight: "600",
             fontSize: "14px",
             cursor: "pointer",
             display: "flex",
@@ -519,18 +527,18 @@ export default function InstructorPage() {
             gap: "8px"
           }}
         >
-          <Layers size={16} />
+          <Layers size={16} strokeWidth={1.5} />
           <span>تصفح أعمال المشاريع</span>
         </button>
         <button
           onClick={() => setActiveTab("search")}
           style={{
             padding: "10px",
-            borderRadius: "10px",
+            borderRadius: "8px",
             border: "none",
-            background: activeTab === "search" ? "#2563eb" : "transparent",
-            color: "#fff",
-            fontWeight: "bold",
+            background: activeTab === "search" ? "var(--primary)" : "transparent",
+            color: activeTab === "search" ? "#fff" : "var(--text-secondary)",
+            fontWeight: "600",
             fontSize: "14px",
             cursor: "pointer",
             display: "flex",
@@ -539,7 +547,7 @@ export default function InstructorPage() {
             gap: "8px"
           }}
         >
-          <Search size={16} />
+          <Search size={16} strokeWidth={1.5} />
           <span>بحث ذكي وتأكد من الطالب</span>
         </button>
       </div>
@@ -552,18 +560,18 @@ export default function InstructorPage() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                 <div>
-                  <h2 style={{ fontSize: "16px", fontWeight: "bold", color: "#fff", margin: 0 }}>مشاريع المقررات المسندة إليك</h2>
-                  <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>اختر أي مشروع لاستعراض الأعمال والصور ورصد الدرجات</div>
+                  <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", margin: 0 }}>مشاريع المقررات المسندة إليك</h2>
+                  <div style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "2px" }}>اختر أي مشروع لاستعراض الأعمال والصور ورصد الدرجات</div>
                 </div>
-                <span style={{ fontSize: "12px", color: "#38bdf8", background: "rgba(56, 189, 248, 0.1)", padding: "4px 10px", borderRadius: "8px" }}>
+                <span className="tabular-nums" style={{ fontSize: "12px", color: "var(--accent-ink)", background: "rgba(56, 189, 248, 0.12)", padding: "4px 10px", borderRadius: "6px", fontWeight: "600" }}>
                   {allProjectsList.length} مشروع مسجل
                 </span>
               </div>
 
               {allProjectsList.length === 0 ? (
-                <div className="glass-card" style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8" }}>
-                  <BookOpen size={40} style={{ margin: "0 auto 12px", color: "#475569" }} />
-                  <h3 style={{ color: "#fff", fontSize: "16px", marginBottom: "6px" }}>لا توجد مشاريع مضافة حالياً</h3>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+                  <BookOpen size={38} strokeWidth={1.5} style={{ margin: "0 auto 12px", color: "var(--text-muted)" }} />
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: "600", marginBottom: "6px" }}>لا توجد مشاريع مضافة حالياً</h3>
                   <p style={{ fontSize: "13px", maxWidth: "420px", margin: "0 auto" }}>
                     لم يتم تسجيل أي مشاريع فنية داخل المقررات المسندة لك حتى الآن.
                   </p>
@@ -574,44 +582,44 @@ export default function InstructorPage() {
                     <div
                       key={idx}
                       onClick={() => handleSelectProjectCard(proj.courseId, proj.projectName)}
-                      className="glass-card"
                       style={{
                         padding: "18px",
-                        borderRadius: "14px",
-                        border: "1px solid #2a374f",
+                        borderRadius: "12px",
+                        border: "1px solid var(--border)",
                         cursor: "pointer",
-                        background: "linear-gradient(135deg, #141b29, #0d131f)",
-                        transition: "transform 0.15s, border-color 0.15s",
+                        background: "var(--surface)",
+                        transition: "border-color 0.15s",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between"
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.borderColor = "#3b82f6"}
-                      onMouseLeave={(e) => e.currentTarget.style.borderColor = "#2a374f"}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = "var(--primary)"}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = "var(--border)"}
                     >
                       <div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", padding: "3px 8px", borderRadius: "6px", fontWeight: "bold" }}>
+                          <span style={{ fontSize: "11px", background: "rgba(56, 189, 248, 0.14)", color: "var(--accent-ink)", padding: "3px 8px", borderRadius: "6px", fontWeight: "600" }}>
                             {proj.academicYear || "عام"}
                           </span>
                           {proj.maxScore && (
-                            <span style={{ fontSize: "11px", color: "#10b981", fontWeight: "bold" }}>
+                            <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--success)", fontWeight: "600" }}>
                               من {proj.maxScore} درجة
                             </span>
                           )}
                         </div>
-                        <h3 style={{ fontSize: "16px", color: "#fff", fontWeight: "bold", margin: "6px 0 8px 0" }}>
-                          🎨 مشروع: {proj.projectName}
+                        <h3 style={{ fontSize: "15px", color: "var(--text-primary)", fontWeight: "600", margin: "6px 0 8px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Palette size={16} strokeWidth={1.5} color="var(--accent-ink)" />
+                          <span>مشروع: {proj.projectName}</span>
                         </h3>
-                        <div style={{ color: "#94a3b8", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <BookOpen size={14} color="#60a5fa" />
+                        <div style={{ color: "var(--text-muted)", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <BookOpen size={14} strokeWidth={1.5} color="var(--accent-ink)" />
                           <span>المقرر: {proj.courseName}</span>
                         </div>
                       </div>
 
-                      <div style={{ marginTop: "16px", paddingTop: "10px", borderTop: "1px dashed #2a374f", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ color: "#34d399", fontSize: "12px", fontWeight: "bold" }}>استعراض الأعمال المرفوعة</span>
-                        <ChevronLeft size={16} color="#34d399" />
+                      <div style={{ marginTop: "16px", paddingTop: "10px", borderTop: "1px dashed var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: "var(--success)", fontSize: "12px", fontWeight: "600" }}>استعراض الأعمال المرفوعة</span>
+                        <ChevronLeft size={16} strokeWidth={1.5} color="var(--success)" />
                       </div>
                     </div>
                   ))}
@@ -622,40 +630,40 @@ export default function InstructorPage() {
             /* VIEW B: SUBMISSIONS GALLERY FOR SELECTED PROJECT */
             <div>
               {/* Back to cards & Project Header bar */}
-              <div className="glass-card" style={{ padding: "14px 18px", marginBottom: "18px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "14px 18px", marginBottom: "18px", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <button
                     onClick={() => setGalleryViewMode("grid")}
                     className="btn-compact"
                     style={{
-                      background: "#1e293b",
-                      color: "#38bdf8",
-                      border: "1px solid #3b82f6",
+                      background: "var(--surface-hover)",
+                      color: "var(--accent-ink)",
+                      border: "1px solid var(--primary)",
                       padding: "8px 14px",
                       borderRadius: "8px",
-                      fontWeight: "bold",
+                      fontWeight: "600",
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "6px"
                     }}
                   >
-                    <ArrowRight size={15} />
+                    <ArrowRight size={15} strokeWidth={1.5} />
                     <span>الرجوع لكافة المشاريع</span>
                   </button>
 
                   <div>
-                    <h2 style={{ fontSize: "16px", fontWeight: "bold", color: "#fff", margin: 0 }}>
+                    <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--text-primary)", margin: 0 }}>
                       مشروع: {selectedProjectName}
                     </h2>
-                    <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                    <div style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "2px" }}>
                       المقرر: {selectedCourse?.name || ""} • الفرقة: {selectedCourse?.academic_year || "عام"}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ background: "rgba(16, 185, 129, 0.15)", color: "#34d399", padding: "6px 12px", borderRadius: "8px", fontWeight: "bold", fontSize: "12px" }}>
+                  <span className="tabular-nums" style={{ background: "rgba(16, 185, 129, 0.14)", color: "var(--success)", padding: "6px 10px", borderRadius: "6px", fontWeight: "600", fontSize: "12px" }}>
                     إجمالي الأعمال: {submissions.length}
                   </span>
 
@@ -665,12 +673,12 @@ export default function InstructorPage() {
                       disabled={isExportingPdf}
                       className="btn-compact"
                       style={{
-                        background: "linear-gradient(135deg, #059669, #10b981)",
+                        background: "var(--success)",
                         color: "#fff",
                         border: "none",
                         padding: "8px 14px",
                         borderRadius: "8px",
-                        fontWeight: "bold",
+                        fontWeight: "600",
                         fontSize: "12px",
                         cursor: isExportingPdf ? "not-allowed" : "pointer",
                         display: "flex",
@@ -685,7 +693,8 @@ export default function InstructorPage() {
                         </>
                       ) : (
                         <>
-                          <span>📥 تحميل PDF (مقاس الجوال)</span>
+                          <Download size={14} strokeWidth={1.5} />
+                          <span>تحميل PDF (مقاس الجوال)</span>
                         </>
                       )}
                     </button>
@@ -695,14 +704,14 @@ export default function InstructorPage() {
 
               {/* Submissions Gallery Grid */}
               {loadingSubmissions ? (
-                <div style={{ textAlign: "center", padding: "50px", color: "#94a3b8" }}>
-                  <div style={{ width: "30px", height: "30px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
+                <div style={{ textAlign: "center", padding: "50px", color: "var(--text-muted)" }}>
+                  <div style={{ width: "30px", height: "30px", border: "2px solid var(--accent-ink)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
                   <div>جاري استعراض أعمال الطلاب...</div>
                 </div>
               ) : submissions.length === 0 ? (
-                <div className="glass-card" style={{ padding: "40px 20px", textAlign: "center", color: "#94a3b8" }}>
-                  <BookOpen size={40} style={{ margin: "0 auto 12px", color: "#475569" }} />
-                  <h3 style={{ color: "#fff", fontSize: "16px", marginBottom: "6px" }}>لا توجد أعمال مرفوعة حتى الآن</h3>
+                <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "40px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+                  <BookOpen size={38} strokeWidth={1.5} style={{ margin: "0 auto 12px", color: "var(--text-muted)" }} />
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "16px", fontWeight: "600", marginBottom: "6px" }}>لا توجد أعمال مرفوعة حتى الآن</h3>
                   <p style={{ fontSize: "13px", maxWidth: "420px", margin: "0 auto" }}>
                     لم يقم أي طالب برفع صور لمشروع ({selectedProjectName}) في مقرر ({selectedCourse?.name || ""}) حتى اللحظة.
                   </p>
@@ -714,14 +723,13 @@ export default function InstructorPage() {
                     const isActionLoading = actionLoading === `${sub.student_code}_${sub.project_name}`;
 
                     return (
-                      <div 
+                      <div
                         key={sub.id || idx}
-                        className="glass-card"
-                        style={{ padding: "14px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #2a374f", overflow: "hidden" }}
+                        style={{ background: "var(--surface)", borderRadius: "12px", padding: "14px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid var(--border)", overflow: "hidden" }}
                       >
                         <div>
                           {/* Image Preview with Zoom Overlay */}
-                          <div 
+                          <div
                             onClick={() => {
                               setPreviewImage({
                                 url: firstImg,
@@ -730,43 +738,43 @@ export default function InstructorPage() {
                               });
                               setRotationDegrees(0);
                             }}
-                            style={{ position: "relative", width: "100%", height: "200px", borderRadius: "12px", overflow: "hidden", background: "#0d131f", cursor: "pointer", marginBottom: "12px", border: "1px solid #1e293b" }}
+                            style={{ position: "relative", width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", background: "var(--bg-deep)", cursor: "pointer", marginBottom: "12px", border: "1px solid var(--border)" }}
                           >
                             {firstImg ? (
-                              <img 
-                                src={firstImg} 
+                              <img
+                                src={firstImg}
                                 alt={sub.student_name}
                                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
                               />
                             ) : (
-                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: "12px" }}>
+                              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px" }}>
                                 لا توجد صورة
                               </div>
                             )}
 
                             <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(0,0,0,0.7)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
-                              <Eye size={12} />
+                              <Eye size={12} strokeWidth={1.5} />
                               <span>تكبير الصورة</span>
                             </div>
 
                             {/* Status Badge */}
-                            <div style={{ position: "absolute", top: "8px", right: "8px", background: sub.score !== null ? "rgba(16, 185, 129, 0.9)" : "rgba(245, 158, 11, 0.9)", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                            <div className="tabular-nums" style={{ position: "absolute", top: "8px", right: "8px", background: sub.score !== null ? "rgba(16, 185, 129, 0.9)" : "rgba(245, 158, 11, 0.9)", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "600" }}>
                               {sub.score !== null ? `الدرجة: ${sub.score}` : "قيد التقييم"}
                             </div>
                           </div>
 
                           {/* Student Info */}
                           <div style={{ marginBottom: "12px" }}>
-                            <div style={{ color: "#ffffff", fontWeight: "bold", fontSize: "15px", marginBottom: "4px", lineHeight: "1.4" }}>
+                            <div style={{ color: "var(--text-primary)", fontWeight: "600", fontSize: "15px", marginBottom: "4px", lineHeight: "1.4" }}>
                               {sub.student_name}
                             </div>
-                            <div style={{ color: "#38bdf8", fontSize: "12px", display: "flex", gap: "8px" }}>
+                            <div className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "12px", display: "flex", gap: "8px" }}>
                               <span>كود: {formatStudentCode(sub.student_code)}</span>
                               <span>•</span>
                               <span>سكشن: {sub.section || "1"}</span>
                             </div>
                             {sub.created_at && (
-                              <div style={{ color: "#64748b", fontSize: "11px", marginTop: "4px" }}>
+                              <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "4px" }}>
                                 تاريخ الرفع: {new Date(sub.created_at).toLocaleDateString("ar-EG")}
                               </div>
                             )}
@@ -777,7 +785,7 @@ export default function InstructorPage() {
                         {sub.images && sub.images.length > 1 && (
                           <div style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "4px 0", marginBottom: "8px" }}>
                             {sub.images.map((imgObj: any, iIdx: number) => (
-                              <div 
+                              <div
                                 key={iIdx}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -793,7 +801,7 @@ export default function InstructorPage() {
                                   height: "42px",
                                   borderRadius: "6px",
                                   overflow: "hidden",
-                                  border: "1px solid #3b82f6",
+                                  border: "1px solid var(--primary)",
                                   cursor: "pointer",
                                   flexShrink: 0
                                 }}
@@ -808,27 +816,29 @@ export default function InstructorPage() {
                         {/* Inline Grading Form / Button */}
                         <div style={{ marginBottom: "8px" }}>
                           {editingScoreStudent?.studentCode === sub.student_code ? (
-                            <div style={{ background: "#1a2436", border: "1px solid #3b82f6", padding: "8px", borderRadius: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
-                              <input 
+                            <div style={{ background: "var(--bg-deep)", border: "1px solid var(--primary)", padding: "8px", borderRadius: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+                              <input
                                 type="number"
                                 value={scoreInput}
                                 onChange={e => setScoreInput(e.target.value)}
                                 placeholder="الدرجة"
-                                style={{ width: "65px", padding: "6px", borderRadius: "6px", background: "#0d131f", border: "1px solid #475569", color: "#fff", fontWeight: "bold", textAlign: "center" }}
+                                className="tabular-nums"
+                                style={{ width: "65px", padding: "6px", borderRadius: "6px", background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-primary)", fontWeight: "600", textAlign: "center" }}
                                 autoFocus
                               />
                               <button
                                 onClick={() => handleSaveScore(sub.student_code)}
                                 disabled={savingScore}
-                                style={{ flex: 1, padding: "6px 8px", background: "#10b981", border: "none", borderRadius: "6px", color: "#fff", fontWeight: "bold", cursor: "pointer", fontSize: "12px" }}
+                                style={{ flex: 1, padding: "6px 8px", background: "var(--success)", border: "none", borderRadius: "6px", color: "#fff", fontWeight: "600", cursor: "pointer", fontSize: "12px" }}
                               >
-                                {savingScore ? "حفظ..." : "✓ حفظ"}
+                                {savingScore ? "حفظ..." : "حفظ"}
                               </button>
                               <button
                                 onClick={() => setEditingScoreStudent(null)}
-                                style={{ padding: "6px 8px", background: "#334155", border: "none", borderRadius: "6px", color: "#94a3b8", cursor: "pointer", fontSize: "12px" }}
+                                style={{ padding: "6px 8px", background: "var(--surface-hover)", border: "1px solid var(--border)", borderRadius: "6px", color: "var(--text-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+                                aria-label="إلغاء"
                               >
-                                ✕
+                                <X size={13} strokeWidth={1.5} />
                               </button>
                             </div>
                           ) : (
@@ -839,13 +849,13 @@ export default function InstructorPage() {
                               }}
                               style={{
                                 width: "100%",
-                                background: sub.score !== null ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
-                                border: `1px solid ${sub.score !== null ? "#10b981" : "#3b82f6"}`,
-                                color: sub.score !== null ? "#34d399" : "#60a5fa",
+                                background: sub.score !== null ? "rgba(16, 185, 129, 0.14)" : "rgba(37, 99, 235, 0.14)",
+                                border: `1px solid ${sub.score !== null ? "var(--success)" : "var(--primary)"}`,
+                                color: sub.score !== null ? "var(--success)" : "var(--accent-ink)",
                                 padding: "7px 10px",
                                 borderRadius: "8px",
                                 fontSize: "12px",
-                                fontWeight: "bold",
+                                fontWeight: "600",
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
@@ -853,8 +863,8 @@ export default function InstructorPage() {
                                 gap: "6px"
                               }}
                             >
-                              <span>✏️</span>
-                              <span>{sub.score !== null ? `تعديل الدرجة (${sub.score})` : "رصد الدرجة لهذا العمل"}</span>
+                              <Pencil size={13} strokeWidth={1.5} />
+                              <span className="tabular-nums">{sub.score !== null ? `تعديل الدرجة (${sub.score})` : "رصد الدرجة لهذا العمل"}</span>
                             </button>
                           )}
                         </div>
@@ -865,10 +875,10 @@ export default function InstructorPage() {
                             onClick={() => handleAllowRetake(sub.student_code, selectedCourseId, selectedProjectName, sub.student_name)}
                             disabled={isActionLoading}
                             className="btn-secondary"
-                            style={{ width: "100%", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "#f87171", fontSize: "11px", padding: "7px" }}
+                            style={{ width: "100%", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "var(--error)", fontSize: "11px", padding: "7px", borderRadius: "8px", fontWeight: "500" }}
                           >
-                            <RefreshCw size={12} className={isActionLoading ? "spin" : ""} />
-                            <span>{isActionLoading ? "جاري فك القفل..." : "🔄 فك قفل إعادة التصوير"}</span>
+                            <RefreshCw size={12} strokeWidth={1.5} className={isActionLoading ? "spin" : ""} />
+                            <span>{isActionLoading ? "جاري فك القفل..." : "فك قفل إعادة التصوير"}</span>
                           </button>
                         </div>
 
@@ -886,8 +896,8 @@ export default function InstructorPage() {
       {activeTab === "search" && (
         <div>
           {/* Search Box */}
-          <div className="glass-card" style={{ padding: "18px 20px", marginBottom: "20px" }}>
-            <label style={{ display: "block", color: "#94a3b8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "18px 20px", marginBottom: "20px" }}>
+            <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>
               ابحث عن الطالب بالكود الجامعي أو بالاسم:
             </label>
             <div style={{ display: "flex", gap: "6px", alignItems: "stretch", width: "100%", boxSizing: "border-box" }}>
@@ -898,10 +908,11 @@ export default function InstructorPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") executeStudentSearch(); }}
                   placeholder="كود الطالب أو الاسم..."
-                  style={{ width: "100%", height: "44px", padding: "0 12px", background: "#0d131f", border: "1px solid #3b82f6", borderRadius: "10px", color: "#fff", fontSize: "14px", boxSizing: "border-box" }}
+                  className="tabular-nums"
+                  style={{ width: "100%", height: "44px", padding: "0 12px", background: "var(--bg-deep)", border: "1px solid var(--primary)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "14px", boxSizing: "border-box" }}
                 />
                 {isSearching && !/^\d+$/.test(searchQuery.trim()) && (
-                  <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid #38bdf8", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                  <div style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", border: "2px solid var(--accent-ink)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
                 )}
               </div>
 
@@ -913,11 +924,11 @@ export default function InstructorPage() {
                 style={{
                   height: "44px",
                   padding: "0 14px",
-                  background: "#2563eb",
+                  background: "var(--primary)",
                   color: "#fff",
                   border: "none",
-                  borderRadius: "10px",
-                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  fontWeight: "600",
                   fontSize: "13px",
                   cursor: isSearching ? "not-allowed" : "pointer",
                   display: "flex",
@@ -929,7 +940,7 @@ export default function InstructorPage() {
                   boxSizing: "border-box"
                 }}
               >
-                <Search size={15} />
+                <Search size={15} strokeWidth={1.5} />
                 <span>بحث</span>
               </button>
 
@@ -940,10 +951,10 @@ export default function InstructorPage() {
                 style={{
                   height: "44px",
                   width: "44px",
-                  background: isCameraOpen ? "#ef4444" : "#1e293b",
-                  color: isCameraOpen ? "#fff" : "#38bdf8",
-                  border: isCameraOpen ? "none" : "1px solid #3b82f6",
-                  borderRadius: "10px",
+                  background: isCameraOpen ? "var(--error)" : "var(--surface-hover)",
+                  color: isCameraOpen ? "#fff" : "var(--accent-ink)",
+                  border: isCameraOpen ? "1px solid transparent" : "1px solid var(--primary)",
+                  borderRadius: "8px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
@@ -953,12 +964,12 @@ export default function InstructorPage() {
                 }}
                 title={isCameraOpen ? "إغلاق الكاميرا" : "مسح QR بالكاميرا"}
               >
-                <Camera size={18} />
+                <Camera size={18} strokeWidth={1.5} />
               </button>
             </div>
 
             {isCameraOpen && (
-              <div style={{ marginTop: "14px", borderRadius: "14px", overflow: "hidden" }}>
+              <div style={{ marginTop: "14px", borderRadius: "12px", overflow: "hidden" }}>
                 <QRScanner
                   onScan={(decoded) => {
                     const code = extractStudentCode(decoded) || decoded.trim();
@@ -975,14 +986,15 @@ export default function InstructorPage() {
                 />
               </div>
             )}
-            <div style={{ color: "#64748b", fontSize: "11px", marginTop: "8px" }}>
-              💡 يقتصر البحث على الفرق والمقررات المسندة إليك فقط لمطابقة وجه الطالب، وفحص أعماله معك.
+            <div style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "8px", display: "flex", alignItems: "center", gap: "5px" }}>
+              <Lightbulb size={13} strokeWidth={1.5} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+              <span>يقتصر البحث على الفرق والمقررات المسندة إليك فقط لمطابقة وجه الطالب، وفحص أعماله معك.</span>
             </div>
           </div>
 
           {/* Search Results */}
           {searchResults.length === 0 && searchQuery && !isSearching && (
-            <div className="glass-card" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
               لا يوجد طالب مطابق لهذا البحث في كشوف مقرراتك المسندة.
             </div>
           )}
@@ -996,57 +1008,57 @@ export default function InstructorPage() {
               const isExpanded = expandedStudentId === st.id;
 
               return (
-                <div 
-                  key={st.id} 
-                  className="glass-card" 
-                  style={{ 
-                    padding: "14px 18px", 
-                    border: isExpanded ? "1px solid #3b82f6" : "1px solid #2a374f",
+                <div
+                  key={st.id}
+                  style={{
+                    padding: "14px 18px",
+                    border: isExpanded ? "1px solid var(--primary)" : "1px solid var(--border)",
                     borderRadius: "12px",
-                    background: isExpanded ? "#131a27" : "#0f1724",
-                    transition: "all 0.2s ease"
+                    background: isExpanded ? "var(--surface-hover)" : "var(--surface)",
+                    transition: "border-color 0.2s ease, background-color 0.2s ease"
                   }}
                 >
                   {/* Clean List Row: Student Name + Academic Year ONLY */}
-                  <div 
+                  <div
                     onClick={() => setExpandedStudentId(isExpanded ? null : st.id)}
                     style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "34px", height: "34px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#38bdf8", fontSize: "14px" }}>
-                        👤
+                      <div style={{ width: "34px", height: "34px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.14)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)" }}>
+                        <User size={16} strokeWidth={1.5} />
                       </div>
                       <div>
-                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>
+                        <div style={{ color: "var(--text-primary)", fontWeight: "600", fontSize: "15px" }}>
                           {st.full_name}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ 
-                        background: "rgba(56, 189, 248, 0.12)", 
-                        color: "#38bdf8", 
-                        padding: "4px 10px", 
-                        borderRadius: "8px", 
-                        fontSize: "12px", 
-                        fontWeight: "bold" 
+                      <span style={{
+                        background: "rgba(56, 189, 248, 0.12)",
+                        color: "var(--accent-ink)",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: "600"
                       }}>
                         {st.academic_year || "عام"}
                       </span>
                       <button
                         className="btn-compact"
                         style={{
-                          background: isExpanded ? "#2563eb" : "#1e293b",
+                          background: isExpanded ? "var(--primary)" : "var(--bg-deep)",
                           color: "#fff",
-                          border: "none",
+                          border: isExpanded ? "none" : "1px solid var(--border)",
                           padding: "6px 12px",
                           borderRadius: "6px",
                           fontSize: "11px",
+                          fontWeight: "500",
                           cursor: "pointer"
                         }}
                       >
-                        {isExpanded ? "إخفاء السجل ▲" : "عرض السجل والأعمال ▼"}
+                        {isExpanded ? "إخفاء السجل" : "عرض السجل والأعمال"}
                       </button>
                     </div>
                   </div>
@@ -1058,38 +1070,38 @@ export default function InstructorPage() {
                         
                         {/* Student ID Photo for Face Verification */}
                         <div>
-                          <div style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+                          <div style={{ color: "var(--text-muted)", fontSize: "12px", fontWeight: "600", marginBottom: "6px" }}>
                             صورة بطاقة الرقم القومي (لمطابقة الوجه والهوية):
                           </div>
                           {acc?.id_card_url ? (
-                            <div 
+                            <div
                               onClick={() => {
                                 setPreviewImage({ url: acc.id_card_url, title: `بطاقة هوية: ${st.full_name}`, subTitle: `كود: ${st.student_code}` });
                                 setRotationDegrees(0);
                               }}
-                              style={{ width: "160px", height: "100px", borderRadius: "10px", overflow: "hidden", border: "2px solid #10b981", cursor: "pointer", background: "#000" }}
+                              style={{ width: "160px", height: "100px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--success)", cursor: "pointer", background: "#000" }}
                             >
                               <img src={acc.id_card_url} alt="بطاقة الهوية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             </div>
                           ) : (
-                            <div style={{ padding: "10px", background: "rgba(245, 158, 11, 0.08)", border: "1px dashed #f59e0b", borderRadius: "8px", color: "#f59e0b", fontSize: "12px" }}>
+                            <div style={{ padding: "10px", background: "rgba(245, 158, 11, 0.08)", border: "1px dashed var(--warning)", borderRadius: "8px", color: "var(--warning)", fontSize: "12px" }}>
                               لم يقم الطالب برفع صورة بطاقة الهوية بعد
                             </div>
                           )}
-                          <div style={{ color: "#64748b", fontSize: "11px", marginTop: "6px" }}>
+                          <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "6px" }}>
                             السكشن: {st.section || "1"} {acc?.mobile && `• هاتف: ${acc.mobile}`}
                           </div>
                         </div>
 
                         {/* Submissions with THIS assistant only */}
                         <div>
-                          <div style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
-                            <Layers size={14} />
+                          <div style={{ color: "var(--accent-ink)", fontSize: "12px", fontWeight: "600", marginBottom: "6px", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Layers size={14} strokeWidth={1.5} />
                             <span>الأعمال المرفوعة في مقرراتك المسندة إليك:</span>
                           </div>
 
                           {subs.length === 0 ? (
-                            <div style={{ padding: "14px", background: "#0a0e17", borderRadius: "8px", color: "#64748b", fontSize: "12px", textAlign: "center" }}>
+                            <div style={{ padding: "14px", background: "var(--bg-deep)", borderRadius: "8px", color: "var(--text-muted)", fontSize: "12px", textAlign: "center" }}>
                               لا توجد أعمال مرفوعة لهذا الطالب في مقرراتك حتى الآن.
                             </div>
                           ) : (
@@ -1099,10 +1111,10 @@ export default function InstructorPage() {
                                 const isActionLoading = actionLoading === `${st.student_code}_${s.project_name}`;
 
                                 return (
-                                  <div key={sIdx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0e17", border: "1px solid #1e293b", padding: "8px 12px", borderRadius: "8px", gap: "10px" }}>
+                                  <div key={sIdx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "8px 12px", borderRadius: "8px", gap: "10px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                       {imgUrl && (
-                                        <div 
+                                        <div
                                           onClick={() => {
                                             setPreviewImage({ url: imgUrl, title: `عمل: ${s.project_name} - ${st.full_name}`, subTitle: `مقرر: ${s.course_name || ""}` });
                                             setRotationDegrees(0);
@@ -1113,8 +1125,8 @@ export default function InstructorPage() {
                                         </div>
                                       )}
                                       <div>
-                                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "12px" }}>{s.project_name}</div>
-                                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>{s.course_name || "مقرر مسند"}</div>
+                                        <div style={{ color: "var(--text-primary)", fontWeight: "600", fontSize: "12px" }}>{s.project_name}</div>
+                                        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>{s.course_name || "مقرر مسند"}</div>
                                       </div>
                                     </div>
 
@@ -1122,9 +1134,9 @@ export default function InstructorPage() {
                                       onClick={() => handleAllowRetake(st.student_code, s.course_id, s.project_name, st.full_name)}
                                       disabled={isActionLoading}
                                       className="btn-compact"
-                                      style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                                      style={{ background: "rgba(239, 68, 68, 0.14)", border: "1px solid var(--error)", color: "var(--error)", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
                                     >
-                                      <RefreshCw size={11} className={isActionLoading ? "spin" : ""} />
+                                      <RefreshCw size={11} strokeWidth={1.5} className={isActionLoading ? "spin" : ""} />
                                       <span>السماح بإعادة التصوير</span>
                                     </button>
                                   </div>
@@ -1146,71 +1158,72 @@ export default function InstructorPage() {
 
       {/* Lightbox Preview Modal (Rendered directly into document.body via Portal) */}
       {previewImage && mounted && typeof document !== "undefined" && createPortal(
-        <div 
+        <div
           onClick={() => setPreviewImage(null)}
-          style={{ 
-            position: "fixed", 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            bottom: 0, 
-            width: "100vw", 
-            height: "100vh", 
-            zIndex: 999999, 
-            background: "rgba(0,0,0,0.94)", 
-            display: "flex", 
-            flexDirection: "column", 
-            justifyContent: "space-between", 
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 999999,
+            background: "rgba(0,0,0,0.94)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
             padding: "20px",
             boxSizing: "border-box"
           }}
         >
           {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "#fff", zIndex: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--text-primary)", zIndex: 10 }}>
             <div>
-              <div style={{ fontWeight: "bold", fontSize: "15px" }}>{previewImage.title}</div>
-              <div style={{ color: "#94a3b8", fontSize: "12px" }}>{previewImage.subTitle}</div>
+              <div style={{ fontWeight: "600", fontSize: "15px" }}>{previewImage.title}</div>
+              <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>{previewImage.subTitle}</div>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setRotationDegrees(prev => (prev + 90) % 360);
                 }}
                 className="btn-compact"
-                style={{ background: "#1e293b", border: "1px solid #475569", color: "#fff", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
+                style={{ background: "var(--surface-hover)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}
               >
-                <RotateCw size={14} />
+                <RotateCw size={14} strokeWidth={1.5} />
                 <span>تدوير 90°</span>
               </button>
-              <button 
+              <button
                 onClick={() => setPreviewImage(null)}
                 className="btn-compact"
-                style={{ background: "#ef4444", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ background: "var(--error)", border: "none", color: "#fff", width: "36px", height: "36px", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                aria-label="إغلاق"
               >
-                ✕
+                <X size={18} strokeWidth={1.5} />
               </button>
             </div>
           </div>
 
           {/* Full Image Centered in Current Viewport */}
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", margin: "16px 0" }}>
-            <img 
-              src={previewImage.url} 
-              alt="معاينة" 
-              style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: "12px", transform: `rotate(${rotationDegrees}deg)`, transition: "transform 0.3s" }} 
+            <img
+              src={previewImage.url}
+              alt="معاينة"
+              style={{ maxHeight: "80vh", maxWidth: "90vw", objectFit: "contain", borderRadius: "12px", transform: `rotate(${rotationDegrees}deg)`, transition: "transform 0.3s" }}
             />
           </div>
 
           {/* Footer note */}
-          <div style={{ textAlign: "center", color: "#64748b", fontSize: "12px" }}>
+          <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "12px" }}>
             اضغط في أي مكان فارغ للإغلاق
           </div>
         </div>,
         document.body
       )}
 
-      <footer style={{ textAlign: "center", paddingTop: "28px", paddingBottom: "20px", color: "#64748b", fontSize: "11px" }}>
+      <footer style={{ textAlign: "center", paddingTop: "28px", paddingBottom: "20px", color: "var(--text-muted)", fontSize: "11px" }}>
         جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
     </div>

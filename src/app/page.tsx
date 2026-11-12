@@ -20,6 +20,7 @@ import AdminUsersModal from "@/components/admin/AdminUsersModal";
 import AdvancedSettingsModal from "@/components/admin/AdvancedSettingsModal";
 import StudentPortalHubModal from "@/components/portal-hub/StudentPortalHubModal";
 import StaffReauthModal from "@/components/auth/StaffReauthModal";
+import { BookOpen, Eye } from "lucide-react";
 import { syncStaffSessionClient } from "@/lib/auth/staffAuthFetch";
 
 function syncStaffSession(accessToken?: string | null) {
@@ -339,23 +340,22 @@ export default function Home() {
         alignItems: "center",
         justifyContent: "center",
         height: "100vh",
-        background: "#0a0e17",
-        color: "#38bdf8",
-        fontFamily: "system-ui, sans-serif",
+        background: "var(--background)",
+        color: "var(--accent-ink)",
         direction: "rtl"
       }}>
-        <div style={{ width: "42px", height: "42px", border: "3px solid #1e293b", borderTopColor: "#38bdf8", borderRadius: "50%", animation: "spin 0.8s linear infinite", marginBottom: "16px" }} />
-        <div style={{ fontSize: "16px", fontWeight: "bold", color: "#f1f5f9" }}>جاري فتح بوابة الطلاب...</div>
-        <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>نظام فنية الموحد</div>
+        <div className="loader-circle" />
+        <div style={{ fontSize: "15px", fontWeight: 500, color: "var(--text)" }}>جاري فتح بوابة الطلاب</div>
+        <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px" }}>نظام التربية الفنية</div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column", background: "var(--background)" }}>
         <div className="loader-circle"></div>
-        <div style={{ color: "#ccc", fontSize: "14px", marginTop: "10px" }}>جاري التحميل...</div>
+        <div style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "8px" }}>جاري التحميل</div>
       </div>
     );
   }
@@ -365,7 +365,7 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ padding: "0", maxWidth: "880px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column" }}>
       <AppBar
         user={user}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -389,18 +389,25 @@ export default function Home() {
         }} 
       />
       
-      <div style={{ padding: "15px", flexGrow: 1, overflowY: "auto" }}>
-        <h2 style={{ color: "var(--success)", marginTop: "10px", marginBottom: "15px", fontSize: "18px" }}>📚 مقرراتي الدراسية</h2>
+      <div style={{ padding: "16px", flexGrow: 1, overflowY: "auto" }}>
+        <h2 style={{ color: "var(--text)", marginTop: "4px", marginBottom: "16px", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+          <BookOpen size={18} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
+          <span>مقرراتي الدراسية</span>
+        </h2>
         <CoursesList user={user} refreshTrigger={refreshTrigger} />
       </div>
 
       {originalAdminUser && user.id !== originalAdminUser.id && (
-        <div style={{ background: "#FF9800", color: "#000", padding: "10px", textAlign: "center", fontWeight: "bold", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span>👀 أنت تتصفح بحساب: {user.full_name}</span>
+        <div style={{ background: "rgba(245, 158, 11, 0.14)", borderTop: "1px solid rgba(245, 158, 11, 0.3)", color: "var(--warning-ink)", padding: "8px 16px", fontWeight: 500, fontSize: "13px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+            <Eye size={16} strokeWidth={1.5} />
+            <span>أنت تتصفح بحساب: {user.full_name}</span>
+          </span>
           <button 
             onClick={() => setUser(originalAdminUser)}
-            style={{ background: "#000", color: "#fff", border: "none", padding: "5px 10px", borderRadius: "5px", cursor: "pointer", fontSize: "12px" }}
-          >العودة لحسابك</button>
+            className="btn-compact"
+            style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border-light)", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}
+          >العودة لحسابي</button>
         </div>
       )}
 

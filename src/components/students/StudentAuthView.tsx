@@ -2,7 +2,30 @@
 
 import React from "react";
 import Link from "next/link";
-import { Camera, CheckCircle2, Eye, EyeOff, FolderOpen, QrCode } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Camera,
+  Check,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Eye,
+  EyeOff,
+  FolderOpen,
+  Globe,
+  Lightbulb,
+  Lock,
+  LogIn,
+  QrCode,
+  RefreshCw,
+  Search,
+  Smartphone,
+  Sparkles,
+  UserPlus,
+  X,
+  Zap,
+} from "lucide-react";
 import { compressImageToWebP } from "@/lib/students/imageCompressor";
 
 interface StudentAuthViewProps {
@@ -102,25 +125,25 @@ export default function StudentAuthView({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#0f172a",
-        color: "#fff",
+        background: "var(--background)",
+        color: "var(--text)",
         padding: "20px",
         direction: "rtl"
       }}>
         <div style={{
-          width: "68px",
-          height: "68px",
-          borderRadius: "20px",
+          width: "64px",
+          height: "64px",
+          borderRadius: "14px",
           overflow: "hidden",
           marginBottom: "16px",
-          boxShadow: "0 10px 30px rgba(37, 99, 235, 0.4)"
+          border: "1px solid var(--border-light)"
         }}>
           <img src="/icon-192.png" alt="بوابة الطالب" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
-        <div style={{ fontSize: "18px", fontWeight: "bold", color: "#f8fafc", marginBottom: "6px" }}>
+        <div style={{ fontSize: "17px", fontWeight: 600, color: "var(--text)", marginBottom: "6px" }}>
           بوابة الطالب — قسم التربية الفنية
         </div>
-        <div style={{ fontSize: "12px", color: "#38bdf8" }}>
+        <div style={{ fontSize: "12.5px", color: "var(--accent-ink)" }}>
           جاري فتح البوابة والتحقق من الحساب...
         </div>
       </div>
@@ -131,7 +154,7 @@ export default function StudentAuthView({
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "16px", maxWidth: "440px", margin: "0 auto", direction: "rtl" }}>
       <div>
         {/* زر سحب الكيو ار كود */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
           <Link 
             href="/?tab=qr" 
             onClick={() => {
@@ -140,28 +163,28 @@ export default function StudentAuthView({
                 localStorage.setItem("fania_bypass_update_notice", "1");
               }
             }}
-            style={{ color: "#38bdf8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12.5px", fontWeight: "bold" }}
+            style={{ color: "var(--accent-ink)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 500 }}
           >
-            <QrCode size={15} />
+            <QrCode size={15} strokeWidth={1.5} />
             <span>سحب الكيو ار كود</span>
           </Link>
-          <span style={{ color: "#64748b", fontSize: "11px", fontWeight: "bold" }}>نظام فنية الموحد</span>
+          <span style={{ color: "var(--text-muted)", fontSize: "11px", fontWeight: 500 }}>نظام فنية الموحد</span>
         </div>
 
-        <header style={{ textAlign: "center", paddingTop: "10px", marginBottom: "16px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "48px", height: "48px", borderRadius: "14px", overflow: "hidden", marginBottom: "6px", boxShadow: "0 8px 20px rgba(37, 99, 235, 0.35)" }}>
+        <header style={{ textAlign: "center", paddingTop: "8px", marginBottom: "16px" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "48px", height: "48px", borderRadius: "12px", overflow: "hidden", marginBottom: "8px", border: "1px solid var(--border-light)" }}>
             <img src="/icon-192.png" alt="فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
-          <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#fff", marginBottom: "3px" }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 600, color: "var(--text)", margin: "0 0 4px 0" }}>
             بوابة فنية الذكية
           </h1>
-          <p style={{ color: "#94a3b8", fontSize: "12px", margin: 0 }}>
+          <p style={{ color: "var(--text-secondary)", fontSize: "12.5px", margin: 0 }}>
             تسجيل الحضور، متابعة التقييمات، ورفع الأعمال الفنية
           </p>
         </header>
 
         {/* مفتاح التبديل بين تسجيل جديد وتسجيل الدخول */}
-        <div style={{ display: "flex", background: "#141b29", padding: "4px", borderRadius: "12px", border: "1px solid #2a374f", marginBottom: "18px" }}>
+        <div style={{ display: "flex", background: "var(--surface)", padding: "4px", borderRadius: "12px", border: "1px solid var(--border-light)", marginBottom: "16px" }}>
           <button
             type="button"
             onClick={() => { setAuthMode("register"); setErrorMsg(""); }}
@@ -170,15 +193,20 @@ export default function StudentAuthView({
               flex: 1,
               padding: "10px",
               borderRadius: "8px",
-              background: authMode === "register" ? "#2563eb" : "transparent",
-              color: authMode === "register" ? "#fff" : "#94a3b8",
-              fontWeight: "bold",
+              background: authMode === "register" ? "var(--primary)" : "transparent",
+              color: authMode === "register" ? "#ffffff" : "var(--text-secondary)",
+              fontWeight: 500,
               fontSize: "13px",
               cursor: "pointer",
-              border: "none"
+              border: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px"
             }}
           >
-            تسجيل طالب جديد 📝
+            <UserPlus size={15} strokeWidth={1.5} />
+            <span>تسجيل طالب جديد</span>
           </button>
           <button
             type="button"
@@ -188,29 +216,35 @@ export default function StudentAuthView({
               flex: 1,
               padding: "10px",
               borderRadius: "8px",
-              background: authMode === "login" ? "#2563eb" : "transparent",
-              color: authMode === "login" ? "#fff" : "#94a3b8",
-              fontWeight: "bold",
+              background: authMode === "login" ? "var(--primary)" : "transparent",
+              color: authMode === "login" ? "#ffffff" : "var(--text-secondary)",
+              fontWeight: 500,
               fontSize: "13px",
               cursor: "pointer",
-              border: "none"
+              border: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px"
             }}
           >
-            تسجيل الدخول 🔐
+            <Lock size={15} strokeWidth={1.5} />
+            <span>تسجيل الدخول</span>
           </button>
         </div>
 
         {errorMsg && (
-          <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#fca5a5", padding: "10px", borderRadius: "10px", marginBottom: "14px", fontSize: "12px" }}>
-            ⚠️ {errorMsg}
+          <div style={{ background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "var(--error-ink)", padding: "10px 12px", borderRadius: "8px", marginBottom: "14px", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <AlertTriangle size={15} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+            <span>{errorMsg}</span>
           </div>
         )}
 
         {/* نموذج تسجيل الدخول */}
         {authMode === "login" ? (
-          <form onSubmit={handleLoginSubmit} className="glass-card" style={{ padding: "20px" }}>
+          <form onSubmit={handleLoginSubmit} className="glass-card" style={{ padding: "20px", borderRadius: "16px" }}>
             <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+              <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
                 كود الطالب الجامعي:
               </label>
               <input
@@ -218,16 +252,17 @@ export default function StudentAuthView({
                 placeholder="أدخل كودك (مثل: 0001)..."
                 value={regCode}
                 onChange={(e) => setRegCode(e.target.value)}
-                style={{ width: "100%", padding: "12px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px" }}
+                className="tabular-nums"
+                style={{ width: "100%", padding: "12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", fontSize: "14px" }}
               />
             </div>
 
             <div style={{ marginBottom: "18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>
+                <label style={{ color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500 }}>
                   الرقم السري (PIN):
                 </label>
-                <span style={{ color: "#64748b", fontSize: "11px" }}>مشفر وخاص بالطالب</span>
+                <span style={{ color: "var(--text-muted)", fontSize: "11px" }}>مشفر وخاص بالطالب</span>
               </div>
               <div style={{ position: "relative" }}>
                 <input
@@ -235,18 +270,19 @@ export default function StudentAuthView({
                   placeholder="أدخل الرقم السري الخاص بك..."
                   value={enteredPin}
                   onChange={(e) => setEnteredPin(e.target.value)}
+                  className="tabular-nums"
                   style={{
                     width: "100%",
-                    height: "46px",
+                    height: "44px",
                     padding: "0 44px 0 14px",
                     textAlign: "center",
                     direction: "ltr",
-                    background: "#141b29",
-                    border: "1px solid #2a374f",
-                    borderRadius: "10px",
-                    color: "#fbbf24",
+                    background: "var(--bg-deep)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "8px",
+                    color: "var(--warning-ink)",
                     fontSize: "16px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     letterSpacing: showLoginPin ? "normal" : "4px",
                     boxSizing: "border-box",
                     margin: 0
@@ -258,14 +294,14 @@ export default function StudentAuthView({
                   onClick={() => setShowLoginPin(!showLoginPin)}
                   style={{
                     position: "absolute",
-                    left: "10px",
+                    left: "8px",
                     top: "50%",
                     transform: "translateY(-50%)",
                     width: "32px",
                     height: "32px",
                     background: "transparent",
                     border: "none",
-                    color: "#94a3b8",
+                    color: "var(--text-secondary)",
                     cursor: "pointer",
                     padding: 0,
                     margin: 0,
@@ -275,12 +311,13 @@ export default function StudentAuthView({
                   }}
                   title={showLoginPin ? "إخفاء الرقم السري" : "إظهار الرقم السري"}
                 >
-                  {showLoginPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showLoginPin ? <EyeOff size={17} strokeWidth={1.5} /> : <Eye size={17} strokeWidth={1.5} />}
                 </button>
               </div>
-              <div style={{ textAlign: "center", marginTop: "8px" }}>
-                <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4", display: "inline-block" }}>
-                  💡 الدخول يتطلب كود الطالب والرقم السري المعتمد. إذا لم يكن لديك رقم سري، راجع منسق المنظومة.
+              <div style={{ textAlign: "center", marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                <Lightbulb size={13} strokeWidth={1.5} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+                <span style={{ color: "var(--accent-ink)", fontSize: "11px", lineHeight: 1.4 }}>
+                  الدخول يتطلب كود الطالب والرقم السري المعتمد. إذا لم يكن لديك رقم سري، راجع منسق المنظومة.
                 </span>
               </div>
             </div>
@@ -291,39 +328,44 @@ export default function StudentAuthView({
               style={{
                 width: "100%",
                 padding: "12px",
-                background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                color: "#fff",
+                background: "var(--primary)",
+                color: "#ffffff",
                 border: "none",
-                borderRadius: "10px",
-                fontWeight: "bold",
+                borderRadius: "8px",
+                fontWeight: 500,
                 fontSize: "14px",
-                cursor: loading ? "not-allowed" : "pointer"
+                cursor: loading ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px"
               }}
             >
-              {loading ? "جاري التحقق..." : "تسجيل الدخول 🚀"}
+              <LogIn size={16} strokeWidth={1.5} />
+              <span>{loading ? "جاري التحقق..." : "تسجيل الدخول"}</span>
             </button>
           </form>
         ) : (
           /* نموذج تسجيل طالب جديد */
-          <form onSubmit={handleRegisterSubmit} className="glass-card" style={{ padding: "20px" }}>
+          <form onSubmit={handleRegisterSubmit} className="glass-card" style={{ padding: "20px", borderRadius: "16px" }}>
             {matchedStudent && (
               <div style={{
-                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(37, 99, 235, 0.2))",
-                border: "1px solid rgba(16, 185, 129, 0.4)",
-                borderRadius: "12px",
+                background: "rgba(16, 185, 129, 0.08)",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                borderRadius: "10px",
                 padding: "12px 14px",
                 marginBottom: "16px",
                 textAlign: "right"
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "16px" }}>✨</span>
-                  <span style={{ fontSize: "13px", fontWeight: "bold", color: "#34d399" }}>
+                  <Sparkles size={15} strokeWidth={1.5} color="var(--success-ink)" />
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--success-ink)" }}>
                     استكمال تفعيل الحساب وتأكيد الهوية
                   </span>
                 </div>
-                <div style={{ fontSize: "12px", color: "#e2e8f0", lineHeight: "1.5" }}>
-                  مرحباً <b>{matchedStudent.full_name}</b> ({matchedStudent.academic_year} • سكشن {matchedStudent.section || 'عام'}).
-                  <div style={{ color: "#93c5fd", marginTop: "2px" }}>
+                <div style={{ fontSize: "12px", color: "var(--text)", lineHeight: 1.5 }}>
+                  مرحباً <strong style={{ fontWeight: 600 }}>{matchedStudent.full_name}</strong> ({matchedStudent.academic_year} • سكشن {matchedStudent.section || 'عام'}).
+                  <div style={{ color: "var(--accent-ink)", marginTop: "2px" }}>
                     يرجى إدخال رقم هاتفك ورفع بطاقة الرقم القومي أو الكارنيه لإرسال طلب الاعتماد فوراً.
                   </div>
                 </div>
@@ -332,7 +374,7 @@ export default function StudentAuthView({
 
             <div style={{ marginBottom: "12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <label style={{ color: "#94a3b8", fontSize: "12px", fontWeight: "bold" }}>
+                <label style={{ color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500 }}>
                   كود الطالب الجامعي:
                 </label>
                 {matchedStudent && (
@@ -345,9 +387,10 @@ export default function StudentAuthView({
                       setLookupStatus(null);
                       setLookupMessage(null);
                     }}
-                    style={{ background: "transparent", border: "none", color: "#60a5fa", fontSize: "11px", cursor: "pointer", textDecoration: "underline" }}
+                    style={{ background: "transparent", border: "none", color: "var(--accent-ink)", fontSize: "11.5px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", padding: 0 }}
                   >
-                    تغيير الكود 🔄
+                    <RefreshCw size={12} strokeWidth={1.5} />
+                    <span>تغيير الكود</span>
                   </button>
                 )}
               </div>
@@ -357,29 +400,34 @@ export default function StudentAuthView({
                 value={regCode}
                 onChange={(e) => setRegCode(e.target.value)}
                 readOnly={!!matchedStudent}
+                className="tabular-nums"
                 style={{
                   width: "100%",
                   padding: "12px",
-                  background: matchedStudent ? "rgba(16, 185, 129, 0.08)" : "#141b29",
-                  border: matchedStudent ? "1px solid #10b981" : "1px solid #2a374f",
-                  borderRadius: "10px",
-                  color: matchedStudent ? "#34d399" : "#fff",
+                  background: matchedStudent ? "rgba(16, 185, 129, 0.08)" : "var(--bg-deep)",
+                  border: matchedStudent ? "1px solid var(--success)" : "1px solid var(--border-light)",
+                  borderRadius: "8px",
+                  color: matchedStudent ? "var(--success-ink)" : "var(--text)",
                   fontSize: "14px",
-                  fontWeight: matchedStudent ? "bold" : "normal"
+                  fontWeight: matchedStudent ? 600 : 400
                 }}
               />
               {isLookingUpCode && (
-                <div style={{ color: "#38bdf8", fontSize: "11px", marginTop: "4px" }}>جاري التحقق من الكود...</div>
+                <div style={{ color: "var(--accent-ink)", fontSize: "11.5px", marginTop: "4px" }}>جاري التحقق من الكود...</div>
               )}
               {matchedStudent && (
-                <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "6px 10px", borderRadius: "8px", marginTop: "6px", fontSize: "12px" }}>
-                  ✓ {matchedStudent.full_name} • {matchedStudent.academic_year} (سكشن {matchedStudent.section || 'عام'})
+                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--success-ink)", padding: "8px 10px", borderRadius: "8px", marginTop: "6px", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Check size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                  <span>{matchedStudent.full_name} • {matchedStudent.academic_year} (سكشن {matchedStudent.section || 'عام'})</span>
                 </div>
               )}
               {lookupStatus?.isAlreadyActive && (
-                <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
-                  <div style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "4px" }}>🎉 حسابك مسجل ومفعل بالفعل على المنظومة!</div>
-                  <div style={{ fontSize: "11px", color: "#a7f3d0", marginBottom: "10px" }}>تم اعتماد وتفعيل حسابك بنجاح. يمكنك الدخول للوحة تحكمك ومقرراتك فوراً.</div>
+                <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--success-ink)", padding: "12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <CheckCircle2 size={15} strokeWidth={1.5} />
+                    <span>حسابك مسجل ومفعل بالفعل على المنظومة</span>
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "10px" }}>تم اعتماد وتفعيل حسابك بنجاح. يمكنك الدخول للوحة تحكمك ومقرراتك فوراً.</div>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -389,18 +437,21 @@ export default function StudentAuthView({
                         setAuthMode("login");
                         setErrorMsg("");
                       }}
-                      style={{ background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", border: "none", borderRadius: "8px", padding: "9px 16px", fontWeight: "bold", fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      style={{ background: "var(--success)", color: "#ffffff", border: "none", borderRadius: "8px", padding: "8px 14px", fontWeight: 500, fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                     >
-                      <span>🔐</span>
+                      <Lock size={14} strokeWidth={1.5} />
                       <span>تسجيل الدخول بالرقم السري</span>
                     </button>
                   </div>
                 </div>
               )}
               {lookupStatus?.isPending && (
-                <div style={{ background: "rgba(56, 189, 248, 0.15)", border: "1px solid #38bdf8", color: "#bae6fd", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
-                  <div style={{ fontWeight: "bold", marginBottom: "4px" }}>⏳ حسابك مسجل وبانتظار اعتماد المنسق</div>
-                  <div style={{ fontSize: "11px", color: "#e0f2fe", marginBottom: "8px" }}>تم استلام بياناتك وبطاقتك وهي بانتظار اعتماد المنسق.</div>
+                <div style={{ background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.35)", color: "var(--accent-ink)", padding: "10px 12px", borderRadius: "10px", marginTop: "8px", fontSize: "12px" }}>
+                  <div style={{ fontWeight: 600, marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Clock size={14} strokeWidth={1.5} />
+                    <span>حسابك مسجل وبانتظار اعتماد المنسق</span>
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "8px" }}>تم استلام بياناتك وبطاقتك وهي بانتظار اعتماد المنسق.</div>
                   <button
                     type="button"
                     onClick={() => {
@@ -409,19 +460,20 @@ export default function StudentAuthView({
                         setAccountStatus("pending");
                       }
                     }}
-                    style={{ background: "#38bdf8", color: "#000", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: "bold", fontSize: "12px", cursor: "pointer" }}
+                    style={{ background: "var(--primary)", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", fontWeight: 500, fontSize: "12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
                   >
-                    عرض شاشة الاعتماد والمنسقين 🔍
+                    <Search size={13} strokeWidth={1.5} />
+                    <span>عرض شاشة الاعتماد والمنسقين</span>
                   </button>
                 </div>
               )}
               {lookupMessage && (
-                <div style={{ color: "#f87171", fontSize: "11px", marginTop: "4px" }}>{lookupMessage}</div>
+                <div style={{ color: "var(--error-ink)", fontSize: "11.5px", marginTop: "4px" }}>{lookupMessage}</div>
               )}
             </div>
 
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+              <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
                 الاسم الكامل:
               </label>
               <input
@@ -433,17 +485,17 @@ export default function StudentAuthView({
                 style={{
                   width: "100%",
                   padding: "12px",
-                  background: matchedStudent ? "rgba(255, 255, 255, 0.05)" : "#141b29",
-                  border: "1px solid #2a374f",
-                  borderRadius: "10px",
-                  color: "#fff",
+                  background: matchedStudent ? "var(--surface-hover)" : "var(--bg-deep)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: "8px",
+                  color: "var(--text)",
                   fontSize: "14px"
                 }}
               />
             </div>
 
             <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+              <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
                 رقم الموبايل (واتساب):
               </label>
               <input
@@ -451,23 +503,24 @@ export default function StudentAuthView({
                 placeholder="01xxxxxxxxx"
                 value={regMobile}
                 onChange={(e) => setRegMobile(e.target.value)}
-                style={{ width: "100%", padding: "12px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "10px", color: "#fff", fontSize: "14px", direction: "ltr", textAlign: "right" }}
+                className="tabular-nums"
+                style={{ width: "100%", padding: "12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", fontSize: "14px", direction: "ltr", textAlign: "right" }}
               />
             </div>
 
             {/* تصوير بطاقة الهوية القومية */}
             <div style={{ marginBottom: "18px" }}>
-              <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+              <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
                 صورة بطاقة الرقم القومي أو كارنيه الكلية (إجباري لتأكيد الهوية): *
               </label>
               {idCardPhoto ? (
-                <div style={{ position: "relative", height: "130px", borderRadius: "10px", overflow: "hidden", border: "2px solid #10b981", background: "#000" }}>
+                <div style={{ position: "relative", height: "130px", borderRadius: "10px", overflow: "hidden", border: "1.5px solid var(--success)", background: "#000" }}>
                   <img src={idCardPhoto} alt="البطاقة" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   <button
                     type="button"
                     onClick={() => setIdCardPhoto(null)}
                     className="btn-compact"
-                    style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(239, 68, 68, 0.8)", color: "#fff", border: "none", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
+                    style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(239, 68, 68, 0.85)", color: "#ffffff", border: "none", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
                   >
                     تغيير الصورة
                   </button>
@@ -477,18 +530,18 @@ export default function StudentAuthView({
                   <button
                     type="button"
                     onClick={() => startCamera("id")}
-                    style={{ flex: 1, padding: "10px", background: "#1e293b", color: "#38bdf8", border: "1px dashed #38bdf8", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    style={{ flex: 1, padding: "10px", background: "var(--surface-hover)", color: "var(--accent-ink)", border: "1px dashed rgba(56, 189, 248, 0.5)", borderRadius: "8px", fontSize: "12px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                   >
-                    <Camera size={16} />
-                    <span>فتح الكاميرا 📷</span>
+                    <Camera size={16} strokeWidth={1.5} />
+                    <span>فتح الكاميرا</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => idFileInputRef.current?.click()}
-                    style={{ flex: 1, padding: "10px", background: "#1e293b", color: "#94a3b8", border: "1px dashed #475569", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+                    style={{ flex: 1, padding: "10px", background: "var(--surface-hover)", color: "var(--text-secondary)", border: "1px dashed var(--border-light)", borderRadius: "8px", fontSize: "12px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                   >
-                    <FolderOpen size={16} />
-                    <span>من الهاتف 📁</span>
+                    <FolderOpen size={16} strokeWidth={1.5} />
+                    <span>من الهاتف</span>
                   </button>
                 </div>
               )}
@@ -499,30 +552,28 @@ export default function StudentAuthView({
               disabled={loading || !regCode || !regMobile || !idCardPhoto}
               style={{
                 width: "100%",
-                padding: "14px",
-                background: "linear-gradient(135deg, #2563eb, #10b981)",
-                color: "#fff",
+                padding: "12px 16px",
+                background: (loading || !regCode || !regMobile || !idCardPhoto) ? "var(--secondary)" : "var(--primary)",
+                color: (loading || !regCode || !regMobile || !idCardPhoto) ? "var(--text-muted)" : "#ffffff",
                 border: "none",
-                borderRadius: "10px",
-                fontWeight: "bold",
-                fontSize: "15px",
+                borderRadius: "8px",
+                fontWeight: 500,
+                fontSize: "14px",
                 cursor: (loading || !regCode || !regMobile || !idCardPhoto) ? "not-allowed" : "pointer",
-                opacity: (loading || !regCode || !regMobile || !idCardPhoto) ? 0.6 : 1,
-                boxShadow: "0 4px 15px rgba(16, 185, 129, 0.25)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "8px"
               }}
             >
-              <CheckCircle2 size={18} />
-              <span>{loading ? "جاري إرسال البيانات..." : "تأكيد واستكمال تفعيل الحساب 🚀"}</span>
+              <CheckCircle2 size={17} strokeWidth={1.5} />
+              <span>{loading ? "جاري إرسال البيانات..." : "تأكيد واستكمال تفعيل الحساب"}</span>
             </button>
           </form>
         )}
       </div>
 
-      <footer style={{ textAlign: "center", paddingTop: "16px", color: "#64748b", fontSize: "11px" }}>
+      <footer style={{ textAlign: "center", paddingTop: "16px", color: "var(--text-muted)", fontSize: "11px" }}>
         جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
       </footer>
 
@@ -534,7 +585,7 @@ export default function StudentAuthView({
           width: "100vw",
           height: "100dvh",
           maxHeight: "100dvh",
-          background: "#000",
+          background: "#000000",
           zIndex: 999999,
           display: "flex",
           flexDirection: "column",
@@ -544,33 +595,36 @@ export default function StudentAuthView({
           <div style={{
             flexShrink: 0,
             padding: "12px 16px",
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(8px)",
+            background: "var(--surface)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+            borderBottom: "1px solid var(--border)",
             zIndex: 10
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "16px" }}>🪪</span>
-              <span style={{ color: "#fff", fontSize: "14px", fontWeight: "bold" }}>تصوير بطاقة الرقم القومي</span>
+              <CreditCard size={16} strokeWidth={1.5} color="var(--accent-ink)" />
+              <span style={{ color: "var(--text)", fontSize: "14px", fontWeight: 600 }}>تصوير بطاقة الرقم القومي</span>
             </div>
             <button
               type="button"
               onClick={() => { stopCamera(); setShowIdCamera(false); }}
               style={{
-                background: "rgba(239, 68, 68, 0.25)",
-                color: "#ef4444",
-                border: "1px solid rgba(239, 68, 68, 0.5)",
+                background: "rgba(239, 68, 68, 0.18)",
+                color: "var(--error-ink)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
                 borderRadius: "8px",
                 padding: "6px 12px",
                 fontSize: "12px",
-                fontWeight: "bold",
-                cursor: "pointer"
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px"
               }}
             >
-              إلغاء ✕
+              <X size={14} strokeWidth={1.5} />
+              <span>إلغاء</span>
             </button>
           </div>
 
@@ -582,7 +636,7 @@ export default function StudentAuthView({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#05070f"
+            background: "var(--bg-deep)"
           }}>
             <video
               ref={setVideoRef}
@@ -597,23 +651,27 @@ export default function StudentAuthView({
               maxWidth: "380px",
               height: "56%",
               maxHeight: "240px",
-              border: "3px dashed #38bdf8",
-              borderRadius: "14px",
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.45), 0 0 25px rgba(56, 189, 248, 0.4)",
+              border: "2.5px dashed var(--accent-ink)",
+              borderRadius: "12px",
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.5)",
               pointerEvents: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center"
             }}>
               <span style={{
-                color: "#38bdf8",
-                fontSize: "11px",
-                fontWeight: "bold",
-                background: "rgba(0, 0, 0, 0.65)",
+                color: "var(--accent-ink)",
+                fontSize: "11.5px",
+                fontWeight: 500,
+                background: "rgba(11, 13, 20, 0.8)",
                 padding: "4px 10px",
-                borderRadius: "6px"
+                borderRadius: "6px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px"
               }}>
-                ضع البطاقة داخل الإطار 🪪
+                <CreditCard size={13} strokeWidth={1.5} />
+                <span>ضع البطاقة داخل الإطار</span>
               </span>
             </div>
           </div>
@@ -622,8 +680,8 @@ export default function StudentAuthView({
             flexShrink: 0,
             padding: "16px 20px",
             paddingBottom: "max(24px, env(safe-area-inset-bottom, 24px))",
-            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95), #070a12)",
-            borderTop: "1px solid rgba(56, 189, 248, 0.2)",
+            background: "var(--bg-deep)",
+            borderTop: "1px solid var(--border)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -647,26 +705,26 @@ export default function StudentAuthView({
                 }
               }}
               style={{
-                width: "72px",
-                height: "72px",
+                width: "68px",
+                height: "68px",
                 borderRadius: "50%",
                 background: "#ffffff",
-                border: "5px solid #38bdf8",
-                boxShadow: "0 0 25px rgba(56, 189, 248, 0.8)",
+                border: "4px solid var(--accent-ink)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 outline: "none",
-                transition: "transform 0.15s ease",
+                transition: "transform 0.15s var(--ease-out)",
                 margin: "0 auto"
               }}
               title="التقاط صورة البطاقة"
             >
-              <div style={{ width: "50px", height: "50px", borderRadius: "50%", background: "#0284c7" }} />
+              <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--primary)" }} />
             </button>
-            <span style={{ color: "#38bdf8", fontSize: "12px", fontWeight: "bold" }}>
-              اضغط هنا لالتقاط الصورة 📸
+            <span style={{ color: "var(--accent-ink)", fontSize: "12px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Camera size={14} strokeWidth={1.5} />
+              <span>اضغط هنا لالتقاط الصورة</span>
             </span>
           </div>
         </div>
@@ -680,8 +738,7 @@ export default function StudentAuthView({
           left: 0,
           width: "100%",
           height: "100%",
-          background: "rgba(0, 0, 0, 0.75)",
-          backdropFilter: "blur(6px)",
+          background: "rgba(11, 13, 20, 0.85)",
           zIndex: 999999,
           display: "flex",
           alignItems: "flex-end",
@@ -692,45 +749,55 @@ export default function StudentAuthView({
           <div className="animate-fade-in" style={{
             width: "100%",
             maxWidth: "420px",
-            background: "linear-gradient(180deg, #182235, #0d131f)",
-            border: "1px solid rgba(56, 189, 248, 0.3)",
-            borderRadius: "20px",
+            background: "var(--surface)",
+            border: "1px solid var(--border-light)",
+            borderRadius: "16px",
             padding: "24px 20px",
-            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
+            boxShadow: "0 20px 50px rgba(0, 0, 0, 0.55)",
             textAlign: "center"
           }}>
             <div style={{
-              width: "64px",
-              height: "64px",
-              borderRadius: "18px",
+              width: "60px",
+              height: "60px",
+              borderRadius: "14px",
               overflow: "hidden",
-              margin: "0 auto 14px",
-              boxShadow: "0 8px 25px rgba(37, 99, 235, 0.5)",
-              border: "2px solid #38bdf8"
+              margin: "0 auto 12px",
+              border: "1.5px solid var(--accent-ink)"
             }}>
               <img src="/icon-192.png" alt="فنية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
 
-            <h3 style={{ fontSize: "20px", fontWeight: "900", color: "#fff", margin: "0 0 6px" }}>
-              قم بتثبيت تطبيق فنية 📱
+            <h3 style={{ fontSize: "18px", fontWeight: 600, color: "var(--text)", margin: "0 0 6px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              <Smartphone size={18} strokeWidth={1.5} color="var(--accent-ink)" />
+              <span>قم بتثبيت تطبيق فنية</span>
             </h3>
-            <div style={{ color: "#38bdf8", fontSize: "13px", fontWeight: "bold", marginBottom: "16px" }}>
+            <div style={{ color: "var(--accent-ink)", fontSize: "13px", fontWeight: 500, marginBottom: "16px" }}>
               لمتابعة حضورك وتقييماتك بشكل دائم
             </div>
 
-            <div style={{ background: "rgba(255, 255, 255, 0.04)", padding: "12px 14px", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "18px", textAlign: "right", fontSize: "12px", color: "#cbd5e1", lineHeight: "1.9" }}>
-              <div>⚡ <b>وصول فوري:</b> بنقرة واحدة من شاشتك الرئيسية دون الحاجة للرابط.</div>
-              <div>🔔 <b>إشعارات حية:</b> متابعة فورية لدرجات التقييم والغياب.</div>
-              <div>📷 <b>كاميرا ذكية:</b> رفع ومزامنة الأعمال الفنية ثلاثية وثنائية الأبعاد.</div>
+            <div style={{ background: "var(--bg-deep)", padding: "12px 14px", borderRadius: "10px", border: "1px solid var(--border)", marginBottom: "16px", textAlign: "right", fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.85, display: "flex", flexDirection: "column", gap: "6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Zap size={14} strokeWidth={1.5} color="var(--warning-ink)" style={{ flexShrink: 0 }} />
+                <span><strong style={{ fontWeight: 600, color: "var(--text)" }}>وصول فوري:</strong> بنقرة واحدة من شاشتك الرئيسية دون الحاجة للرابط.</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Bell size={14} strokeWidth={1.5} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+                <span><strong style={{ fontWeight: 600, color: "var(--text)" }}>إشعارات حية:</strong> متابعة فورية لدرجات التقييم والغياب.</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Camera size={14} strokeWidth={1.5} color="var(--success-ink)" style={{ flexShrink: 0 }} />
+                <span><strong style={{ fontWeight: 600, color: "var(--text)" }}>كاميرا ذكية:</strong> رفع ومزامنة الأعمال الفنية ثلاثية وثنائية الأبعاد.</span>
+              </div>
             </div>
 
             {pwaHintVisible && (
-              <div style={{ background: "rgba(245, 158, 11, 0.15)", border: "1px solid #f59e0b", color: "#fbbf24", padding: "10px", borderRadius: "10px", fontSize: "12px", marginBottom: "14px" }}>
-                💡 اضغط على قائمة المتصفح (الثلاث نقاط ⋮ أعلى الشاشة) ثم اختر <b>"تثبيت التطبيق"</b> أو <b>"إضافة إلى الشاشة الرئيسية"</b>.
+              <div style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.35)", color: "var(--warning-ink)", padding: "10px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "14px", display: "flex", alignItems: "flex-start", gap: "8px", textAlign: "right" }}>
+                <Lightbulb size={15} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "2px" }} />
+                <span>اضغط على قائمة المتصفح (الثلاث نقاط أعلى الشاشة) ثم اختر <strong style={{ fontWeight: 600 }}>&quot;تثبيت التطبيق&quot;</strong> أو <strong style={{ fontWeight: 600 }}>&quot;إضافة إلى الشاشة الرئيسية&quot;</strong>.</span>
               </div>
             )}
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <button
                 type="button"
                 onClick={async () => {
@@ -748,22 +815,22 @@ export default function StudentAuthView({
                 }}
                 style={{
                   width: "100%",
-                  padding: "13px",
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                  color: "#fff",
+                  padding: "12px",
+                  background: "var(--primary)",
+                  color: "#ffffff",
                   border: "none",
-                  borderRadius: "12px",
-                  fontWeight: "bold",
+                  borderRadius: "8px",
+                  fontWeight: 500,
                   fontSize: "14px",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "8px",
-                  boxShadow: "0 4px 15px rgba(37, 99, 235, 0.4)"
+                  gap: "8px"
                 }}
               >
-                <span>تثبيت التطبيق الآن 📱</span>
+                <Smartphone size={16} strokeWidth={1.5} />
+                <span>تثبيت التطبيق الآن</span>
               </button>
 
               <button
@@ -776,14 +843,20 @@ export default function StudentAuthView({
                   width: "100%",
                   padding: "10px",
                   background: "transparent",
-                  color: "#94a3b8",
-                  border: "1px solid #334155",
-                  borderRadius: "12px",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border-light)",
+                  borderRadius: "8px",
                   fontSize: "13px",
-                  cursor: "pointer"
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px"
                 }}
               >
-                المتابعة عبر المتصفح 🌐
+                <Globe size={15} strokeWidth={1.5} />
+                <span>المتابعة عبر المتصفح</span>
               </button>
             </div>
           </div>

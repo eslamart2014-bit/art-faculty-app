@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CalendarCheck } from "lucide-react";
+import { Calendar, CalendarCheck, CheckCircle2, FileText, User, XCircle } from "lucide-react";
 
 interface StudentAttendanceTabProps {
   attendance?: any[];
@@ -10,90 +10,91 @@ interface StudentAttendanceTabProps {
 export default function StudentAttendanceTab({ attendance }: StudentAttendanceTabProps) {
   return (
     <div className="animate-fade-in">
-      <h3 style={{ fontSize: "13.5px", color: "#fff", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-        <CalendarCheck size={16} color="#38bdf8" />
+      <h3 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)", margin: "0 0 12px 0", display: "flex", alignItems: "center", gap: "8px" }}>
+        <CalendarCheck size={16} strokeWidth={1.5} color="var(--accent-ink)" />
         <span>سجلات حضور المحاضرات والسكاشن:</span>
       </h3>
 
       {attendance && attendance.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           {attendance.map((c: any) => (
-            <div key={c.courseId} className="glass-card" style={{ padding: "12px", borderRadius: "12px" }}>
-              {/* رأس المقرر بدون نسبة الحضور */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ color: "#fff", fontWeight: "bold", fontSize: "13.5px" }}>{c.courseName}</span>
+            <div key={c.courseId} className="glass-card" style={{ padding: "16px", borderRadius: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "8px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <span style={{ color: "var(--text)", fontWeight: 600, fontSize: "14px" }}>{c.courseName}</span>
                   {(c.instructorTitle || c.instructorName) && (
-                    <span style={{ fontSize: "10.5px", color: "#94a3b8", fontWeight: "normal" }}>
-                      👨‍🏫 أستاذ المقرر: {c.instructorTitle || c.instructorName}
+                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 400, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <User size={12} strokeWidth={1.5} />
+                      <span>أستاذ المقرر: {c.instructorTitle || c.instructorName}</span>
                     </span>
                   )}
                 </div>
                 <span style={{
-                  fontSize: "10.5px",
-                  color: "#38bdf8",
-                  background: "rgba(56, 189, 248, 0.12)",
-                  padding: "3px 8px",
+                  fontSize: "11px",
+                  fontWeight: 500,
+                  color: "var(--accent-ink)",
+                  background: "rgba(56, 189, 248, 0.1)",
+                  padding: "4px 8px",
                   borderRadius: "6px",
-                  border: "1px solid rgba(56, 189, 248, 0.25)"
+                  border: "1px solid rgba(56, 189, 248, 0.25)",
+                  flexShrink: 0
                 }}>
                   {c.courseType === 'sections' ? 'سكشن عملي' : 'محاضرة'}
                 </span>
               </div>
 
-              {/* بطاقتان فقط متساويتان: حضور ✅ وغياب ❌ (بدون نسبة) */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-                {/* بطاقة الحضور */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                 <div style={{
-                  background: "rgba(16, 185, 129, 0.12)",
-                  border: "1px solid rgba(16, 185, 129, 0.35)",
-                  borderRadius: "10px",
-                  padding: "6px 4px",
+                  background: "rgba(16, 185, 129, 0.1)",
+                  border: "1px solid rgba(16, 185, 129, 0.28)",
+                  borderRadius: "8px",
+                  padding: "8px 6px",
                   textAlign: "center",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center"
                 }}>
-                  <span style={{ fontSize: "11.5px", fontWeight: "bold", color: "#34d399", marginBottom: "1px" }}>
-                    حضور ✅
+                  <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--success-ink)", marginBottom: "2px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <CheckCircle2 size={13} strokeWidth={1.5} />
+                    <span>حضور</span>
                   </span>
-                  <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
+                  <span className="tabular-nums" style={{ fontSize: "20px", fontWeight: 600, color: "var(--text)", lineHeight: 1.1 }}>
                     {c.attended}
                   </span>
-                  <span style={{ fontSize: "10px", color: "#a7f3d0", marginTop: "1px" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
                     {c.courseType === 'sections' ? 'سكشن' : 'محاضرة'}
                   </span>
                 </div>
 
-                {/* بطاقة الغياب */}
                 <div style={{
                   background: "rgba(239, 68, 68, 0.1)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  borderRadius: "10px",
-                  padding: "6px 4px",
+                  border: "1px solid rgba(239, 68, 68, 0.28)",
+                  borderRadius: "8px",
+                  padding: "8px 6px",
                   textAlign: "center",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center"
                 }}>
-                  <span style={{ fontSize: "11.5px", fontWeight: "bold", color: "#f87171", marginBottom: "1px" }}>
-                    غياب ❌
+                  <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--error-ink)", marginBottom: "2px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <XCircle size={13} strokeWidth={1.5} />
+                    <span>غياب</span>
                   </span>
-                  <span style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", lineHeight: "1.1" }}>
+                  <span className="tabular-nums" style={{ fontSize: "20px", fontWeight: 600, color: "var(--text)", lineHeight: 1.1 }}>
                     {c.absent}
                   </span>
-                  <span style={{ fontSize: "10px", color: "#fca5a5", marginTop: "1px" }}>
+                  <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
                     {c.excused > 0 ? `(${c.excused} عذر)` : (c.courseType === 'sections' ? 'سكشن' : 'محاضرة')}
                   </span>
                 </div>
               </div>
 
-              {/* جدول تواريخ الحضور بشكل تلقائي تحت كل مقرر بدون أزرار فتح/إغلاق */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "8px" }}>
-                <div style={{ fontSize: "10.5px", color: "#94a3b8", fontWeight: "bold", marginBottom: "6px" }}>
-                  📅 سجل التواريخ المفصلة:
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
+                <div style={{ fontSize: "11px", color: "var(--text-secondary)", fontWeight: 500, marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Calendar size={13} strokeWidth={1.5} />
+                  <span>سجل التواريخ المفصلة:</span>
                 </div>
                 {c.records && c.records.length > 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -109,30 +110,35 @@ export default function StudentAttendanceTab({ attendance }: StudentAttendanceTa
                             alignItems: "center",
                             background: isPresent ? "rgba(16, 185, 129, 0.08)" : isExcused ? "rgba(245, 158, 11, 0.08)" : "rgba(239, 68, 68, 0.08)",
                             border: isPresent ? "1px solid rgba(16, 185, 129, 0.2)" : isExcused ? "1px solid rgba(245, 158, 11, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)",
-                            padding: "5px 10px",
+                            padding: "6px 10px",
                             borderRadius: "6px",
-                            fontSize: "11px"
+                            fontSize: "12px"
                           }}
                         >
-                          <span style={{ color: "#ffffff", fontWeight: "600", fontSize: "11px" }}>
-                            📅 {rec.formattedDate || rec.date}
+                          <span className="tabular-nums" style={{ color: "var(--text)", fontWeight: 500, fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <Calendar size={12} strokeWidth={1.5} color="var(--text-secondary)" />
+                            <span>{rec.formattedDate || rec.date}</span>
                           </span>
                           <span style={{
-                            fontWeight: "bold",
-                            fontSize: "10.5px",
+                            fontWeight: 500,
+                            fontSize: "11px",
                             padding: "2px 8px",
                             borderRadius: "6px",
-                            background: isPresent ? "rgba(16, 185, 129, 0.25)" : isExcused ? "rgba(245, 158, 11, 0.25)" : "rgba(239, 68, 68, 0.25)",
-                            color: isPresent ? "#34d399" : isExcused ? "#fbbf24" : "#f87171"
+                            background: isPresent ? "rgba(16, 185, 129, 0.2)" : isExcused ? "rgba(245, 158, 11, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                            color: isPresent ? "var(--success-ink)" : isExcused ? "var(--warning-ink)" : "var(--error-ink)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
                           }}>
-                            {isPresent ? "حاضر ✅" : isExcused ? "عذر 📝" : "غائب ❌"}
+                            {isPresent ? <CheckCircle2 size={12} strokeWidth={1.5} /> : isExcused ? <FileText size={12} strokeWidth={1.5} /> : <XCircle size={12} strokeWidth={1.5} />}
+                            <span>{isPresent ? "حاضر" : isExcused ? "عذر" : "غائب"}</span>
                           </span>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div style={{ color: "#64748b", fontSize: "10.5px", textAlign: "center", padding: "6px" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "12px", textAlign: "center", padding: "8px" }}>
                     لا توجد تواريخ تفصيلية مسجلة بعد.
                   </div>
                 )}
@@ -141,7 +147,7 @@ export default function StudentAttendanceTab({ attendance }: StudentAttendanceTa
           ))}
         </div>
       ) : (
-        <div className="glass-card" style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
+        <div className="glass-card" style={{ padding: "24px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
           لا توجد سجلات حضور مسجلة لك حتى الآن.
         </div>
       )}

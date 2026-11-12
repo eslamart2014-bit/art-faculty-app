@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/core/supabase";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Lock, Trash2, X } from "lucide-react";
 
 interface PasswordConfirmModalProps {
   isOpen: boolean;
@@ -53,52 +53,56 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userE
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-      background: "rgba(0,0,0,0.8)", zIndex: 9999,
-      display: "flex", justifyContent: "center", alignItems: "center"
+      background: "rgba(6, 9, 15, 0.85)", zIndex: 9999,
+      display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
     }} onClick={onClose}>
       <div style={{
-        background: "#1e1e1e", padding: "25px", borderRadius: "15px", width: "90%", maxWidth: "350px",
-        direction: "rtl", border: "1px solid #444", position: "relative"
+        background: "var(--surface)", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "360px",
+        direction: "rtl", border: "1px solid var(--border-light)", position: "relative",
+        boxShadow: "0 12px 32px rgba(0,0,0,0.45)"
       }} onClick={e => e.stopPropagation()}>
         <button 
           onClick={onClose} 
           className="modal-close-btn"
-          style={{ position: "absolute", top: "15px", left: "15px" }}
+          style={{ position: "absolute", top: "16px", left: "16px" }}
           title="إغلاق"
         >
-          ✕
+          <X size={16} strokeWidth={1.5} />
         </button>
         
         <div style={{ textAlign: "center", marginBottom: "20px" }}>
-          <div style={{ fontSize: "40px", marginBottom: "10px" }}>🔒</div>
-          <h3 style={{ margin: 0, color: "#fff" }}>تأكيد الهوية</h3>
-          <p style={{ color: "#aaa", fontSize: "12px", marginTop: "5px" }}>
-            إجراء الحذف النهائي لا يمكن التراجع عنه. الرجاء إدخال كلمة المرور الخاصة بحسابك للتأكيد.
+          <div style={{ width: "48px", height: "48px", borderRadius: "12px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.25)", color: "var(--error-ink)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+            <Lock size={22} strokeWidth={1.5} />
+          </div>
+          <h3 style={{ margin: 0, color: "var(--text)", fontSize: "16px", fontWeight: 600 }}>تأكيد الهوية</h3>
+          <p style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "6px", lineHeight: 1.5, marginBottom: 0 }}>
+            إجراء الحذف النهائي لا يمكن التراجع عنه. أدخل كلمة المرور الخاصة بحسابك للتأكيد.
           </p>
         </div>
 
-        {error && <div style={{ color: "#f44336", fontSize: "13px", marginBottom: "15px", textAlign: "center" }}>{error}</div>}
+        {error && <div style={{ color: "var(--error-ink)", fontSize: "13px", marginBottom: "12px", textAlign: "center" }}>{error}</div>}
 
-        <div style={{ position: "relative", width: "100%", marginBottom: "20px" }}>
+        <div style={{ position: "relative", width: "100%", marginBottom: "16px" }}>
           <input 
             type={showPassword ? "text" : "password"} 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="كلمة المرور..."
-            style={{ width: "100%", padding: "12px", paddingLeft: "42px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#fff", outline: "none", fontSize: "15px", boxSizing: "border-box" }}
+            placeholder="كلمة المرور"
+            style={{ width: "100%", padding: "10px 12px", paddingLeft: "40px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", outline: "none", fontSize: "14px", boxSizing: "border-box", marginBottom: 0 }}
             onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
+            className="icon-btn"
             style={{
               position: "absolute",
-              left: "10px",
+              left: "8px",
               top: "50%",
               transform: "translateY(-50%)",
               background: "transparent",
               border: "none",
-              color: "#94a3b8",
+              color: "var(--text-muted)",
               cursor: "pointer",
               padding: "4px",
               display: "flex",
@@ -109,16 +113,17 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, userE
             }}
             title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
           >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
           </button>
         </div>
 
         <button 
           onClick={handleVerify}
           disabled={loading}
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#f44336", color: "#fff", border: "none", fontWeight: "bold", fontSize: "16px", cursor: loading ? "not-allowed" : "pointer" }}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", background: "var(--danger)", color: "#fff", border: "none", fontWeight: 500, fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
         >
-          {loading ? "جاري التحقق..." : "تأكيد الحذف النهائي 🗑️"}
+          <Trash2 size={16} strokeWidth={1.5} />
+          <span>{loading ? "جاري التحقق" : "تأكيد الحذف النهائي"}</span>
         </button>
       </div>
     </div>

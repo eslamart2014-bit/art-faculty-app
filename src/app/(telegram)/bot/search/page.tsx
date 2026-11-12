@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { Search } from "lucide-react";
 
 function SearchContent() {
   const [init, setInit] = useState(false);
@@ -56,46 +57,100 @@ function SearchContent() {
     }
   };
 
-  if (!init) return <div style={{ background: "#f3f4f6", minHeight: "100vh" }}></div>;
+  if (!init) {
+    return (
+      <div style={{ background: "var(--background)", minHeight: "100vh", color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px" }}>
+        جاري التحميل...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ background: "#f3f4f6", minHeight: "100vh", padding: "20px", direction: "rtl" }}>
-      <h2 style={{ color: "#333", marginBottom: "15px", textAlign: "center" }}>بحث عن طالب</h2>
-      {crs && proj && <p style={{ textAlign: "center", color: "#666", marginBottom: "20px", fontSize: "14px" }}>إضافة عمل لمشروع: {proj}</p>}
-      
-      <input 
-        type="text" 
-        placeholder="اكتب اسم الطالب أو رقمه الجامعي..." 
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #ccc", fontSize: "16px", marginBottom: "20px" }}
-      />
+    <div style={{ background: "var(--background)", minHeight: "100vh", padding: "20px 16px", direction: "rtl", color: "var(--text)", fontFamily: "inherit" }}>
+      <div style={{ maxWidth: "460px", margin: "0 auto" }}>
+        <h2 style={{ color: "var(--text)", fontSize: "18px", fontWeight: 600, margin: "0 0 12px 0", textAlign: "center" }}>بحث عن طالب</h2>
+        {crs && proj && (
+          <p style={{ textAlign: "center", color: "var(--text-secondary)", margin: "0 0 16px 0", fontSize: "13px" }}>
+            إضافة عمل لمشروع: {proj}
+          </p>
+        )}
+        
+        <div style={{ position: "relative", marginBottom: "16px" }}>
+          <input 
+            type="text" 
+            placeholder="اكتب اسم الطالب أو رقمه الجامعي..." 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{
+              width: "100%",
+              background: "var(--bg-deep)",
+              color: "var(--text)",
+              padding: "12px 40px 12px 14px",
+              borderRadius: "8px",
+              border: "1px solid var(--border-light)",
+              fontSize: "14px",
+              fontFamily: "inherit",
+              outline: "none",
+              boxSizing: "border-box"
+            }}
+          />
+          <Search
+            size={16}
+            strokeWidth={1.5}
+            style={{
+              position: "absolute",
+              right: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--text-muted)",
+              pointerEvents: "none"
+            }}
+          />
+        </div>
 
-      {loading && <div style={{ textAlign: "center", color: "#666" }}>جاري البحث...</div>}
+        {loading && <div style={{ textAlign: "center", color: "var(--text-secondary)", fontSize: "13px", padding: "12px" }}>جاري البحث...</div>}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {results.map(s => (
-          <div 
-            key={s.id} 
-            onClick={() => handleSelect(s.student_code)}
-            style={{ background: "#fff", padding: "15px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.05)", cursor: "pointer" }}
-          >
-            <div style={{ fontWeight: "bold", color: "#333" }}>{s.full_name}</div>
-            <div style={{ fontSize: "13px", color: "#666", marginTop: "5px" }}>
-              كود: {s.student_code} | فرقة: {s.academic_year} | سكشن: {s.section}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {results.map(s => (
+            <div 
+              key={s.id} 
+              onClick={() => handleSelect(s.student_code)}
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                padding: "12px 14px",
+                borderRadius: "10px",
+                cursor: "pointer"
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text)" }}>{s.full_name}</div>
+              <div className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
+                كود: {s.student_code} • فرقة: {s.academic_year} • سكشن: {s.section}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {tg && (
-        <button 
-          onClick={() => tg.close()} 
-          style={{ width: "100%", marginTop: "30px", background: "#f44336", color: "#fff", border: "none", padding: "12px", borderRadius: "10px", fontSize: "16px" }}
-        >
-          إلغاء وإغلاق
-        </button>
-      )}
+        {tg && (
+          <button 
+            onClick={() => tg.close()} 
+            style={{
+              width: "100%",
+              marginTop: "24px",
+              background: "rgba(239, 68, 68, 0.14)",
+              color: "var(--error-ink)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              padding: "12px",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontWeight: 500,
+              cursor: "pointer"
+            }}
+          >
+            إلغاء وإغلاق
+          </button>
+        )}
+      </div>
     </div>
   );
 }

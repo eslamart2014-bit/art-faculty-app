@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
+import { User, Check, Palette, X } from "lucide-react";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -80,50 +81,51 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-      background: "rgba(0,0,0,0.8)", zIndex: 1000,
-      display: "flex", justifyContent: "center", alignItems: "center"
+      background: "rgba(6, 9, 15, 0.85)", zIndex: 1000,
+      display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
     }} onClick={onClose}>
       <div style={{
-        background: "#1e1e1e", padding: "25px", borderRadius: "15px", width: "90%", maxWidth: "400px",
-        direction: "rtl", border: "1px solid #333", position: "relative",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+        background: "var(--surface)", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "400px",
+        direction: "rtl", border: "1px solid var(--border-light)", position: "relative",
+        boxShadow: "0 12px 32px rgba(0,0,0,0.45)"
       }} onClick={e => e.stopPropagation()}>
         <button 
           onClick={onClose} 
           className="modal-close-btn"
-          style={{ position: "absolute", top: "15px", left: "15px" }}
+          style={{ position: "absolute", top: "16px", left: "16px" }}
           title="إغلاق"
         >
-          ✕
+          <X size={16} strokeWidth={1.5} />
         </button>
         
-        <div style={{ textAlign: "center", marginBottom: "25px" }}>
+        <div style={{ textAlign: "center", marginBottom: "20px" }}>
           <div style={{ 
-            width: "70px", height: "70px", borderRadius: "50%", background: "var(--primary)", 
-            color: "#fff", display: "flex", justifyContent: "center", alignItems: "center", 
-            fontSize: "30px", margin: "0 auto 10px auto", boxShadow: "0 4px 10px rgba(0,123,255,0.3)" 
+            width: "56px", height: "56px", borderRadius: "12px", background: "rgba(37, 99, 235, 0.14)", 
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+            color: "var(--accent-ink)", display: "flex", justifyContent: "center", alignItems: "center", 
+            fontSize: "22px", fontWeight: 600, margin: "0 auto 12px auto"
           }}>
-            {user.full_name?.charAt(0) || "👤"}
+            {user.full_name?.charAt(0) || <User size={24} strokeWidth={1.5} />}
           </div>
-          <h2 style={{ margin: 0, color: "#fff", fontSize: "20px" }}>البيانات الشخصية</h2>
+          <h2 style={{ margin: 0, color: "var(--text)", fontSize: "18px", fontWeight: 600 }}>البيانات الشخصية</h2>
         </div>
 
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ display: "block", color: "#aaa", fontSize: "13px", marginBottom: "8px" }}>البريد الإلكتروني (لا يمكن تعديله)</label>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", marginBottom: "6px" }}>البريد الإلكتروني (غير قابل للتعديل)</label>
           <input 
             type="email" 
             value={user.email} 
             disabled 
-            style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#666", outline: "none", cursor: "not-allowed" }}
+            style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border)", color: "var(--text-muted)", outline: "none", cursor: "not-allowed", marginBottom: 0, fontSize: "14px" }}
           />
         </div>
 
-        <div style={{ marginBottom: "15px" }}>
-          <label style={{ display: "block", color: "#aaa", fontSize: "13px", marginBottom: "8px" }}>الدرجة العلمية</label>
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", marginBottom: "6px" }}>الدرجة العلمية</label>
           <select 
             value={degree}
             onChange={(e) => setDegree(e.target.value)}
-            style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", cursor: "pointer", fontSize: "15px" }}
+            style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", outline: "none", cursor: "pointer", fontSize: "14px", marginBottom: 0 }}
           >
             {DEGREES.map(d => (
               <option key={d} value={d}>{d}</option>
@@ -131,13 +133,13 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
           </select>
         </div>
 
-        <div style={{ marginBottom: "30px" }}>
-          <label style={{ display: "block", color: "#aaa", fontSize: "13px", marginBottom: "8px" }}>الاسم (يظهر في تقارير PDF)</label>
+        <div style={{ marginBottom: "24px" }}>
+          <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", marginBottom: "6px" }}>الاسم (يظهر في تقارير PDF)</label>
           <input 
             type="text" 
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", fontSize: "15px" }}
+            style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", outline: "none", fontSize: "14px", marginBottom: 0 }}
             placeholder="الاسم كاملاً"
           />
         </div>
@@ -145,9 +147,10 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
         <button 
           onClick={handleSave}
           disabled={saving}
-          style={{ width: "100%", padding: "14px", borderRadius: "8px", background: "var(--primary)", color: "#fff", border: "none", fontWeight: "bold", fontSize: "16px", cursor: saving ? "not-allowed" : "pointer", transition: "0.2s", marginBottom: "15px" }}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", background: "var(--primary)", color: "#fff", border: "none", fontWeight: 500, fontSize: "14px", cursor: saving ? "not-allowed" : "pointer", marginBottom: "12px", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
         >
-          {saving ? "جاري الحفظ..." : "حفظ التعديلات ✅"}
+          <Check size={16} strokeWidth={1.5} />
+          <span>{saving ? "جاري الحفظ" : "حفظ التعديلات"}</span>
         </button>
 
         <button 
@@ -159,9 +162,10 @@ export default function ProfileModal({ isOpen, onClose, user, onUpdateProfile }:
             }
             window.open(`/instructor${user?.id ? `?instructor_id=${user.id}` : ''}`, "_blank");
           }}
-          style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "linear-gradient(135deg, #1976D2, #00897B)", color: "#fff", border: "none", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "0.2s", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+          style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", background: "var(--surface-hover)", color: "var(--accent-ink)", border: "1px solid var(--border-light)", fontWeight: 500, fontSize: "14px", cursor: "pointer", display: "inline-flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
         >
-          <span>🎨</span> الانتقال لبوابة أعمال مقرراتي (المعرض والبحث)
+          <Palette size={16} strokeWidth={1.5} />
+          <span>بوابة أعمال مقرراتي (المعرض والبحث)</span>
         </button>
       </div>
     </div>

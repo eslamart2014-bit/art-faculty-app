@@ -3,6 +3,26 @@
 import { useEffect, useState, use, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  ArrowRight,
+  Calendar,
+  Camera,
+  Check,
+  FileText,
+  FolderOpen,
+  Megaphone,
+  Menu,
+  Plus,
+  Repeat,
+  Settings,
+  Sparkles,
+  Star,
+  Tag,
+  Trash2,
+  X
+} from "lucide-react";
 import { supabase } from "@/lib/core/supabase";
 import { addToQueue, getLocalCache, setLocalCache } from "@/lib/admin/syncEngine";
 import { getCurrentWeekRange } from "@/lib/core/dateHelpers";
@@ -571,7 +591,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (!globalStudent) {
       vibrateHeavyError();
       setScannerStatus('error');
-      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code})`);
       await new Promise(r => setTimeout(r, 100));
       alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
@@ -580,7 +600,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     // Heavy rough vibration for student from another cohort + display full details
     vibrateHeavyError();
     setScannerStatus('error');
-    setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section}) ❌`);
+    setScannerStatusText(`طالب مقيد بفرقة أخرى: ${globalStudent.full_name} (${globalStudent.academic_year} - سكشن ${globalStudent.section})`);
     
     await new Promise(r => setTimeout(r, 100));
     const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
@@ -630,7 +650,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     if (!student) {
       vibrateHeavyError();
       setScannerStatus('error');
-      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code}) ❌`);
+      setScannerStatusText(`كود غير مسجل في أي فرقة: (${code})`);
       alert(`لم يتم العثور على طالب بهذا الكود في أي فرقة!\nالكود المدخل: ${code}`);
       return null;
     }
@@ -675,7 +695,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const cleanCode = extractStudentCode(decodedText) || decodedText.trim();
     if (!cleanCode) {
       setScannerStatus('error');
-      setScannerStatusText("كود غير صالح ❌");
+      setScannerStatusText("كود غير صالح");
       vibrateHeavyError();
       setTimeout(() => {
         setScannerStatus('idle');
@@ -695,7 +715,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         if (isAlreadyInDb || isAlreadySelected || isAlreadyInSession) {
           setScannerStatus('error');
-          setScannerStatusText(`⚠️ تم تحضير الطالب هذا الأسبوع مسبقاً (${student.full_name})`);
+          setScannerStatusText(`تم تحضير الطالب هذا الأسبوع مسبقاً (${student.full_name})`);
           vibrateAlreadyAttended();
           setTimeout(() => {
             setScannerStatus('idle');
@@ -709,7 +729,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         setScannedStudents(prev => [student, ...prev]);
         setLatestScannedStudentId(student.id);
         setScannerStatus('success');
-        setScannerStatusText(`تم الرصد: ${student.full_name} ✅`);
+        setScannerStatusText(`تم الرصد: ${student.full_name}`);
         vibrateSuccess();
 
         // التمرير التلقائي السلس لأعلى القائمة لضمان رؤية الطالب فوراً بدون سكرول
@@ -726,7 +746,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         }, 800);
       } else {
         setScannerStatus('error');
-        setScannerStatusText("طالب غير مسجل في المقرر ❌");
+        setScannerStatusText("طالب غير مسجل في المقرر");
         vibrateHeavyError();
         setTimeout(() => {
           setScannerStatus('idle');
@@ -736,7 +756,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       }
     } catch (err) {
       setScannerStatus('error');
-      setScannerStatusText("خطأ في قراءة بيانات الطالب ❌");
+      setScannerStatusText("خطأ في قراءة بيانات الطالب");
       vibrateHeavyError();
       setTimeout(() => {
         setScannerStatus('idle');
@@ -1092,15 +1112,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
   if (loading && !course && !showCameraScanner) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column", background: "var(--background)" }}>
         <div className="loader-circle"></div>
-        <div style={{ color: "#ccc", fontSize: "14px", marginTop: "10px" }}>جاري التحميل...</div>
+        <div style={{ color: "var(--text-secondary)", fontSize: "14px", marginTop: "12px" }}>جاري التحميل...</div>
       </div>
     );
   }
 
   const displayStudents = getDisplayStudents();
-  
+
   let pendingChangesCount = 0;
   displayStudents.forEach(s => {
     const isSelected = selectedStudentIds.has(s.id);
@@ -1111,55 +1131,147 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   });
 
   return (
-    <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "#121212", position: "relative" }}>
-      
+    <div style={{ padding: "0", maxWidth: "800px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", background: "var(--background)", position: "relative" }}>
+
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", background: "#1e1e1e", borderBottom: "1px solid #333", direction: "rtl" }}>
-        <button className="hide-on-mobile" onClick={() => {
-          if (searchParams.get("mode") === "camera") {
-            router.push("/");
-          } else {
-            router.push(`/course/${course.id}`);
-          }
-        }} style={{ background: "none", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}>
-          🡲
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: "var(--surface)", borderBottom: "1px solid var(--border)", direction: "rtl" }}>
+        <button
+          type="button"
+          className="hide-on-mobile btn-compact"
+          onClick={() => {
+            if (searchParams.get("mode") === "camera") {
+              router.push("/");
+            } else {
+              router.push(`/course/${course.id}`);
+            }
+          }}
+          style={{
+            background: "var(--surface-hover)",
+            border: "1px solid var(--border-light)",
+            color: "var(--text)",
+            padding: "6px 12px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            margin: 0
+          }}
+        >
+          <ArrowRight size={15} strokeWidth={1.5} />
+          <span>عودة</span>
         </button>
-        <h2 style={{ margin: 0, color: "#4CAF50", fontSize: "18px" }}>تسجيل الحضور</h2>
-        <button onClick={() => setShowSettingsModal(true)} style={{ background: "none", border: "none", color: "#fff", fontSize: "24px", cursor: "pointer" }}>
-          ☰
+        <h2 style={{ margin: 0, color: "var(--success-ink)", fontSize: "16px", fontWeight: 600 }}>تسجيل الحضور</h2>
+        <button
+          type="button"
+          className="btn-compact"
+          onClick={() => setShowSettingsModal(true)}
+          title="إعدادات المقرر"
+          style={{
+            width: "34px",
+            height: "34px",
+            padding: 0,
+            background: "var(--surface-hover)",
+            border: "1px solid var(--border-light)",
+            borderRadius: "8px",
+            color: "var(--text)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            margin: 0
+          }}
+        >
+          <Menu size={18} strokeWidth={1.5} />
         </button>
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: "flex", gap: "10px", padding: "15px", direction: "rtl" }}>
-        
-        <button 
+      <div style={{ display: "flex", gap: "8px", padding: "12px 16px", direction: "rtl" }}>
+
+        <button
+          type="button"
           onClick={() => setShowWeeksModal(true)}
-          style={{ flex: 1, background: "var(--surface)", border: "1px solid #444", color: selectedWeekKey === currentWeekKey ? "#4CAF50" : "#FF9800", padding: "12px 10px", borderRadius: "10px", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", fontWeight: "bold" }}>
-          <span>📅</span> {getWeekDisplayName()}
+          style={{
+            flex: 1,
+            background: "var(--surface)",
+            border: "1px solid var(--border-light)",
+            color: selectedWeekKey === currentWeekKey ? "var(--success-ink)" : "var(--warning-ink)",
+            padding: "10px 8px",
+            borderRadius: "8px",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            fontWeight: 500,
+            cursor: "pointer",
+            margin: 0
+          }}
+        >
+          <Calendar size={15} strokeWidth={1.5} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getWeekDisplayName()}</span>
         </button>
 
-        <button 
+        <button
+          type="button"
           onClick={startCameraScanner}
-          style={{ flex: 1, background: "var(--primary)", border: "none", color: "#fff", padding: "12px 10px", borderRadius: "10px", fontSize: "14px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-          <span>📸</span> كاميرا
+          style={{
+            flex: 1,
+            background: "var(--primary)",
+            border: "1px solid var(--primary)",
+            color: "#ffffff",
+            padding: "10px 8px",
+            borderRadius: "8px",
+            fontSize: "13px",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            cursor: "pointer",
+            margin: 0
+          }}
+        >
+          <Camera size={15} strokeWidth={1.5} />
+          <span>كاميرا</span>
         </button>
 
-        <button 
+        <button
+          type="button"
           onClick={() => setShowMakeupModal(true)}
           disabled={saving}
-          style={{ flex: 1, background: "#E91E63", border: "none", color: "#fff", padding: "12px 10px", borderRadius: "10px", fontSize: "14px", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}>
-          <span>➕</span> تخلفات
+          style={{
+            flex: 1,
+            background: "rgba(225, 29, 72, 0.14)",
+            border: "1px solid rgba(244, 63, 94, 0.35)",
+            color: "#fda4af",
+            padding: "10px 8px",
+            borderRadius: "8px",
+            fontSize: "13px",
+            fontWeight: 500,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            cursor: saving ? "not-allowed" : "pointer",
+            margin: 0
+          }}
+        >
+          <Plus size={15} strokeWidth={1.5} />
+          <span>تخلفات</span>
         </button>
 
       </div>
 
       {/* Section Selector */}
-      <div style={{ padding: "0 15px", direction: "rtl", marginBottom: "10px" }}>
-        <select 
-          value={selectedSection} 
+      <div style={{ padding: "0 16px", direction: "rtl", marginBottom: "10px" }}>
+        <select
+          value={selectedSection}
           onChange={(e) => setSelectedSection(e.target.value)}
-          style={{ width: "100%", padding: "12px", background: "#1e1e1e", border: "1px solid #444", borderRadius: "10px", color: selectedSection ? "#fff" : "#aaa", fontSize: "16px", outline: "none" }}
+          style={{ width: "100%", padding: "11px 12px", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "8px", color: selectedSection ? "var(--text)" : "var(--text-muted)", fontSize: "14px", outline: "none", margin: 0 }}
         >
           <option value="" disabled>الرجاء اختيار السكشن لعرض الطلاب...</option>
           {course?.course_type === "lectures" ? (
@@ -1173,41 +1285,41 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             <option value="تخلفات">سكشن التخلفات</option>
           )}
         </select>
-        <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px", paddingRight: "5px" }}>
-          إجمالي الطلاب: <span style={{ color: "var(--primary)", fontWeight: "bold" }}>{displayStudents.length}</span> طالباً
+        <div className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "8px", paddingRight: "4px" }}>
+          إجمالي الطلاب: <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>{displayStudents.length}</span> طالباً
         </div>
       </div>
 
       {/* Students List */}
-      <div style={{ flexGrow: 1, overflowY: "auto", direction: "rtl", paddingBottom: "80px" }}>
+      <div style={{ flexGrow: 1, overflowY: "auto", direction: "rtl", paddingBottom: "84px" }}>
         {!selectedSection ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#888", display: "flex", flexDirection: "column", alignItems: "center", gap: "15px" }}>
-            <span style={{ fontSize: "50px", opacity: 0.5 }}>📂</span>
+          <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-muted)", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", fontSize: "13px", lineHeight: 1.6 }}>
+            <FolderOpen size={40} strokeWidth={1.5} color="var(--text-muted)" />
             <span>لم يتم اختيار سكشن.<br/>اختر سكشن من القائمة بالأعلى لعرض الطلاب وبدء التحضير.</span>
           </div>
         ) : displayStudents.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "30px", color: "#888" }}>لا يوجد طلاب في هذا القسم.</div>
+          <div style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)", fontSize: "13px" }}>لا يوجد طلاب في هذا القسم.</div>
         ) : (
           displayStudents.map((student) => {
             const isSelected = selectedStudentIds.has(student.id);
             const isExcused = attendance.some(a => a.student_id === student.id && a.status === 'غياب بعذر');
-            
-            let bg = "#1e1e1e";
+
+            let bg = "var(--surface)";
             let borderColor = "transparent";
             if (isSelected) {
-              bg = "#1b5e20";
-              borderColor = "#4CAF50";
+              bg = "rgba(16, 185, 129, 0.12)";
+              borderColor = "var(--success)";
             } else if (isExcused) {
-              bg = "#4a0b0b";
-              borderColor = "#f44336";
+              bg = "rgba(239, 68, 68, 0.1)";
+              borderColor = "var(--error)";
             }
-            
+
             return (
-              <div 
-                key={student.id} 
+              <div
+                key={student.id}
                 onClick={() => {
                   if (isExcused) {
-                    alert("هذا الطالب مسجل غياب بعذر، للإلغاء استخدم الضغط المطول ثم (إلغاء الحضور).");
+                    alert("هذا الطالب مسجل غياب بعذر، للإلغاء استخدم الضغط المطول ثم (إلغاء العذر).");
                     return;
                   }
                   toggleSelection(student.id);
@@ -1221,42 +1333,47 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "15px 20px",
+                  padding: "14px 16px",
                   background: bg,
-                  borderBottom: "1px solid #333",
-                  borderRight: `5px solid ${borderColor}`,
+                  borderBottom: "1px solid var(--border)",
+                  borderRight: `4px solid ${borderColor}`,
                   cursor: "pointer",
-                  transition: "background 0.2s"
+                  transition: "background 0.15s var(--ease-out)"
                 }}
               >
                 <div>
-                  <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                     <span>{student.full_name}</span>
                     {(student.isMakeup || course?.makeup_students?.includes(student.id) || student.section === "تخلفات") && (
-                      <span style={{ background: "rgba(233, 30, 99, 0.2)", color: "#f43f5e", border: "1px solid rgba(233, 30, 99, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
-                        🔄 تخلفات
+                      <span style={{ background: "rgba(244, 63, 94, 0.14)", color: "#fda4af", border: "1px solid rgba(244, 63, 94, 0.3)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <Repeat size={11} strokeWidth={1.5} />
+                        <span>تخلفات</span>
                       </span>
                     )}
                     {getStudentTag(student, course?.teacher_id) === "distinguished" && (
-                      <span style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
-                        ⭐ متميز
+                      <span style={{ background: "rgba(245, 158, 11, 0.14)", color: "var(--warning-ink)", border: "1px solid rgba(245, 158, 11, 0.3)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <Star size={11} strokeWidth={1.5} />
+                        <span>متميز</span>
                       </span>
                     )}
                     {getStudentTag(student, course?.teacher_id) === "uncommitted" && (
-                      <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: "bold" }}>
-                        ⚠️ غير ملتزم
+                      <span style={{ background: "rgba(239, 68, 68, 0.14)", color: "var(--error-ink)", border: "1px solid rgba(239, 68, 68, 0.3)", fontSize: "10.5px", padding: "1px 6px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <AlertTriangle size={11} strokeWidth={1.5} />
+                        <span>غير ملتزم</span>
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: "12px", color: isSelected ? "#A5D6A7" : "#888", marginTop: "4px", fontFamily: "monospace" }}>
+                  <div className="tabular-nums" style={{ fontSize: "12px", color: isSelected ? "var(--success-ink)" : "var(--text-secondary)", marginTop: "4px" }}>
                     كود: {student.student_code}
                   </div>
                 </div>
-                {isSelected && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
-                {isExcused && <div style={{ color: "#f44336", fontSize: "20px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span>📝</span>
-                  <span style={{ fontSize: "9px" }}>بعذر</span>
-                </div>}
+                {isSelected && <Check size={18} strokeWidth={2} color="var(--success-ink)" />}
+                {isExcused && (
+                  <div style={{ color: "var(--error-ink)", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                    <FileText size={16} strokeWidth={1.5} />
+                    <span style={{ fontSize: "10px", fontWeight: 500 }}>بعذر</span>
+                  </div>
+                )}
               </div>
             );
           })
@@ -1264,22 +1381,26 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Floating Save Button */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "15px", background: "linear-gradient(transparent, #121212 20%, #121212)" }}>
-        <button 
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "12px 16px", background: "var(--background)", borderTop: "1px solid var(--border)" }}>
+        <button
+          type="button"
           onClick={handleSaveAttendance}
           disabled={saving || pendingChangesCount === 0}
-          style={{ 
-            width: "100%", 
-            padding: "15px", 
-            borderRadius: "15px", 
-            background: pendingChangesCount > 0 ? "#4CAF50" : "#333", 
-            color: pendingChangesCount > 0 ? "#fff" : "#888", 
-            fontWeight: "bold", 
-            fontSize: "16px", 
-            boxShadow: pendingChangesCount > 0 ? "0 4px 15px rgba(76,175,80,0.4)" : "none", 
-            border: "none",
-            transition: "all 0.3s"
-          }}>
+          className="tabular-nums"
+          style={{
+            width: "100%",
+            padding: "13px",
+            borderRadius: "10px",
+            background: pendingChangesCount > 0 ? "var(--success)" : "var(--surface)",
+            color: pendingChangesCount > 0 ? "#ffffff" : "var(--text-muted)",
+            fontWeight: 500,
+            fontSize: "15px",
+            border: pendingChangesCount > 0 ? "1px solid var(--success)" : "1px solid var(--border-light)",
+            cursor: pendingChangesCount > 0 && !saving ? "pointer" : "not-allowed",
+            transition: "background 0.15s var(--ease-out)",
+            margin: 0
+          }}
+        >
           {saving ? "جاري الحفظ..." : `تأكيد وحفظ التعديلات (${pendingChangesCount})`}
         </button>
       </div>
@@ -1288,92 +1409,160 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       {longPressStudent && (() => {
         const isExcused = attendance.some(a => a.student_id === longPressStudent.id && a.status === 'غياب بعذر');
         return (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(3px)" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ color: "var(--primary)", marginTop: 0 }}>{longPressStudent.full_name}</h3>
-            <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "12px", fontFamily: "monospace" }}>كود: {longPressStudent.student_code}</p>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.72)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px" }}>
+          <div style={{ background: "var(--surface)", width: "100%", maxWidth: "340px", borderRadius: "16px", padding: "20px", textAlign: "center", border: "1px solid var(--border-light)", direction: "rtl", boxSizing: "border-box" }}>
+            <h3 style={{ color: "var(--text)", margin: "0 0 4px 0", fontSize: "16px", fontWeight: 600 }}>{longPressStudent.full_name}</h3>
+            <p className="tabular-nums" style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 14px 0" }}>كود: {longPressStudent.student_code}</p>
 
             {/* تصنيف وتمييز الطالب */}
-            <div style={{ background: "#262626", padding: "10px", borderRadius: "10px", marginBottom: "14px", border: "1px solid #3a3a3a" }}>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "8px", fontWeight: "bold" }}>🏷️ تصنيف الطالب (مرئي لك فقط):</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "6px" }}>
-                <button 
+            <div style={{ background: "var(--bg-deep)", padding: "12px", borderRadius: "12px", marginBottom: "14px", border: "1px solid var(--border)" }}>
+              <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "8px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                <Tag size={12} strokeWidth={1.5} color="var(--accent-ink)" />
+                <span>تصنيف الطالب (مرئي لك فقط)</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: getStudentTag(longPressStudent, course?.teacher_id) ? "8px" : "0" }}>
+                <button
+                  type="button"
                   onClick={async () => {
                     await setStudentTag(longPressStudent, 'distinguished', course?.teacher_id);
                     vibrateSuccess();
                     setLongPressStudent(null);
                     fetchData();
                   }}
-                  style={{ background: getStudentTag(longPressStudent, course?.teacher_id) === 'distinguished' ? "#ca8a04" : "#3b341f", color: "#fef08a", border: "1px solid #eab308", padding: "9px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                  style={{
+                    background: getStudentTag(longPressStudent, course?.teacher_id) === 'distinguished' ? "rgba(245, 158, 11, 0.25)" : "var(--surface)",
+                    color: "var(--warning-ink)",
+                    border: "1px solid rgba(245, 158, 11, 0.4)",
+                    padding: "8px 6px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                    margin: 0
+                  }}
                 >
-                  ⭐ طالب متميز
+                  <Star size={13} strokeWidth={1.5} />
+                  <span>طالب متميز</span>
                 </button>
-                <button 
+                <button
+                  type="button"
                   onClick={async () => {
                     await setStudentTag(longPressStudent, 'uncommitted', course?.teacher_id);
                     vibrateHeavyError();
                     setLongPressStudent(null);
                     fetchData();
                   }}
-                  style={{ background: getStudentTag(longPressStudent, course?.teacher_id) === 'uncommitted' ? "#b91c1c" : "#3b1f1f", color: "#fca5a5", border: "1px solid #ef4444", padding: "9px 6px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}
+                  style={{
+                    background: getStudentTag(longPressStudent, course?.teacher_id) === 'uncommitted' ? "rgba(239, 68, 68, 0.22)" : "var(--surface)",
+                    color: "var(--error-ink)",
+                    border: "1px solid rgba(239, 68, 68, 0.4)",
+                    padding: "8px 6px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                    margin: 0
+                  }}
                 >
-                  ⚠️ غير ملتزم
+                  <AlertTriangle size={13} strokeWidth={1.5} />
+                  <span>غير ملتزم</span>
                 </button>
               </div>
               {getStudentTag(longPressStudent, course?.teacher_id) && (
-                <button 
+                <button
+                  type="button"
                   onClick={async () => {
                     await setStudentTag(longPressStudent, null, course?.teacher_id);
                     setLongPressStudent(null);
                     fetchData();
                   }}
-                  style={{ background: "transparent", color: "#94a3b8", border: "1px dashed #64748b", padding: "6px", borderRadius: "6px", fontSize: "11px", width: "100%", cursor: "pointer" }}
+                  style={{ background: "transparent", color: "var(--text-secondary)", border: "1px dashed var(--border-light)", padding: "6px", borderRadius: "6px", fontSize: "11px", width: "100%", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px", margin: 0 }}
                 >
-                  ✖️ إزالة علامة التصنيف
+                  <X size={12} strokeWidth={1.5} />
+                  <span>إزالة علامة التصنيف</span>
                 </button>
               )}
             </div>
-            
-            {isExcused ? (
-              <button onClick={handleCancelAttendancePast} style={{ background: "#f44336", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-                ❌ إلغاء العذر
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {isExcused ? (
+                <button
+                  type="button"
+                  onClick={handleCancelAttendancePast}
+                  style={{ background: "var(--error)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--error)", color: "#ffffff", fontSize: "14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: 0 }}
+                >
+                  <X size={15} strokeWidth={1.5} />
+                  <span>إلغاء العذر</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCancelAttendancePast}
+                    style={{ background: "rgba(245, 158, 11, 0.14)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid rgba(245, 158, 11, 0.35)", color: "var(--warning-ink)", fontSize: "14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: 0 }}
+                  >
+                    <X size={15} strokeWidth={1.5} />
+                    <span>إلغاء حضور هذا الأسبوع</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const excuse = window.prompt("أدخل سبب الغياب (مثال: مرضي، رياضي...):");
+                      if (excuse !== null) {
+                        const inserts = [{
+                          course_id: course.id,
+                          student_id: longPressStudent.id,
+                          date: getEffectiveSaveDate(selectedWeekKey),
+                          status: "غياب بعذر",
+                          note: excuse,
+                          teacher_id: course.teacher_id
+                        }];
+                        supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
+                          fetchData();
+                        });
+                        setLongPressStudent(null);
+                      }
+                    }}
+                    style={{ background: "rgba(56, 189, 248, 0.14)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.35)", color: "var(--accent-ink)", fontSize: "14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: 0 }}
+                  >
+                    <FileText size={15} strokeWidth={1.5} />
+                    <span>تسجيل غياب بعذر</span>
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={handleMoveToSectionClick}
+                style={{ background: "var(--primary)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--primary)", color: "#ffffff", fontSize: "14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: 0 }}
+              >
+                <ArrowLeftRight size={15} strokeWidth={1.5} />
+                <span>نقل الطالب لسكشن آخر</span>
               </button>
-            ) : (
-              <>
-                <button onClick={handleCancelAttendancePast} style={{ background: "#FF9800", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-                  ❌ إلغاء حضور هذا الأسبوع
-                </button>
-                <button onClick={() => {
-                  const excuse = window.prompt("أدخل سبب الغياب (مثال: مرضي، رياضي...):");
-                  if (excuse !== null) {
-                    const inserts = [{
-                      course_id: course.id,
-                      student_id: longPressStudent.id,
-                      date: getEffectiveSaveDate(selectedWeekKey),
-                      status: "غياب بعذر",
-                      note: excuse,
-                      teacher_id: course.teacher_id
-                    }];
-                    supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' }).then(() => {
-                      fetchData();
-                    });
-                    setLongPressStudent(null);
-                  }
-                }} style={{ background: "#9C27B0", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-                  📝 تسجيل غياب بعذر
-                </button>
-              </>
-            )}
-            
-            <button onClick={handleMoveToSectionClick} style={{ background: "#2196F3", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px" }}>
-              🔄 نقل الطالب لسكشن آخر
-            </button>
-            <button onClick={handleRemoveStudentFromCourse} style={{ background: "#F44336", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "15px" }}>
-              🗑️ حذف من مقرري نهائياً
-            </button>
-            <button onClick={() => setLongPressStudent(null)} style={{ background: "transparent", width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #555", color: "#fff", fontSize: "15px" }}>
-              تراجع
-            </button>
+              <button
+                type="button"
+                onClick={handleRemoveStudentFromCourse}
+                style={{ background: "rgba(239, 68, 68, 0.14)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid rgba(239, 68, 68, 0.35)", color: "var(--error-ink)", fontSize: "14px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: 0 }}
+              >
+                <Trash2 size={15} strokeWidth={1.5} />
+                <span>حذف من مقرري نهائياً</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLongPressStudent(null)}
+                style={{ background: "var(--surface-hover)", width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "14px", fontWeight: 500, cursor: "pointer", margin: 0 }}
+              >
+                تراجع
+              </button>
+            </div>
           </div>
         </div>
         );
@@ -1381,15 +1570,15 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Move Section Modal */}
       {showMoveModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 110, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(3px)" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ color: "#2196F3", marginTop: 0 }}>نقل الطالب إلى سكشن آخر</h3>
-            <p style={{ fontSize: "14px", color: "#aaa", marginBottom: "20px" }}>اختر السكشن الجديد الذي ترغب في نقل الطالب إليه:</p>
-            
-            <select 
-              value={targetSection} 
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.72)", zIndex: 110, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px" }}>
+          <div style={{ background: "var(--surface)", width: "100%", maxWidth: "340px", borderRadius: "16px", padding: "20px", textAlign: "center", border: "1px solid var(--border-light)", direction: "rtl", boxSizing: "border-box" }}>
+            <h3 style={{ color: "var(--accent-ink)", margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600 }}>نقل الطالب إلى سكشن آخر</h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 16px 0" }}>اختر السكشن الجديد الذي ترغب في نقل الطالب إليه:</p>
+
+            <select
+              value={targetSection}
               onChange={(e) => setTargetSection(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "10px", color: "#fff", marginBottom: "15px", fontSize: "16px" }}
+              style={{ width: "100%", padding: "11px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", marginBottom: "14px", fontSize: "14px", boxSizing: "border-box", outline: "none" }}
             >
               {course?.sections?.map((sec: string) => (
                 <option key={sec} value={sec}>سكشن {sec}</option>
@@ -1397,10 +1586,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
               <option value="تخلفات">التخلفات</option>
             </select>
 
-            <button onClick={handleConfirmMove} style={{ background: "#2196F3", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px", fontWeight: "bold" }}>
+            <button type="button" onClick={handleConfirmMove} style={{ background: "var(--primary)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--primary)", color: "#ffffff", fontSize: "14px", marginBottom: "8px", fontWeight: 500, cursor: "pointer", margin: "0 0 8px 0" }}>
               تأكيد النقل
             </button>
-            <button onClick={() => setShowMoveModal(false)} style={{ background: "transparent", width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #555", color: "#fff", fontSize: "15px" }}>
+            <button type="button" onClick={() => setShowMoveModal(false)} style={{ background: "var(--surface-hover)", width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "14px", fontWeight: 500, cursor: "pointer", margin: 0 }}>
               إلغاء
             </button>
           </div>
@@ -1409,23 +1598,23 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Week Rename Modal */}
       {showWeekRenameModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(3px)" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "320px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ color: "#4CAF50", marginTop: 0 }}>تسمية الأسبوع المخصصة</h3>
-            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "15px" }}>أدخل اسماً مخصصاً ليظهر في التقارير (مثال: الأسبوع الأول - تدريب)</p>
-            
-            <input 
-              type="text" 
-              value={customWeekName} 
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.72)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px" }}>
+          <div style={{ background: "var(--surface)", width: "100%", maxWidth: "340px", borderRadius: "16px", padding: "20px", textAlign: "center", border: "1px solid var(--border-light)", direction: "rtl", boxSizing: "border-box" }}>
+            <h3 style={{ color: "var(--success-ink)", margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600 }}>تسمية الأسبوع المخصصة</h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 14px 0", lineHeight: 1.5 }}>أدخل اسماً مخصصاً ليظهر في التقارير (مثال: الأسبوع الأول - تدريب)</p>
+
+            <input
+              type="text"
+              value={customWeekName}
               onChange={(e) => setCustomWeekName(e.target.value)}
               placeholder="اسم الأسبوع"
-              style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "10px", color: "#fff", marginBottom: "15px", textAlign: "right" }}
+              style={{ width: "100%", padding: "11px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", marginBottom: "14px", textAlign: "right", fontSize: "14px", boxSizing: "border-box", outline: "none" }}
             />
 
-            <button onClick={handleSaveWeekName} style={{ background: "#4CAF50", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px", fontWeight: "bold" }}>
+            <button type="button" onClick={handleSaveWeekName} style={{ background: "var(--success)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--success)", color: "#ffffff", fontSize: "14px", marginBottom: "8px", fontWeight: 500, cursor: "pointer", margin: "0 0 8px 0" }}>
               حفظ المسمى
             </button>
-            <button onClick={() => setShowWeekRenameModal(false)} style={{ background: "transparent", width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #555", color: "#fff", fontSize: "15px" }}>
+            <button type="button" onClick={() => setShowWeekRenameModal(false)} style={{ background: "var(--surface-hover)", width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "14px", fontWeight: 500, cursor: "pointer", margin: 0 }}>
               إلغاء
             </button>
           </div>
@@ -1434,46 +1623,48 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Makeup Add Modal */}
       {showMakeupModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 120, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <div style={{ background: "#1e1e1e", width: "90%", maxWidth: "350px", borderRadius: "15px", padding: "20px", textAlign: "center", border: "1px solid #E91E63", direction: "rtl" }}>
-            <h3 style={{ color: "#E91E63", marginTop: 0 }}>إضافة طالب تخلفات</h3>
-            
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.78)", zIndex: 120, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px" }}>
+          <div style={{ background: "var(--surface)", width: "100%", maxWidth: "360px", borderRadius: "16px", padding: "20px", textAlign: "center", border: "1px solid rgba(244, 63, 94, 0.35)", direction: "rtl", boxSizing: "border-box" }}>
+            <h3 style={{ color: "#fda4af", margin: "0 0 14px 0", fontSize: "16px", fontWeight: 600 }}>إضافة طالب تخلفات</h3>
+
             {!makeupCameraActive ? (
               <>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={makeupInputCode}
                   onChange={(e) => setMakeupInputCode(e.target.value)}
                   placeholder="أدخل كود الطالب..."
-                  style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "10px", color: "#fff", marginBottom: "15px", textAlign: "center", fontSize: "18px", letterSpacing: "2px" }}
+                  className="tabular-nums"
+                  style={{ width: "100%", padding: "11px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", marginBottom: "14px", textAlign: "center", fontSize: "16px", letterSpacing: "2px", boxSizing: "border-box", outline: "none" }}
                 />
-                
-                <button onClick={() => handleAddMakeupStudentSubmit(makeupInputCode)} style={{ background: "#4CAF50", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px", fontWeight: "bold" }}>
+
+                <button type="button" onClick={() => handleAddMakeupStudentSubmit(makeupInputCode)} style={{ background: "var(--success)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--success)", color: "#ffffff", fontSize: "14px", marginBottom: "8px", fontWeight: 500, cursor: "pointer", margin: "0 0 8px 0" }}>
                   إضافة الآن
                 </button>
-                <button onClick={startMakeupCamera} style={{ background: "#2196F3", width: "100%", padding: "12px", borderRadius: "10px", border: "none", color: "#fff", fontSize: "15px", marginBottom: "10px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
-                  <span>📸</span> مسح الكود بالكاميرا
+                <button type="button" onClick={startMakeupCamera} style={{ background: "var(--primary)", width: "100%", padding: "11px", borderRadius: "8px", border: "1px solid var(--primary)", color: "#ffffff", fontSize: "14px", marginBottom: "8px", fontWeight: 500, display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: "pointer", margin: "0 0 8px 0" }}>
+                  <Camera size={16} strokeWidth={1.5} />
+                  <span>مسح الكود بالكاميرا</span>
                 </button>
               </>
             ) : (
-              <div style={{ background: "#05070c", borderRadius: "14px", position: "relative", padding: "8px", marginBottom: "15px" }}>
-                <QRScanner 
-                  onScan={(result) => { 
-                    if(result) { 
-                      handleAddMakeupStudentSubmit(extractStudentCode(result) || result.trim()); 
-                      setMakeupCameraActive(false); 
-                    } 
-                  }} 
+              <div style={{ background: "var(--bg-deep)", borderRadius: "12px", border: "1px solid var(--border-light)", position: "relative", padding: "8px", marginBottom: "14px" }}>
+                <QRScanner
+                  onScan={(result) => {
+                    if(result) {
+                      handleAddMakeupStudentSubmit(extractStudentCode(result) || result.trim());
+                      setMakeupCameraActive(false);
+                    }
+                  }}
                   onClose={() => setMakeupCameraActive(false)}
                   height="220px"
                 />
               </div>
             )}
 
-            <button onClick={() => {
+            <button type="button" onClick={() => {
               if (makeupCameraActive && (window as any).__mkpScanner) { (window as any).__mkpScanner.clear(); setMakeupCameraActive(false); }
               setShowMakeupModal(false);
-            }} style={{ background: "transparent", width: "100%", padding: "12px", borderRadius: "10px", border: "1px solid #555", color: "#fff", fontSize: "15px" }}>
+            }} style={{ background: "var(--surface-hover)", width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-light)", color: "var(--text-secondary)", fontSize: "14px", fontWeight: 500, cursor: "pointer", margin: 0 }}>
               إغلاق
             </button>
           </div>
@@ -1482,15 +1673,26 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Batch Attendance Scanner Modal */}
       {showCameraScanner && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.9)", zIndex: 130, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "15px", background: "#1e1e1e", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", direction: "rtl" }}>
-            <h3 style={{ margin: 0, color: "#2196F3", fontSize: "16px" }}>📸 ماسح الحضور الذكي</h3>
-            
-            <button onClick={closeCameraScanner} className="modal-close-btn" title="إغلاق">✕</button>
+        <div style={{ position: "fixed", inset: 0, background: "var(--background)", zIndex: 130, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "14px 16px", background: "var(--surface)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", direction: "rtl" }}>
+            <h3 style={{ margin: 0, color: "var(--accent-ink)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Camera size={18} strokeWidth={1.5} />
+              <span>ماسح الحضور الذكي</span>
+            </h3>
+
+            <button
+              type="button"
+              onClick={closeCameraScanner}
+              className="btn-compact"
+              title="إغلاق"
+              style={{ width: "32px", height: "32px", padding: 0, borderRadius: "8px", background: "var(--surface-hover)", border: "1px solid var(--border-light)", color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", margin: 0 }}
+            >
+              <X size={16} strokeWidth={1.5} />
+            </button>
           </div>
-          
-          <div style={{ background: "#05070c", position: "relative", padding: "10px 14px", flexShrink: 0 }}>
-            <QRScanner 
+
+          <div style={{ background: "var(--bg-deep)", position: "relative", padding: "10px 14px", flexShrink: 0, borderBottom: "1px solid var(--border)" }}>
+            <QRScanner
               onScan={(result) => { if (result) handleCameraScan(result); }}
               isBusy={isProcessingScanRef.current || scannerStatus !== 'idle'}
               status={scannerStatus}
@@ -1500,23 +1702,44 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             />
           </div>
 
-          <div style={{ padding: "15px", background: "#2d2d2d", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #444", direction: "rtl" }}>
-            <span style={{ color: "#90CAF9", fontWeight: "bold", fontSize: "14px" }}>تم رصد: <span style={{ color: "#fff" }}>{scannedStudents.length}</span> طلاب</span>
-            <button onClick={saveBatchCameraAttendance} disabled={scannedStudents.length === 0 || savingBatch} style={{ background: scannedStudents.length > 0 ? "#4CAF50" : "#555", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "10px", fontWeight: "bold" }}>
-              {savingBatch ? "جاري الحفظ..." : "حفظ الحضور ✅"}
+          <div style={{ padding: "12px 16px", background: "var(--surface)", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", direction: "rtl" }}>
+            <span className="tabular-nums" style={{ color: "var(--text-secondary)", fontWeight: 500, fontSize: "14px" }}>
+              تم رصد: <span style={{ color: "var(--text)", fontWeight: 600 }}>{scannedStudents.length}</span> طلاب
+            </span>
+            <button
+              type="button"
+              onClick={saveBatchCameraAttendance}
+              disabled={scannedStudents.length === 0 || savingBatch}
+              style={{
+                background: scannedStudents.length > 0 ? "var(--success)" : "var(--surface-hover)",
+                color: scannedStudents.length > 0 ? "#ffffff" : "var(--text-muted)",
+                border: scannedStudents.length > 0 ? "1px solid var(--success)" : "1px solid var(--border-light)",
+                padding: "9px 16px",
+                borderRadius: "8px",
+                fontWeight: 500,
+                fontSize: "13px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                cursor: scannedStudents.length > 0 && !savingBatch ? "pointer" : "not-allowed",
+                margin: 0
+              }}
+            >
+              <Check size={15} strokeWidth={1.5} />
+              <span>{savingBatch ? "جاري الحفظ..." : "حفظ الحضور"}</span>
             </button>
           </div>
 
-          <div ref={scannedListRef} style={{ flexGrow: 1, overflowY: "auto", background: "#1e1e1e", padding: "10px", direction: "rtl" }}>
+          <div ref={scannedListRef} style={{ flexGrow: 1, overflowY: "auto", background: "var(--background)", padding: "12px", direction: "rtl" }}>
             {scannedStudents.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#666", marginTop: "30px" }}>الطلاب الممسوحين سيظهرون هنا...</div>
+              <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "32px", fontSize: "13px" }}>الطلاب الممسوحين سيظهرون هنا...</div>
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: "13px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center", fontSize: "13px", border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden" }}>
                 <thead>
-                  <tr style={{ background: "#333" }}>
-                    <th style={{ padding: "10px", border: "1px solid #444", color: "#fff" }}>الاسم</th>
-                    <th style={{ padding: "10px", border: "1px solid #444", color: "#fff", width: "50px" }}>السكشن</th>
-                    <th style={{ padding: "10px", border: "1px solid #444", color: "#fff", width: "40px" }}>حذف</th>
+                  <tr style={{ background: "var(--surface)" }}>
+                    <th style={{ padding: "10px", border: "1px solid var(--border)", color: "var(--text-secondary)", fontWeight: 600 }}>الاسم</th>
+                    <th style={{ padding: "10px", border: "1px solid var(--border)", color: "var(--text-secondary)", fontWeight: 600, width: "56px" }}>السكشن</th>
+                    <th style={{ padding: "10px", border: "1px solid var(--border)", color: "var(--text-secondary)", fontWeight: 600, width: "44px" }}>حذف</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1525,64 +1748,69 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                     const isMakeup = s.isMakeup || course?.makeup_students?.includes(s.id) || s.section === "تخلفات";
                     const sTag = getStudentTag(s, course?.teacher_id);
                     return (
-                      <tr 
-                        key={s.id} 
+                      <tr
+                        key={s.id}
                         className={isLatest ? "latest-scanned-row" : ""}
                         onTouchStart={() => handleTouchStart(s)}
                         onTouchEnd={handleTouchEnd}
                         onMouseDown={() => handleTouchStart(s)}
                         onMouseUp={handleTouchEnd}
-                        style={{ 
-                          background: isLatest ? "rgba(76, 175, 80, 0.28)" : (idx % 2 === 0 ? "#222" : "#1a1a1a"),
-                          transition: "background-color 0.3s ease",
+                        style={{
+                          background: isLatest ? "rgba(16, 185, 129, 0.14)" : (idx % 2 === 0 ? "var(--surface)" : "var(--bg-deep)"),
+                          transition: "background-color 0.2s var(--ease-out)",
                           cursor: "pointer"
                         }}
                         title="اضغط ضغطة مطولة لتصنيف الطالب (متميز / غير ملتزم)"
                       >
-                        <td style={{ padding: "10px", border: "1px solid #444", color: "#fff", textAlign: "right" }}>
+                        <td style={{ padding: "10px", border: "1px solid var(--border)", color: "var(--text)", textAlign: "right" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "4px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                              <span style={{ fontWeight: isLatest ? "bold" : "normal", color: isLatest ? "#81C784" : "#fff" }}>
+                              <span style={{ fontWeight: isLatest ? 600 : 400, color: isLatest ? "var(--success-ink)" : "var(--text)" }}>
                                 {s.full_name}
                               </span>
                               {isMakeup && (
-                                <span style={{ background: "rgba(233, 30, 99, 0.2)", color: "#f43f5e", border: "1px solid rgba(233, 30, 99, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
-                                  🔄 تخلفات
+                                <span style={{ background: "rgba(244, 63, 94, 0.14)", color: "#fda4af", border: "1px solid rgba(244, 63, 94, 0.3)", fontSize: "10px", padding: "1px 5px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                  <Repeat size={10} strokeWidth={1.5} />
+                                  <span>تخلفات</span>
                                 </span>
                               )}
                               {sTag === "distinguished" && (
-                                <span style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", border: "1px solid rgba(234, 179, 8, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
-                                  ⭐ متميز
+                                <span style={{ background: "rgba(245, 158, 11, 0.14)", color: "var(--warning-ink)", border: "1px solid rgba(245, 158, 11, 0.3)", fontSize: "10px", padding: "1px 5px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                  <Star size={10} strokeWidth={1.5} />
+                                  <span>متميز</span>
                                 </span>
                               )}
                               {sTag === "uncommitted" && (
-                                <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", fontSize: "10px", padding: "1px 5px", borderRadius: "5px", fontWeight: "bold" }}>
-                                  ⚠️ غير ملتزم
+                                <span style={{ background: "rgba(239, 68, 68, 0.14)", color: "var(--error-ink)", border: "1px solid rgba(239, 68, 68, 0.3)", fontSize: "10px", padding: "1px 5px", borderRadius: "6px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                  <AlertTriangle size={10} strokeWidth={1.5} />
+                                  <span>غير ملتزم</span>
                                 </span>
                               )}
                             </div>
                             {isLatest && (
-                              <span style={{ 
-                                background: "#4CAF50", 
-                                color: "#000", 
-                                fontSize: "10px", 
-                                padding: "2px 7px", 
-                                borderRadius: "10px", 
-                                fontWeight: "bold",
+                              <span style={{
+                                background: "var(--success)",
+                                color: "#ffffff",
+                                fontSize: "10px",
+                                padding: "2px 7px",
+                                borderRadius: "6px",
+                                fontWeight: 500,
                                 display: "inline-flex",
                                 alignItems: "center",
-                                gap: "3px",
-                                boxShadow: "0 0 10px rgba(76, 175, 80, 0.75)"
+                                gap: "3px"
                               }}>
-                                ✨ أحدث رصد
+                                <Sparkles size={10} strokeWidth={1.5} />
+                                <span>أحدث رصد</span>
                               </span>
                             )}
                           </div>
-                          <span style={{ fontSize: "11px", color: isLatest ? "#c8e6c9" : "#aaa" }}>{s.student_code}</span>
+                          <span className="tabular-nums" style={{ fontSize: "11px", color: isLatest ? "var(--success-ink)" : "var(--text-secondary)" }}>{s.student_code}</span>
                         </td>
-                        <td style={{ padding: "10px", border: "1px solid #444", color: "#4CAF50", fontWeight: "bold" }}>{s.section}</td>
-                        <td style={{ padding: "10px", border: "1px solid #444" }}>
-                          <button onClick={(e) => { e.stopPropagation(); setScannedStudents(prev => prev.filter(x => x.id !== s.id)); }} style={{ background: "transparent", border: "none", color: "#f44336", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}>✕</button>
+                        <td className="tabular-nums" style={{ padding: "10px", border: "1px solid var(--border)", color: "var(--success-ink)", fontWeight: 600 }}>{s.section}</td>
+                        <td style={{ padding: "10px", border: "1px solid var(--border)" }}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setScannedStudents(prev => prev.filter(x => x.id !== s.id)); }} style={{ background: "transparent", border: "none", color: "var(--error-ink)", cursor: "pointer", padding: "4px", display: "inline-flex", alignItems: "center", justifyContent: "center", margin: 0 }}>
+                            <X size={15} strokeWidth={1.5} />
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1596,42 +1824,54 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Settings Modal (Hamburger Menu) */}
       {showSettingsModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 140, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <div style={{ background: "#1e1e1e", borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "20px", direction: "rtl", animation: "slideUp 0.3s" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "15px", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, color: "#fff" }}>⚙️ إعدادات المقرر</h3>
-              <button onClick={() => setShowSettingsModal(false)} className="modal-close-btn" title="إغلاق">✕</button>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.72)", zIndex: 140, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div style={{ background: "var(--surface)", borderTopLeftRadius: "16px", borderTopRightRadius: "16px", padding: "20px", direction: "rtl", animation: "slideUp 0.25s var(--ease-out)", borderTop: "1px solid var(--border-light)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "14px", marginBottom: "16px" }}>
+              <h3 style={{ margin: 0, color: "var(--text)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Settings size={18} strokeWidth={1.5} color="var(--accent-ink)" />
+                <span>إعدادات المقرر</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(false)}
+                className="btn-compact"
+                title="إغلاق"
+                style={{ width: "30px", height: "30px", padding: 0, borderRadius: "8px", background: "var(--surface-hover)", border: "1px solid var(--border-light)", color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", margin: 0 }}
+              >
+                <X size={16} strokeWidth={1.5} />
+              </button>
             </div>
-            
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#121212", padding: "10px 15px", borderRadius: "10px", border: "1px solid #333" }}>
-                <span style={{ color: "#aaa", fontSize: "14px" }}>حد الإنذار (أسابيع الغياب):</span>
+
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-deep)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--border)" }}>
+                <span style={{ color: "var(--text-secondary)", fontSize: "13px" }}>حد الإنذار (أسابيع الغياب):</span>
                 <div style={{ display: "flex", gap: "8px" }}>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={absenceLimit}
                     onChange={(e) => setAbsenceLimit(e.target.value)}
-                    style={{ width: "50px", padding: "6px", background: "#1e1e1e", border: "1px solid #444", borderRadius: "6px", color: "#fff", textAlign: "center", fontSize: "14px", outline: "none" }}
+                    className="tabular-nums"
+                    style={{ width: "54px", padding: "6px", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "6px", color: "var(--text)", textAlign: "center", fontSize: "14px", outline: "none", margin: 0 }}
                   />
-                  <button onClick={async () => {
+                  <button type="button" onClick={async () => {
                     const updatedNames = { ...(course.custom_week_names || {}), __absence_limit__: Number(absenceLimit) };
                     await supabase.from("courses").update({ custom_week_names: updatedNames }).eq("id", course.id);
                     setCourse({ ...course, custom_week_names: updatedNames });
-                    alert("تم حفظ إعدادات الغياب بنجاح!");
-                  }} style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold", cursor: "pointer" }}>حفظ</button>
+                    alert("تم حفظ إعدادات الغياب بنجاح.");
+                  }} style={{ background: "var(--success)", color: "#ffffff", border: "1px solid var(--success)", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 500, cursor: "pointer", margin: 0 }}>حفظ</button>
                 </div>
               </div>
-              <div style={{ fontSize: "11px", color: "#666", marginTop: "8px", textAlign: "center" }}>يُستخدم هذا الرقم لحساب قائمة الإنذارات بالأسفل.</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px", textAlign: "center" }}>يُستخدم هذا الرقم لحساب قائمة الإنذارات بالأسفل.</div>
             </div>
 
-            <div style={{ background: "#121212", borderRadius: "10px", border: "1px solid #333", padding: "15px", marginBottom: "20px" }}>
+            <div className="tabular-nums" style={{ background: "var(--bg-deep)", borderRadius: "10px", border: "1px solid var(--border)", padding: "14px", marginBottom: "16px", fontSize: "13px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>الأسابيع المسجلة (الرصد):</span>
-                <span style={{ color: "#FF9800", fontWeight: "bold" }}>{totalWeeksCount} أسبوع</span>
+                <span style={{ color: "var(--text-secondary)" }}>الأسابيع المسجلة (الرصد):</span>
+                <span style={{ color: "var(--warning-ink)", fontWeight: 600 }}>{totalWeeksCount} أسبوع</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>الطلاب تجاوزوا الإنذار:</span>
-                <span style={{ color: "#F44336", fontWeight: "bold" }}>
+                <span style={{ color: "var(--text-secondary)" }}>الطلاب تجاوزوا الإنذار:</span>
+                <span style={{ color: "var(--error-ink)", fontWeight: 600 }}>
                   {(() => {
                     const limit = Number(absenceLimit);
                     if (isNaN(limit)) return "0";
@@ -1648,25 +1888,27 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                   })()} طالب
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px", borderTop: "1px solid #333", paddingTop: "10px" }}>
-                <span style={{ color: "#aaa" }}>إجمالي الطلاب المسجلين:</span>
-                <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{students.filter(s => !(course.excluded_students || []).includes(s.id)).length} طالب</span>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px", borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
+                <span style={{ color: "var(--text-secondary)" }}>إجمالي الطلاب المسجلين:</span>
+                <span style={{ color: "var(--success-ink)", fontWeight: 600 }}>{students.filter(s => !(course.excluded_students || []).includes(s.id)).length} طالب</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>تخلفات من فرق أخرى:</span>
-                <span style={{ color: "#E91E63", fontWeight: "bold" }}>{makeupStudents.filter(s => !(course.excluded_students || []).includes(s.id)).length} طالب</span>
+                <span style={{ color: "var(--text-secondary)" }}>تخلفات من فرق أخرى:</span>
+                <span style={{ color: "#fda4af", fontWeight: 600 }}>{makeupStudents.filter(s => !(course.excluded_students || []).includes(s.id)).length} طالب</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#aaa" }}>نظام المقرر:</span>
-                <span style={{ color: "#2196F3", fontWeight: "bold" }}>{course.course_type === "lectures" ? "محاضرات عامة" : "سكاشن منفصلة"}</span>
+                <span style={{ color: "var(--text-secondary)" }}>نظام المقرر:</span>
+                <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>{course.course_type === "lectures" ? "محاضرات عامة" : "سكاشن منفصلة"}</span>
               </div>
             </div>
 
-            <button onClick={handlePrintWarnings} style={{ width: "100%", background: "#F44336", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px" }}>
-              <span>📄</span> استخراج قائمة المنذرين بصيغة PDF
+            <button type="button" onClick={handlePrintWarnings} style={{ width: "100%", background: "var(--error)", color: "#ffffff", border: "1px solid var(--error)", padding: "12px", borderRadius: "8px", fontWeight: 500, fontSize: "14px", marginBottom: "8px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: "pointer", margin: "0 0 8px 0" }}>
+              <FileText size={16} strokeWidth={1.5} />
+              <span>استخراج قائمة المنذرين بصيغة PDF</span>
             </button>
-            <button onClick={handleSendTelegramWarnings} disabled={saving} style={{ width: "100%", background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontWeight: "bold", fontSize: "16px", marginBottom: "10px", display: "flex", justifyContent: "center", gap: "10px", opacity: saving ? 0.7 : 1 }}>
-              <span>📢</span> إرسال إنذار لبوابة الطلاب للمتجاوزين
+            <button type="button" onClick={handleSendTelegramWarnings} disabled={saving} style={{ width: "100%", background: "var(--primary)", color: "#ffffff", border: "1px solid var(--primary)", padding: "12px", borderRadius: "8px", fontWeight: 500, fontSize: "14px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, margin: 0 }}>
+              <Megaphone size={16} strokeWidth={1.5} />
+              <span>إرسال إنذار لبوابة الطلاب للمتجاوزين</span>
             </button>
           </div>
         </div>
@@ -1674,24 +1916,32 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       {/* Week Picker Modal */}
       {showWeeksModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-          <div style={{ background: "#1e1e1e", borderTopLeftRadius: "20px", borderTopRightRadius: "20px", padding: "20px", direction: "rtl", animation: "slideUp 0.3s", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #333", paddingBottom: "15px", marginBottom: "15px" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.72)", zIndex: 120, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          <div style={{ background: "var(--surface)", borderTopLeftRadius: "16px", borderTopRightRadius: "16px", padding: "20px", direction: "rtl", animation: "slideUp 0.25s var(--ease-out)", maxHeight: "80vh", display: "flex", flexDirection: "column", borderTop: "1px solid var(--border-light)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "14px", marginBottom: "14px" }}>
               <div>
-                <h3 style={{ margin: 0, color: "#fff" }}>اختر أسبوع التحضير</h3>
-                <span style={{ fontSize: "12px", color: "#888" }}>اضغط مطولاً على أي أسبوع لتغيير اسمه (مثال: أسبوع الرسم بالرصاص)</span>
+                <h3 style={{ margin: 0, color: "var(--text)", fontSize: "16px", fontWeight: 600 }}>اختر أسبوع التحضير</h3>
+                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>اضغط مطولاً على أي أسبوع لتغيير اسمه (مثال: أسبوع الرسم بالرصاص)</span>
               </div>
-              <button onClick={() => setShowWeeksModal(false)} className="modal-close-btn" title="إغلاق">✕</button>
+              <button
+                type="button"
+                onClick={() => setShowWeeksModal(false)}
+                className="btn-compact"
+                title="إغلاق"
+                style={{ width: "30px", height: "30px", padding: 0, borderRadius: "8px", background: "var(--surface-hover)", border: "1px solid var(--border-light)", color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", margin: 0 }}
+              >
+                <X size={16} strokeWidth={1.5} />
+              </button>
             </div>
-            
-            <div style={{ overflowY: "auto", flexGrow: 1, paddingRight: "5px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px" }}>
+
+            <div style={{ overflowY: "auto", flexGrow: 1, paddingLeft: "2px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
                 {generateWeeks().map((w) => {
                   const isActive = selectedWeekKey === w.key;
                   const displayName = course?.custom_week_names?.[w.key] || w.defaultName;
-                  
+
                   return (
-                    <div 
+                    <div
                       key={w.key}
                       onClick={() => { setSelectedWeekKey(w.key); setShowWeeksModal(false); }}
                       onTouchStart={() => handleWeekTouchStart(w.key, w.defaultName)}
@@ -1699,24 +1949,24 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                       onMouseDown={() => handleWeekTouchStart(w.key, w.defaultName)}
                       onMouseUp={handleTouchEnd}
                       onMouseLeave={handleTouchEnd}
-                      style={{ 
-                        background: isActive ? "#1b5e20" : "#121212", 
-                        border: isActive ? "2px solid #4CAF50" : "1px solid #333", 
-                        padding: "15px", 
-                        borderRadius: "12px", 
-                        cursor: "pointer", 
-                        display: "flex", 
-                        justifyContent: "space-between", 
-                        alignItems: "center" 
+                      style={{
+                        background: isActive ? "rgba(16, 185, 129, 0.12)" : "var(--bg-deep)",
+                        border: isActive ? "1px solid var(--success)" : "1px solid var(--border)",
+                        padding: "12px 14px",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
                       }}
                     >
                       <div>
-                        <div style={{ color: isActive ? "#fff" : "#4CAF50", fontWeight: "bold", fontSize: "16px" }}>{displayName}</div>
-                        <div style={{ color: "#aaa", fontSize: "11px", marginTop: "4px" }}>{w.subtitle}</div>
+                        <div style={{ color: isActive ? "var(--text)" : "var(--success-ink)", fontWeight: 600, fontSize: "14px" }}>{displayName}</div>
+                        <div className="tabular-nums" style={{ color: "var(--text-secondary)", fontSize: "11px", marginTop: "3px" }}>{w.subtitle}</div>
                       </div>
-                      {isActive && <div style={{ color: "#4CAF50", fontSize: "20px" }}>✓</div>}
+                      {isActive && <Check size={18} strokeWidth={2} color="var(--success-ink)" />}
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>

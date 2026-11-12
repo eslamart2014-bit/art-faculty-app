@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
 let _reloading = false;
 
@@ -118,19 +119,22 @@ export default function ServiceWorkerRegister() {
         direction: "rtl",
       }}
     >
-      <div style={{ fontSize: "50px", marginBottom: "20px" }}>🔄</div>
-      <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold", marginBottom: "8px" }}>
+      <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", width: "64px", height: "64px", borderRadius: "12px", background: "rgba(56, 189, 248, 0.12)", border: "1px solid var(--border)" }}>
+        <RefreshCw size={32} strokeWidth={1.5} color="var(--accent-ink)" className="spin" />
+      </div>
+      <div style={{ color: "var(--text-primary)", fontSize: "19px", fontWeight: "600", marginBottom: "8px" }}>
         جاري تحديث النظام وتثبيت أحدث حزمة...
       </div>
-      <div style={{ color: "#aaa", fontSize: "14px", marginBottom: "30px" }}>
+      <div style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "28px" }}>
         يرجى الانتظار لحظة واحدة فقط
       </div>
       <div
         style={{
           width: "80%",
           maxWidth: "300px",
-          background: "#333",
-          borderRadius: "10px",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: "6px",
           height: "12px",
           overflow: "hidden",
         }}
@@ -138,14 +142,14 @@ export default function ServiceWorkerRegister() {
         <div
           style={{
             height: "100%",
-            borderRadius: "10px",
-            background: "linear-gradient(90deg, #2196F3, #4CAF50)",
+            borderRadius: "6px",
+            background: "var(--primary)",
             width: updateProgress + "%",
             transition: "width 0.05s linear",
           }}
         />
       </div>
-      <div style={{ color: "#4CAF50", marginTop: "12px", fontSize: "13px", fontWeight: "bold" }}>{updateProgress}%</div>
+      <div className="tabular-nums" style={{ color: "var(--accent-ink)", marginTop: "12px", fontSize: "13px", fontWeight: "600" }}>{updateProgress}%</div>
     </div>
   );
 }

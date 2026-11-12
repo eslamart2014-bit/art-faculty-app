@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { processQueue, getQueue } from "@/lib/admin/syncEngine";
+import { RefreshCw } from "lucide-react";
 
 export default function OfflineSyncManager() {
   const [queueCount, setQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // HIGH-2 FIX: Use useRef instead of useState so the guard is never stale inside closures
   const isSyncingRef = useRef(false);
 
   const runSync = async () => {
-    // Check ref (never stale) instead of state variable
     if (isSyncingRef.current || !navigator.onLine) return;
     const q = getQueue();
     if (q.length === 0) return;
@@ -19,41 +18,42 @@ export default function OfflineSyncManager() {
     isSyncingRef.current = true;
     setIsSyncing(true);
 
-    // LOW-3 FIX: Use React state for toast instead of direct DOM manipulation
     let toastEl: HTMLDivElement | null = null;
     try {
-      // Still use DOM for toast since it's outside React tree (overlay) — but cleanly
       toastEl = document.createElement("div");
       Object.assign(toastEl.style, {
         position: "fixed",
-        top: "20px",
+        top: "16px",
         left: "50%",
         transform: "translateX(-50%)",
-        background: "#2196F3",
-        color: "#fff",
-        padding: "10px 24px",
-        borderRadius: "25px",
+        background: "#151b26",
+        color: "#eef0f5",
+        border: "1px solid rgba(56, 189, 248, 0.35)",
+        padding: "8px 16px",
+        borderRadius: "8px",
         zIndex: "99999",
-        fontSize: "14px",
-        fontWeight: "bold",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+        fontSize: "13px",
+        fontWeight: "500",
+        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
       });
-      toastEl.innerText = "🔄 جاري مزامنة العمليات المعلقة...";
+      toastEl.innerText = "جاري مزامنة العمليات المعلقة";
       document.body.appendChild(toastEl);
 
       const res = await processQueue();
       if (res.success && res.count > 0) {
-        toastEl.innerText = `✅ تمت مزامنة ${res.count} عملية معلقة بنجاح!`;
-        toastEl.style.background = "#4CAF50";
-        window.dispatchEvent(new Event('refreshData'));
+        toastEl.innerText = `تمت مزامنة ${res.count} عملية معلقة`;
+        toastEl.style.borderColor = "rgba(16, 185, 129, 0.45)";
+        toastEl.style.color = "#34d399";
+        window.dispatchEvent(new Event("refreshData"));
       } else {
         if (toastEl && document.body.contains(toastEl)) document.body.removeChild(toastEl);
         toastEl = null;
       }
     } catch (e) {
       if (toastEl) {
-        toastEl.innerText = "⚠️ تعذر استكمال المزامنة، سيتم المحاولة مجدداً.";
-        toastEl.style.background = "#f44336";
+        toastEl.innerText = "تعذر استكمال المزامنة، سيتم المحاولة مجدداً";
+        toastEl.style.borderColor = "rgba(239, 68, 68, 0.45)";
+        toastEl.style.color = "#f87171";
       }
     } finally {
       isSyncingRef.current = false;
@@ -74,16 +74,17 @@ export default function OfflineSyncManager() {
     };
     updateCount();
 
-    window.addEventListener('offlineQueueUpdated', updateCount);
+    window.addEventListener("offlineQueueUpdated", updateCount);
 
-    const handleOnline = () => { runSync(); };
-    window.addEventListener('online', handleOnline);
+    const handleOnline = () => {
+      runSync();
+    };
+    window.addEventListener("online", handleOnline);
 
     if (navigator.onLine) {
       runSync();
     }
 
-    // Periodic check every 15 seconds if queue has items and online
     const interval = setInterval(() => {
       if (navigator.onLine && getQueue().length > 0) {
         runSync();
@@ -92,47 +93,42 @@ export default function OfflineSyncManager() {
 
     return () => {
       mounted = false;
-      window.removeEventListener('offlineQueueUpdated', updateCount);
-      window.removeEventListener('online', handleOnline);
+      window.removeEventListener("offlineQueueUpdated", updateCount);
+      window.removeEventListener("online", handleOnline);
       clearInterval(interval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (queueCount === 0) return null;
 
   return (
-    <div 
+    <button
+      type="button"
       onClick={runSync}
-      title="اضغط للمزامنة الفورية الآن"
+      title="اضغط للمزامنة الفورية"
+      className="btn-compact tabular-nums"
       style={{
         position: "fixed",
-        bottom: "20px",
-        right: "20px",
-        background: "linear-gradient(135deg, #FF9800, #F57C00)",
-        color: "#fff",
-        padding: "10px 18px",
-        borderRadius: "30px",
+        bottom: "16px",
+        right: "16px",
+        background: "var(--surface)",
+        color: "var(--warning-ink)",
+        border: "1px solid rgba(245, 158, 11, 0.35)",
+        padding: "8px 16px",
+        borderRadius: "8px",
         fontSize: "13px",
-        fontWeight: "bold",
+        fontWeight: 500,
         zIndex: 9990,
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
         gap: "8px",
-        boxShadow: "0 4px 15px rgba(255, 152, 0, 0.4)",
+        boxShadow: "0 8px 20px rgba(0, 0, 0, 0.35)",
         cursor: "pointer",
-        animation: "pulse 2s infinite"
       }}
     >
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes pulse {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.85; transform: scale(0.96); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-      `}} />
-      <span>🔄</span>
-      <span>{queueCount} عملية معلقة {isSyncing ? "(جاري المزامنة...)" : "(اضغط للمزامنة)"}</span>
-    </div>
+      <RefreshCw size={16} strokeWidth={1.5} className={isSyncing ? "animate-spin" : ""} />
+      <span>{queueCount} عملية معلقة {isSyncing ? "(جاري المزامنة)" : "(اضغط للمزامنة)"}</span>
+    </button>
   );
 }

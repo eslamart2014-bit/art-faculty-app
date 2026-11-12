@@ -3,14 +3,27 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
 import {
-  Search,
-  Trash2,
-  RefreshCw,
-  CheckCircle2,
-  Sparkles,
-  Lock,
-  Unlock,
+  AlertTriangle,
+  ArrowUpRight,
+  Bot,
   Camera,
+  CheckCircle2,
+  Copy,
+  Image as ImageIcon,
+  Lightbulb,
+  Lock,
+  Palette,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  Unlock,
+  User,
+  UserCog,
+  X,
+  Zap,
 } from "lucide-react";
 import { formatStudentCode, extractStudentCode } from "@/lib/students/codeHelper";
 import QRScanner from "@/components/scanner/QRScanner";
@@ -132,7 +145,7 @@ export default function StudentPortalHubModal({
       }
 
       setPortalSettings(newSettings);
-      setPortalSettingsMsg("✅ تم حفظ الإعدادات بنجاح");
+      setPortalSettingsMsg("تم حفظ الإعدادات بنجاح");
     } catch (e: any) {
       try {
         const { data: current } = await supabase
@@ -147,9 +160,9 @@ export default function StudentPortalHubModal({
           .eq("id", 1);
         if (error) throw error;
         setPortalSettings(newSettings);
-        setPortalSettingsMsg("✅ تم حفظ الإعدادات بنجاح");
+        setPortalSettingsMsg("تم حفظ الإعدادات بنجاح");
       } catch (fallbackErr: any) {
-        setPortalSettingsMsg("❌ خطأ في الحفظ: " + (fallbackErr?.message || e?.message || "حاول مجدداً"));
+        setPortalSettingsMsg("خطأ في الحفظ: " + (fallbackErr?.message || e?.message || "حاول مجدداً"));
       }
     } finally {
       setSavingPortalSettings(false);
@@ -225,7 +238,7 @@ export default function StudentPortalHubModal({
         });
         const data = await res.json();
         if (res.ok) {
-          setActionMessage("✓ " + (data.message || "تم حذف الحساب وفك ربط تليجرام بنجاح."));
+          setActionMessage(data.message || "تم حذف الحساب وفك ربط تليجرام بنجاح.");
           handleInspectAccount(cleanCode);
           fetchPortalStats();
         } else {
@@ -360,7 +373,7 @@ export default function StudentPortalHubModal({
         left: 0,
         width: "100%",
         height: "100%",
-        background: "rgba(0,0,0,0.85)",
+        background: "var(--bg-deep)",
         zIndex: 1000,
         display: "flex",
         flexDirection: "column",
@@ -374,21 +387,22 @@ export default function StudentPortalHubModal({
           justifyContent: "space-between",
           alignItems: "center",
           padding: "12px 18px",
-          background: "#141b29",
-          borderBottom: "1px solid #2a374f",
+          background: "var(--surface)",
+          borderBottom: "1px solid var(--border)",
           minHeight: "56px",
         }}
       >
         <div>
-          <h3 style={{ margin: 0, color: "#38bdf8", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🤖</span> إدارة بوت تليجرام للطلاب والتحكم الأكاديمي
+          <h3 style={{ margin: 0, color: "var(--accent-ink)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+            <Bot size={18} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
+            <span>إدارة بوت تليجرام للطلاب والتحكم الأكاديمي</span>
           </h3>
-          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "2px" }}>
             جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
         <button onClick={onClose} className="modal-close-btn" title="إغلاق">
-          ✕
+          <X size={18} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -399,36 +413,38 @@ export default function StudentPortalHubModal({
           flexWrap: "wrap",
           gap: "8px",
           padding: "10px 16px",
-          background: "#0d131f",
-          borderBottom: "1px solid #1e293b",
+          background: "var(--background)",
+          borderBottom: "1px solid var(--border)",
         }}
       >
         {[
-          { id: "overview", label: "نظرة عامة وإعدادات البوت 🤖", color: "#38bdf8" },
-          { id: "advanced_students", label: "الطلاب المسجلون بالبوت وآخر نشاط ⚡", color: "#10b981" },
-          { id: "accounts", label: "بحث وإدارة حساب طالب 👤", color: "#6366f1" },
-          { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI) 🎨", color: "#f59e0b" },
+          { id: "overview", label: "نظرة عامة وإعدادات البوت", Icon: Bot, color: "var(--accent-ink)", activeBg: "rgba(56, 189, 248, 0.12)" },
+          { id: "advanced_students", label: "الطلاب المسجلون بالبوت وآخر نشاط", Icon: Zap, color: "var(--success-ink)", activeBg: "rgba(16, 185, 129, 0.12)" },
+          { id: "accounts", label: "بحث وإدارة حساب طالب", Icon: User, color: "var(--primary)", activeBg: "rgba(37, 99, 235, 0.14)" },
+          { id: "plagiarism", label: "كشف تطابق اللوحات الفنية (AI)", Icon: Palette, color: "var(--warning-ink)", activeBg: "rgba(245, 158, 11, 0.12)" },
         ].map((tab) => {
           const isActive = activeTab === tab.id;
+          const TabIcon = tab.Icon;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               style={{
                 padding: "8px 14px",
-                borderRadius: "10px",
-                border: isActive ? `1px solid ${tab.color}` : "1px solid rgba(255,255,255,0.08)",
-                background: isActive ? `${tab.color}22` : "rgba(255,255,255,0.03)",
-                color: isActive ? "#fff" : "#94a3b8",
-                fontWeight: isActive ? "bold" : "normal",
+                borderRadius: "8px",
+                border: isActive ? `1px solid ${tab.color}` : "1px solid var(--border)",
+                background: isActive ? tab.activeBg : "var(--surface)",
+                color: isActive ? "var(--text-primary)" : "var(--text-muted)",
+                fontWeight: isActive ? 600 : 500,
                 cursor: "pointer",
                 fontSize: "13px",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                transition: "all 0.2s ease",
+                transition: "background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease",
               }}
             >
+              <TabIcon size={15} strokeWidth={1.5} style={{ color: isActive ? tab.color : "var(--text-muted)" }} />
               <span>{tab.label}</span>
             </button>
           );
@@ -451,9 +467,9 @@ export default function StudentPortalHubModal({
                 marginBottom: "20px",
               }}
             >
-              <div style={{ background: "#1a2430", border: "1px solid #1e3a5f", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#90CAF9" }}>إجمالي الطلاب المقيدين</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "11px", color: "var(--accent-ink)" }}>إجمالي الطلاب المقيدين</div>
+                <div className="tabular-nums" style={{ fontSize: "22px", fontWeight: 600, color: "var(--text-primary)", marginTop: "4px" }}>
                   {stats.totalStudents || "--"}
                 </div>
               </div>
@@ -461,28 +477,30 @@ export default function StudentPortalHubModal({
               <div
                 onClick={() => setActiveTab("advanced_students")}
                 style={{
-                  background: "linear-gradient(135deg, #132b1e, #1a3826)",
-                  border: "1.5px solid #22c55e",
+                  background: "var(--surface)",
+                  border: "1px solid var(--success)",
                   padding: "14px",
                   borderRadius: "12px",
                   textAlign: "center",
                   cursor: "pointer",
-                  boxShadow: "0 4px 15px rgba(34, 197, 94, 0.15)",
                 }}
                 title="انقر لاستعراض الطلاب المسجلين على بوت تليجرام"
               >
-                <div style={{ fontSize: "11px", color: "#86efac", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                <div style={{ fontSize: "11px", color: "var(--success-ink)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                   <span>المسجلون في بوت تليجرام</span>
-                  <span style={{ fontSize: "10px", background: "#15803d", color: "#fff", padding: "1px 5px", borderRadius: "6px" }}>↗ عرض</span>
+                  <span style={{ fontSize: "10px", background: "var(--success)", color: "#fff", padding: "1px 6px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                    <ArrowUpRight size={11} strokeWidth={1.5} />
+                    <span>عرض</span>
+                  </span>
                 </div>
-                <div style={{ fontSize: "24px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+                <div className="tabular-nums" style={{ fontSize: "24px", fontWeight: 600, color: "var(--text-primary)", marginTop: "4px" }}>
                   {stats.registeredAccounts || "0"}
                 </div>
               </div>
 
-              <div style={{ background: "#2a1f14", border: "1px solid #5a3d1e", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "11px", color: "#FFB74D" }}>أعمال ومشاريع مرفوعة</div>
-                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#fff", marginTop: "4px" }}>
+              <div style={{ background: "var(--surface)", border: "1px solid rgba(245, 158, 11, 0.35)", padding: "14px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "11px", color: "var(--warning-ink)" }}>أعمال ومشاريع مرفوعة</div>
+                <div className="tabular-nums" style={{ fontSize: "22px", fontWeight: 600, color: "var(--text-primary)", marginTop: "4px" }}>
                   {stats.submissionsCount || "0"}
                 </div>
               </div>
@@ -490,21 +508,24 @@ export default function StudentPortalHubModal({
               <div
                 onClick={() => setActiveTab("advanced_students")}
                 style={{
-                  background: "linear-gradient(135deg, #0d2818, #164024)",
-                  border: "1.5px solid #10b981",
+                  background: "var(--surface)",
+                  border: "1px solid var(--success)",
                   padding: "14px",
                   borderRadius: "12px",
                   textAlign: "center",
                   cursor: "pointer",
-                  boxShadow: "0 4px 15px rgba(16, 185, 129, 0.15)",
                 }}
               >
-                <div style={{ fontSize: "11px", color: "#a7f3d0", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                <div style={{ fontSize: "11px", color: "var(--success-ink)", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                   <span>سجل نشاط البوت والتحكم</span>
-                  <span style={{ fontSize: "10px", background: "#059669", color: "#fff", padding: "1px 5px", borderRadius: "6px" }}>↗ فتح</span>
+                  <span style={{ fontSize: "10px", background: "var(--success)", color: "#fff", padding: "1px 6px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                    <ArrowUpRight size={11} strokeWidth={1.5} />
+                    <span>فتح</span>
+                  </span>
                 </div>
-                <div style={{ fontSize: "15px", fontWeight: "bold", color: "#6ee7b7", marginTop: "7px" }}>
-                  متابعة وتعليق وحذف ⚡
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--success-ink)", marginTop: "8px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <span>متابعة وتعليق وحذف</span>
+                  <Zap size={14} strokeWidth={1.5} />
                 </div>
               </div>
             </div>
@@ -514,19 +535,20 @@ export default function StudentPortalHubModal({
                 onClick={fetchPortalStats}
                 disabled={loadingStats}
                 style={{
-                  background: "#1e293b",
-                  border: "1px solid #334155",
-                  color: "#fff",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-primary)",
                   padding: "8px 16px",
                   borderRadius: "8px",
                   fontSize: "12px",
+                  fontWeight: 500,
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",
                 }}
               >
-                <RefreshCw size={14} className={loadingStats ? "spin" : ""} />
+                <RefreshCw size={14} strokeWidth={1.5} className={loadingStats ? "spin" : ""} />
                 <span>{loadingStats ? "جاري التحديث..." : "تحديث الإحصائيات"}</span>
               </button>
             </div>
@@ -534,9 +556,9 @@ export default function StudentPortalHubModal({
             {/* القسم 1: رابط بوت تليجرام الرسمي للطلاب */}
             <div
               style={{
-                background: "#181d29",
-                border: "1px solid #2a374f",
-                borderRadius: "14px",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "12px",
                 padding: "16px",
                 marginBottom: "16px",
               }}
@@ -544,24 +566,24 @@ export default function StudentPortalHubModal({
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
                 <div
                   style={{
-                    background: "rgba(34, 158, 217, 0.2)",
-                    color: "#38bdf8",
+                    background: "rgba(56, 189, 248, 0.14)",
+                    color: "var(--accent-ink)",
                     width: "38px",
                     height: "38px",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "20px",
+                    flexShrink: 0,
                   }}
                 >
-                  🤖
+                  <Bot size={20} strokeWidth={1.5} />
                 </div>
                 <div>
-                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>
+                  <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "15px" }}>
                     بوت تليجرام الرسمي لبوابة الطلاب (@NEZAMFANYAbot)
                   </div>
-                  <div style={{ color: "#94a3b8", fontSize: "12px" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
                     تم إغلاق كافة الروابط والتطبيقات السابقة وتوجيه جميع الطلاب تلقائياً إلى البوت الرسمي للدخول بالكود ومعرف تليجرام.
                   </div>
                 </div>
@@ -569,10 +591,10 @@ export default function StudentPortalHubModal({
 
               <div
                 style={{
-                  background: "#101622",
-                  border: "1px dashed #334155",
+                  background: "var(--bg-deep)",
+                  border: "1px dashed var(--border-light)",
                   padding: "10px 14px",
-                  borderRadius: "10px",
+                  borderRadius: "8px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -581,39 +603,47 @@ export default function StudentPortalHubModal({
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ color: "#38bdf8", fontSize: "13.5px", fontFamily: "monospace", direction: "ltr", fontWeight: "bold" }}>
+                <span className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "13px", fontFamily: "monospace", direction: "ltr", fontWeight: 600 }}>
                   {TELEGRAM_BOT_URL}
                 </span>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     onClick={handleCopyBotLink}
                     style={{
-                      background: copiedLink ? "#10b981" : "#1e293b",
+                      background: copiedLink ? "var(--success)" : "var(--surface-hover)",
                       color: "#fff",
-                      border: "none",
+                      border: "1px solid var(--border)",
                       padding: "8px 14px",
                       borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
                     }}
                   >
-                    {copiedLink ? "✓ تم نسخ رابط البوت" : "📋 نسخ رابط البوت"}
+                    {copiedLink ? <CheckCircle2 size={14} strokeWidth={1.5} /> : <Copy size={14} strokeWidth={1.5} />}
+                    <span>{copiedLink ? "تم نسخ رابط البوت" : "نسخ رابط البوت"}</span>
                   </button>
                   <button
                     onClick={() => window.open(TELEGRAM_BOT_URL, "_blank")}
                     style={{
-                      background: "linear-gradient(135deg, #2AABEE, #229ED9)",
+                      background: "var(--primary)",
                       color: "#fff",
                       border: "none",
                       padding: "8px 14px",
                       borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
                     }}
                   >
-                    ✈️ فتح البوت في تليجرام
+                    <Send size={14} strokeWidth={1.5} />
+                    <span>فتح البوت في تليجرام</span>
                   </button>
                 </div>
               </div>
@@ -622,19 +652,20 @@ export default function StudentPortalHubModal({
             {/* القسم 2: إعدادات عرض البوابة داخل البوت */}
             <div
               style={{
-                background: "#181d29",
-                border: "1px solid #2a374f",
-                borderRadius: "14px",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "12px",
                 padding: "16px",
                 marginBottom: "16px",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                 <div>
-                  <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>
-                    ⚠️ إخفاء تبويب الإنذارات عن الطلاب داخل البوت
+                  <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <AlertTriangle size={16} strokeWidth={1.5} style={{ color: "var(--warning-ink)" }} />
+                    <span>إخفاء تبويب الإنذارات عن الطلاب داخل البوت</span>
                   </div>
-                  <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "2px" }}>
+                  <div style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
                     عند التفعيل يختفي تبويب الإنذارات من شاشة الطالب داخل البوت ويظهر له المشاريع والحضور والدواليب فقط.
                   </div>
                 </div>
@@ -642,21 +673,25 @@ export default function StudentPortalHubModal({
                   disabled={savingPortalSettings}
                   onClick={() => savePortalSettings({ hide_warnings_tab: !portalSettings.hide_warnings_tab })}
                   style={{
-                    background: portalSettings.hide_warnings_tab ? "#10b981" : "#334155",
+                    background: portalSettings.hide_warnings_tab ? "var(--success)" : "var(--surface-hover)",
                     color: "#fff",
-                    border: "none",
+                    border: "1px solid var(--border)",
                     padding: "8px 16px",
                     borderRadius: "8px",
                     fontSize: "12px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     cursor: savingPortalSettings ? "wait" : "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
                   }}
                 >
-                  {portalSettings.hide_warnings_tab ? "مفعل (الإنذارات مخفية) ✓" : "غير مفعل (الإنذارات ظاهرة)"}
+                  {portalSettings.hide_warnings_tab && <CheckCircle2 size={14} strokeWidth={1.5} />}
+                  <span>{portalSettings.hide_warnings_tab ? "مفعل (الإنذارات مخفية)" : "غير مفعل (الإنذارات ظاهرة)"}</span>
                 </button>
               </div>
               {portalSettingsMsg && (
-                <div style={{ marginTop: "8px", fontSize: "12px", color: "#34d399" }}>
+                <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--success-ink)" }}>
                   {portalSettingsMsg}
                 </div>
               )}
@@ -665,21 +700,21 @@ export default function StudentPortalHubModal({
             {/* القسم 3: معرض أعمال ومشاريع الطلاب للأساتذة */}
             <div
               style={{
-                background: "#181d29",
-                border: "1px solid #2a374f",
-                borderRadius: "14px",
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: "12px",
                 padding: "16px",
                 marginBottom: "16px",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ background: "rgba(76, 175, 80, 0.2)", color: "#4CAF50", width: "38px", height: "38px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>
-                    🖼️
+                  <div style={{ background: "rgba(16, 185, 129, 0.14)", color: "var(--success-ink)", width: "38px", height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <ImageIcon size={20} strokeWidth={1.5} />
                   </div>
                   <div>
-                    <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px" }}>معرض وفحص أعمال ومشاريع الطلاب</div>
-                    <div style={{ color: "#888", fontSize: "12px" }}>خاص بالسادة المعيدين والمدرسين لفحص الأعمال والتقييم وتحميل تقرير الـ PDF.</div>
+                    <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "15px" }}>معرض وفحص أعمال ومشاريع الطلاب</div>
+                    <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>خاص بالسادة المعيدين والمدرسين لفحص الأعمال والتقييم وتحميل تقرير الـ PDF.</div>
                   </div>
                 </div>
 
@@ -689,17 +724,21 @@ export default function StudentPortalHubModal({
                     window.open("/instructor", "_blank");
                   }}
                   style={{
-                    background: "#10b981",
+                    background: "var(--success)",
                     color: "#fff",
                     border: "none",
                     padding: "10px 18px",
                     borderRadius: "8px",
                     fontSize: "13px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
                   }}
                 >
-                  🎨 الانتقال للمعرض
+                  <Palette size={15} strokeWidth={1.5} />
+                  <span>الانتقال للمعرض</span>
                 </button>
               </div>
             </div>
@@ -720,14 +759,15 @@ export default function StudentPortalHubModal({
         {/* ========================================================= */}
         {activeTab === "accounts" && (
           <div className="animate-fade-in">
-            <div style={{ background: "#181d29", border: "1px solid #2a374f", borderRadius: "14px", padding: "18px", marginBottom: "18px" }}>
-              <label style={{ display: "block", color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "8px" }}>
+            <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "18px", marginBottom: "18px" }}>
+              <label style={{ display: "block", color: "var(--accent-ink)", fontWeight: 600, fontSize: "13px", marginBottom: "8px" }}>
                 البحث بكود الطالب لإدارة حسابه على البوت (معاينة، تعليق، أو حذف وفك ربط تليجرام):
               </label>
 
               <div style={{ display: "flex", gap: "8px", width: "100%", alignItems: "stretch", boxSizing: "border-box" }}>
                 <input
                   type="text"
+                  className="tabular-nums"
                   placeholder="كود الطالب (مثل: 0001)..."
                   value={searchAccountCode}
                   onChange={(e) => setSearchAccountCode(e.target.value)}
@@ -738,14 +778,14 @@ export default function StudentPortalHubModal({
                     flex: "1 1 auto",
                     minWidth: 0,
                     width: "100%",
-                    height: "44px",
+                    height: "42px",
                     padding: "0 12px",
-                    background: "#0d131f",
-                    border: "1px solid #2a374f",
-                    borderRadius: "10px",
-                    color: "#fff",
+                    background: "var(--bg-deep)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "8px",
+                    color: "var(--text-primary)",
                     fontSize: "14px",
-                    fontWeight: "bold",
+                    fontWeight: 500,
                     boxSizing: "border-box",
                     margin: 0,
                   }}
@@ -759,13 +799,13 @@ export default function StudentPortalHubModal({
                     width: "auto",
                     minWidth: "80px",
                     maxWidth: "95px",
-                    height: "44px",
-                    background: "#2563eb",
+                    height: "42px",
+                    background: "var(--primary)",
                     color: "#fff",
                     border: "none",
                     padding: "0 14px",
-                    borderRadius: "10px",
-                    fontWeight: "bold",
+                    borderRadius: "8px",
+                    fontWeight: 600,
                     fontSize: "13px",
                     cursor: searchingAccount ? "not-allowed" : "pointer",
                     display: "inline-flex",
@@ -778,7 +818,7 @@ export default function StudentPortalHubModal({
                     margin: 0,
                   }}
                 >
-                  <Search size={16} />
+                  <Search size={15} strokeWidth={1.5} />
                   <span>{searchingAccount ? "فحص..." : "فحص"}</span>
                 </button>
                 <button
@@ -786,15 +826,15 @@ export default function StudentPortalHubModal({
                   className="btn-compact"
                   onClick={() => setIsScanningQr(!isScanningQr)}
                   style={{
-                    width: "44px",
-                    minWidth: "44px",
-                    maxWidth: "44px",
-                    height: "44px",
-                    background: isScanningQr ? "#ef4444" : "#1e293b",
+                    width: "42px",
+                    minWidth: "42px",
+                    maxWidth: "42px",
+                    height: "42px",
+                    background: isScanningQr ? "var(--error)" : "var(--surface-hover)",
                     border: "1px solid",
-                    borderColor: isScanningQr ? "#ef4444" : "#3b82f6",
+                    borderColor: isScanningQr ? "var(--error)" : "var(--primary)",
                     color: "#fff",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
@@ -806,12 +846,12 @@ export default function StudentPortalHubModal({
                   }}
                   title={isScanningQr ? "إغلاق الكاميرا" : "مسح QR بالكاميرا"}
                 >
-                  <Camera size={18} />
+                  <Camera size={17} strokeWidth={1.5} />
                 </button>
               </div>
 
               {isScanningQr && (
-                <div style={{ marginTop: "12px", borderRadius: "12px", overflow: "hidden", border: "2px solid #3b82f6" }}>
+                <div style={{ marginTop: "12px", borderRadius: "12px", overflow: "hidden", border: "1px solid var(--primary)" }}>
                   <QRScanner
                     onScan={(decoded) => {
                       const clean = extractStudentCode(decoded) || decoded.trim();
@@ -829,41 +869,43 @@ export default function StudentPortalHubModal({
               )}
 
               {accountInspectError && (
-                <div style={{ marginTop: "10px", color: "#f87171", fontSize: "12px" }}>
+                <div style={{ marginTop: "10px", color: "var(--error-ink)", fontSize: "12px" }}>
                   {accountInspectError}
                 </div>
               )}
             </div>
 
             {actionMessage && (
-              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "12px", borderRadius: "10px", marginBottom: "16px", textAlign: "center", fontSize: "13px" }}>
+              <div style={{ background: "rgba(16, 185, 129, 0.14)", border: "1px solid var(--success)", color: "var(--success-ink)", padding: "12px", borderRadius: "8px", marginBottom: "16px", textAlign: "center", fontSize: "13px" }}>
                 {actionMessage}
               </div>
             )}
 
             {inspectedAccount && (
-              <div className="glass-card animate-fade-in" style={{ padding: "20px", borderRadius: "14px", border: "1px solid #2a374f" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid #1e293b", paddingBottom: "14px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ background: "var(--surface)", padding: "20px", borderRadius: "12px", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid var(--border)", paddingBottom: "14px", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
                   <div>
-                    <h2 style={{ color: "#fff", fontSize: "18px", fontWeight: "bold", margin: "0 0 4px 0" }}>
+                    <h2 style={{ color: "var(--text-primary)", fontSize: "18px", fontWeight: 600, margin: "0 0 4px 0" }}>
                       {inspectedAccount.student?.full_name}
                     </h2>
-                    <div style={{ color: "#38bdf8", fontSize: "13px" }}>
+                    <div className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "13px" }}>
                       كود: {formatStudentCode(inspectedAccount.student?.student_code)} • {inspectedAccount.student?.academic_year} (سكشن {inspectedAccount.student?.section || "عام"})
                     </div>
                   </div>
 
                   <div>
                     {isInspectedSuspended ? (
-                      <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.4)", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
-                        حساب معلق ⛔
+                      <span style={{ background: "rgba(239, 68, 68, 0.14)", color: "var(--error-ink)", border: "1px solid rgba(239, 68, 68, 0.4)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <ShieldAlert size={12} strokeWidth={1.5} />
+                        <span>حساب معلق</span>
                       </span>
                     ) : inspectedTgId ? (
-                      <span style={{ background: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "1px solid rgba(16, 185, 129, 0.4)", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
-                        مربوط ببوت تليجرام ونشط ✅
+                      <span style={{ background: "rgba(16, 185, 129, 0.14)", color: "var(--success-ink)", border: "1px solid rgba(16, 185, 129, 0.4)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <CheckCircle2 size={12} strokeWidth={1.5} />
+                        <span>مربوط ببوت تليجرام ونشط</span>
                       </span>
                     ) : (
-                      <span style={{ background: "rgba(148, 163, 184, 0.15)", color: "#cbd5e1", border: "1px solid rgba(148, 163, 184, 0.3)", padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: "bold" }}>
+                      <span style={{ background: "rgba(148, 163, 184, 0.14)", color: "var(--text-muted)", border: "1px solid var(--border-light)", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                         لم يسجل بالبوت بعد
                       </span>
                     )}
@@ -871,26 +913,26 @@ export default function StudentPortalHubModal({
                 </div>
 
                 {/* تفاصيل ربط تليجرام وآخر نشاط */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "#0d131f", padding: "14px", borderRadius: "12px", marginBottom: "16px", border: "1px solid #1e293b" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
-                    <span style={{ color: "#94a3b8", fontSize: "12px" }}>معرف تليجرام (Telegram ID):</span>
-                    <span style={{ color: "#38bdf8", fontFamily: "monospace", fontWeight: "bold", fontSize: "14px", direction: "ltr" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", background: "var(--bg-deep)", padding: "14px", borderRadius: "8px", marginBottom: "16px", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>معرف تليجرام (Telegram ID):</span>
+                    <span className="tabular-nums" style={{ color: "var(--accent-ink)", fontFamily: "monospace", fontWeight: 600, fontSize: "14px", direction: "ltr" }}>
                       {inspectedTgId || "غير مربوط حالياً"}
                     </span>
                   </div>
 
                   {inspectedAccount.account?.telegram_username && (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "8px" }}>
-                      <span style={{ color: "#94a3b8", fontSize: "12px" }}>حساب تليجرام:</span>
-                      <span style={{ color: "#fff", fontFamily: "monospace", fontSize: "13px", direction: "ltr" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+                      <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>حساب تليجرام:</span>
+                      <span style={{ color: "var(--text-primary)", fontFamily: "monospace", fontSize: "13px", direction: "ltr" }}>
                         @{inspectedAccount.account.telegram_username}
                       </span>
                     </div>
                   )}
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#94a3b8", fontSize: "12px" }}>آخر نشاط مسجل:</span>
-                    <span style={{ color: "#cbd5e1", fontSize: "12px", fontWeight: "bold" }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: "12px" }}>آخر نشاط مسجل:</span>
+                    <span className="tabular-nums" style={{ color: "var(--text-primary)", fontSize: "12px", fontWeight: 600 }}>
                       {inspectedAccount.auditLogs?.[0]?.created_at
                         ? new Date(inspectedAccount.auditLogs[0].created_at).toLocaleString("ar-EG")
                         : (inspectedAccount.account?.last_login_at
@@ -901,7 +943,7 @@ export default function StudentPortalHubModal({
                 </div>
 
                 {/* أزرار العمليات الإدارية المباشرة */}
-                <div style={{ borderTop: "1px solid #1e293b", paddingTop: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: "14px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
                   <button
                     type="button"
                     className="btn-compact"
@@ -914,23 +956,22 @@ export default function StudentPortalHubModal({
                     style={{
                       width: "100%",
                       margin: 0,
-                      background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
-                      border: "1.5px solid #38bdf8",
+                      background: "var(--primary)",
+                      border: "1px solid var(--accent-ink)",
                       color: "#fff",
-                      padding: "12px",
-                      borderRadius: "10px",
+                      padding: "11px 12px",
+                      borderRadius: "8px",
                       fontSize: "13px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: "8px",
                       gridColumn: "1 / -1",
-                      boxShadow: "0 3px 12px rgba(2, 132, 199, 0.3)",
                     }}
                   >
-                    <span style={{ fontSize: "16px" }}>👑</span>
+                    <UserCog size={16} strokeWidth={1.5} />
                     <span>الدخول لحساب الطالب مباشرة (وضع الإدارة)</span>
                   </button>
 
@@ -943,13 +984,13 @@ export default function StudentPortalHubModal({
                       style={{
                         width: "100%",
                         margin: 0,
-                        background: "rgba(16, 185, 129, 0.15)",
-                        border: "1px solid #10b981",
-                        color: "#34d399",
+                        background: "rgba(16, 185, 129, 0.14)",
+                        border: "1px solid var(--success)",
+                        color: "var(--success-ink)",
                         padding: "10px",
-                        borderRadius: "10px",
+                        borderRadius: "8px",
                         fontSize: "12px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
@@ -957,7 +998,7 @@ export default function StudentPortalHubModal({
                         gap: "6px",
                       }}
                     >
-                      <Unlock size={14} />
+                      <Unlock size={14} strokeWidth={1.5} />
                       <span>إلغاء تعليق الحساب وتفعيله</span>
                     </button>
                   ) : (
@@ -969,13 +1010,13 @@ export default function StudentPortalHubModal({
                       style={{
                         width: "100%",
                         margin: 0,
-                        background: "rgba(245, 158, 11, 0.16)",
-                        border: "1px solid #f59e0b",
-                        color: "#fde68a",
+                        background: "rgba(245, 158, 11, 0.14)",
+                        border: "1px solid var(--warning)",
+                        color: "var(--warning-ink)",
                         padding: "10px",
-                        borderRadius: "10px",
+                        borderRadius: "8px",
                         fontSize: "12px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         cursor: "pointer",
                         display: "inline-flex",
                         alignItems: "center",
@@ -983,7 +1024,7 @@ export default function StudentPortalHubModal({
                         gap: "6px",
                       }}
                     >
-                      <Lock size={14} />
+                      <Lock size={14} strokeWidth={1.5} />
                       <span>تعليق الحساب وإيقاف دخوله للبوت</span>
                     </button>
                   )}
@@ -996,13 +1037,13 @@ export default function StudentPortalHubModal({
                     style={{
                       width: "100%",
                       margin: 0,
-                      background: "#1e293b",
-                      border: "1px solid #eab308",
-                      color: "#facc15",
+                      background: "var(--surface-hover)",
+                      border: "1px solid var(--warning)",
+                      color: "var(--warning-ink)",
                       padding: "10px",
-                      borderRadius: "10px",
+                      borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
@@ -1010,7 +1051,7 @@ export default function StudentPortalHubModal({
                       gap: "6px",
                     }}
                   >
-                    <RefreshCw size={14} />
+                    <RefreshCw size={14} strokeWidth={1.5} />
                     <span>تصفير الأعمال لإعادة الرفع</span>
                   </button>
 
@@ -1022,13 +1063,13 @@ export default function StudentPortalHubModal({
                     style={{
                       width: "100%",
                       margin: 0,
-                      background: "rgba(239, 68, 68, 0.2)",
-                      border: "1.5px solid #ef4444",
-                      color: "#fca5a5",
+                      background: "rgba(239, 68, 68, 0.16)",
+                      border: "1px solid var(--error)",
+                      color: "var(--error-ink)",
                       padding: "10px",
-                      borderRadius: "10px",
+                      borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
                       display: "inline-flex",
                       alignItems: "center",
@@ -1036,8 +1077,8 @@ export default function StudentPortalHubModal({
                       gap: "6px",
                     }}
                   >
-                    <Trash2 size={15} />
-                    <span>حذف الحساب وفك ربط تليجرام 🗑️</span>
+                    <Trash2 size={15} strokeWidth={1.5} />
+                    <span>حذف الحساب وفك ربط تليجرام</span>
                   </button>
                 </div>
               </div>
@@ -1052,26 +1093,27 @@ export default function StudentPortalHubModal({
           <div className="animate-fade-in">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
               <div>
-                <h3 style={{ margin: 0, color: "#f59e0b", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Sparkles size={20} />
+                <h3 style={{ margin: 0, color: "var(--warning-ink)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Sparkles size={19} strokeWidth={1.5} />
                   <span>كاشف تشابه وتطابق اللوحات الفنية بالذكاء الاصطناعي</span>
                 </h3>
-                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "4px" }}>
+                <div style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
                   فحص دقيق لبصمات الصور (dHash) لكشف أي محاولات رفع لنفس اللوحة أو نسخها بين الطلاب.
                 </div>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", padding: "4px 8px" }}>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>عتبة الفحص:</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "4px 8px" }}>
+                  <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>عتبة الفحص:</span>
                   <select
+                    className="tabular-nums"
                     value={plagiarismThreshold}
                     onChange={(e) => {
                       const val = Number(e.target.value);
                       setPlagiarismThreshold(val);
                       fetchPlagiarismData(val);
                     }}
-                    style={{ background: "#0f172a", color: "#fff", border: "1px solid #475569", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
+                    style={{ background: "var(--bg-deep)", color: "var(--text-primary)", border: "1px solid var(--border-light)", borderRadius: "6px", padding: "4px 8px", fontSize: "11px", cursor: "pointer" }}
                   >
                     <option value={85}>دقة فائقة: تطابق مؤكد (85% فأكثر)</option>
                     <option value={80}>دقة قياسية: اشتباه قوي (80% فأكثر) - موصى به</option>
@@ -1083,27 +1125,28 @@ export default function StudentPortalHubModal({
                   onClick={() => fetchPlagiarismData()}
                   disabled={loadingPlagiarism}
                   style={{
-                    background: "#1e293b",
-                    border: "1px solid #334155",
-                    color: "#fff",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-primary)",
                     padding: "8px 14px",
                     borderRadius: "8px",
                     fontSize: "12px",
+                    fontWeight: 500,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
                     gap: "6px",
                   }}
                 >
-                  <RefreshCw size={14} className={loadingPlagiarism ? "spin" : ""} />
+                  <RefreshCw size={14} strokeWidth={1.5} className={loadingPlagiarism ? "spin" : ""} />
                   <span>{loadingPlagiarism ? "جاري الفحص..." : "إعادة الفحص الآن"}</span>
                 </button>
               </div>
             </div>
 
             {loadingPlagiarism ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-                <RefreshCw size={28} className="spin" style={{ margin: "0 auto 10px" }} />
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
+                <RefreshCw size={28} strokeWidth={1.5} className="spin" style={{ margin: "0 auto 10px" }} />
                 <div>جاري تحليل بصمات اللوحات الفنية عبر الذكاء الاصطناعي...</div>
               </div>
             ) : plagiarismData?.matches?.length > 0 ? (
@@ -1121,38 +1164,40 @@ export default function StudentPortalHubModal({
                   const hamming = m.hammingDistance ?? Math.round(64 * (1 - (m.similarityPercent || 0) / 100));
 
                   return (
-                    <div key={idx} style={{ background: "#141b29", border: "1px solid #ef4444", borderRadius: "14px", padding: "16px" }}>
+                    <div key={idx} style={{ background: "var(--surface)", border: "1px solid var(--error)", borderRadius: "12px", padding: "16px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "14px" }}>
-                            {m.tierLabel || `⚠️ تطابق مشبوه بنسبة ${m.similarityPercent}%!`}
+                          <span className="tabular-nums" style={{ color: "var(--error-ink)", fontWeight: 600, fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                            <AlertTriangle size={15} strokeWidth={1.5} />
+                            <span>{m.tierLabel || `تطابق مشبوه بنسبة ${m.similarityPercent}%`}</span>
                           </span>
-                          <span style={{ background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                          <span style={{ background: "rgba(239, 68, 68, 0.16)", color: "var(--error-ink)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                             {projectName}
                           </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span style={{ background: "#ef4444", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                          <span className="tabular-nums" style={{ background: "var(--error)", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                             مسافة هامد: {hamming}
                           </span>
-                          <span style={{ background: "#1e293b", color: "#38bdf8", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>
+                          <span className="tabular-nums" style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", color: "var(--accent-ink)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                             تشابه {m.similarityPercent}%
                           </span>
                         </div>
                       </div>
 
                       {m.reason && (
-                        <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: "8px", padding: "8px 10px", marginBottom: "12px", fontSize: "11px", color: "#cbd5e1", border: "1px dashed #334155" }}>
-                          💡 <b>تشخيص الـ AI:</b> {m.reason}
+                        <div style={{ background: "var(--bg-deep)", borderRadius: "8px", padding: "8px 10px", marginBottom: "12px", fontSize: "11px", color: "var(--text-primary)", border: "1px dashed var(--border-light)", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Lightbulb size={13} strokeWidth={1.5} style={{ color: "var(--warning-ink)", flexShrink: 0 }} />
+                          <span><b style={{ fontWeight: 600 }}>تشخيص الـ AI:</b> {m.reason}</span>
                         </div>
                       )}
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", textAlign: "center" }}>
-                        <div style={{ background: "#0f172a", borderRadius: "10px", padding: "10px", border: "1px solid #1e293b" }}>
-                          <div style={{ fontSize: "13px", color: "#fff", fontWeight: "bold", marginBottom: "2px" }}>
+                        <div style={{ background: "var(--bg-deep)", borderRadius: "8px", padding: "10px", border: "1px solid var(--border)" }}>
+                          <div className="tabular-nums" style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 600, marginBottom: "2px" }}>
                             {name1} {code1 ? `(كود: ${code1})` : ""}
                           </div>
-                          {course1 && <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px" }}>{course1}</div>}
+                          {course1 && <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>{course1}</div>}
                           <div
                             onClick={() => img1 && setZoomedImage(img1)}
                             style={{
@@ -1160,7 +1205,7 @@ export default function StudentPortalHubModal({
                               height: "160px",
                               borderRadius: "8px",
                               overflow: "hidden",
-                              border: "2px solid #ef4444",
+                              border: "1px solid var(--error)",
                               background: "#000",
                               cursor: img1 ? "zoom-in" : "default",
                             }}
@@ -1171,11 +1216,11 @@ export default function StudentPortalHubModal({
                           </div>
                         </div>
 
-                        <div style={{ background: "#0f172a", borderRadius: "10px", padding: "10px", border: "1px solid #1e293b" }}>
-                          <div style={{ fontSize: "13px", color: "#fff", fontWeight: "bold", marginBottom: "2px" }}>
+                        <div style={{ background: "var(--bg-deep)", borderRadius: "8px", padding: "10px", border: "1px solid var(--border)" }}>
+                          <div className="tabular-nums" style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 600, marginBottom: "2px" }}>
                             {name2} {code2 ? `(كود: ${code2})` : ""}
                           </div>
-                          {course2 && <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "6px" }}>{course2}</div>}
+                          {course2 && <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "6px" }}>{course2}</div>}
                           <div
                             onClick={() => img2 && setZoomedImage(img2)}
                             style={{
@@ -1183,7 +1228,7 @@ export default function StudentPortalHubModal({
                               height: "160px",
                               borderRadius: "8px",
                               overflow: "hidden",
-                              border: "2px solid #ef4444",
+                              border: "1px solid var(--error)",
                               background: "#000",
                               cursor: img2 ? "zoom-in" : "default",
                             }}
@@ -1195,32 +1240,41 @@ export default function StudentPortalHubModal({
                         </div>
                       </div>
 
-                      <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed #334155", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                        <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                          🤖 مراقبة التطابق: يعمل النظام في الخلفية ويرسل تنبيهات تلقائية.
+                      <div style={{ marginTop: "14px", paddingTop: "10px", borderTop: "1px dashed var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                          <Bot size={13} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
+                          <span>مراقبة التطابق: يعمل النظام في الخلفية ويرسل تنبيهات تلقائية.</span>
                         </div>
                         <button
                           onClick={() => handleSendTelegramPlagiarismAlert(m, m.id || `match_${idx}`)}
                           disabled={sendingTelegramMatchId === (m.id || `match_${idx}`)}
                           style={{
-                            background: telegramSentMatches[m.id || `match_${idx}`] ? "#065f46" : "#2563eb",
+                            background: telegramSentMatches[m.id || `match_${idx}`] ? "var(--success)" : "var(--primary)",
                             color: "#fff",
                             border: "none",
                             borderRadius: "8px",
                             padding: "8px 14px",
                             fontSize: "12px",
-                            fontWeight: "bold",
+                            fontWeight: 600,
                             cursor: "pointer",
                             display: "flex",
                             alignItems: "center",
                             gap: "6px",
                           }}
                         >
-                          {sendingTelegramMatchId === (m.id || `match_${idx}`)
-                            ? "جاري إرسال الصورتين للتليجرام..."
-                            : telegramSentMatches[m.id || `match_${idx}`]
-                              ? "تم إرسال الصورتين لبوت التليجرام بنجاح ✓"
-                              : "📲 إرسال إشعار التليجرام الآن (مع الصورتين)"}
+                          {sendingTelegramMatchId === (m.id || `match_${idx}`) ? (
+                            <span>جاري إرسال الصورتين للتليجرام...</span>
+                          ) : telegramSentMatches[m.id || `match_${idx}`] ? (
+                            <>
+                              <CheckCircle2 size={14} strokeWidth={1.5} />
+                              <span>تم إرسال الصورتين لبوت التليجرام بنجاح</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send size={14} strokeWidth={1.5} />
+                              <span>إرسال إشعار التليجرام الآن (مع الصورتين)</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -1228,10 +1282,10 @@ export default function StudentPortalHubModal({
                 })}
               </div>
             ) : (
-              <div style={{ background: "#141b29", border: "1px solid #10b981", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
-                <CheckCircle2 size={38} color="#10b981" style={{ margin: "0 auto 10px" }} />
-                <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px" }}>جميع الأعمال واللوحات أصلية 100% ✅</div>
-                <div style={{ color: "#94a3b8", fontSize: "12px", marginTop: "8px", maxWidth: "550px", margin: "8px auto 0", lineHeight: "1.6" }}>
+              <div style={{ background: "var(--surface)", border: "1px solid var(--success)", padding: "30px", borderRadius: "12px", textAlign: "center" }}>
+                <CheckCircle2 size={36} strokeWidth={1.5} style={{ color: "var(--success-ink)", margin: "0 auto 10px" }} />
+                <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "16px" }}>جميع الأعمال واللوحات أصلية 100%</div>
+                <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "8px", maxWidth: "550px", margin: "8px auto 0", lineHeight: "1.6" }}>
                   لم يعثر محرك الذكاء الاصطناعي على أي شبهة نسخ أو تطابق بين الطلاب (عتبة الفحص الحالية: {plagiarismThreshold}% فأكثر).
                 </div>
               </div>
@@ -1247,7 +1301,7 @@ export default function StudentPortalHubModal({
             position: "fixed",
             inset: 0,
             zIndex: 999999,
-            background: "rgba(0, 0, 0, 0.92)",
+            background: "rgba(2, 6, 23, 0.92)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -1256,13 +1310,14 @@ export default function StudentPortalHubModal({
             cursor: "zoom-out",
           }}
         >
-          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "#ef4444", padding: "6px 14px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>
-            ✕ إغلاق المعاينة
+          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "var(--error)", padding: "6px 14px", borderRadius: "8px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <X size={15} strokeWidth={1.5} />
+            <span>إغلاق المعاينة</span>
           </div>
           <img
             src={zoomedImage}
             alt="معاينة مكبرة"
-            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #38bdf8", objectFit: "contain" }}
+            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "1px solid var(--accent-ink)", objectFit: "contain" }}
           />
         </div>
       )}

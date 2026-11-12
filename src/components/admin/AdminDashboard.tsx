@@ -6,6 +6,23 @@ import Papa from "papaparse";
 import { generatePrintableHtml } from "@/lib/courses/pdfHelper";
 import { downloadPdf } from "@/lib/courses/downloadPdf";
 import { normalizeAcademicYear } from "@/lib/students/codeHelper";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  GraduationCap,
+  Link2,
+  Lock,
+  RefreshCw,
+  Search,
+  Upload,
+  UserPlus,
+  Users,
+  X
+} from "lucide-react";
 
 interface AdminDashboardProps {
   activeModal: "users" | "roster" | null;
@@ -489,14 +506,22 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
   return (
     <>
       {activeModal === "roster" && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", backdropFilter: "blur(4px)" }}>
-          <div className="card" style={{ width: "95%", maxWidth: "540px", display: "flex", flexDirection: "column", maxHeight: "92vh", padding: 0, overflow: "hidden", border: "1px solid #334155", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", justifyContent: "center", alignItems: "center", padding: "12px" }}>
+          <div className="card" style={{ width: "95%", maxWidth: "540px", display: "flex", flexDirection: "column", maxHeight: "92vh", padding: 0, overflow: "hidden", border: "1px solid var(--border)", borderRadius: "16px", background: "var(--surface)" }}>
             
             {/* Header Tabs */}
-            <div style={{ display: "flex", alignItems: "center", background: "#181f2c", borderBottom: "1px solid #2a374f", padding: "0 10px 0 0" }}>
-              <button onClick={() => setActiveTab("sync")} style={{ flex: 1, padding: "14px", background: activeTab === "sync" ? "#222e42" : "transparent", color: activeTab === "sync" ? "#38bdf8" : "#94a3b8", border: "none", borderBottom: activeTab === "sync" ? "2px solid #38bdf8" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>مزامنة وترفيع الدفعات 🤖</button>
-              <button onClick={() => setActiveTab("export")} style={{ flex: 1, padding: "14px", background: activeTab === "export" ? "#222e42" : "transparent", color: activeTab === "export" ? "#38bdf8" : "#94a3b8", border: "none", borderBottom: activeTab === "export" ? "2px solid #38bdf8" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>تصدير الكشوف 📥</button>
-              <button onClick={onClose} className="modal-close-btn" style={{ margin: "0 8px" }} title="إغلاق">✕</button>
+            <div style={{ display: "flex", alignItems: "center", background: "var(--bg-deep)", borderBottom: "1px solid var(--border)", padding: "0 10px 0 0" }}>
+              <button onClick={() => setActiveTab("sync")} style={{ flex: 1, padding: "14px 10px", background: activeTab === "sync" ? "var(--surface)" : "transparent", color: activeTab === "sync" ? "var(--accent-ink)" : "var(--text-muted)", border: "none", borderBottom: activeTab === "sync" ? "2px solid var(--primary)" : "2px solid transparent", fontWeight: activeTab === "sync" ? 600 : 500, cursor: "pointer", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                <RefreshCw size={15} strokeWidth={1.5} />
+                <span>مزامنة وترفيع الدفعات</span>
+              </button>
+              <button onClick={() => setActiveTab("export")} style={{ flex: 1, padding: "14px 10px", background: activeTab === "export" ? "var(--surface)" : "transparent", color: activeTab === "export" ? "var(--accent-ink)" : "var(--text-muted)", border: "none", borderBottom: activeTab === "export" ? "2px solid var(--primary)" : "2px solid transparent", fontWeight: activeTab === "export" ? 600 : 500, cursor: "pointer", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                <Download size={15} strokeWidth={1.5} />
+                <span>تصدير الكشوف</span>
+              </button>
+              <button onClick={onClose} className="modal-close-btn" style={{ margin: "0 8px" }} title="إغلاق" aria-label="إغلاق">
+                <X size={18} strokeWidth={1.5} />
+              </button>
             </div>
 
             <div style={{ overflowY: "auto", padding: "20px", flexGrow: 1, direction: "rtl" }}>
@@ -504,31 +529,33 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
               {activeTab === "sync" && (
                 <>
                   <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "15px", textAlign: "center", lineHeight: "1.6" }}>
-                    قم برفع الشيت متضمناً الدفعات المحدثة (الاسم، الفرقة، السكشن) <b>بدون أكواد</b>.<br/>
-                    يقوم النظام آلياً بـ <b>تثبيت أكواد الطلاب المستمرين</b>، وترفيع فرقهم وسكاشنهم، و<b>أرشفة الخريجين</b> (الفرقة الرابعة السابقة) تلقائياً.
+                    قم برفع الشيت متضمناً الدفعات المحدثة (الاسم، الفرقة، السكشن) <strong style={{ fontWeight: 600, color: "var(--text-primary)" }}>بدون أكواد</strong>.<br/>
+                    يقوم النظام آلياً بـ <strong style={{ fontWeight: 600, color: "var(--text-primary)" }}>تثبيت أكواد الطلاب المستمرين</strong>، وترفيع فرقهم وسكاشنهم، و<strong style={{ fontWeight: 600, color: "var(--text-primary)" }}>أرشفة الخريجين</strong> (الفرقة الرابعة السابقة) تلقائياً.
                   </p>
 
-                  <div style={{ background: "#111827", border: "1px solid #1f2937", padding: "15px", borderRadius: "10px", marginBottom: "15px", textAlign: "right" }}>
-                    <label style={{ fontSize: "12px", fontWeight: "bold", color: "#38bdf8", display: "block", marginBottom: "6px" }}>
-                      🔗 خيار 1: رابط Google Sheets (أو تاب محدد):
+                  <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "15px", borderRadius: "12px", marginBottom: "15px", textAlign: "right" }}>
+                    <label style={{ fontSize: "12px", fontWeight: 500, color: "var(--accent-ink)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                      <Link2 size={14} strokeWidth={1.5} />
+                      <span>خيار 1: رابط Google Sheets (أو تاب محدد):</span>
                     </label>
                     <input 
                       type="text" 
                       value={sheetUrl}
                       onChange={(e) => setSheetUrl(e.target.value)}
                       placeholder="https://docs.google.com/spreadsheets/d/..." 
-                      style={{ marginBottom: "12px", fontSize: "12px", width: "100%", direction: "ltr", textAlign: "left", padding: "10px", borderRadius: "6px", border: "1px solid #374151", background: "#030712", color: "#fff" }} 
+                      style={{ marginBottom: "12px", fontSize: "12px", width: "100%", direction: "ltr", textAlign: "left", padding: "10px", borderRadius: "8px", border: "1px solid var(--border-light)", background: "var(--surface)", color: "var(--text-primary)", boxSizing: "border-box" }} 
                       disabled={loading || !!previewData} 
                     />
 
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "5px 0 10px 0" }}>
-                      <div style={{ flex: 1, height: "1px", background: "#374151" }}></div>
-                      <span style={{ fontSize: "11px", color: "#9ca3af" }}>أو مباشرة من جهازك</span>
-                      <div style={{ flex: 1, height: "1px", background: "#374151" }}></div>
+                      <div style={{ flex: 1, height: "1px", background: "var(--border)" }}></div>
+                      <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>أو مباشرة من جهازك</span>
+                      <div style={{ flex: 1, height: "1px", background: "var(--border)" }}></div>
                     </div>
 
-                    <label style={{ fontSize: "12px", fontWeight: "bold", color: "#10b981", display: "block", marginBottom: "6px" }}>
-                      📁 خيار 2: رفع ملف CSV مباشر:
+                    <label style={{ fontSize: "12px", fontWeight: 500, color: "var(--success-ink)", display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
+                      <FileSpreadsheet size={14} strokeWidth={1.5} />
+                      <span>خيار 2: رفع ملف CSV مباشر:</span>
                     </label>
                     <input 
                       type="file" 
@@ -542,9 +569,10 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                       type="button" 
                       onClick={() => fileInputRef.current?.click()} 
                       disabled={loading || !!previewData}
-                      style={{ width: "100%", background: "#1f2937", border: "1px dashed #4b5563", color: "#e5e7eb", padding: "10px", borderRadius: "6px", fontSize: "13px", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+                      style={{ width: "100%", background: "var(--surface)", border: "1px dashed var(--border-light)", color: "var(--text-primary)", padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
                     >
-                      <span>📂</span> اختيار ملف CSV من الكمبيوتر
+                      <Upload size={15} strokeWidth={1.5} />
+                      <span>اختيار ملف CSV من الكمبيوتر</span>
                     </button>
                   </div>
 
@@ -552,33 +580,46 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                     <button 
                       onClick={parseGoogleSheet} 
                       disabled={loading || !sheetUrl} 
-                      style={{ background: "#2563eb", fontSize: "14px", fontWeight: "bold", width: "100%", padding: "12px", borderRadius: "6px", border: "none", color: "#fff", cursor: loading || !sheetUrl ? "not-allowed" : "pointer", opacity: loading || !sheetUrl ? 0.6 : 1 }}
+                      style={{ background: "var(--primary)", fontSize: "14px", fontWeight: 600, width: "100%", padding: "12px", borderRadius: "8px", border: "none", color: "#fff", cursor: loading || !sheetUrl ? "not-allowed" : "pointer", opacity: loading || !sheetUrl ? 0.6 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
                     >
-                      {loading ? "جاري المعالجة والفحص..." : "تحليل الشيت والمطابقة الذكية 🔍"}
+                      <Search size={15} strokeWidth={1.5} />
+                      <span>{loading ? "جاري المعالجة والفحص..." : "تحليل الشيت والمطابقة الذكية"}</span>
                     </button>
                   ) : (
-                    <div style={{ background: "#0b1329", padding: "16px", borderRadius: "10px", border: "1px solid #1e3a8a", marginBottom: "10px" }}>
-                      <h4 style={{ color: "#60a5fa", margin: "0 0 12px 0", textAlign: "center", fontSize: "16px" }}>
-                        📊 نتيجة المطابقة والترفيع الذكي
+                    <div style={{ background: "var(--bg-deep)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border-light)", marginBottom: "10px" }}>
+                      <h4 style={{ color: "var(--accent-ink)", margin: "0 0 12px 0", textAlign: "center", fontSize: "15px", fontWeight: 600 }}>
+                        نتيجة المطابقة والترفيع الذكي
                       </h4>
 
                       {/* Security note */}
-                      <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "8px", padding: "10px", marginBottom: "14px", fontSize: "12px", color: "#6ee7b7", lineHeight: "1.5" }}>
-                        🔒 <b>تثبيت الأكواد:</b> كافة الطلاب المستمرين ({previewData.updateList.length} طالب) سيحتفظون بأكوادهم السابقة تماماً كما هي، وسيتم فقط ترفيع الفرق والسكاشن.
+                      <div className="tabular-nums" style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "8px", padding: "10px", marginBottom: "14px", fontSize: "12px", color: "var(--success-ink)", lineHeight: "1.5", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+                        <Lock size={15} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "2px" }} />
+                        <span>
+                          <strong style={{ fontWeight: 600 }}>تثبيت الأكواد:</strong> كافة الطلاب المستمرين ({previewData.updateList.length} طالب) سيحتفظون بأكوادهم السابقة تماماً كما هي، وسيتم فقط ترفيع الفرق والسكاشن.
+                        </span>
                       </div>
 
                       <ul style={{ listStyle: "none", padding: 0, margin: "0 0 16px 0", fontSize: "13px", lineHeight: "2" }}>
-                        <li style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #1e293b", padding: "4px 0" }}>
-                          <span style={{ color: "#38bdf8" }}>🔵 طلاب مستمرون (ترفيع واحتفاظ بالكود):</span> 
-                          <b style={{ color: "#fff" }}>{previewData.updateList.length} طالب</b>
+                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", padding: "4px 0" }}>
+                          <span style={{ color: "var(--accent-ink)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <Users size={14} strokeWidth={1.5} />
+                            <span>طلاب مستمرون (ترفيع واحتفاظ بالكود):</span>
+                          </span> 
+                          <strong className="tabular-nums" style={{ color: "var(--text-primary)", fontWeight: 600 }}>{previewData.updateList.length} طالب</strong>
                         </li>
-                        <li style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #1e293b", padding: "4px 0" }}>
-                          <span style={{ color: "#f87171" }}>🎓 خريجون / منقولون (للأرشيف):</span> 
-                          <b style={{ color: "#f87171" }}>{previewData.archiveList.length} طالب</b>
+                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", padding: "4px 0" }}>
+                          <span style={{ color: "var(--error-ink)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <GraduationCap size={14} strokeWidth={1.5} />
+                            <span>خريجون / منقولون (للأرشيف):</span>
+                          </span> 
+                          <strong className="tabular-nums" style={{ color: "var(--error-ink)", fontWeight: 600 }}>{previewData.archiveList.length} طالب</strong>
                         </li>
-                        <li style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                          <span style={{ color: "#34d399" }}>🟢 طلاب مستجدون (أكواد جديدة):</span> 
-                          <b style={{ color: "#34d399" }}>{previewData.insertList.length} طالب</b>
+                        <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                          <span style={{ color: "var(--success-ink)", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                            <UserPlus size={14} strokeWidth={1.5} />
+                            <span>طلاب مستجدون (أكواد جديدة):</span>
+                          </span> 
+                          <strong className="tabular-nums" style={{ color: "var(--success-ink)", fontWeight: 600 }}>{previewData.insertList.length} طالب</strong>
                         </li>
                       </ul>
 
@@ -586,30 +627,42 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                       <button 
                         type="button" 
                         onClick={() => setShowDetails(!showDetails)}
-                        style={{ width: "100%", background: "#1e293b", border: "1px solid #334155", color: "#cbd5e1", padding: "8px", borderRadius: "6px", fontSize: "12px", cursor: "pointer", marginBottom: "14px" }}
+                        style={{ width: "100%", background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--text-muted)", padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 500, cursor: "pointer", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
-                        {showDetails ? "إخفاء التفاصيل ▲" : "🔍 عرض تفاصيل وعينات المطابقة ▼"}
+                        {showDetails ? (
+                          <>
+                            <ChevronUp size={14} strokeWidth={1.5} />
+                            <span>إخفاء التفاصيل</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={14} strokeWidth={1.5} />
+                            <span>عرض تفاصيل وعينات المطابقة</span>
+                          </>
+                        )}
                       </button>
 
                       {showDetails && (
-                        <div style={{ background: "#030712", border: "1px solid #1f2937", borderRadius: "8px", padding: "10px", marginBottom: "14px", maxHeight: "180px", overflowY: "auto", fontSize: "11px" }}>
-                          <div style={{ fontWeight: "bold", color: "#f87171", marginBottom: "4px" }}>
-                            🎓 عينة من الخريجين المحولين للأرشيف (أول 5):
+                        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "8px", padding: "10px", marginBottom: "14px", maxHeight: "180px", overflowY: "auto", fontSize: "11px" }}>
+                          <div style={{ fontWeight: 600, color: "var(--error-ink)", marginBottom: "4px", display: "flex", alignItems: "center", gap: "5px" }}>
+                            <GraduationCap size={13} strokeWidth={1.5} />
+                            <span>عينة من الخريجين المحولين للأرشيف (أول 5):</span>
                           </div>
                           {previewData.archiveList.slice(0, 5).map(s => (
-                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", color: "#9ca3af", padding: "2px 0" }}>
+                            <div key={s.id} className="tabular-nums" style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", padding: "2px 0" }}>
                               <span>{s.full_name}</span>
                               <span>كود: {s.student_code} ({s.academic_year})</span>
                             </div>
                           ))}
 
-                          <div style={{ fontWeight: "bold", color: "#38bdf8", marginTop: "10px", marginBottom: "4px" }}>
-                            🔵 عينة من المستمرين المحتفظين بأكوادهم (أول 5):
+                          <div style={{ fontWeight: 600, color: "var(--accent-ink)", marginTop: "10px", marginBottom: "4px", display: "flex", alignItems: "center", gap: "5px" }}>
+                            <Users size={13} strokeWidth={1.5} />
+                            <span>عينة من المستمرين المحتفظين بأكوادهم (أول 5):</span>
                           </div>
                           {previewData.updateList.slice(0, 5).map(s => (
-                            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", color: "#9ca3af", padding: "2px 0" }}>
+                            <div key={s.id} className="tabular-nums" style={{ display: "flex", justifyContent: "space-between", color: "var(--text-muted)", padding: "2px 0" }}>
                               <span>{s.full_name}</span>
-                              <span style={{ color: "#38bdf8" }}>كود ثابت: {s.student_code} ➔ {s.academic_year} (س{s.section})</span>
+                              <span style={{ color: "var(--accent-ink)" }}>كود ثابت: {s.student_code} ← {s.academic_year} (س{s.section})</span>
                             </div>
                           ))}
                         </div>
@@ -618,14 +671,15 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                       <button 
                         onClick={executeSync} 
                         disabled={loading} 
-                        style={{ background: "#16a34a", fontSize: "14px", fontWeight: "bold", width: "100%", padding: "12px", borderRadius: "6px", border: "none", color: "#fff", marginBottom: "8px", cursor: loading ? "not-allowed" : "pointer" }}
+                        style={{ background: "var(--success)", fontSize: "14px", fontWeight: 600, width: "100%", padding: "12px", borderRadius: "8px", border: "none", color: "#fff", marginBottom: "8px", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                       >
-                        {loading ? "جاري الحفظ والأرشفة..." : "تأكيد وتنفيذ المزامنة والأرشفة ✅"}
+                        <Check size={16} strokeWidth={1.5} />
+                        <span>{loading ? "جاري الحفظ والأرشفة..." : "تأكيد وتنفيذ المزامنة والأرشفة"}</span>
                       </button>
                       <button 
                         onClick={() => { setPreviewData(null); setShowDetails(false); }} 
                         disabled={loading} 
-                        style={{ background: "transparent", color: "#ef4444", border: "1px solid #ef4444", width: "100%", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}
+                        style={{ background: "transparent", color: "var(--error-ink)", border: "1px solid var(--error)", width: "100%", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}
                       >
                         إلغاء المعاينة
                       </button>
@@ -639,11 +693,11 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                   <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "20px", lineHeight: "1.6" }}>
                     بعد إتمام المزامنة، يمكنك تحميل كشوف الطلاب متضمنة الأكواد التي تم الاحتفاظ بها آلياً أو توليدها.
                   </p>
-                  <label style={{ display: "block", color: "#fff", marginBottom: "8px", fontWeight: "bold", fontSize: "13px" }}>اختر الفرقة المراد تصديرها:</label>
+                  <label style={{ display: "block", color: "var(--text-primary)", marginBottom: "8px", fontWeight: 500, fontSize: "13px" }}>اختر الفرقة المراد تصديرها:</label>
                   <select 
                     value={exportYear} 
                     onChange={e => setExportYear(e.target.value)}
-                    style={{ width: "100%", padding: "10px", background: "#111", border: "1px solid #555", color: "#fff", borderRadius: "5px", marginBottom: "20px" }}
+                    style={{ width: "100%", padding: "10px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", borderRadius: "8px", marginBottom: "20px" }}
                   >
                     <option value="">-- اختر الفرقة --</option>
                     {availableYears.map(year => (
@@ -652,25 +706,27 @@ export default function AdminDashboard({ activeModal, onClose }: AdminDashboardP
                   </select>
 
                   <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={handleExportPDF} disabled={loading} style={{ flex: 1, background: "#ef4444", color: "#fff", border: "none", padding: "12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-                      تحميل PDF 📄
+                    <button onClick={handleExportPDF} disabled={loading} style={{ flex: 1, background: "var(--error)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                      <FileText size={15} strokeWidth={1.5} />
+                      <span>تحميل PDF</span>
                     </button>
-                    <button onClick={handleExportExcel} disabled={loading} style={{ flex: 1, background: "#16a34a", color: "#fff", border: "none", padding: "12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>
-                      تحميل Excel 📊
+                    <button onClick={handleExportExcel} disabled={loading} style={{ flex: 1, background: "var(--success)", color: "#fff", border: "none", padding: "12px", borderRadius: "8px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                      <FileSpreadsheet size={15} strokeWidth={1.5} />
+                      <span>تحميل Excel</span>
                     </button>
                   </div>
                 </div>
               )}
 
               {msg && (
-                <div style={{ marginTop: "15px", fontSize: "13px", color: msg.includes("بنجاح") ? "#4ade80" : "#facc15", textAlign: "center", background: "rgba(0,0,0,0.3)", padding: "10px", borderRadius: "8px", border: `1px solid ${msg.includes("بنجاح") ? "#22c55e" : "#eab308"}` }}>
+                <div style={{ marginTop: "15px", fontSize: "13px", color: msg.includes("بنجاح") ? "var(--success-ink)" : "var(--warning-ink)", textAlign: "center", background: msg.includes("بنجاح") ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)", padding: "10px", borderRadius: "8px", border: `1px solid ${msg.includes("بنجاح") ? "var(--success)" : "var(--warning)"}` }}>
                   {msg}
                 </div>
               )}
             </div>
 
-            <div style={{ padding: "12px 20px", background: "#181f2c", borderTop: "1px solid #2a374f" }}>
-              <button className="secondary" onClick={onClose} style={{ width: "100%", margin: 0, padding: "10px" }}>إغلاق</button>
+            <div style={{ padding: "12px 20px", background: "var(--bg-deep)", borderTop: "1px solid var(--border)" }}>
+              <button className="secondary" onClick={onClose} style={{ width: "100%", margin: 0, padding: "10px", borderRadius: "8px" }}>إغلاق</button>
             </div>
           </div>
         </div>

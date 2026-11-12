@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
-import { LogIn, CheckCircle2, UserCheck } from "lucide-react";
+import { LogIn, CheckCircle2, UserCheck, GraduationCap, Smartphone, AlertTriangle } from "lucide-react";
 
 function extractTelegramUser(): { id: string | number; first_name?: string; username?: string } | null {
   if (typeof window === "undefined") return null;
@@ -318,9 +318,9 @@ export default function TelegramPortalEntryPage() {
         style={{
           minHeight: "100vh",
           width: "100%",
-          background: "radial-gradient(ellipse at top, #0d1527 0%, #060a12 100%)",
-          color: "#f8fafc",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          background: "var(--background)",
+          color: "var(--text)",
+          fontFamily: "inherit",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -331,74 +331,78 @@ export default function TelegramPortalEntryPage() {
       >
         <div style={{ width: "100%", maxWidth: "420px" }}>
           {/* Academic Header */}
-          <div style={{ textAlign: "center", marginBottom: "16px" }}>
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
             <div style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "6px",
-              background: "rgba(56, 189, 248, 0.1)",
-              border: "1px solid rgba(56, 189, 248, 0.25)",
-              padding: "5px 12px",
-              borderRadius: "999px",
-              fontSize: "11.5px",
-              color: "#38bdf8",
-              fontWeight: "bold",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              padding: "4px 12px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              color: "var(--accent-ink)",
+              fontWeight: 500,
               marginBottom: "8px"
             }}>
-              <span>🎓</span>
+              <GraduationCap size={14} strokeWidth={1.5} />
               <span>جامعة قنا • كلية التربية النوعية</span>
             </div>
-            <h1 style={{ fontSize: "20px", fontWeight: "900", color: "#ffffff", margin: "0 0 4px 0" }}>
+            <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text)", margin: "0 0 4px 0" }}>
               قسم التربية الفنية
             </h1>
-            <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
-              المنظومة الرقمية للطلاب 📱
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Smartphone size={14} strokeWidth={1.5} />
+              <span>المنظومة الرقمية للطلاب</span>
             </p>
           </div>
 
           {loading ? (
             <div style={{
-              background: "rgba(15, 23, 42, 0.7)",
-              border: "1px solid rgba(56, 189, 248, 0.2)",
-              borderRadius: "16px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "12px",
               padding: "32px 16px",
               textAlign: "center"
             }}>
               <div style={{
-                width: "32px",
-                height: "32px",
-                border: "3px solid rgba(56, 189, 248, 0.2)",
-                borderTopColor: "#38bdf8",
+                width: "28px",
+                height: "28px",
+                border: "2.5px solid var(--border-light)",
+                borderTopColor: "var(--accent-ink)",
                 borderRadius: "50%",
                 animation: "spin 0.8s linear infinite",
                 margin: "0 auto 12px"
               }} />
-              <div style={{ fontSize: "13px", color: "#94a3b8" }}>
+              <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
                 جاري فتح حسابك المثبت...
               </div>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           ) : (
             <div style={{
-              background: "rgba(15, 23, 42, 0.85)",
-              border: "1px solid rgba(56, 189, 248, 0.25)",
-              borderRadius: "18px",
-              padding: "20px 16px",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "16px",
+              padding: "20px 16px"
             }}>
               {/* Short Security Warning */}
               <div style={{
                 background: "rgba(245, 158, 11, 0.1)",
                 border: "1px solid rgba(245, 158, 11, 0.3)",
-                borderRadius: "10px",
+                borderRadius: "8px",
                 padding: "8px 12px",
                 marginBottom: "16px",
-                fontSize: "11.5px",
-                color: "#fde68a",
-                textAlign: "center",
+                fontSize: "12px",
+                color: "var(--warning-ink)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
                 lineHeight: 1.5
               }}>
-                ⚠️ تنبيه: الدخول دائم بحسابك ولا يُعدّل إلا بإذن المنسق.
+                <AlertTriangle size={15} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                <span>تنبيه: الدخول دائم بحسابك ولا يُعدّل إلا بإذن المنسق.</span>
               </div>
 
               {/* Login Form */}
@@ -410,27 +414,28 @@ export default function TelegramPortalEntryPage() {
                     onChange={(e) => setStudentCode(e.target.value)}
                     placeholder="اكتب الكود هنا..."
                     disabled={submitting}
+                    className="tabular-nums"
                     style={{
                       width: "100%",
-                      background: "#0e1626",
-                      border: lookupStudent ? "2px solid #10b981" : "2px solid #1e293b",
-                      borderRadius: "12px",
-                      padding: "14px",
-                      fontSize: "18px",
-                      color: "#ffffff",
-                      fontFamily: "monospace",
-                      fontWeight: "bold",
+                      background: "var(--bg-deep)",
+                      border: lookupStudent ? "1.5px solid var(--success)" : "1.5px solid var(--border-light)",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      fontSize: "16px",
+                      color: "var(--text)",
+                      fontFamily: "inherit",
+                      fontWeight: 600,
                       textAlign: "center",
-                      letterSpacing: "2px",
+                      letterSpacing: "1.5px",
                       boxSizing: "border-box",
                       outline: "none",
-                      transition: "border-color 0.2s ease"
+                      transition: "border-color 0.2s var(--ease-out)"
                     }}
                     onFocus={(e) => {
-                      if (!lookupStudent) e.target.style.borderColor = "#38bdf8";
+                      if (!lookupStudent) e.target.style.borderColor = "var(--accent-ink)";
                     }}
                     onBlur={(e) => {
-                      if (!lookupStudent) e.target.style.borderColor = "#1e293b";
+                      if (!lookupStudent) e.target.style.borderColor = "var(--border-light)";
                     }}
                     autoFocus
                   />
@@ -438,31 +443,30 @@ export default function TelegramPortalEntryPage() {
 
                 {/* Instant Name Verification Display */}
                 {lookupLoading ? (
-                  <div style={{ textAlign: "center", padding: "6px", fontSize: "12px", color: "#38bdf8" }}>
+                  <div style={{ textAlign: "center", padding: "6px", fontSize: "12px", color: "var(--accent-ink)" }}>
                     جاري التحقق من الاسم...
                   </div>
                 ) : lookupStudent ? (
-                  <div style={{
-                    background: "rgba(16, 185, 129, 0.12)",
-                    border: "1px solid rgba(16, 185, 129, 0.35)",
-                    borderRadius: "10px",
+                  <div className="animate-fade-in" style={{
+                    background: "rgba(16, 185, 129, 0.1)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    borderRadius: "8px",
                     padding: "10px 12px",
                     marginBottom: "14px",
-                    textAlign: "center",
-                    animation: "fadeIn 0.25s ease"
+                    textAlign: "center"
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", color: "#34d399", fontWeight: "bold", fontSize: "14px", marginBottom: "2px" }}>
-                      <UserCheck size={16} />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", color: "var(--success-ink)", fontWeight: 600, fontSize: "14px", marginBottom: "2px" }}>
+                      <UserCheck size={16} strokeWidth={1.5} />
                       <span>{lookupStudent.full_name}</span>
                     </div>
-                    <div style={{ fontSize: "11.5px", color: "#94a3b8" }}>
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                       {lookupStudent.academic_year} {lookupStudent.section ? `• سكشن ${lookupStudent.section}` : ""}
                     </div>
                   </div>
                 ) : studentCode.trim().length >= 3 ? (
                   <div style={{
-                    fontSize: "11.5px",
-                    color: "#f87171",
+                    fontSize: "12px",
+                    color: "var(--error-ink)",
                     textAlign: "center",
                     marginBottom: "12px"
                   }}>
@@ -472,13 +476,13 @@ export default function TelegramPortalEntryPage() {
 
                 {errorMsg && (
                   <div style={{
-                    background: "rgba(239, 68, 68, 0.15)",
-                    border: "1px solid #ef4444",
-                    borderRadius: "10px",
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.35)",
+                    borderRadius: "8px",
                     padding: "10px 12px",
                     marginBottom: "14px",
                     fontSize: "12px",
-                    color: "#fca5a5",
+                    color: "var(--error-ink)",
                     textAlign: "center",
                     lineHeight: 1.5
                   }}>
@@ -488,19 +492,19 @@ export default function TelegramPortalEntryPage() {
 
                 {successMsg && (
                   <div style={{
-                    background: "rgba(16, 185, 129, 0.15)",
-                    border: "1px solid #10b981",
-                    borderRadius: "10px",
+                    background: "rgba(16, 185, 129, 0.12)",
+                    border: "1px solid rgba(16, 185, 129, 0.35)",
+                    borderRadius: "8px",
                     padding: "10px 12px",
                     marginBottom: "14px",
                     fontSize: "12.5px",
-                    color: "#6ee7b7",
+                    color: "var(--success-ink)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px"
                   }}>
-                    <CheckCircle2 size={16} />
+                    <CheckCircle2 size={16} strokeWidth={1.5} />
                     <span>{successMsg}</span>
                   </div>
                 )}
@@ -510,26 +514,26 @@ export default function TelegramPortalEntryPage() {
                   disabled={submitting || !studentCode.trim()}
                   style={{
                     width: "100%",
-                    background: submitting
-                      ? "#334155"
-                      : "linear-gradient(135deg, #0284c7, #2563eb)",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "12px",
-                    padding: "14px",
-                    fontSize: "16px",
-                    fontWeight: "bold",
+                    background: submitting || !studentCode.trim()
+                      ? "var(--secondary)"
+                      : "var(--primary)",
+                    color: submitting || !studentCode.trim() ? "var(--text-muted)" : "#ffffff",
+                    border: "1px solid " + (submitting || !studentCode.trim() ? "var(--border)" : "var(--primary)"),
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    fontSize: "15px",
+                    fontWeight: 500,
+                    fontFamily: "inherit",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
                     cursor: submitting || !studentCode.trim() ? "not-allowed" : "pointer",
-                    boxShadow: "0 4px 15px rgba(37, 99, 235, 0.35)",
-                    transition: "all 0.2s ease"
+                    transition: "background-color 0.2s var(--ease-out), border-color 0.2s var(--ease-out)"
                   }}
                 >
-                  <LogIn size={18} />
-                  <span>{submitting ? "جاري تثبيت الحساب..." : "دخول وتثبيت الحساب 🚀"}</span>
+                  <LogIn size={16} strokeWidth={1.5} />
+                  <span>{submitting ? "جاري تثبيت الحساب..." : "دخول وتثبيت الحساب"}</span>
                 </button>
               </form>
             </div>

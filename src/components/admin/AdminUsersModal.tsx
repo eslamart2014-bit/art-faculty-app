@@ -1,6 +1,31 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
-import { Eye, EyeOff, Copy, Check } from "lucide-react";
+import {
+  BadgeCheck,
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  MessageCircle,
+  MoreVertical,
+  Pause,
+  Pencil,
+  Play,
+  Save,
+  Shield,
+  Star,
+  Trash2,
+  Unlock,
+  UserCheck,
+  UserPlus,
+  X,
+  XCircle,
+  Zap
+} from "lucide-react";
 import { normalizeAcademicDegree } from "@/lib/courses/academicHelper";
 
 interface AdminUsersModalProps {
@@ -370,7 +395,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-      background: "rgba(0,0,0,0.85)", zIndex: 1000,
+      background: "var(--background)", zIndex: 1000,
       display: "flex", flexDirection: "column"
     }}>
       {/* Header */}
@@ -379,16 +404,17 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
         justifyContent: "space-between", 
         alignItems: "center", 
         padding: "12px 18px", 
-        background: "#181f2c", 
-        borderBottom: "1px solid #2a374f", 
+        background: "var(--bg-deep)", 
+        borderBottom: "1px solid var(--border)", 
         direction: "rtl",
         minHeight: "56px"
       }}>
         <div>
-          <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🛡️</span> إدارة المستخدمين والزملاء
+          <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+            <Shield size={18} strokeWidth={1.5} color="var(--accent-ink)" />
+            <span>إدارة المستخدمين والزملاء</span>
           </h3>
-          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "2px" }}>
             جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
           </div>
         </div>
@@ -396,8 +422,9 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
           onClick={onClose} 
           className="modal-close-btn"
           title="إغلاق"
+          aria-label="إغلاق"
         >
-          ✕
+          <X size={18} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -411,8 +438,7 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0, 0, 0, 0.85)",
-            backdropFilter: "blur(6px)",
+            background: "rgba(0, 0, 0, 0.8)",
             zIndex: 999999,
             display: "flex",
             alignItems: "center",
@@ -421,85 +447,83 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
             direction: "rtl"
           }}>
             <div style={{
-              background: "#1e293b",
-              border: "2px solid #22c55e",
-              borderRadius: "20px",
+              background: "var(--surface)",
+              border: "1px solid var(--success)",
+              borderRadius: "16px",
               maxWidth: "480px",
               width: "100%",
               padding: "24px",
-              color: "#fff",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.6)",
+              color: "var(--text-primary)",
               animation: "fadeIn 0.2s ease-out"
             }}>
               <div style={{ textAlign: "center", marginBottom: "18px" }}>
                 <div style={{
-                  width: "60px",
-                  height: "60px",
-                  borderRadius: "50%",
-                  background: "rgba(34, 197, 94, 0.2)",
-                  color: "#22c55e",
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "12px",
+                  background: "rgba(16, 185, 129, 0.14)",
+                  color: "var(--success-ink)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "30px",
                   margin: "0 auto 12px auto",
-                  border: "2px solid rgba(34, 197, 94, 0.4)"
+                  border: "1px solid rgba(16, 185, 129, 0.35)"
                 }}>
-                  ✓
+                  <CheckCircle2 size={28} strokeWidth={1.5} />
                 </div>
-                <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#f8fafc" }}>
-                  {createdCard.isExisting ? "تم تحديث وتجهيز حساب الزميل بنجاح" : "تم إنشاء وتفعيل حساب الزميل بنجاح!"}
+                <h3 style={{ margin: "0 0 6px 0", fontSize: "17px", fontWeight: 600, color: "var(--text-primary)" }}>
+                  {createdCard.isExisting ? "تم تحديث وتجهيز حساب الزميل بنجاح" : "تم إنشاء وتفعيل حساب الزميل بنجاح"}
                 </h3>
-                <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-muted)" }}>
                   الحساب جاهز للدخول المباشر فوراً دون الحاجة لأي خطوات تفعيل.
                 </p>
               </div>
 
               {/* Card Details Box */}
               <div style={{
-                background: "#0f172a",
-                borderRadius: "14px",
+                background: "var(--bg-deep)",
+                borderRadius: "12px",
                 padding: "16px",
-                border: "1px solid #334155",
+                border: "1px solid var(--border)",
                 marginBottom: "20px"
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "10px", borderBottom: "1px solid #1e293b" }}>
-                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>عضو هيئة التدريس:</span>
-                  <span style={{ fontSize: "14px", fontWeight: "bold", color: "#38bdf8" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "10px", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>عضو هيئة التدريس:</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--accent-ink)" }}>
                     {createdCard.degree} / {createdCard.fullName}
                   </span>
                 </div>
 
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1e293b" }}>
-                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>البريد الإلكتروني:</span>
-                  <span style={{ fontSize: "13px", fontWeight: "bold", color: "#f1f5f9", direction: "ltr", fontFamily: "monospace" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>البريد الإلكتروني:</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", direction: "ltr", fontFamily: "monospace" }}>
                     {createdCard.email}
                   </span>
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "10px" }}>
-                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>كلمة المرور المولدة:</span>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>كلمة المرور المولدة:</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{
+                    <span className="tabular-nums" style={{
                       fontSize: "15px",
-                      fontWeight: "bold",
-                      color: "#22c55e",
+                      fontWeight: 600,
+                      color: "var(--success-ink)",
                       fontFamily: "monospace",
                       letterSpacing: "1px",
-                      background: "rgba(34, 197, 94, 0.1)",
+                      background: "rgba(16, 185, 129, 0.1)",
                       padding: "4px 8px",
                       borderRadius: "6px",
-                      border: "1px solid rgba(34, 197, 94, 0.3)"
+                      border: "1px solid rgba(16, 185, 129, 0.3)"
                     }}>
                       {showCreatedPassword ? createdCard.password : "••••••••"}
                     </span>
                     <button
                       type="button"
                       onClick={() => setShowCreatedPassword(!showCreatedPassword)}
-                      style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: "2px" }}
+                      style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" }}
                       title={showCreatedPassword ? "إخفاء" : "إظهار"}
                     >
-                      {showCreatedPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {showCreatedPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                     </button>
                   </div>
                 </div>
@@ -520,12 +544,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                   style={{
                     width: "100%",
                     padding: "12px",
-                    background: copySuccess ? "#16a34a" : "#2563eb",
+                    background: copySuccess ? "var(--success)" : "var(--primary)",
                     color: "#fff",
                     border: "none",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     fontSize: "14px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -533,8 +557,8 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                     gap: "8px"
                   }}
                 >
-                  {copySuccess ? <Check size={18} /> : <Copy size={18} />}
-                  <span>{copySuccess ? "تم نسخ الرسالة بنجاح!" : "📋 نسخ رسالة الترحيب وبيانات الدخول"}</span>
+                  {copySuccess ? <Check size={16} strokeWidth={1.5} /> : <Copy size={16} strokeWidth={1.5} />}
+                  <span>{copySuccess ? "تم نسخ الرسالة بنجاح" : "نسخ رسالة الترحيب وبيانات الدخول"}</span>
                 </button>
 
                 {/* WhatsApp button */}
@@ -548,12 +572,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                   style={{
                     width: "100%",
                     padding: "12px",
-                    background: "#25D366",
-                    color: "#000",
+                    background: "var(--success)",
+                    color: "#fff",
                     border: "none",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     fontSize: "14px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -561,7 +585,8 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                     gap: "8px"
                   }}
                 >
-                  <span>💬 إرسال عبر واتساب مباشرة</span>
+                  <MessageCircle size={16} strokeWidth={1.5} />
+                  <span>إرسال عبر واتساب مباشرة</span>
                 </button>
 
                 {/* Close card */}
@@ -572,10 +597,11 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                     width: "100%",
                     padding: "10px",
                     background: "transparent",
-                    color: "#94a3b8",
-                    border: "1px solid #334155",
-                    borderRadius: "10px",
+                    color: "var(--text-muted)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "8px",
                     fontSize: "13px",
+                    fontWeight: 500,
                     cursor: "pointer",
                     marginTop: "4px"
                   }}
@@ -588,39 +614,40 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
         )}
 
         {/* Invite Colleague */}
-        <div style={{ background: "#222", padding: "18px", borderRadius: "14px", border: "1px solid #333", marginBottom: "25px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-            <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>👨‍🏫</span> إضافة عضو هيئة تدريس جديد
+        <div style={{ background: "var(--surface)", padding: "18px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "25px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "8px" }}>
+            <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <UserPlus size={18} strokeWidth={1.5} color="var(--accent-ink)" />
+              <span>إضافة عضو هيئة تدريس جديد</span>
             </h3>
-            <span style={{ fontSize: "11px", color: "#4CAF50", background: "rgba(76, 175, 80, 0.15)", padding: "3px 8px", borderRadius: "6px", fontWeight: "bold" }}>
+            <span style={{ fontSize: "11px", color: "var(--success-ink)", background: "rgba(16, 185, 129, 0.14)", padding: "3px 8px", borderRadius: "6px", fontWeight: 600 }}>
               تفعيل وتوليد حساب فوري
             </span>
           </div>
 
-          <p style={{ margin: "0 0 14px 0", color: "#94a3b8", fontSize: "12px", lineHeight: "1.5" }}>
+          <p style={{ margin: "0 0 14px 0", color: "var(--text-muted)", fontSize: "12px", lineHeight: "1.5" }}>
             أدخل بيانات الزميل وسيتم إنشاء حسابه وكلمة المرور تلقائياً مع استخراج بطاقة بيانات جاهزة للإرسال عبر واتساب فوراً.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
             <div>
-              <label style={{ fontSize: "12px", color: "#ccc", display: "block", marginBottom: "4px" }}>اسم الزميل (باللغة العربية):</label>
+              <label style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 500, display: "block", marginBottom: "4px" }}>اسم الزميل (باللغة العربية):</label>
               <input 
                 id="invite-colleague-name"
                 type="text"
                 value={inviteFullName}
                 onChange={e => setInviteFullName(e.target.value)}
                 placeholder="مثال: أحمد محمد علي"
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #444", color: "#fff", outline: "none", boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
               />
             </div>
 
             <div>
-              <label style={{ fontSize: "12px", color: "#ccc", display: "block", marginBottom: "4px" }}>الدرجة العلمية:</label>
+              <label style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 500, display: "block", marginBottom: "4px" }}>الدرجة العلمية:</label>
               <select
                 value={inviteDegree}
                 onChange={e => setInviteDegree(e.target.value)}
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #444", color: "#fff", outline: "none", boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
               >
                 <option value="د">مدرس / دكتور (د)</option>
                 <option value="م">معيد (م)</option>
@@ -632,13 +659,13 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
           </div>
 
           <div style={{ marginBottom: "14px" }}>
-            <label style={{ fontSize: "12px", color: "#ccc", display: "block", marginBottom: "4px" }}>البريد الإلكتروني للزميل (Gmail):</label>
+            <label style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 500, display: "block", marginBottom: "4px" }}>البريد الإلكتروني للزميل (Gmail):</label>
             <input 
               type="email"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
               placeholder="example@gmail.com"
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #444", color: "#fff", outline: "none", boxSizing: "border-box", textAlign: "left", direction: "ltr" }}
+              style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box", textAlign: "left", direction: "ltr" }}
             />
           </div>
 
@@ -647,22 +674,22 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
             disabled={inviting || !inviteEmail || !inviteFullName}
             style={{ 
               width: "100%",
-              background: (inviting || !inviteEmail || !inviteFullName) ? "#444" : "linear-gradient(135deg, #22c55e, #16a34a)", 
-              color: "#fff", 
+              background: (inviting || !inviteEmail || !inviteFullName) ? "var(--surface-hover)" : "var(--success)", 
+              color: (inviting || !inviteEmail || !inviteFullName) ? "var(--text-dim)" : "#fff", 
               border: "none", 
               padding: "12px", 
-              borderRadius: "10px", 
+              borderRadius: "8px", 
               cursor: (inviting || !inviteEmail || !inviteFullName) ? "not-allowed" : "pointer", 
-              fontWeight: "bold",
+              fontWeight: 600,
               fontSize: "14px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "8px",
-              boxShadow: "0 4px 14px rgba(34, 197, 94, 0.25)"
+              gap: "8px"
             }}
           >
-            {inviting ? "جاري إنشاء الحساب والتوليد..." : "✨ إضافة الزميل وتوليد بيانات الدخول"}
+            <UserPlus size={16} strokeWidth={1.5} />
+            <span>{inviting ? "جاري إنشاء الحساب والتوليد..." : "إضافة الزميل وتوليد بيانات الدخول"}</span>
           </button>
         </div>
 
@@ -670,11 +697,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
         {invitations.length > 0 && (
           <div style={{ marginBottom: "25px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <h3 style={{ margin: 0, color: "#ff9800", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>⏳</span> دعوات في انتظار التسجيل ({invitations.length})
+              <h3 className="tabular-nums" style={{ margin: 0, color: "var(--warning-ink)", fontSize: "14px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+                <Clock size={15} strokeWidth={1.5} />
+                <span>دعوات في انتظار التسجيل ({invitations.length})</span>
               </h3>
-              <span style={{ fontSize: "11px", color: "#94a3b8" }}>
-                اضغط "إكمال" لتوليد الحساب والكارت فوراً
+              <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                اضغط &quot;إكمال&quot; لتوليد الحساب والكارت فوراً
               </span>
             </div>
 
@@ -683,10 +711,10 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                 <div 
                   key={inv.id} 
                   style={{ 
-                    background: "rgba(255, 152, 0, 0.08)", 
-                    border: "1px solid rgba(255, 152, 0, 0.25)", 
+                    background: "rgba(245, 158, 11, 0.08)", 
+                    border: "1px solid rgba(245, 158, 11, 0.25)", 
                     padding: "12px 14px", 
-                    borderRadius: "10px", 
+                    borderRadius: "12px", 
                     display: "flex", 
                     justifyContent: "space-between", 
                     alignItems: "center",
@@ -695,11 +723,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                   }}
                 >
                   <div>
-                    <div style={{ color: "#fff", fontSize: "14px", fontWeight: "bold", direction: "ltr", textAlign: "right" }}>
+                    <div style={{ color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, direction: "ltr", textAlign: "right" }}>
                       {inv.email}
                     </div>
-                    <div style={{ color: "#ff9800", fontSize: "11px", marginTop: "2px" }}>
-                      ⏳ دعوة معلقة (بانتظار الاسم وتوليد الحساب)
+                    <div style={{ color: "var(--warning-ink)", fontSize: "11px", marginTop: "3px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <Clock size={12} strokeWidth={1.5} />
+                      <span>دعوة معلقة (بانتظار الاسم وتوليد الحساب)</span>
                     </div>
                   </div>
 
@@ -708,21 +737,21 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                       type="button"
                       onClick={() => handleSelectPendingInvitation(inv.email)}
                       style={{
-                        background: "rgba(34, 197, 94, 0.15)",
-                        color: "#22c55e",
-                        border: "1px solid rgba(34, 197, 94, 0.4)",
+                        background: "rgba(16, 185, 129, 0.14)",
+                        color: "var(--success-ink)",
+                        border: "1px solid rgba(16, 185, 129, 0.35)",
                         padding: "6px 12px",
                         borderRadius: "8px",
                         fontSize: "12px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
-                        gap: "4px"
+                        gap: "5px"
                       }}
                       title="استكمال بيانات الزميل وتوليد الحساب والكارت"
                     >
-                      <span>⚡</span>
+                      <Zap size={13} strokeWidth={1.5} />
                       <span>إكمال وتوليد الحساب</span>
                     </button>
 
@@ -730,20 +759,21 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                       type="button"
                       onClick={() => handleDeleteInvitation(inv.id, inv.email)}
                       style={{
-                        background: "rgba(239, 68, 68, 0.15)",
-                        color: "#f87171",
+                        background: "rgba(239, 68, 68, 0.14)",
+                        color: "var(--error-ink)",
                         border: "1px solid rgba(239, 68, 68, 0.35)",
                         padding: "6px 10px",
                         borderRadius: "8px",
                         fontSize: "12px",
+                        fontWeight: 500,
                         cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
-                        gap: "4px"
+                        gap: "5px"
                       }}
                       title="حذف هذه الدعوة المعلقة"
                     >
-                      <span>🗑️</span>
+                      <Trash2 size={13} strokeWidth={1.5} />
                       <span>حذف</span>
                     </button>
                   </div>
@@ -755,10 +785,10 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
 
         {/* Registered Users */}
         <div>
-          <h3 style={{ margin: "0 0 15px 0", color: "#aaa", fontSize: "14px" }}>الحسابات المسجلة ({users.length})</h3>
+          <h3 className="tabular-nums" style={{ margin: "0 0 15px 0", color: "var(--text-muted)", fontSize: "14px", fontWeight: 600 }}>الحسابات المسجلة ({users.length})</h3>
           
           {loading ? (
-            <div style={{ textAlign: "center", color: "#888", padding: "20px" }}>جاري التحميل...</div>
+            <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "20px" }}>جاري التحميل...</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {users.map(u => {
@@ -767,10 +797,30 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                 const getLastSeen = (dateStr: string | null) => {
                   if (!isAdmin || !dateStr) return null;
                   const diffMins = (new Date().getTime() - new Date(dateStr).getTime()) / 1000 / 60;
-                  if (diffMins < 5) return <span style={{ fontSize: "11px", color: "#4CAF50" }}>🟢 نشط الآن</span>;
-                  if (diffMins < 60) return <span style={{ fontSize: "11px", color: "#FF9800" }}>🟠 نشط منذ {Math.floor(diffMins)} دقيقة</span>;
-                  if (diffMins < 24 * 60) return <span style={{ fontSize: "11px", color: "#9e9e9e" }}>⚪ نشط منذ {Math.floor(diffMins / 60)} ساعة</span>;
-                  return <span style={{ fontSize: "11px", color: "#757575" }}>⚪ أخر ظهور: {new Date(dateStr).toLocaleDateString('ar-EG')}</span>;
+                  if (diffMins < 5) return (
+                    <span style={{ fontSize: "11px", color: "var(--success-ink)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "6px", background: "var(--success-ink)" }} />
+                      <span>نشط الآن</span>
+                    </span>
+                  );
+                  if (diffMins < 60) return (
+                    <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--warning-ink)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "6px", background: "var(--warning-ink)" }} />
+                      <span>نشط منذ {Math.floor(diffMins)} دقيقة</span>
+                    </span>
+                  );
+                  if (diffMins < 24 * 60) return (
+                    <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "6px", background: "var(--text-muted)" }} />
+                      <span>نشط منذ {Math.floor(diffMins / 60)} ساعة</span>
+                    </span>
+                  );
+                  return (
+                    <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-dim)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "6px", background: "var(--text-dim)" }} />
+                      <span>آخر ظهور: {new Date(dateStr).toLocaleDateString('ar-EG')}</span>
+                    </span>
+                  );
                 };
 
                 return (
@@ -778,57 +828,71 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                     <div 
                       onClick={() => setActiveMenuId(activeMenuId === u.id ? null : u.id)}
                       style={{ 
-                        background: u.is_suspended ? "#3a2020" : "#222", 
-                        border: `1px solid ${u.is_suspended ? "#f44336" : "#333"}`, 
+                        background: u.is_suspended ? "rgba(239, 68, 68, 0.1)" : "var(--surface)", 
+                        border: `1px solid ${u.is_suspended ? "var(--error)" : "var(--border)"}`, 
                         padding: "15px", 
-                        borderRadius: "10px", 
+                        borderRadius: "12px", 
                         cursor: "pointer",
                         display: "flex", justifyContent: "space-between", alignItems: "center"
                       }}
                     >
                       <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontWeight: "bold", marginBottom: "4px" }}>
-                          {u.degree && <span style={{ color: "#4CAF50" }}>{u.degree}</span>}
-                          {u.full_name || "بدون اسم"}
-                          {u.role === 'مدير' && <span style={{ background: "#2196F3", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير</span>}
-                          {u.role === 'مدير مساعد' && <span style={{ background: "#9C27B0", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>مدير مساعد</span>}
-                          {u.can_verify_students && <span style={{ background: "#0288D1", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🪪 منسق هويات</span>}
-                          {isLocked && <span style={{ background: "#f44336", fontSize: "10px", padding: "2px 5px", borderRadius: "4px" }}>🔒 مقفول</span>}
+                        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px", color: "var(--text-primary)", fontWeight: 600, marginBottom: "4px" }}>
+                          {u.degree && <span style={{ color: "var(--success-ink)" }}>{u.degree}</span>}
+                          <span>{u.full_name || "بدون اسم"}</span>
+                          {u.role === 'مدير' && <span style={{ background: "var(--primary)", color: "#fff", fontSize: "10px", fontWeight: 600, padding: "2px 6px", borderRadius: "6px" }}>مدير</span>}
+                          {u.role === 'مدير مساعد' && <span style={{ background: "rgba(56, 189, 248, 0.16)", color: "var(--accent-ink)", border: "1px solid rgba(56, 189, 248, 0.35)", fontSize: "10px", fontWeight: 600, padding: "2px 6px", borderRadius: "6px" }}>مدير مساعد</span>}
+                          {u.can_verify_students && (
+                            <span style={{ background: "rgba(37, 99, 235, 0.2)", color: "var(--accent-ink)", fontSize: "10px", fontWeight: 600, padding: "2px 6px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                              <BadgeCheck size={11} strokeWidth={1.5} />
+                              <span>منسق هويات</span>
+                            </span>
+                          )}
+                          {isLocked && (
+                            <span style={{ background: "var(--error)", color: "#fff", fontSize: "10px", fontWeight: 600, padding: "2px 6px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                              <Lock size={11} strokeWidth={1.5} />
+                              <span>مقفول</span>
+                            </span>
+                          )}
                         </div>
-                        <div style={{ color: "#888", fontSize: "12px", display: "flex", gap: "10px", alignItems: "center" }}>
+                        <div style={{ color: "var(--text-muted)", fontSize: "12px", display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                           <span>{u.email}</span>
                           {getLastSeen(u.last_seen)}
                         </div>
                       </div>
                       
-                      <div style={{ fontSize: "20px", color: "#888" }}>⋮</div>
+                      <MoreVertical size={18} strokeWidth={1.5} color="var(--text-muted)" />
                     </div>
 
                     {/* Options Menu */}
                     {activeMenuId === u.id && (
                       <div style={{
-                        background: "#1a1a1a", border: "1px solid #444", borderRadius: "8px", padding: "10px",
-                        marginTop: "5px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", animation: "slideDown 0.2s"
+                        background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "10px", padding: "10px",
+                        marginTop: "6px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", animation: "slideDown 0.2s"
                       }}>
                         {isAssistant && u.role === 'مدير' ? (
-                          <div style={{ gridColumn: "1 / -1", color: "#888", textAlign: "center", fontSize: "12px", padding: "10px", background: "#222", borderRadius: "6px", border: "1px dashed #444" }}>
-                            🔒 حساب المدير محمي ولا يمكن التعديل عليه
+                          <div style={{ gridColumn: "1 / -1", color: "var(--text-muted)", textAlign: "center", fontSize: "12px", padding: "10px", background: "var(--surface)", borderRadius: "8px", border: "1px dashed var(--border-light)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <Lock size={14} strokeWidth={1.5} />
+                            <span>حساب المدير محمي ولا يمكن التعديل عليه</span>
                           </div>
                         ) : (
                           <>
-                            <button onClick={() => handleChangePassword(u)} style={{ background: "#333", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                              🔑 تغيير كلمة المرور
+                            <button onClick={() => handleChangePassword(u)} style={{ background: "var(--surface-hover)", color: "var(--text-primary)", border: "1px solid var(--border)", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <KeyRound size={14} strokeWidth={1.5} />
+                              <span>تغيير كلمة المرور</span>
                             </button>
                             
-                            <button onClick={() => handleDeleteUser(u)} style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                              {isAssistant ? '🗑️ حذف المستخدم' : '🗑️ حذف نهائي'}
+                            <button onClick={() => handleDeleteUser(u)} style={{ background: "transparent", color: "var(--error-ink)", border: "1px solid var(--error)", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <Trash2 size={14} strokeWidth={1.5} />
+                              <span>{isAssistant ? 'حذف المستخدم' : 'حذف نهائي'}</span>
                             </button>
                           </>
                         )}
 
                         {isLocked && (
-                          <button onClick={() => handleUnlock(u)} style={{ background: "#333", color: "#4CAF50", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1" }}>
-                            🔓 فك قفل الحساب وإعطاء محاولات جديدة
+                          <button onClick={() => handleUnlock(u)} style={{ background: "var(--surface-hover)", color: "var(--success-ink)", border: "1px solid var(--success)", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500, gridColumn: "1 / -1", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <Unlock size={14} strokeWidth={1.5} />
+                            <span>فك قفل الحساب وإعطاء محاولات جديدة</span>
                           </button>
                         )}
 
@@ -837,14 +901,14 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                             <button 
                               onClick={() => handleOpenEditUser(u)} 
                               style={{ 
-                                background: "rgba(37, 99, 235, 0.2)", 
-                                color: "#60a5fa", 
-                                border: "1px solid #2563eb", 
+                                background: "rgba(37, 99, 235, 0.14)", 
+                                color: "var(--accent-ink)", 
+                                border: "1px solid var(--primary)", 
                                 padding: "10px", 
-                                borderRadius: "6px", 
+                                borderRadius: "8px", 
                                 cursor: "pointer", 
                                 fontSize: "13px", 
-                                fontWeight: "bold",
+                                fontWeight: 600,
                                 gridColumn: "1 / -1",
                                 display: "flex",
                                 alignItems: "center",
@@ -852,26 +916,31 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
                                 gap: "6px"
                               }}
                             >
-                              <span>✏️</span> تعديل الدرجة العلمية والاسم
+                              <Pencil size={14} strokeWidth={1.5} />
+                              <span>تعديل الدرجة العلمية والاسم</span>
                             </button>
 
-                            <button onClick={() => handleToggleSuspend(u)} style={{ background: "#333", color: u.is_suspended ? "#4CAF50" : "#FF9800", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
-                              {u.is_suspended ? "▶️ تفعيل الحساب" : "⏸️ إيقاف مؤقت"}
+                            <button onClick={() => handleToggleSuspend(u)} style={{ background: "var(--surface-hover)", color: u.is_suspended ? "var(--success-ink)" : "var(--warning-ink)", border: "1px solid var(--border)", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              {u.is_suspended ? <Play size={14} strokeWidth={1.5} /> : <Pause size={14} strokeWidth={1.5} />}
+                              <span>{u.is_suspended ? "تفعيل الحساب" : "إيقاف مؤقت"}</span>
                             </button>
 
-                            <button onClick={() => handleImpersonate(u)} style={{ background: "#2196F3", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "bold" }}>
-                              🎭 الدخول كـ {u.full_name}
+                            <button onClick={() => handleImpersonate(u)} style={{ background: "var(--primary)", color: "#fff", border: "none", padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <UserCheck size={14} strokeWidth={1.5} />
+                              <span>الدخول كـ {u.full_name}</span>
                             </button>
                             
                             {u.role !== 'مدير' && (
-                              <button onClick={() => handleGrantAssistantRole(u)} style={{ background: "#9C27B0", color: "#fff", border: "none", padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
-                                {u.role === 'مدير مساعد' ? "❌ إلغاء صلاحية مدير مساعد" : "⭐ منح صلاحية مدير مساعد"}
+                              <button onClick={() => handleGrantAssistantRole(u)} style={{ background: u.role === 'مدير مساعد' ? "rgba(239, 68, 68, 0.12)" : "rgba(56, 189, 248, 0.14)", color: u.role === 'مدير مساعد' ? "var(--error-ink)" : "var(--accent-ink)", border: `1px solid ${u.role === 'مدير مساعد' ? "var(--error)" : "var(--primary)"}`, padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                                {u.role === 'مدير مساعد' ? <XCircle size={14} strokeWidth={1.5} /> : <Star size={14} strokeWidth={1.5} />}
+                                <span>{u.role === 'مدير مساعد' ? "إلغاء صلاحية مدير مساعد" : "منح صلاحية مدير مساعد"}</span>
                               </button>
                             )}
 
                               {isPrimaryAdmin && (
-                                <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(33, 150, 243, 0.2)" : "#333", color: u.can_verify_students ? "#64B5F6" : "#aaa", border: `1px solid ${u.can_verify_students ? "#2196F3" : "#555"}`, padding: "10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: "bold" }}>
-                                  {u.can_verify_students ? "✅ سحب صلاحية تفعيل حسابات الطلاب" : "🪪 منح صلاحية تفعيل حسابات الطلاب"}
+                                <button onClick={() => handleToggleVerifyPermission(u)} style={{ background: u.can_verify_students ? "rgba(37, 99, 235, 0.14)" : "var(--surface-hover)", color: u.can_verify_students ? "var(--accent-ink)" : "var(--text-muted)", border: `1px solid ${u.can_verify_students ? "var(--primary)" : "var(--border-light)"}`, padding: "10px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", gridColumn: "1 / -1", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                                  {u.can_verify_students ? <CheckCircle2 size={14} strokeWidth={1.5} /> : <BadgeCheck size={14} strokeWidth={1.5} />}
+                                  <span>{u.can_verify_students ? "سحب صلاحية تفعيل حسابات الطلاب" : "منح صلاحية تفعيل حسابات الطلاب"}</span>
                                 </button>
                               )}
                           </>
@@ -889,27 +958,30 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
       {generatedPasswordData && (
         <div style={{
           position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(0,0,0,0.8)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+          background: "rgba(0,0,0,0.8)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
         }} onClick={() => setGeneratedPasswordData(null)}>
-          <div style={{ background: "#222", padding: "20px", borderRadius: "10px", width: "90%", maxWidth: "350px", textAlign: "center", border: "1px solid #4CAF50" }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: "#4CAF50", marginTop: 0 }}>تم إنشاء كلمة مرور جديدة</h3>
-            <p style={{ color: "#aaa", fontSize: "13px" }}>للحساب: <br/><strong>{generatedPasswordData.email}</strong></p>
+          <div style={{ background: "var(--surface)", padding: "22px", borderRadius: "16px", width: "90%", maxWidth: "360px", textAlign: "center", border: "1px solid var(--success)" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: "var(--success-ink)", marginTop: 0, fontSize: "16px", fontWeight: 600 }}>تم إنشاء كلمة مرور جديدة</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>للحساب: <br/><strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{generatedPasswordData.email}</strong></p>
             
-            <div style={{ background: "#111", padding: "15px", borderRadius: "8px", border: "1px dashed #555", margin: "20px 0", fontSize: "24px", letterSpacing: "2px", fontWeight: "bold", userSelect: "all" }}>
+            <div className="tabular-nums" style={{ background: "var(--bg-deep)", padding: "14px", borderRadius: "8px", border: "1px dashed var(--border-light)", margin: "18px 0", fontSize: "22px", letterSpacing: "2px", fontWeight: 600, userSelect: "all", color: "var(--text-primary)", fontFamily: "monospace" }}>
               {generatedPasswordData.pass}
             </div>
 
             <button 
               onClick={() => {
                 navigator.clipboard.writeText(`البريد: ${generatedPasswordData.email}\nكلمة المرور: ${generatedPasswordData.pass}`);
-                alert("تم النسخ بنجاح!");
+                alert("تم النسخ بنجاح");
               }}
-              style={{ width: "100%", padding: "12px", background: "#2196F3", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginBottom: "10px" }}
-            >📋 نسخ بيانات الدخول</button>
+              style={{ width: "100%", padding: "12px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: "pointer", marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+            >
+              <Copy size={15} strokeWidth={1.5} />
+              <span>نسخ بيانات الدخول</span>
+            </button>
 
             <button 
               onClick={() => setGeneratedPasswordData(null)}
-              style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "1px solid #555", borderRadius: "8px", cursor: "pointer" }}
+              style={{ width: "100%", padding: "10px", background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border-light)", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
             >إغلاق</button>
           </div>
         </div>
@@ -918,29 +990,30 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
       {editingUser && (
         <div style={{
           position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(0,0,0,0.85)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center"
+          background: "rgba(0,0,0,0.8)", zIndex: 10000, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
         }} onClick={() => setEditingUser(null)}>
-          <div style={{ background: "#1e1e1e", padding: "22px", borderRadius: "14px", width: "90%", maxWidth: "380px", border: "1px solid #444", direction: "rtl", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ color: "#38bdf8", marginTop: 0, marginBottom: "15px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>✏️</span> تعديل الدرجة العلمية والاسم
+          <div style={{ background: "var(--surface)", padding: "22px", borderRadius: "16px", width: "90%", maxWidth: "380px", border: "1px solid var(--border)", direction: "rtl" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ color: "var(--accent-ink)", marginTop: 0, marginBottom: "15px", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Pencil size={16} strokeWidth={1.5} />
+              <span>تعديل الدرجة العلمية والاسم</span>
             </h3>
             
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ fontSize: "12px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>البريد الإلكتروني:</label>
+              <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>البريد الإلكتروني:</label>
               <input 
                 type="text" 
                 value={editingUser.email} 
                 disabled 
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#64748b", outline: "none", boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border)", color: "var(--text-dim)", outline: "none", boxSizing: "border-box" }}
               />
             </div>
 
             <div style={{ marginBottom: "12px" }}>
-              <label style={{ fontSize: "12px", color: "#cbd5e1", display: "block", marginBottom: "4px" }}>الدرجة العلمية:</label>
+              <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>الدرجة العلمية:</label>
               <select
                 value={editDegree}
                 onChange={e => setEditDegree(e.target.value)}
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
               >
                 <option value="د">دكتور / مدرس (د)</option>
                 <option value="م">معيد (م)</option>
@@ -951,12 +1024,12 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
             </div>
 
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "12px", color: "#cbd5e1", display: "block", marginBottom: "4px" }}>الاسم بالكامل:</label>
+              <label style={{ fontSize: "12px", color: "var(--text-muted)", display: "block", marginBottom: "4px" }}>الاسم بالكامل:</label>
               <input 
                 type="text" 
                 value={editFullName} 
                 onChange={e => setEditFullName(e.target.value)}
-                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "#111", border: "1px solid #555", color: "#fff", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
+                style={{ width: "100%", padding: "10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", boxSizing: "border-box", fontSize: "14px" }}
               />
             </div>
 
@@ -964,13 +1037,14 @@ export default function AdminUsersModal({ isOpen, onClose, adminUser, onImperson
               <button
                 onClick={handleSaveUserEdit}
                 disabled={savingEdit}
-                style={{ flex: 1, padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: savingEdit ? "not-allowed" : "pointer" }}
+                style={{ flex: 1, padding: "12px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 600, cursor: savingEdit ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
               >
-                {savingEdit ? "جاري الحفظ..." : "💾 حفظ التعديلات"}
+                <Save size={15} strokeWidth={1.5} />
+                <span>{savingEdit ? "جاري الحفظ..." : "حفظ التعديلات"}</span>
               </button>
               <button
                 onClick={() => setEditingUser(null)}
-                style={{ padding: "12px 18px", background: "transparent", color: "#94a3b8", border: "1px solid #475569", borderRadius: "8px", cursor: "pointer" }}
+                style={{ padding: "12px 18px", background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border-light)", borderRadius: "8px", fontWeight: 500, cursor: "pointer" }}
               >
                 إلغاء
               </button>

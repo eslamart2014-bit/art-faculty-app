@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { staffFetch } from "@/lib/auth/staffAuthFetch";
+import {
+  Ban,
+  Bot,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Pause,
+  Play,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+  Zap
+} from "lucide-react";
 
 interface BotStudentItem {
   student_code: string;
@@ -203,14 +217,15 @@ export default function AdvancedStudentsTab() {
   };
 
   return (
-    <div style={{ background: "#0b101b", borderRadius: "16px", padding: "18px", color: "#f8fafc" }}>
+    <div style={{ background: "var(--bg-deep)", borderRadius: "16px", padding: "18px", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
       {/* رأس متابعة طلاب بوت تليجرام */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "bold", color: "#38bdf8", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span>🤖</span> متابعة طلاب بوت تليجرام وسجل النشاط
+          <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--accent-ink)", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Bot size={18} strokeWidth={1.5} />
+            <span>متابعة طلاب بوت تليجرام وسجل النشاط</span>
           </h2>
-          <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "3px" }}>
+          <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "3px" }}>
             متابعة الطلاب المسجلين على البوت الرسمي (@NEZAMFANYAbot) وآخر نشاط لهم مع إمكانية تعليق أو حذف أي حساب
           </div>
         </div>
@@ -219,20 +234,21 @@ export default function AdvancedStudentsTab() {
           onClick={fetchData}
           disabled={loading}
           style={{
-            background: "rgba(56, 189, 248, 0.15)",
-            border: "1px solid rgba(56, 189, 248, 0.35)",
-            color: "#38bdf8",
+            background: "rgba(56, 189, 248, 0.14)",
+            border: "1px solid var(--primary)",
+            color: "var(--accent-ink)",
             padding: "7px 14px",
             borderRadius: "8px",
             fontSize: "12px",
-            fontWeight: "bold",
+            fontWeight: 600,
             cursor: loading ? "wait" : "pointer",
             display: "flex",
             alignItems: "center",
             gap: "6px",
           }}
         >
-          <span>🔄</span> {loading ? "جارٍ التحديث..." : "تحديث البيانات"}
+          <RefreshCw size={13} strokeWidth={1.5} className={loading ? "spin" : ""} />
+          <span>{loading ? "جارٍ التحديث..." : "تحديث البيانات"}</span>
         </button>
       </div>
 
@@ -240,13 +256,13 @@ export default function AdvancedStudentsTab() {
       {feedbackMsg && (
         <div
           style={{
-            background: feedbackMsg.type === "success" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-            border: `1px solid ${feedbackMsg.type === "success" ? "#10b981" : "#ef4444"}`,
-            color: feedbackMsg.type === "success" ? "#a7f3d0" : "#fecaca",
+            background: feedbackMsg.type === "success" ? "rgba(16, 185, 129, 0.14)" : "rgba(239, 68, 68, 0.14)",
+            border: `1px solid ${feedbackMsg.type === "success" ? "var(--success)" : "var(--error)"}`,
+            color: feedbackMsg.type === "success" ? "var(--success-ink)" : "var(--error-ink)",
             padding: "10px 14px",
-            borderRadius: "10px",
+            borderRadius: "8px",
             fontSize: "12.5px",
-            fontWeight: "bold",
+            fontWeight: 500,
             marginBottom: "14px",
             display: "flex",
             alignItems: "center",
@@ -256,9 +272,10 @@ export default function AdvancedStudentsTab() {
           <span>{feedbackMsg.text}</span>
           <button
             onClick={() => setFeedbackMsg(null)}
-            style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", fontSize: "14px" }}
+            style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}
+            aria-label="إغلاق"
           >
-            ✕
+            <X size={15} strokeWidth={1.5} />
           </button>
         </div>
       )}
@@ -269,24 +286,25 @@ export default function AdvancedStudentsTab() {
         <button
           onClick={() => setSubTab("bot")}
           style={{
-            background: subTab === "bot" ? "linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.15))" : "rgba(255, 255, 255, 0.03)",
-            border: subTab === "bot" ? "1.5px solid #10b981" : "1px solid rgba(255, 255, 255, 0.08)",
+            background: subTab === "bot" ? "rgba(16, 185, 129, 0.14)" : "var(--surface)",
+            border: subTab === "bot" ? "1.5px solid var(--success)" : "1px solid var(--border)",
             borderRadius: "12px",
             padding: "12px 14px",
             textAlign: "right",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "background-color 0.2s, border-color 0.2s",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "12.5px", color: subTab === "bot" ? "#a7f3d0" : "#94a3b8", fontWeight: "bold" }}>
-              🤖 الطلاب المسجلون بالبوت
+            <span style={{ fontSize: "12.5px", color: subTab === "bot" ? "var(--success-ink)" : "var(--text-muted)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Bot size={14} strokeWidth={1.5} />
+              <span>الطلاب المسجلون بالبوت</span>
             </span>
-            <span style={{ background: "#10b98133", color: "#10b981", fontSize: "11.5px", fontWeight: "bold", padding: "2px 8px", borderRadius: "10px" }}>
+            <span className="tabular-nums" style={{ background: "rgba(16, 185, 129, 0.18)", color: "var(--success-ink)", fontSize: "11.5px", fontWeight: 600, padding: "2px 8px", borderRadius: "6px" }}>
               {data.stats.bot_registered_count}
             </span>
           </div>
-          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+          <div className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
             من إجمالي {data.stats.total_students} طالب مقيد بالمنظومة
           </div>
         </button>
@@ -295,24 +313,25 @@ export default function AdvancedStudentsTab() {
         <button
           onClick={() => setSubTab("activity")}
           style={{
-            background: subTab === "activity" ? "linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(2, 132, 199, 0.15))" : "rgba(255, 255, 255, 0.03)",
-            border: subTab === "activity" ? "1.5px solid #38bdf8" : "1px solid rgba(255, 255, 255, 0.08)",
+            background: subTab === "activity" ? "rgba(56, 189, 248, 0.14)" : "var(--surface)",
+            border: subTab === "activity" ? "1.5px solid var(--accent-ink)" : "1px solid var(--border)",
             borderRadius: "12px",
             padding: "12px 14px",
             textAlign: "right",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "background-color 0.2s, border-color 0.2s",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "12.5px", color: subTab === "activity" ? "#bae6fd" : "#94a3b8", fontWeight: "bold" }}>
-              ⚡ آخر نشاط للطلاب بالبوت
+            <span style={{ fontSize: "12.5px", color: subTab === "activity" ? "var(--accent-ink)" : "var(--text-muted)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Zap size={14} strokeWidth={1.5} />
+              <span>آخر نشاط للطلاب بالبوت</span>
             </span>
-            <span style={{ background: "#38bdf833", color: "#38bdf8", fontSize: "11.5px", fontWeight: "bold", padding: "2px 8px", borderRadius: "10px" }}>
+            <span className="tabular-nums" style={{ background: "rgba(56, 189, 248, 0.18)", color: "var(--accent-ink)", fontSize: "11.5px", fontWeight: 600, padding: "2px 8px", borderRadius: "6px" }}>
               {data.stats.active_recent_count}
             </span>
           </div>
-          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+          <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
             آخر دخول وتفاعل لكل طالب داخل البوت
           </div>
         </button>
@@ -321,24 +340,25 @@ export default function AdvancedStudentsTab() {
         <button
           onClick={() => setSubTab("suspended")}
           style={{
-            background: subTab === "suspended" ? "linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.15))" : "rgba(255, 255, 255, 0.03)",
-            border: subTab === "suspended" ? "1.5px solid #ef4444" : "1px solid rgba(255, 255, 255, 0.08)",
+            background: subTab === "suspended" ? "rgba(239, 68, 68, 0.14)" : "var(--surface)",
+            border: subTab === "suspended" ? "1.5px solid var(--error)" : "1px solid var(--border)",
             borderRadius: "12px",
             padding: "12px 14px",
             textAlign: "right",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "background-color 0.2s, border-color 0.2s",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "12.5px", color: subTab === "suspended" ? "#fecaca" : "#94a3b8", fontWeight: "bold" }}>
-              ⛔ الحسابات المعلقة
+            <span style={{ fontSize: "12.5px", color: subTab === "suspended" ? "var(--error-ink)" : "var(--text-muted)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Ban size={14} strokeWidth={1.5} />
+              <span>الحسابات المعلقة</span>
             </span>
-            <span style={{ background: "#ef444433", color: "#ef4444", fontSize: "11.5px", fontWeight: "bold", padding: "2px 8px", borderRadius: "10px" }}>
+            <span className="tabular-nums" style={{ background: "rgba(239, 68, 68, 0.18)", color: "var(--error-ink)", fontSize: "11.5px", fontWeight: 600, padding: "2px 8px", borderRadius: "6px" }}>
               {data.stats.suspended_count}
             </span>
           </div>
-          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+          <div style={{ fontSize: "11px", color: "var(--text-dim)", marginTop: "4px" }}>
             حسابات تم إيقاف دخولها مؤقتاً من الإدارة
           </div>
         </button>
@@ -347,18 +367,19 @@ export default function AdvancedStudentsTab() {
       {/* شريط البحث وفلترة الفرقة */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ position: "relative", flex: 1, minWidth: "220px" }}>
+          <Search size={15} strokeWidth={1.5} color="var(--text-dim)" style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="🔍 ابحث بكود الطالب أو الاسم أو معرف تليجرام..."
+            placeholder="ابحث بكود الطالب أو الاسم أو معرف تليجرام..."
             style={{
               width: "100%",
-              padding: "10px 14px",
-              background: "#131b2a",
-              border: "1px solid #1e293b",
-              borderRadius: "10px",
-              color: "#fff",
+              padding: "10px 36px 10px 34px",
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              color: "var(--text-primary)",
               fontSize: "13px",
               boxSizing: "border-box",
             }}
@@ -373,12 +394,14 @@ export default function AdvancedStudentsTab() {
                 transform: "translateY(-50%)",
                 background: "transparent",
                 border: "none",
-                color: "#64748b",
+                color: "var(--text-dim)",
                 cursor: "pointer",
-                fontSize: "14px",
+                display: "flex",
+                alignItems: "center",
               }}
+              aria-label="مسح البحث"
             >
-              ✕
+              <X size={14} strokeWidth={1.5} />
             </button>
           )}
         </div>
@@ -387,11 +410,11 @@ export default function AdvancedStudentsTab() {
           value={yearFilter}
           onChange={(e) => setYearFilter(e.target.value)}
           style={{
-            background: "#131b2a",
-            border: "1px solid #1e293b",
-            color: "#94a3b8",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
             padding: "9px 14px",
-            borderRadius: "10px",
+            borderRadius: "8px",
             fontSize: "13px",
             cursor: "pointer",
           }}
@@ -406,26 +429,36 @@ export default function AdvancedStudentsTab() {
 
       {/* قائمة الطلاب */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#64748b", fontSize: "13px" }}>
-          ⏳ جارٍ تحميل سجل طلاب البوت...
+        <div style={{ textAlign: "center", padding: "40px", color: "var(--text-dim)", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+          <Clock size={15} strokeWidth={1.5} />
+          <span>جارٍ تحميل سجل طلاب البوت...</span>
         </div>
       ) : currentList.length === 0 ? (
         <div
           style={{
             textAlign: "center",
             padding: "40px",
-            color: "#64748b",
+            color: "var(--text-dim)",
             fontSize: "13px",
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--surface)",
             borderRadius: "12px",
-            border: "1px dashed rgba(255,255,255,0.08)",
+            border: "1px dashed var(--border)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
           }}
         >
-          {searchQuery
-            ? "لا توجد نتائج مطابقة لبحثك"
-            : subTab === "suspended"
-              ? "لا توجد أي حسابات معلقة حالياً ✅"
-              : "لا توجد حسابات مسجلة في هذا القسم حالياً"}
+          {searchQuery ? (
+            <span>لا توجد نتائج مطابقة لبحثك</span>
+          ) : subTab === "suspended" ? (
+            <>
+              <CheckCircle2 size={16} strokeWidth={1.5} color="var(--success-ink)" />
+              <span>لا توجد أي حسابات معلقة حالياً</span>
+            </>
+          ) : (
+            <span>لا توجد حسابات مسجلة في هذا القسم حالياً</span>
+          )}
         </div>
       ) : (
         <div
@@ -448,15 +481,15 @@ export default function AdvancedStudentsTab() {
                 onClick={() => setSelectedStudent(st)}
                 style={{
                   background: isSuspended
-                    ? "linear-gradient(135deg, #1b1116, #18121b)"
-                    : "#131b2a",
+                    ? "rgba(239, 68, 68, 0.08)"
+                    : "var(--surface)",
                   border: isSuspended
-                    ? "1px solid rgba(239, 68, 68, 0.35)"
-                    : "1px solid #1e293b",
+                    ? "1px solid rgba(239, 68, 68, 0.4)"
+                    : "1px solid var(--border)",
                   borderRadius: "12px",
                   padding: "13px 14px",
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
+                  transition: "border-color 0.15s ease",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
@@ -466,18 +499,19 @@ export default function AdvancedStudentsTab() {
                 {/* أعلى الكارت: الاسم والكود والحالة */}
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                    <div style={{ fontWeight: "bold", fontSize: "14px", color: "#fff", lineHeight: 1.4 }}>
+                    <div style={{ fontWeight: 600, fontSize: "14px", color: "var(--text-primary)", lineHeight: 1.4 }}>
                       {st.full_name}
                     </div>
                     <span
+                      className="tabular-nums"
                       style={{
-                        background: "rgba(56, 189, 248, 0.15)",
-                        color: "#38bdf8",
+                        background: "rgba(56, 189, 248, 0.14)",
+                        color: "var(--accent-ink)",
                         fontFamily: "monospace",
                         fontSize: "12px",
                         padding: "2px 8px",
                         borderRadius: "6px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -485,7 +519,7 @@ export default function AdvancedStudentsTab() {
                     </span>
                   </div>
 
-                  <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
                     <span>
                       {st.academic_year || "غير محدد"}
                       {st.section ? ` • سكشن ${st.section}` : ""}
@@ -493,31 +527,35 @@ export default function AdvancedStudentsTab() {
                     <span
                       style={{
                         fontSize: "10.5px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         padding: "2px 7px",
                         borderRadius: "6px",
-                        background: isSuspended ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.15)",
-                        color: isSuspended ? "#fca5a5" : "#6ee7b7",
+                        background: isSuspended ? "rgba(239, 68, 68, 0.18)" : "rgba(16, 185, 129, 0.14)",
+                        color: isSuspended ? "var(--error-ink)" : "var(--success-ink)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
                       }}
                     >
-                      {isSuspended ? "⛔ معلق" : "✅ نشط بالبوت"}
+                      {isSuspended ? <Ban size={11} strokeWidth={1.5} /> : <CheckCircle2 size={11} strokeWidth={1.5} />}
+                      <span>{isSuspended ? "معلق" : "نشط بالبوت"}</span>
                     </span>
                   </div>
                 </div>
 
                 {/* معلومات تليجرام وآخر نشاط */}
-                <div style={{ background: "rgba(0,0,0,0.28)", padding: "7px 10px", borderRadius: "8px", fontSize: "11px" }}>
+                <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "7px 10px", borderRadius: "8px", fontSize: "11px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <span style={{ color: "#94a3b8" }}>معرف تليجرام:</span>
-                    <span style={{ fontFamily: "monospace", color: "#38bdf8", fontWeight: "bold", direction: "ltr" }}>
+                    <span style={{ color: "var(--text-muted)" }}>معرف تليجرام:</span>
+                    <span className="tabular-nums" style={{ fontFamily: "monospace", color: "var(--accent-ink)", fontWeight: 600, direction: "ltr" }}>
                       {st.telegram_username ? `@${st.telegram_username} (${st.telegram_id})` : (st.telegram_id || "غير مربوط")}
                     </span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#cbd5e1", fontWeight: "bold" }}>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
                       {st.last_action || "مسجل ببوت تليجرام"}
                     </span>
-                    <span style={{ color: "#6ee7b7", fontSize: "10.5px" }}>
+                    <span className="tabular-nums" style={{ color: "var(--success-ink)", fontSize: "10.5px" }}>
                       {formatRelativeArabic(st.last_seen)}
                     </span>
                   </div>
@@ -528,7 +566,7 @@ export default function AdvancedStudentsTab() {
                   style={{
                     display: "flex",
                     gap: "6px",
-                    borderTop: "1px solid rgba(255,255,255,0.06)",
+                    borderTop: "1px solid var(--border)",
                     paddingTop: "8px",
                   }}
                   onClick={(e) => e.stopPropagation()}
@@ -538,17 +576,22 @@ export default function AdvancedStudentsTab() {
                     disabled={isBusy}
                     style={{
                       flex: 1,
-                      background: isSuspended ? "rgba(16, 185, 129, 0.18)" : "rgba(245, 158, 11, 0.16)",
-                      border: `1px solid ${isSuspended ? "rgba(16, 185, 129, 0.4)" : "rgba(245, 158, 11, 0.4)"}`,
-                      color: isSuspended ? "#6ee7b7" : "#fde68a",
-                      borderRadius: "7px",
+                      background: isSuspended ? "rgba(16, 185, 129, 0.16)" : "rgba(245, 158, 11, 0.14)",
+                      border: `1px solid ${isSuspended ? "var(--success)" : "var(--warning)"}`,
+                      color: isSuspended ? "var(--success-ink)" : "var(--warning-ink)",
+                      borderRadius: "8px",
                       padding: "6px 8px",
                       fontSize: "11px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: isBusy ? "wait" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
                     }}
                   >
-                    {isSuspended ? "▶️ تفعيل الحساب" : "⏸️ تعليق الحساب"}
+                    {isSuspended ? <Play size={12} strokeWidth={1.5} /> : <Pause size={12} strokeWidth={1.5} />}
+                    <span>{isSuspended ? "تفعيل الحساب" : "تعليق الحساب"}</span>
                   </button>
 
                   <button
@@ -556,34 +599,42 @@ export default function AdvancedStudentsTab() {
                     disabled={isBusy}
                     style={{
                       flex: 1,
-                      background: "rgba(239, 68, 68, 0.15)",
-                      border: "1px solid rgba(239, 68, 68, 0.35)",
-                      color: "#fca5a5",
-                      borderRadius: "7px",
+                      background: "rgba(239, 68, 68, 0.14)",
+                      border: "1px solid var(--error)",
+                      color: "var(--error-ink)",
+                      borderRadius: "8px",
                       padding: "6px 8px",
                       fontSize: "11px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: isBusy ? "wait" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "4px",
                     }}
                   >
-                    🗑️ حذف الحساب
+                    <Trash2 size={12} strokeWidth={1.5} />
+                    <span>حذف الحساب</span>
                   </button>
 
                   <button
                     onClick={() => window.open(`/system?impersonate=${st.student_code}`, "_blank")}
                     title="معاينة بوابة الطالب كأدمن"
                     style={{
-                      background: "rgba(56, 189, 248, 0.15)",
-                      border: "1px solid rgba(56, 189, 248, 0.35)",
-                      color: "#38bdf8",
-                      borderRadius: "7px",
+                      background: "rgba(56, 189, 248, 0.14)",
+                      border: "1px solid var(--primary)",
+                      color: "var(--accent-ink)",
+                      borderRadius: "8px",
                       padding: "6px 10px",
                       fontSize: "11px",
-                      fontWeight: "bold",
+                      fontWeight: 600,
                       cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    👑
+                    <Eye size={14} strokeWidth={1.5} />
                   </button>
                 </div>
               </div>
@@ -602,8 +653,7 @@ export default function AdvancedStudentsTab() {
             left: 0,
             width: "100%",
             height: "100%",
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(6px)",
+            background: "rgba(0, 0, 0, 0.8)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -614,14 +664,13 @@ export default function AdvancedStudentsTab() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "linear-gradient(145deg, #121a29, #0c121e)",
-              border: "1.5px solid rgba(56, 189, 248, 0.35)",
-              borderRadius: "20px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              borderRadius: "16px",
               width: "100%",
               maxWidth: "440px",
               padding: "24px",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
-              color: "#fff",
+              color: "var(--text-primary)",
               position: "relative",
             }}
           >
@@ -631,28 +680,31 @@ export default function AdvancedStudentsTab() {
                 position: "absolute",
                 top: "16px",
                 left: "16px",
-                background: "rgba(255,255,255,0.08)",
-                border: "none",
-                color: "#94a3b8",
+                background: "var(--surface-hover)",
+                border: "1px solid var(--border)",
+                color: "var(--text-muted)",
                 width: "32px",
                 height: "32px",
-                borderRadius: "50%",
+                borderRadius: "8px",
                 cursor: "pointer",
-                fontSize: "14px",
-                fontWeight: "bold",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
+              aria-label="إغلاق"
             >
-              ✕
+              <X size={16} strokeWidth={1.5} />
             </button>
 
             <div style={{ textAlign: "center", marginBottom: "18px" }}>
-              <div style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>
-                بوت تليجرام الرسمي للطلاب • @NEZAMFANYAbot 🤖
+              <div style={{ fontSize: "11px", color: "var(--accent-ink)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                <Bot size={13} strokeWidth={1.5} />
+                <span>بوت تليجرام الرسمي للطلاب • @NEZAMFANYAbot</span>
               </div>
-              <h3 style={{ margin: "6px 0 4px 0", fontSize: "18px", fontWeight: "bold", color: "#fff" }}>
+              <h3 style={{ margin: "6px 0 4px 0", fontSize: "18px", fontWeight: 600, color: "var(--text-primary)" }}>
                 {selectedStudent.full_name}
               </h3>
-              <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                 {selectedStudent.academic_year || "طالب مقيد"}{" "}
                 {selectedStudent.section ? `• سكشن ${selectedStudent.section}` : ""}
               </div>
@@ -660,8 +712,8 @@ export default function AdvancedStudentsTab() {
 
             <div
               style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--bg-deep)",
+                border: "1px solid var(--border)",
                 borderRadius: "12px",
                 padding: "12px 16px",
                 marginBottom: "14px",
@@ -672,39 +724,43 @@ export default function AdvancedStudentsTab() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#94a3b8" }}>الكود الجامعي:</span>
-                <span style={{ fontFamily: "monospace", fontWeight: "bold", color: "#38bdf8", fontSize: "15px" }}>
+                <span style={{ color: "var(--text-muted)" }}>الكود الجامعي:</span>
+                <span className="tabular-nums" style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--accent-ink)", fontSize: "15px" }}>
                   {selectedStudent.student_code}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#94a3b8" }}>معرف تليجرام (ID):</span>
-                <span style={{ fontFamily: "monospace", fontWeight: "bold", color: "#e2e8f0", direction: "ltr" }}>
+                <span style={{ color: "var(--text-muted)" }}>معرف تليجرام (ID):</span>
+                <span className="tabular-nums" style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--text-primary)", direction: "ltr" }}>
                   {selectedStudent.telegram_id || "غير مربوط"}
                 </span>
               </div>
               {selectedStudent.telegram_username && (
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#94a3b8" }}>حساب تليجرام:</span>
-                  <span style={{ fontFamily: "monospace", color: "#38bdf8", direction: "ltr" }}>
+                  <span style={{ color: "var(--text-muted)" }}>حساب تليجرام:</span>
+                  <span style={{ fontFamily: "monospace", color: "var(--accent-ink)", direction: "ltr" }}>
                     @{selectedStudent.telegram_username}
                   </span>
                 </div>
               )}
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#94a3b8" }}>حالة الحساب:</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "var(--text-muted)" }}>حالة الحساب:</span>
                 <span
                   style={{
-                    fontWeight: "bold",
-                    color: selectedStudent.status === "suspended" ? "#ef4444" : "#10b981",
+                    fontWeight: 600,
+                    color: selectedStudent.status === "suspended" ? "var(--error-ink)" : "var(--success-ink)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
                   }}
                 >
-                  {selectedStudent.status === "suspended" ? "⛔ معلق من الإدارة" : "✅ نشط ومفعل"}
+                  {selectedStudent.status === "suspended" ? <Ban size={13} strokeWidth={1.5} /> : <CheckCircle2 size={13} strokeWidth={1.5} />}
+                  <span>{selectedStudent.status === "suspended" ? "معلق من الإدارة" : "نشط ومفعل"}</span>
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#94a3b8" }}>آخر نشاط:</span>
-                <span style={{ color: "#cbd5e1", fontWeight: "bold" }}>
+                <span style={{ color: "var(--text-muted)" }}>آخر نشاط:</span>
+                <span className="tabular-nums" style={{ color: "var(--text-primary)", fontWeight: 500 }}>
                   {selectedStudent.last_action || "—"} ({formatRelativeArabic(selectedStudent.last_seen)})
                 </span>
               </div>
@@ -714,53 +770,70 @@ export default function AdvancedStudentsTab() {
               <button
                 onClick={() => window.open(`/system?impersonate=${selectedStudent.student_code}`, "_blank")}
                 style={{
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                  background: "var(--primary)",
                   border: "none",
-                  borderRadius: "10px",
+                  borderRadius: "8px",
                   padding: "11px 16px",
                   color: "#fff",
-                  fontWeight: "bold",
+                  fontWeight: 600,
                   fontSize: "13px",
                   cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
                 }}
               >
-                👑 فتح ومعاينة حساب الطالب (وضع الإدارة)
+                <Eye size={15} strokeWidth={1.5} />
+                <span>فتح ومعاينة حساب الطالب (وضع الإدارة)</span>
               </button>
 
               <button
                 onClick={() => handleToggleSuspend(selectedStudent)}
                 disabled={actionLoadingCode === selectedStudent.student_code}
                 style={{
-                  background: selectedStudent.status === "suspended" ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)",
-                  border: `1px solid ${selectedStudent.status === "suspended" ? "#10b981" : "#f59e0b"}`,
-                  borderRadius: "10px",
+                  background: selectedStudent.status === "suspended" ? "rgba(16, 185, 129, 0.16)" : "rgba(245, 158, 11, 0.16)",
+                  border: `1px solid ${selectedStudent.status === "suspended" ? "var(--success)" : "var(--warning)"}`,
+                  borderRadius: "8px",
                   padding: "11px 16px",
-                  color: selectedStudent.status === "suspended" ? "#6ee7b7" : "#fde68a",
-                  fontWeight: "bold",
+                  color: selectedStudent.status === "suspended" ? "var(--success-ink)" : "var(--warning-ink)",
+                  fontWeight: 600,
                   fontSize: "13px",
                   cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
                 }}
               >
-                {selectedStudent.status === "suspended"
-                  ? "▶️ إعادة تفعيل الحساب على البوت"
-                  : "⏸️ تعليق الحساب وإيقاف دخوله للبوت"}
+                {selectedStudent.status === "suspended" ? <Play size={14} strokeWidth={1.5} /> : <Pause size={14} strokeWidth={1.5} />}
+                <span>
+                  {selectedStudent.status === "suspended"
+                    ? "إعادة تفعيل الحساب على البوت"
+                    : "تعليق الحساب وإيقاف دخوله للبوت"}
+                </span>
               </button>
 
               <button
                 onClick={() => handleDeleteAccount(selectedStudent)}
                 disabled={actionLoadingCode === selectedStudent.student_code}
                 style={{
-                  background: "rgba(239, 68, 68, 0.18)",
-                  border: "1px solid #ef4444",
-                  borderRadius: "10px",
+                  background: "rgba(239, 68, 68, 0.14)",
+                  border: "1px solid var(--error)",
+                  borderRadius: "8px",
                   padding: "11px 16px",
-                  color: "#fca5a5",
-                  fontWeight: "bold",
+                  color: "var(--error-ink)",
+                  fontWeight: 600,
                   fontSize: "13px",
                   cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
                 }}
               >
-                🗑️ حذف الحساب وفك ربط تليجرام نهائياً
+                <Trash2 size={14} strokeWidth={1.5} />
+                <span>حذف الحساب وفك ربط تليجرام نهائياً</span>
               </button>
             </div>
           </div>

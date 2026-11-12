@@ -34,7 +34,10 @@ import {
   Archive,
   Eye,
   EyeOff,
-  KeyRound
+  KeyRound,
+  Palette,
+  Shield,
+  WifiOff
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/students/codeHelper";
 import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA, isIOSClient } from "@/lib/auth/deviceFingerprint";
@@ -324,7 +327,7 @@ export default function SystemPage() {
         try {
           localStorage.setItem("fania_student_avatar", data.avatar_url);
         } catch (e) {}
-        setSelfieMsg("تم حفظ صورتك الشخصية واعتمادها بنجاح! 🎉");
+        setSelfieMsg("تم حفظ صورتك الشخصية واعتمادها بنجاح!");
         setTimeout(() => {
           stopSelfieCamera();
           setShowSelfieModal(false);
@@ -1127,7 +1130,7 @@ export default function SystemPage() {
           setRegCode(approvedCode);
           setEnteredPin("");
           setAuthMode("login");
-          setSuccessMsg("🎉 تم اعتماد حسابك بنجاح! يرجى إدخال الرقم السري لتسجيل الدخول.");
+          setSuccessMsg("تم اعتماد حسابك بنجاح! يرجى إدخال الرقم السري لتسجيل الدخول.");
           if (typeof window !== "undefined") {
             window.history.replaceState({}, '', window.location.pathname);
           }
@@ -1136,7 +1139,7 @@ export default function SystemPage() {
           setCurrentStudent(null);
           setAccountStatus(null);
           setAuthMode("register");
-          setErrorMsg("⚠️ تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
+          setErrorMsg("تم إعادة تعيين بيانات التسجيل من قبل المنسق. يرجى إعادة إدخال بياناتك بشكل صحيح.");
         }
       } catch (e) {}
     }, 3000);
@@ -1898,7 +1901,7 @@ export default function SystemPage() {
         localStorage.setItem("fania_student_code", data.student.student_code);
         if (data.token) localStorage.setItem("fania_student_token", data.token);
         setEnteredPin("");
-        setSuccessMsg("🎉 تم تسجيل الدخول بنجاح! مرحباً بك في منظومة فنية.");
+        setSuccessMsg("تم تسجيل الدخول بنجاح. مرحباً بك في منظومة فنية.");
         loadDashboard(data.student.student_code);
       }
     } catch (err: any) {
@@ -2034,7 +2037,7 @@ export default function SystemPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setComplaintSuccessMsg("✅ تم إرسال شكوتك بنجاح. سوف يتم مراجعتها والرد عليك قريباً. يرجى متابعة هذا القسم للاطلاع على الرد فور اعتماده.");
+        setComplaintSuccessMsg("تم إرسال شكوتك بنجاح. سوف يتم مراجعتها والرد عليك قريباً. يرجى متابعة هذا القسم للاطلاع على الرد فور اعتماده.");
         setComplaintText("");
         loadDashboard(currentStudent.student_code);
       } else {
@@ -2059,7 +2062,7 @@ export default function SystemPage() {
   // ==========================================
   if (currentStudent) {
     return (
-      <div style={{ minHeight: "100vh", padding: "10px 14px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
+      <div style={{ minHeight: "100vh", padding: "12px 16px", maxWidth: "550px", margin: "0 auto", display: "flex", flexDirection: "column" }}>
         
         {/* شريط وضع تصفح الإدارة العائم */}
         {isImpersonating && (
@@ -2067,21 +2070,21 @@ export default function SystemPage() {
             position: "sticky",
             top: 0,
             zIndex: 9999,
-            background: "linear-gradient(135deg, #b91c1c, #991b1b)",
-            color: "#fff",
+            background: "var(--danger)",
+            color: "#ffffff",
             padding: "10px 14px",
-            borderRadius: "12px",
+            borderRadius: "10px",
             marginBottom: "12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            boxShadow: "0 4px 15px rgba(0,0,0,0.4)",
+            gap: "8px",
             fontSize: "12px",
-            fontWeight: "bold",
-            border: "1px solid #ef4444"
+            fontWeight: 600,
+            border: "1px solid var(--error)"
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>👑</span>
+            <div className="tabular-nums" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Shield size={15} strokeWidth={1.5} style={{ flexShrink: 0 }} />
               <span>وضع تصفح الإدارة — حساب: {currentStudent.full_name} ({formatStudentCode(currentStudent.student_code)})</span>
             </div>
             <button
@@ -2094,55 +2097,60 @@ export default function SystemPage() {
               }}
               className="btn-compact"
               style={{
-                background: "rgba(255,255,255,0.2)",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,0.4)",
+                background: "rgba(255, 255, 255, 0.16)",
+                color: "#ffffff",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
                 padding: "4px 8px",
                 borderRadius: "6px",
                 cursor: "pointer",
                 fontSize: "11px",
-                fontWeight: "bold"
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                flexShrink: 0
               }}
             >
-              الرجوع للوحة الإدارة ✕
+              <span>الرجوع للوحة الإدارة</span>
+              <X size={13} strokeWidth={1.5} />
             </button>
           </div>
         )}
 
-        {/* شريط حالة الاتصال ومزامنة البيانات (Telecom-style Offline/Sync Banner) */}
+        {/* شريط حالة الاتصال ومزامنة البيانات */}
         {isOffline ? (
           <div style={{
-            background: "linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(217, 119, 6, 0.12))",
+            background: "rgba(245, 158, 11, 0.1)",
             border: "1px solid rgba(245, 158, 11, 0.35)",
-            borderRadius: "14px",
-            padding: "9px 13px",
+            borderRadius: "10px",
+            padding: "10px 14px",
             marginBottom: "12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: "8px",
             fontSize: "12px",
-            color: "#fbbf24",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.25)"
+            color: "var(--warning-ink)"
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "16px" }}>📡</span>
+              <WifiOff size={16} strokeWidth={1.5} style={{ flexShrink: 0 }} />
               <div>
-                <div style={{ fontWeight: 700, fontSize: "12px" }}>أنت غير متصل بالإنترنت</div>
-                <div style={{ fontSize: "10px", color: "rgba(251, 191, 36, 0.85)" }}>تتصفح البيانات المحفوظة محلياً على جهازك</div>
+                <div style={{ fontWeight: 600, fontSize: "12px" }}>أنت غير متصل بالإنترنت</div>
+                <div style={{ fontSize: "10.5px", color: "var(--text-secondary)" }}>تتصفح البيانات المحفوظة محلياً على جهازك</div>
               </div>
             </div>
             {lastSyncTime && (
               <div style={{
                 textAlign: "left",
-                fontSize: "10.5px",
-                color: "#fef3c7",
-                background: "rgba(0,0,0,0.3)",
+                fontSize: "11px",
+                color: "var(--warning-ink)",
+                background: "var(--bg-deep)",
                 padding: "4px 8px",
-                borderRadius: "8px",
-                border: "1px solid rgba(245, 158, 11, 0.2)"
+                borderRadius: "6px",
+                border: "1px solid var(--border)"
               }}>
-                <span style={{ opacity: 0.8 }}>آخر تحديث: </span>
-                <span style={{ fontFamily: "monospace", direction: "ltr", display: "inline-block", fontWeight: 600 }}>{lastSyncTime}</span>
+                <span style={{ color: "var(--text-secondary)" }}>آخر تحديث: </span>
+                <span className="tabular-nums" style={{ direction: "ltr", display: "inline-block", fontWeight: 600 }}>{lastSyncTime}</span>
               </div>
             )}
           </div>
@@ -2153,24 +2161,23 @@ export default function SystemPage() {
             justifyContent: "space-between",
             padding: "4px 8px",
             marginBottom: "6px",
-            fontSize: "10.5px",
-            color: "#64748b"
+            fontSize: "11px",
+            color: "var(--text-muted)"
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", display: "inline-block" }}></span>
-              <span style={{ color: "#94a3b8" }}>متصل بالخادم</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--success)", display: "inline-block" }}></span>
+              <span style={{ color: "var(--text-secondary)" }}>متصل بالخادم</span>
             </div>
-            <div style={{ fontFamily: "monospace", direction: "ltr" }}>
+            <div className="tabular-nums" style={{ direction: "ltr" }}>
               آخر مزامنة: {lastSyncTime}
             </div>
           </div>
         ) : null}
 
-        {/* شريط أعلى منظم: دائرة الحساب، اسم الطالب وكوده بوضوح، وأزرار التحكم الثلاثة */}
+        {/* شريط أعلى منظم: دائرة الحساب، اسم الطالب وكوده بوضوح، وأزرار التحكم */}
         <div className="student-top-bar">
           {/* قسم بيانات وهوية الطالب ودائرة الحساب */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, width: "100%" }}>
-            {/* الدائرة المخصصة للحساب: تعرض الصورة الشخصية النقية بعد الالتقاط وتختفي علامة + تلقائياً */}
             <div 
               onClick={handleOpenSelfieModal}
               style={{ 
@@ -2181,21 +2188,18 @@ export default function SystemPage() {
                 height: "44px",
                 borderRadius: "50%",
                 background: (currentStudent?.avatar_url || currentStudent?.photo_url)
-                  ? "#0f172a"
-                  : "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                  ? "var(--bg-deep)"
+                  : "var(--success)",
                 border: (currentStudent?.avatar_url || currentStudent?.photo_url)
-                  ? "2px solid #38bdf8"
-                  : "2.5px solid #10b981",
-                boxShadow: (currentStudent?.avatar_url || currentStudent?.photo_url)
-                  ? "0 2px 8px rgba(0, 0, 0, 0.4)"
-                  : "0 0 10px rgba(16, 185, 129, 0.45)",
+                  ? "2px solid var(--accent-ink)"
+                  : "2px solid var(--success)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 overflow: "hidden",
-                transition: "transform 0.15s ease"
+                transition: "border-color 0.2s var(--ease-out)"
               }}
-              title={currentStudent?.avatar_url || currentStudent?.photo_url ? "صورتك الشخصية (اضغط لتغييرها) 📷" : "اضغط هنا لالتقاط صورتك الشخصية 📷"}
+              title={currentStudent?.avatar_url || currentStudent?.photo_url ? "صورتك الشخصية (اضغط لتغييرها)" : "اضغط هنا لالتقاط صورتك الشخصية"}
             >
               {currentStudent?.avatar_url || currentStudent?.photo_url ? (
                 <img 
@@ -2211,8 +2215,8 @@ export default function SystemPage() {
                   width: "100%",
                   height: "100%",
                   color: "#ffffff",
-                  fontSize: "30px",
-                  fontWeight: "900",
+                  fontSize: "22px",
+                  fontWeight: 600,
                   lineHeight: 1,
                   userSelect: "none"
                 }}>
@@ -2221,49 +2225,48 @@ export default function SystemPage() {
               )}
             </div>
 
-            {/* الاسم الكامل والكود والفرقة بحجم متناسق ومصغر مع شاشات الهواتف */}
+            {/* الاسم الكامل والكود والفرقة */}
             <div style={{ minWidth: 0, flex: 1 }}>
               <div 
                 style={{ 
-                  color: "#ffffff", 
-                  fontWeight: "bold", 
-                  fontSize: "13px", 
-                  lineHeight: "1.25",
-                  letterSpacing: "-0.2px",
+                  color: "var(--text)", 
+                  fontWeight: 600, 
+                  fontSize: "13.5px", 
+                  lineHeight: 1.3,
                   wordBreak: "break-word"
                 }}
                 title={currentStudent.full_name}
               >
                 {currentStudent.full_name}
               </div>
-              <div style={{ 
-                color: "#38bdf8", 
-                fontSize: "10.5px", 
+              <div className="tabular-nums" style={{ 
+                color: "var(--accent-ink)", 
+                fontSize: "11px", 
                 display: "flex", 
                 alignItems: "center", 
                 gap: "4px", 
                 flexWrap: "wrap",
                 marginTop: "2px",
-                lineHeight: "1.2"
+                lineHeight: 1.25
               }}>
-                <span style={{ fontWeight: "700" }}>كود: {formatStudentCode(currentStudent.student_code)}</span>
+                <span style={{ fontWeight: 600 }}>كود: {formatStudentCode(currentStudent.student_code)}</span>
                 {currentStudent.academic_year && (
                   <>
-                    <span style={{ opacity: 0.35 }}>•</span>
-                    <span style={{ color: "#94a3b8" }}>{currentStudent.academic_year}</span>
+                    <span style={{ color: "var(--text-muted)" }}>•</span>
+                    <span style={{ color: "var(--text-secondary)" }}>{currentStudent.academic_year}</span>
                   </>
                 )}
                 {currentStudent.section && (
                   <>
-                    <span style={{ opacity: 0.35 }}>•</span>
-                    <span style={{ color: "#cbd5e1" }}>سكشن {currentStudent.section}</span>
+                    <span style={{ color: "var(--text-muted)" }}>•</span>
+                    <span style={{ color: "var(--text)" }}>سكشن {currentStudent.section}</span>
                   </>
                 )}
               </div>
             </div>
           </div>
 
-          {/* مجموعة أزرار التحكم للطالب المثبت: رمز QR + تحديث البيانات (بدون زر تسجيل خروج لضمان ثبات الحساب) */}
+          {/* مجموعة أزرار التحكم للطالب المثبت */}
           <div 
             className="student-actions-group"
             style={{
@@ -2281,23 +2284,23 @@ export default function SystemPage() {
               title="عرض رمز QR الذكي الخاص بي"
               style={{ 
                 background: "rgba(16, 185, 129, 0.12)",
-                color: "#10b981",
+                color: "var(--success-ink)",
                 border: "1px solid rgba(16, 185, 129, 0.3)",
                 borderRadius: "8px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "4px",
-                fontSize: "11px",
-                fontWeight: "bold",
+                gap: "5px",
+                fontSize: "11.5px",
+                fontWeight: 500,
                 height: "32px",
                 width: "100%",
-                padding: "0 2px",
+                padding: "0 4px",
                 whiteSpace: "nowrap"
               }}
             >
-              <QrCode size={13} />
+              <QrCode size={14} strokeWidth={1.5} />
               <span>رمز QR</span>
             </button>
 
@@ -2309,45 +2312,46 @@ export default function SystemPage() {
               title="تحديث البيانات فورياً"
               style={{ 
                 background: "rgba(56, 189, 248, 0.12)",
-                color: "#38bdf8",
+                color: "var(--accent-ink)",
                 border: "1px solid rgba(56, 189, 248, 0.3)",
                 borderRadius: "8px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "4px",
-                fontSize: "11px",
-                fontWeight: "bold",
+                gap: "5px",
+                fontSize: "11.5px",
+                fontWeight: 500,
                 height: "32px",
                 width: "100%",
-                padding: "0 2px",
+                padding: "0 4px",
                 whiteSpace: "nowrap"
               }}
             >
-              <RotateCw size={13} className={loading ? "animate-spin" : ""} />
+              <RotateCw size={14} strokeWidth={1.5} className={loading ? "animate-spin" : ""} />
               <span>تحديث</span>
             </button>
           </div>
         </div>
 
-        {/* تابات التنقل الرئيسية لشاشة الطالب (4 تابات متساوية العرض تماماً تغطي كامل الشاشة) */}
+        {/* تابات التنقل الرئيسية لشاشة الطالب */}
         <div 
           style={{ 
             display: "grid", 
             gridTemplateColumns: `repeat(${dashboardData?.hide_warnings_tab ? 3 : 4}, 1fr)`, 
-            gap: "4px", 
+            gap: "6px", 
             marginBottom: "12px",
             width: "100%"
           }}
         >
           {[
-            { id: "evaluation", label: "المشاريع 🎨", color: "#10b981", badge: unreadProjectsCount },
-            { id: "attendance", label: "الحضور 📅", color: "#38bdf8", badge: unreadAttendanceCount },
-            ...(!dashboardData?.hide_warnings_tab ? [{ id: "warnings", label: "الإنذارات ⚠️", color: "#ef4444", badge: unreadWarningsCount }] : []),
-            { id: "lockers", label: "الدواليب 🗄️", color: "#a855f7", badge: unreadLockersCount }
+            { id: "evaluation", label: "المشاريع", Icon: Palette, color: "#10b981", badge: unreadProjectsCount },
+            { id: "attendance", label: "الحضور", Icon: CalendarCheck, color: "#38bdf8", badge: unreadAttendanceCount },
+            ...(!dashboardData?.hide_warnings_tab ? [{ id: "warnings", label: "الإنذارات", Icon: AlertTriangle, color: "#ef4444", badge: unreadWarningsCount }] : []),
+            { id: "lockers", label: "الدواليب", Icon: Archive, color: "#f59e0b", badge: unreadLockersCount }
           ].map(tab => {
             const isActive = activeTab === tab.id;
+            const TabIcon = tab.Icon;
             return (
               <button
                 key={tab.id}
@@ -2364,45 +2368,46 @@ export default function SystemPage() {
                 className="btn-compact"
                 style={{
                   width: "100%",
-                  padding: "7px 2px",
+                  padding: "8px 4px",
                   borderRadius: "8px",
-                  border: isActive ? `1px solid ${tab.color}` : "1px solid rgba(255,255,255,0.08)",
-                  background: isActive ? `${tab.color}22` : "rgba(255,255,255,0.03)",
-                  color: isActive ? "#fff" : "#94a3b8",
-                  fontWeight: isActive ? "bold" : "normal",
-                  fontSize: "11px",
+                  border: isActive ? `1px solid ${tab.color}` : "1px solid var(--border)",
+                  background: isActive ? `${tab.color}1a` : "var(--surface)",
+                  color: isActive ? "var(--text)" : "var(--text-secondary)",
+                  fontWeight: isActive ? 600 : 400,
+                  fontSize: "11.5px",
                   cursor: "pointer",
                   position: "relative",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  gap: "5px",
                   textAlign: "center",
-                  lineHeight: "1.2"
+                  lineHeight: 1.2
                 }}
               >
+                <TabIcon size={14} strokeWidth={1.5} color={isActive ? tab.color : "currentColor"} />
                 <span>{tab.label}</span>
                 {tab.badge && tab.badge > 0 ? (
                   <span 
                     title={`${tab.badge} جديد`}
+                    className="tabular-nums"
                     style={{
                       position: "absolute",
-                      top: "-7px",
+                      top: "-6px",
                       left: "-2px",
-                      background: "#ef4444",
-                      color: "#fff",
-                      borderRadius: "999px",
-                      minWidth: "19px",
-                      height: "19px",
+                      background: "var(--error)",
+                      color: "#ffffff",
+                      borderRadius: "6px",
+                      minWidth: "18px",
+                      height: "18px",
                       padding: "0 4px",
                       fontSize: "10px",
-                      fontWeight: "900",
+                      fontWeight: 600,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      boxShadow: "0 0 10px rgba(239, 68, 68, 0.85), 0 2px 4px rgba(0,0,0,0.5)",
-                      border: "2px solid #0b1120",
-                      zIndex: 10,
-                      animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
+                      border: "1.5px solid var(--background)",
+                      zIndex: 10
                     }}
                   >
                     {tab.badge > 99 ? "+99" : tab.badge}
@@ -2491,16 +2496,16 @@ export default function SystemPage() {
         {previewModalImage && (
           <div 
             onClick={() => setPreviewModalImage(null)}
-            style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.92)", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", cursor: "pointer" }}
+            style={{ position: "fixed", inset: 0, background: "rgba(11, 13, 20, 0.92)", zIndex: 100000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", cursor: "pointer" }}
           >
             <div style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh" }}>
-              <img src={previewModalImage} alt="عرض مكبر" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: "10px", objectFit: "contain" }} />
+              <img src={previewModalImage} alt="عرض مكبر" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: "10px", objectFit: "contain", border: "1px solid var(--border-light)" }} />
               <button 
                 onClick={() => setPreviewModalImage(null)}
                 className="btn-compact"
-                style={{ position: "absolute", top: "-15px", right: "-15px", background: "#ef4444", color: "#fff", border: "none", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", fontSize: "16px" }}
+                style={{ position: "absolute", top: "-12px", right: "-12px", background: "var(--error)", color: "#ffffff", border: "none", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
               >
-                ✕
+                <X size={16} strokeWidth={1.5} />
               </button>
             </div>
           </div>
@@ -2558,7 +2563,7 @@ export default function SystemPage() {
           />
         )}
 
-        <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "#64748b", fontSize: "11px" }}>
+        <footer style={{ textAlign: "center", paddingTop: "24px", paddingBottom: "16px", color: "var(--text-muted)", fontSize: "11px" }}>
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </footer>
       </div>
@@ -2569,7 +2574,7 @@ export default function SystemPage() {
   // VIEW 3: إذا لم يكن مسجلاً أو فتح خارج تليجرام -> شاشة الانتقال إلى تليجرام
   // ==========================================
   if (!isClientReady) {
-    return <div style={{ minHeight: "100vh", background: "#060b14" }} />;
+    return <div style={{ minHeight: "100vh", background: "var(--background)" }} />;
   }
 
   return <StudentMigrationNotice />;

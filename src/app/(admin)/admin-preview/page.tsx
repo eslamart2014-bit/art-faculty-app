@@ -12,7 +12,7 @@ const PREVIEW_ADMIN = {
 
 export default function AdminPreviewPage() {
   return (
-    <div style={{ minHeight: "100vh", background: "#070b14", direction: "rtl" }}>
+    <div style={{ minHeight: "100vh", background: "var(--background)", direction: "rtl" }}>
       <StudentPortalHubModal
         isOpen={true}
         onClose={() => {

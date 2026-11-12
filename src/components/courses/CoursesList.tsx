@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/core/supabase";
-import { Camera, MoreVertical, Download, CheckCircle2, Zap } from "lucide-react";
+import { AlertTriangle, Calendar, Camera, CheckCircle2, Download, Edit3, MoreVertical, PinOff, RefreshCw, Settings, Trash2, Users, Zap } from "lucide-react";
 import { forceDownloadFacultyOfflinePack } from "@/lib/admin/preloadFacultyData";
 
 interface CoursesListProps {
@@ -434,7 +434,7 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
 
   if (loading) {
     return (
-      <div style={{ textAlign: "center", padding: "20px", color: "var(--text-muted)" }}>
+      <div style={{ textAlign: "center", padding: "24px", color: "var(--text-muted)", fontSize: "13px" }}>
         جاري تحميل المقررات...
       </div>
     );
@@ -442,68 +442,75 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
 
   if (courses.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "30px", border: "1px dashed var(--border-light)", borderRadius: "12px", color: "var(--text-muted)" }}>
-        لا توجد مقررات دراسية حالياً.<br/>
-        <span style={{ fontSize: "12px" }}>اضغط على أيقونة الإعدادات ⚙️ ثم "إضافة مقرر" لتبدأ.</span>
+      <div style={{ textAlign: "center", padding: "32px 20px", background: "var(--surface)", border: "1px dashed var(--border-light)", borderRadius: "12px", color: "var(--text-secondary)" }}>
+        <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text)", marginBottom: "8px" }}>
+          لا توجد مقررات دراسية حالياً
+        </div>
+        <div style={{ fontSize: "12px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "center" }}>
+          <span>اضغط على أيقونة الإعدادات</span>
+          <Settings size={14} strokeWidth={1.5} color="var(--accent-ink)" />
+          <span>ثم اختر «إضافة مقرر» لتبدأ.</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       {/* Auto-Sync Badge when Strong Connection Syncs */}
       {autoSyncedBadge && (
         <div style={{
-          background: "rgba(34, 197, 94, 0.15)",
-          border: "1px solid #22c55e",
+          background: "rgba(16, 185, 129, 0.12)",
+          border: "1px solid rgba(16, 185, 129, 0.35)",
           borderRadius: "10px",
-          padding: "8px 12px",
+          padding: "10px 12px",
           fontSize: "12px",
-          color: "#4ade80",
-          fontWeight: "bold",
+          color: "var(--success-ink)",
+          fontWeight: 500,
           display: "flex",
           alignItems: "center",
           gap: "8px",
           direction: "rtl",
-          animation: "fadeIn 0.3s ease"
+          animation: "fadeIn 0.25s var(--ease-out)"
         }}>
-          <CheckCircle2 size={16} />
-          <span>⚡ تم التحديث والمزامنة تلقائياً مع استقرار اتصال الإنترنت.</span>
+          <CheckCircle2 size={16} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+          <span>تم التحديث والمزامنة تلقائياً مع استقرار اتصال الإنترنت.</span>
         </div>
       )}
 
       {/* Offline Pack Status & One-Click Download Widget */}
       <div style={{
-        background: offlinePackMeta ? "rgba(34, 197, 94, 0.08)" : "rgba(37, 99, 235, 0.08)",
-        border: `1px solid ${offlinePackMeta ? "rgba(34, 197, 94, 0.25)" : "rgba(59, 130, 246, 0.25)"}`,
-        borderRadius: "14px",
+        background: offlinePackMeta ? "rgba(16, 185, 129, 0.08)" : "rgba(37, 99, 235, 0.08)",
+        border: `1px solid ${offlinePackMeta ? "rgba(16, 185, 129, 0.28)" : "rgba(56, 189, 248, 0.25)"}`,
+        borderRadius: "12px",
         padding: "12px 14px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: "10px",
+        gap: "12px",
         direction: "rtl"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           <div style={{
             width: "36px",
             height: "36px",
-            borderRadius: "10px",
-            background: offlinePackMeta ? "rgba(34, 197, 94, 0.2)" : "rgba(59, 130, 246, 0.2)",
+            borderRadius: "8px",
+            background: offlinePackMeta ? "rgba(16, 185, 129, 0.15)" : "rgba(37, 99, 235, 0.16)",
+            border: `1px solid ${offlinePackMeta ? "rgba(16, 185, 129, 0.3)" : "rgba(56, 189, 248, 0.28)"}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "18px",
-            color: offlinePackMeta ? "#22c55e" : "#3b82f6"
+            color: offlinePackMeta ? "var(--success-ink)" : "var(--accent-ink)",
+            flexShrink: 0
           }}>
-            {offlinePackMeta ? <Zap size={20} /> : <Download size={20} />}
+            {offlinePackMeta ? <Zap size={18} strokeWidth={1.5} /> : <Download size={18} strokeWidth={1.5} />}
           </div>
-          <div>
-            <div style={{ fontSize: "13px", fontWeight: "bold", color: offlinePackMeta ? "#4ade80" : "#60a5fa" }}>
-              {offlinePackMeta ? "وضع السرعة الفائقة مفعّل (0ms)" : "حفظ المقررات للعمل بدون إنترنت"}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: offlinePackMeta ? "var(--success-ink)" : "var(--accent-ink)" }}>
+              {offlinePackMeta ? "وضع العمل السريع مفعّل (0ms)" : "حفظ المقررات للعمل بدون إنترنت"}
             </div>
-            <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "2px" }}>
-              {offlinePackMeta 
+            <div className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
+              {offlinePackMeta
                 ? `بيانات (${courses.length}) مقررات و (${offlinePackMeta.studentsCount || 0}) طالباً محفوظة محلياً`
                 : "اضغط لتنزيل مقرراتك وطلابك للعمل في قاعات الكلية بدون نت"}
             </div>
@@ -511,56 +518,81 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
         </div>
 
         <button
+          type="button"
+          className="btn-compact"
           onClick={handleDownloadOfflinePack}
           disabled={downloadingPack}
           style={{
-            background: offlinePackMeta ? "rgba(255, 255, 255, 0.08)" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
-            color: "#fff",
-            border: offlinePackMeta ? "1px solid rgba(255, 255, 255, 0.15)" : "none",
+            background: offlinePackMeta ? "var(--surface)" : "var(--primary)",
+            color: offlinePackMeta ? "var(--text)" : "#ffffff",
+            border: offlinePackMeta ? "1px solid var(--border-light)" : "1px solid var(--primary)",
             padding: "8px 12px",
             borderRadius: "8px",
             fontSize: "12px",
-            fontWeight: "bold",
+            fontWeight: 500,
             cursor: downloadingPack ? "not-allowed" : "pointer",
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
             gap: "6px",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+            margin: 0
           }}
         >
-          {downloadingPack ? "جاري الحفظ..." : (offlinePackMeta ? "تحديث الحزمة 🔄" : "تنزيل الآن 📥")}
+          {downloadingPack ? (
+            <>
+              <RefreshCw size={14} strokeWidth={1.5} className="animate-spin" />
+              <span>جاري الحفظ...</span>
+            </>
+          ) : offlinePackMeta ? (
+            <>
+              <RefreshCw size={14} strokeWidth={1.5} />
+              <span>تحديث الحزمة</span>
+            </>
+          ) : (
+            <>
+              <Download size={14} strokeWidth={1.5} />
+              <span>تنزيل الآن</span>
+            </>
+          )}
         </button>
       </div>
 
       {/* Progress Modal during Download */}
       {downloadingPack && (
         <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0, 0, 0, 0.8)", backdropFilter: "blur(4px)",
+          position: "fixed", inset: 0,
+          background: "rgba(0, 0, 0, 0.78)",
           zIndex: 999999, display: "flex", alignItems: "center", justifyContent: "center",
           padding: "16px", direction: "rtl"
         }}>
           <div style={{
-            background: "#181f2c", border: "1px solid #334155", borderRadius: "16px",
-            padding: "24px", maxWidth: "400px", width: "100%", textAlign: "center",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+            background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "16px",
+            padding: "24px", maxWidth: "400px", width: "100%", textAlign: "center"
           }}>
-            <div style={{ fontSize: "36px", marginBottom: "12px" }}>⚡</div>
-            <h3 style={{ margin: "0 0 8px 0", color: "#f8fafc", fontSize: "16px" }}>
+            <div style={{
+              width: "48px", height: "48px", borderRadius: "12px",
+              background: "rgba(56, 189, 248, 0.12)", border: "1px solid rgba(56, 189, 248, 0.3)",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              color: "var(--accent-ink)", marginBottom: "12px"
+            }}>
+              <Zap size={24} strokeWidth={1.5} />
+            </div>
+            <h3 style={{ margin: "0 0 8px 0", color: "var(--text)", fontSize: "16px", fontWeight: 600 }}>
               تجهيز حزمة العمل السريع بدون إنترنت
             </h3>
-            <p style={{ margin: "0 0 16px 0", fontSize: "12px", color: "#94a3b8" }}>
+            <p style={{ margin: "0 0 16px 0", fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
               {packProgressStep}
             </p>
             {/* Progress Bar */}
-            <div style={{ width: "100%", height: "8px", background: "#0f172a", borderRadius: "4px", overflow: "hidden", marginBottom: "10px" }}>
+            <div style={{ width: "100%", height: "8px", background: "var(--bg-deep)", borderRadius: "4px", overflow: "hidden", marginBottom: "10px", border: "1px solid var(--border)" }}>
               <div style={{
                 width: `${packProgressPercent}%`, height: "100%",
-                background: "linear-gradient(90deg, #2563eb, #22c55e)",
-                transition: "width 0.3s ease"
+                background: "var(--primary)",
+                transition: "width 0.3s var(--ease-out)"
               }} />
             </div>
-            <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>
+            <span className="tabular-nums" style={{ fontSize: "12px", color: "var(--accent-ink)", fontWeight: 600 }}>
               {packProgressPercent}%
             </span>
           </div>
@@ -571,18 +603,19 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
       {showPackSuccessToast && (
         <div style={{
           position: "fixed", bottom: "20px", left: "50%", transform: "translateX(-50%)",
-          background: "#166534", color: "#fff", padding: "12px 20px", borderRadius: "12px",
-          display: "flex", alignItems: "center", gap: "10px", zIndex: 999999,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.5)", direction: "rtl", fontSize: "13px", fontWeight: "bold"
+          background: "#065f46", border: "1px solid rgba(16, 185, 129, 0.45)", color: "#ffffff",
+          padding: "12px 18px", borderRadius: "12px",
+          display: "flex", alignItems: "center", gap: "8px", zIndex: 999999,
+          direction: "rtl", fontSize: "13px", fontWeight: 500, maxWidth: "90vw"
         }}>
-          <CheckCircle2 size={18} />
-          <span>تم حفظ كافة بياناتك وطلابك على الهاتف بنجاح! التطبيق جاهز للعمل بدون نت 0ms.</span>
+          <CheckCircle2 size={18} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+          <span>تم حفظ كافة بياناتك وطلابك على الهاتف بنجاح. التطبيق جاهز للعمل بدون إنترنت.</span>
         </div>
       )}
 
       {courses.map(course => (
-        <div 
-          key={course.id} 
+        <div
+          key={course.id}
           onClick={() => router.push(`/course/${course.id}`)}
           onMouseEnter={() => {
             router.prefetch(`/course/${course.id}`);
@@ -594,18 +627,18 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
             router.prefetch(`/course/${course.id}/attendance`);
             router.prefetch(`/course/${course.id}/evaluations`);
           }}
-          style={{ 
-            background: "var(--surface)", 
-            padding: "11px 14px", 
-            borderRadius: "12px", 
-            border: "1px solid var(--border)", 
-            borderRight: "5px solid var(--primary)", 
-            display: "flex", 
-            justifyContent: "space-between", 
+          style={{
+            background: "var(--surface)",
+            padding: "12px 14px",
+            borderRadius: "12px",
+            border: "1px solid var(--border)",
+            borderRight: "4px solid var(--primary)",
+            display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            gap: "10px",
+            gap: "12px",
             cursor: "pointer",
-            transition: "all 0.2s ease",
+            transition: "border-color 0.15s var(--ease-out), background 0.15s var(--ease-out)",
             position: "relative",
             boxSizing: "border-box"
           }}
@@ -613,24 +646,24 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
           <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
             {/* السطر الأول: اسم المقرر + شارة المشاركة الذكية */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <h3 style={{ margin: 0, color: "#fff", fontSize: "15px", fontWeight: "bold", wordBreak: "break-word" }}>
+              <h3 style={{ margin: 0, color: "var(--text)", fontSize: "15px", fontWeight: 600, wordBreak: "break-word" }}>
                 {course.name}
               </h3>
               {course.shared_with && course.shared_with.length > 0 && (
-                <span 
+                <span
                   title={`مقرر مشترك مع: ${
-                    course.teacher_id === user.id 
+                    course.teacher_id === user.id
                     ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join("، ")
                     : (profilesMap[course.teacher_id] || "الزميل")
                   }`}
-                  style={{ 
-                    fontSize: "11px", 
-                    background: "rgba(16, 185, 129, 0.15)", 
-                    border: "1px solid rgba(16, 185, 129, 0.35)", 
-                    color: "#34d399", 
-                    padding: "2px 7px", 
-                    borderRadius: "6px", 
-                    fontWeight: "500",
+                  style={{
+                    fontSize: "11px",
+                    background: "rgba(16, 185, 129, 0.12)",
+                    border: "1px solid rgba(16, 185, 129, 0.3)",
+                    color: "var(--success-ink)",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    fontWeight: 500,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "4px",
@@ -640,10 +673,10 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
                     whiteSpace: "nowrap"
                   }}
                 >
-                  <span>🤝</span>
+                  <Users size={12} strokeWidth={1.5} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     مشترك: {
-                      course.teacher_id === user.id 
+                      course.teacher_id === user.id
                       ? course.shared_with.map((id: string) => profilesMap[id] || "زميل").join("، ")
                       : (profilesMap[course.teacher_id] || "الزميل")
                     }
@@ -653,223 +686,256 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
             </div>
 
             {/* السطر الثاني: الفرقة والسكاشن + تاريخ التسجيل الصغير بالأرقام */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "12px", color: "var(--text-muted)", lineHeight: 1.4 }}>
+            <div className="tabular-nums" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
               <span>الفرقة {course.academic_year}</span>
-              <span style={{ opacity: 0.4 }}>•</span>
+              <span style={{ color: "var(--text-muted)" }}>•</span>
               <span>{course.course_type === "lectures" ? "محاضرات" : `سكاشن: ${Array.isArray(course.sections) ? course.sections.join(", ") : course.sections || "عام"}`}</span>
               {course.created_at && (
                 <>
-                  <span style={{ opacity: 0.4 }}>•</span>
-                  <span 
+                  <span style={{ color: "var(--text-muted)" }}>•</span>
+                  <span
                     title="تاريخ إنشاء المقرر"
-                    style={{ 
-                      fontSize: "10.5px", 
-                      color: "#94a3b8", 
-                      background: "rgba(255, 255, 255, 0.05)", 
-                      padding: "1px 6px", 
-                      borderRadius: "4px", 
-                      fontFamily: "monospace", 
+                    className="tabular-nums"
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--text-muted)",
+                      background: "var(--bg-deep)",
+                      border: "1px solid var(--border)",
+                      padding: "1px 6px",
+                      borderRadius: "4px",
                       direction: "ltr",
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: "3px"
+                      gap: "4px"
                     }}
                   >
-                    <span>📅</span>
+                    <Calendar size={11} strokeWidth={1.5} />
                     <span>{formatCourseDate(course.created_at)}</span>
                   </span>
                 </>
               )}
             </div>
           </div>
-          
+
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-            
+
             {course.custom_week_names?.__pinned_attendance && (
-              <span 
+              <button
+                type="button"
+                className="btn-compact"
                 onClick={(e) => {
                   e.stopPropagation();
                   router.push(`/course/${course.id}/attendance?mode=camera`);
                 }}
-                style={{ 
-                  width: "34px", 
-                  height: "34px", 
-                  cursor: "pointer", 
-                  background: "rgba(16, 185, 129, 0.15)", 
-                  border: "1px solid rgba(16, 185, 129, 0.4)", 
-                  borderRadius: "8px", 
-                  display: "flex", 
-                  alignItems: "center", 
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  padding: 0,
+                  cursor: "pointer",
+                  background: "rgba(16, 185, 129, 0.14)",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
-                  color: "#34d399",
-                  transition: "all 0.15s ease",
-                  flexShrink: 0
+                  color: "var(--success-ink)",
+                  transition: "background 0.15s var(--ease-out)",
+                  flexShrink: 0,
+                  margin: 0
                 }}
                 title="تسجيل الحضور السريع بالكاميرا"
               >
-                <Camera size={17} />
-              </span>
+                <Camera size={16} strokeWidth={1.5} />
+              </button>
             )}
-            
+
             <div style={{ position: "relative" }}>
-              <span 
+              <button
+                type="button"
+                className="btn-compact"
                 onClick={(e) => handleMenuClick(e, course.id)}
-                style={{ 
-                  width: "30px", 
-                  height: "34px", 
-                  color: "var(--text-muted)", 
-                  cursor: "pointer", 
-                  display: "flex", 
-                  alignItems: "center", 
+                style={{
+                  width: "32px",
+                  height: "34px",
+                  padding: 0,
+                  background: activeMenuId === course.id ? "var(--surface-hover)" : "transparent",
+                  border: "1px solid transparent",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
-                  position: "relative", 
+                  position: "relative",
                   zIndex: activeMenuId === course.id ? 101 : 1,
-                  borderRadius: "6px"
+                  borderRadius: "8px",
+                  margin: 0
                 }}
                 title="خيارات المقرر"
               >
-                <MoreVertical size={18} />
-              </span>
-              
+                <MoreVertical size={18} strokeWidth={1.5} />
+              </button>
+
               {activeMenuId === course.id && (
                 <>
-                  <div 
+                  <div
                     onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); }}
-                    style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+                    style={{ position: "fixed", inset: 0, zIndex: 99 }}
                   />
-                  <div 
+                  <div
                     style={{
                       position: "absolute",
-                      top: "35px",
+                      top: "38px",
                       left: "0",
-                      background: "#2a2a2a",
-                      border: "1px solid #444",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+                      background: "var(--surface)",
+                      border: "1px solid var(--border-light)",
+                      borderRadius: "10px",
                       zIndex: 100,
-                      width: "170px",
+                      width: "196px",
                       overflow: "hidden"
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                  <div 
-                    onClick={(e) => openRenameModal(e, course)}
-                    style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
-                    onMouseOver={(e) => e.currentTarget.style.background = "#333"}
-                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    ✏️ تعديل اسم المقرر
-                  </div>
-                  <div 
-                    onClick={(e) => togglePinAttendance(e, course)}
-                    style={{ padding: "12px 15px", cursor: "pointer", borderBottom: "1px solid #333", fontSize: "13px", color: "#fff" }}
-                    onMouseOver={(e) => e.currentTarget.style.background = "#333"}
-                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    {course.custom_week_names?.__pinned_attendance ? "📌 إلغاء الكاميرا" : "📷 تثبيت زر الحضور"}
-                  </div>
-                  <div 
-                    onClick={(e) => openDeleteModal(e, course)}
-                    style={{ padding: "12px 15px", cursor: "pointer", fontSize: "13px", color: "#f44336" }}
-                    onMouseOver={(e) => e.currentTarget.style.background = "#3a2020"}
-                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    🗑️ حذف المقرر
-                  </div>
-                  <div 
-                    onClick={(e) => {
-                       e.stopPropagation();
-                       setCourseToShare(course);
-                       setActiveMenuId(null);
-                    }}
-                    style={{ padding: "12px 15px", cursor: "pointer", borderTop: "1px solid #333", fontSize: "13px", color: "#4CAF50" }}
-                    onMouseOver={(e) => e.currentTarget.style.background = "#2a3b2c"}
-                    onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-                  >
-                    🤝 طلب مشاركة المقرر مع زميل
-                  </div>
+                    <div
+                      onClick={(e) => openRenameModal(e, course)}
+                      style={{ padding: "11px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: "13px", color: "var(--text)", display: "flex", alignItems: "center", gap: "8px", fontWeight: 500 }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "var(--surface-hover)"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <Edit3 size={14} strokeWidth={1.5} color="var(--accent-ink)" />
+                      <span>تعديل اسم المقرر</span>
+                    </div>
+                    <div
+                      onClick={(e) => togglePinAttendance(e, course)}
+                      style={{ padding: "11px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: "13px", color: "var(--text)", display: "flex", alignItems: "center", gap: "8px", fontWeight: 500 }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "var(--surface-hover)"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      {course.custom_week_names?.__pinned_attendance ? (
+                        <>
+                          <PinOff size={14} strokeWidth={1.5} color="var(--warning-ink)" />
+                          <span>إلغاء زر الكاميرا</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera size={14} strokeWidth={1.5} color="var(--success-ink)" />
+                          <span>تثبيت زر الحضور</span>
+                        </>
+                      )}
+                    </div>
+                    <div
+                      onClick={(e) => openDeleteModal(e, course)}
+                      style={{ padding: "11px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)", fontSize: "13px", color: "var(--error-ink)", display: "flex", alignItems: "center", gap: "8px", fontWeight: 500 }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <Trash2 size={14} strokeWidth={1.5} />
+                      <span>حذف المقرر</span>
+                    </div>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCourseToShare(course);
+                        setActiveMenuId(null);
+                      }}
+                      style={{ padding: "11px 14px", cursor: "pointer", fontSize: "13px", color: "var(--success-ink)", display: "flex", alignItems: "center", gap: "8px", fontWeight: 500 }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "rgba(16, 185, 129, 0.1)"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <Users size={14} strokeWidth={1.5} />
+                      <span>طلب مشاركة مع زميل</span>
+                    </div>
                   </div>
                 </>
               )}
             </div>
-            
+
           </div>
         </div>
       ))}
-      
+
       {/* Rename Modal */}
       {courseToRename && (
         <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+          position: "fixed", inset: 0,
+          background: "rgba(0, 0, 0, 0.72)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
         }} onClick={() => setCourseToRename(null)}>
-          <div style={{ background: "#222", padding: "20px", borderRadius: "15px", width: "90%", maxWidth: "350px", border: "1px solid #444" }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 15px 0", color: "#fff" }}>تعديل اسم المقرر</h3>
-            <input 
-              type="text" 
+          <div style={{ background: "var(--surface)", padding: "20px", borderRadius: "16px", width: "100%", maxWidth: "360px", border: "1px solid var(--border-light)", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 14px 0", color: "var(--text)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Edit3 size={17} strokeWidth={1.5} color="var(--accent-ink)" />
+              <span>تعديل اسم المقرر</span>
+            </h3>
+            <input
+              type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #555", background: "#111", color: "#fff", marginBottom: "20px" }}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border-light)", background: "var(--bg-deep)", color: "var(--text)", marginBottom: "16px", fontSize: "14px", boxSizing: "border-box", outline: "none" }}
               autoFocus
             />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button 
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
                 onClick={handleRenameSubmit}
-                style={{ flex: 1, padding: "10px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                style={{ flex: 1, padding: "10px", background: "var(--primary)", color: "#ffffff", border: "1px solid var(--primary)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
               >حفظ التعديل</button>
-              <button 
+              <button
+                type="button"
                 onClick={() => setCourseToRename(null)}
-                style={{ flex: 1, padding: "10px", background: "#444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                style={{ flex: 1, padding: "10px", background: "var(--surface-hover)", color: "var(--text-secondary)", border: "1px solid var(--border-light)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
               >إلغاء</button>
             </div>
           </div>
         </div>
       )}
-      
+
       {/* Delete/Archive Modal */}
       {courseToDelete && (
         <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.8)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+          position: "fixed", inset: 0,
+          background: "rgba(0, 0, 0, 0.78)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
         }} onClick={() => setCourseToDelete(null)}>
-          <div style={{ background: "#222", padding: "25px", borderRadius: "15px", width: "90%", maxWidth: "350px", border: "1px solid #555", textAlign: "center" }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: "40px", marginBottom: "10px" }}>⚠️</div>
-            <h3 style={{ margin: "0 0 10px 0", color: "#fff" }}>تحذير!</h3>
-            <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "25px", lineHeight: "1.5" }}>
+          <div style={{ background: "var(--surface)", padding: "24px", borderRadius: "16px", width: "100%", maxWidth: "360px", border: "1px solid var(--border-light)", textAlign: "center", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.3)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--warning-ink)", marginBottom: "12px" }}>
+              <AlertTriangle size={22} strokeWidth={1.5} />
+            </div>
+            <h3 style={{ margin: "0 0 8px 0", color: "var(--text)", fontSize: "16px", fontWeight: 600 }}>تأكيد حذف المقرر</h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", margin: "0 0 20px 0", lineHeight: 1.6 }}>
               هذا المقرر قد يحتوي على بيانات طلاب وكشوف غياب ومشاريع. هل أنت متأكد من رغبتك في حذفه؟
             </p>
-            
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {courseToDelete.teacher_id === user.id ? (
-                // Owner
                 courseToDelete.shared_with && courseToDelete.shared_with.length > 0 ? (
                   <>
-                    <button 
+                    <button
+                      type="button"
                       onClick={handleDeleteForMeOnly}
-                      style={{ width: "100%", padding: "12px", background: "#FF9800", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                      style={{ width: "100%", padding: "11px", background: "var(--warning)", color: "#ffffff", border: "1px solid var(--warning)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
                     >حذف لدي فقط (يبقى للزملاء)</button>
-                    <button 
+                    <button
+                      type="button"
                       onClick={handleArchiveGlobal}
-                      style={{ width: "100%", padding: "12px", background: "#f44336", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                      style={{ width: "100%", padding: "11px", background: "var(--error)", color: "#ffffff", border: "1px solid var(--error)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
                     >حذف عند الجميع (نقل للأرشيف)</button>
                   </>
                 ) : (
-                  <button 
+                  <button
+                    type="button"
                     onClick={handleArchiveGlobal}
-                    style={{ width: "100%", padding: "12px", background: "#f44336", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                    style={{ width: "100%", padding: "11px", background: "var(--error)", color: "#ffffff", border: "1px solid var(--error)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
                   >حذف المقرر (نقل للأرشيف)</button>
                 )
               ) : (
-                // Colleague
-                <button 
+                <button
+                  type="button"
                   onClick={handleLeaveCourse}
-                  style={{ width: "100%", padding: "12px", background: "#FF9800", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}
+                  style={{ width: "100%", padding: "11px", background: "var(--warning)", color: "#ffffff", border: "1px solid var(--warning)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
                 >حذف من قائمتي (انسحاب من المقرر)</button>
               )}
 
-              <button 
+              <button
+                type="button"
                 onClick={() => setCourseToDelete(null)}
-                style={{ width: "100%", padding: "10px", background: "transparent", color: "#aaa", border: "none", cursor: "pointer", marginTop: "10px" }}
+                style={{ width: "100%", padding: "10px", background: "var(--surface-hover)", color: "var(--text-secondary)", border: "1px solid var(--border-light)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", marginTop: "4px", marginBottom: 0 }}
               >تراجع وإلغاء</button>
             </div>
           </div>
@@ -879,31 +945,36 @@ export default function CoursesList({ user, refreshTrigger }: CoursesListProps) 
       {/* Share Modal */}
       {courseToShare && (
         <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center"
+          position: "fixed", inset: 0,
+          background: "rgba(0, 0, 0, 0.72)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: "16px"
         }} onClick={() => setCourseToShare(null)}>
-          <div style={{ background: "#222", padding: "20px", borderRadius: "15px", width: "90%", maxWidth: "350px", border: "1px solid #4CAF50" }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 15px 0", color: "#4CAF50" }}>🤝 طلب مشاركة المقرر مع زميل</h3>
-            <p style={{ fontSize: "13px", color: "#aaa", marginBottom: "15px", lineHeight: "1.5" }}>
+          <div style={{ background: "var(--surface)", padding: "20px", borderRadius: "16px", width: "100%", maxWidth: "360px", border: "1px solid var(--border-light)", boxSizing: "border-box" }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 10px 0", color: "var(--success-ink)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Users size={18} strokeWidth={1.5} />
+              <span>طلب مشاركة المقرر مع زميل</span>
+            </h3>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: "0 0 14px 0", lineHeight: 1.6 }}>
               سيتم إرسال الطلب للمطور لإضافة الزميل للمقرر. بعد الإضافة، سيتمكن كلاكما من إدارة نفس المقرر بكل بياناته.
             </p>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={colleagueName}
               onChange={(e) => setColleagueName(e.target.value)}
               placeholder="اكتب اسم الزميل هنا..."
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #555", background: "#111", color: "#fff", marginBottom: "20px" }}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--border-light)", background: "var(--bg-deep)", color: "var(--text)", marginBottom: "16px", fontSize: "13px", boxSizing: "border-box", outline: "none" }}
               autoFocus
             />
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button 
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
                 onClick={handleShareSubmit}
                 disabled={isSharing}
-                style={{ flex: 1, padding: "10px", background: "#4CAF50", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", opacity: isSharing ? 0.7 : 1 }}
+                style={{ flex: 1, padding: "10px", background: "var(--success)", color: "#ffffff", border: "1px solid var(--success)", borderRadius: "8px", cursor: isSharing ? "not-allowed" : "pointer", fontWeight: 500, fontSize: "13px", opacity: isSharing ? 0.7 : 1, margin: 0 }}
               >{isSharing ? "جاري الإرسال..." : "إرسال الطلب"}</button>
-              <button 
+              <button
+                type="button"
                 onClick={() => setCourseToShare(null)}
-                style={{ flex: 1, padding: "10px", background: "#444", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                style={{ flex: 1, padding: "10px", background: "var(--surface-hover)", color: "var(--text-secondary)", border: "1px solid var(--border-light)", borderRadius: "8px", cursor: "pointer", fontWeight: 500, fontSize: "13px", margin: 0 }}
               >إلغاء</button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/core/supabase";
 import NotificationsModal from "@/components/layout/NotificationsModal";
 import { getTermAndWeekInfo } from "@/lib/core/termHelper";
+import { User, Bell, Settings, Calendar } from "lucide-react";
 
 interface AppBarProps {
   user: any;
@@ -101,35 +102,35 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          padding: "14px 20px",
-          background: "rgba(0,0,0,0.5)",
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          padding: "12px 20px",
+          background: "var(--bg-deep)",
+          borderBottom: "1px solid var(--border)",
           direction: "rtl",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
         }}
       >
         {/* Right: Profile Button */}
         <div style={{ flex: 1, display: "flex", justifyContent: "flex-start", overflow: "hidden" }}>
           <button
             onClick={onOpenProfile}
+            className="btn-compact"
             style={{
-              background: "rgba(33, 150, 243, 0.15)",
-              border: "1px solid rgba(33, 150, 243, 0.3)",
-              color: "white",
-              padding: "8px 14px",
-              borderRadius: "25px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              color: "var(--text)",
+              padding: "8px 12px",
+              borderRadius: "8px",
               fontSize: "13px",
-              fontWeight: "bold",
-              display: "flex",
+              fontWeight: 500,
+              display: "inline-flex",
               alignItems: "center",
               gap: "8px",
               cursor: "pointer",
               margin: 0,
               maxWidth: "100%",
-              transition: "all 0.3s ease",
+              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), border-color 150ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
-            <span style={{ fontSize: "16px" }}>👤</span> 
+            <User size={16} strokeWidth={1.5} style={{ color: "var(--accent-ink)", flexShrink: 0 }} />
             <span style={{ 
               whiteSpace: "nowrap", 
               overflow: "hidden", 
@@ -141,67 +142,67 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
         </div>
 
         {/* Center: Live Clock, Connection Status & Developer Stamp */}
-        <div style={{ flex: 1.5, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 5px" }}>
-          <div style={{ fontSize: "15px", fontWeight: "bold", color: "#4CAF50", fontFamily: "monospace", letterSpacing: "1px", whiteSpace: "nowrap" }}>
+        <div style={{ flex: 1.5, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 8px" }}>
+          <div className="tabular-nums" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap" }}>
             {timeStr}
           </div>
-          <div style={{ fontSize: "10px", color: "#ccc", marginTop: "2px", whiteSpace: "nowrap" }}>
+          <div className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px", whiteSpace: "nowrap" }}>
             {dateStr}
           </div>
 
-          {/* Elegant Connection Status Badge (شارة الاتصال الأنيقة) */}
           <div 
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "6px",
               marginTop: "4px",
-              background: isOnline ? "rgba(76, 175, 80, 0.12)" : "rgba(244, 67, 54, 0.16)",
-              border: `1px solid ${isOnline ? "rgba(76, 175, 80, 0.3)" : "rgba(244, 67, 54, 0.4)"}`,
-              padding: "2px 10px",
-              borderRadius: "12px",
-              fontSize: "10px",
-              color: isOnline ? "#81C784" : "#EF5350",
-              fontWeight: "bold",
-              transition: "all 0.3s ease",
-              boxShadow: isOnline ? "0 0 8px rgba(76, 175, 80, 0.15)" : "0 0 8px rgba(244, 67, 54, 0.25)"
+              background: isOnline ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.12)",
+              border: `1px solid ${isOnline ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.3)"}`,
+              padding: "2px 8px",
+              borderRadius: "6px",
+              fontSize: "11px",
+              color: isOnline ? "var(--success-ink)" : "var(--error-ink)",
+              fontWeight: 500,
+              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), border-color 150ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
-            title={isOnline ? "أنت متصل بالإنترنت، البيانات متزامنة" : "أنت غير متصل، التطبيق يعمل بكفاءة في وضع عدم الاتصال"}
+            title={isOnline ? "أنت متصل بالإنترنت، البيانات متزامنة" : "أنت غير متصل، التطبيق يعمل في وضع عدم الاتصال"}
           >
             <span style={{
               width: "6px",
               height: "6px",
               borderRadius: "50%",
-              background: isOnline ? "#4CAF50" : "#F44336",
-              boxShadow: isOnline ? "0 0 6px #4CAF50" : "0 0 6px #F44336",
+              background: isOnline ? "var(--success)" : "var(--error)",
               display: "inline-block"
             }} />
-            <span>{isOnline ? "متصل بالإنترنت" : "غير متصل (أوفلاين)"}</span>
+            <span>{isOnline ? "متصل" : "غير متصل"}</span>
           </div>
 
-          <div style={{ fontSize: "8px", color: "#777", marginTop: "3px", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "4px", whiteSpace: "nowrap" }}>
             مطور النظام: د/ إسلام عبد اللطيف
           </div>
         </div>
 
         {/* Left: Settings Button & Notifications */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+        <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: "8px" }}>
           <button
             onClick={() => { setIsNotificationsOpen(true); setUnreadCount(0); }}
+            className="icon-btn"
+            aria-label="الإشعارات"
             style={{
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "#e0e0e0",
-              padding: "8px",
-              borderRadius: "50%",
-              fontSize: "16px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              color: "var(--text-secondary)",
+              width: "36px",
+              height: "36px",
+              padding: "0",
+              borderRadius: "8px",
               cursor: "pointer",
               position: "relative"
             }}
           >
-            🔔
+            <Bell size={16} strokeWidth={1.5} />
             {unreadCount > 0 && (
-              <span style={{ position: "absolute", top: "-2px", right: "-2px", background: "#f44336", color: "#fff", fontSize: "10px", width: "16px", height: "16px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>
+              <span className="tabular-nums" style={{ position: "absolute", top: "-4px", right: "-4px", background: "var(--error)", color: "#fff", fontSize: "10px", minWidth: "16px", height: "16px", padding: "0 4px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600 }}>
                 {unreadCount}
               </span>
             )}
@@ -209,60 +210,60 @@ export default function AppBar({ user, onOpenSettings, onOpenProfile, refreshTri
 
           <button
             onClick={onOpenSettings}
+            className="btn-compact"
             style={{
-              background: "rgba(255, 255, 255, 0.05)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-              color: "#e0e0e0",
-              padding: "8px 14px",
-              borderRadius: "25px",
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              color: "var(--text)",
+              padding: "8px 12px",
+              height: "36px",
+              borderRadius: "8px",
               fontSize: "13px",
-              fontWeight: "bold",
-              display: "flex",
+              fontWeight: 500,
+              display: "inline-flex",
               alignItems: "center",
               gap: "8px",
               cursor: "pointer",
               margin: 0,
-              transition: "all 0.3s ease",
+              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), border-color 150ms cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           >
-            <span style={{ fontSize: "16px" }}>⚙️</span> 
-            <span className="hide-on-mobile">إعدادات</span>
+            <Settings size={16} strokeWidth={1.5} style={{ color: "var(--text-secondary)" }} />
+            <span className="hide-on-mobile">الإعدادات</span>
           </button>
         </div>
       </div>
 
-      {/* Elegant Term Bar (شريط الترم الأنيق) */}
+      {/* Term Bar */}
       {termStr && (
         <div
           style={{
             width: "100%",
-            background: "linear-gradient(90deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-            padding: "7px 20px",
+            background: "var(--surface)",
+            borderBottom: "1px solid var(--border)",
+            padding: "8px 20px",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
             direction: "rtl",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
           }}
         >
           <div
+            className="tabular-nums"
             style={{
-              background: "rgba(76, 175, 80, 0.12)",
-              color: "#81C784",
-              border: "1px solid rgba(76, 175, 80, 0.3)",
-              padding: "4px 18px",
-              borderRadius: "20px",
+              background: "rgba(16, 185, 129, 0.1)",
+              color: "var(--success-ink)",
+              border: "1px solid rgba(16, 185, 129, 0.22)",
+              padding: "4px 12px",
+              borderRadius: "6px",
               fontSize: "12px",
-              fontWeight: "bold",
-              display: "flex",
+              fontWeight: 500,
+              display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-              letterSpacing: "0.3px",
             }}
           >
-            <span>📅</span>
+            <Calendar size={14} strokeWidth={1.5} />
             <span>{termStr}</span>
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
-import { X, Search } from "lucide-react";
+import { X, Search, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { extractStudentCode } from "@/lib/students/codeHelper";
 import { initScannerAudio } from "@/lib/courses/audioHelper";
 
@@ -87,7 +87,7 @@ export default function QRScanner({
     // Fallback feedback only if parent didn't provide custom status
     if (!parentStatus) {
       setInternalStatus("success");
-      setInternalStatusText(`تم الرصد: ${cleanCode} ✅`);
+      setInternalStatusText(`تم الرصد: ${cleanCode}`);
     }
 
     // Call consumer callback to validate and trigger exact vibration pattern
@@ -264,16 +264,16 @@ export default function QRScanner({
 
   // Visual reticle styling based on status
   const borderColor = currentStatus === "success" 
-    ? "#10b981" 
+    ? "var(--success)" 
     : currentStatus === "error" 
-    ? "#ef4444" 
-    : "#38bdf8";
+    ? "var(--error)" 
+    : "var(--accent-ink)";
 
   const glowShadow = currentStatus === "success"
-    ? "0 0 25px rgba(16, 185, 129, 0.7), 0 0 0 4000px rgba(0, 0, 0, 0.55)"
+    ? "0 0 0 4000px rgba(0, 0, 0, 0.55)"
     : currentStatus === "error"
-    ? "0 0 25px rgba(239, 68, 68, 0.7), 0 0 0 4000px rgba(0, 0, 0, 0.55)"
-    : "0 0 15px rgba(56, 189, 248, 0.4), 0 0 0 4000px rgba(0, 0, 0, 0.5)";
+    ? "0 0 0 4000px rgba(0, 0, 0, 0.55)"
+    : "0 0 0 4000px rgba(0, 0, 0, 0.5)";
 
   return (
     <div style={{ position: "relative", width: "100%", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -284,9 +284,10 @@ export default function QRScanner({
           width: "100%",
           height: height,
           minHeight: "260px",
-          background: "#05070c",
+          background: "var(--bg-deep)",
           overflow: "hidden",
-          borderRadius: "16px",
+          borderRadius: "12px",
+          border: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center"
@@ -318,7 +319,7 @@ export default function QRScanner({
 
         {/* Camera Error Message */}
         {cameraError && (
-          <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", padding: "16px", background: "rgba(239, 68, 68, 0.9)", color: "#fff", borderRadius: "12px", fontSize: "13px", fontWeight: "bold", textAlign: "center", maxWidth: "85%", zIndex: 30 }}>
+          <div style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", padding: "14px 16px", background: "rgba(239, 68, 68, 0.92)", color: "#fff", borderRadius: "8px", fontSize: "13px", fontWeight: 500, textAlign: "center", maxWidth: "85%", zIndex: 30, border: "1px solid var(--error)" }}>
             {cameraError}
           </div>
         )}
@@ -339,7 +340,7 @@ export default function QRScanner({
             }}
           >
             {title && !title.includes("بطاقة") && !title.includes("ماسح بطاقة") && (
-              <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold", background: "rgba(0,0,0,0.6)", padding: "4px 10px", borderRadius: "8px", backdropFilter: "blur(4px)" }}>
+              <span style={{ color: "#fff", fontSize: "12px", fontWeight: 600, background: "rgba(7, 11, 20, 0.85)", border: "1px solid var(--border)", padding: "4px 10px", borderRadius: "6px" }}>
                 {title}
               </span>
             )}
@@ -349,12 +350,13 @@ export default function QRScanner({
                 type="button"
                 onClick={onClose}
                 title="إغلاق الكاميرا"
+                aria-label="إغلاق الكاميرا"
                 style={{
                   width: "36px",
                   height: "36px",
-                  borderRadius: "10px",
-                  background: "rgba(239, 68, 68, 0.8)",
-                  border: "none",
+                  borderRadius: "8px",
+                  background: "rgba(239, 68, 68, 0.9)",
+                  border: "1px solid rgba(255,255,255,0.15)",
                   color: "#fff",
                   display: "flex",
                   alignItems: "center",
@@ -362,7 +364,7 @@ export default function QRScanner({
                   cursor: "pointer"
                 }}
               >
-                <X size={18} />
+                <X size={18} strokeWidth={1.5} />
               </button>
             )}
           </div>
@@ -378,17 +380,17 @@ export default function QRScanner({
             width: compact ? "180px" : "230px",
             height: compact ? "180px" : "230px",
             border: `2px solid ${borderColor}`,
-            borderRadius: "18px",
+            borderRadius: "12px",
             pointerEvents: "none",
             boxShadow: glowShadow,
-            transition: "all 0.22s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "border-color 0.2s ease, transform 0.2s ease",
             zIndex: 15
           }}
         >
-          <div style={{ position: "absolute", top: "-2px", left: "-2px", width: "24px", height: "24px", borderTop: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderTopLeftRadius: "14px", transition: "border-color 0.2s" }} />
-          <div style={{ position: "absolute", top: "-2px", right: "-2px", width: "24px", height: "24px", borderTop: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderTopRightRadius: "14px", transition: "border-color 0.2s" }} />
-          <div style={{ position: "absolute", bottom: "-2px", left: "-2px", width: "24px", height: "24px", borderBottom: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderBottomLeftRadius: "14px", transition: "border-color 0.2s" }} />
-          <div style={{ position: "absolute", bottom: "-2px", right: "-2px", width: "24px", height: "24px", borderBottom: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderBottomRightRadius: "14px", transition: "border-color 0.2s" }} />
+          <div style={{ position: "absolute", top: "-2px", left: "-2px", width: "24px", height: "24px", borderTop: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderTopLeftRadius: "10px", transition: "border-color 0.2s" }} />
+          <div style={{ position: "absolute", top: "-2px", right: "-2px", width: "24px", height: "24px", borderTop: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderTopRightRadius: "10px", transition: "border-color 0.2s" }} />
+          <div style={{ position: "absolute", bottom: "-2px", left: "-2px", width: "24px", height: "24px", borderBottom: `4px solid ${borderColor}`, borderLeft: `4px solid ${borderColor}`, borderBottomLeftRadius: "10px", transition: "border-color 0.2s" }} />
+          <div style={{ position: "absolute", bottom: "-2px", right: "-2px", width: "24px", height: "24px", borderBottom: `4px solid ${borderColor}`, borderRight: `4px solid ${borderColor}`, borderBottomRightRadius: "10px", transition: "border-color 0.2s" }} />
 
           {/* Laser sweep */}
           {!isBusy && currentStatus !== "success" && (
@@ -398,8 +400,8 @@ export default function QRScanner({
                 left: "8px",
                 right: "8px",
                 height: "2px",
-                background: "linear-gradient(90deg, transparent, #38bdf8, #fff, #38bdf8, transparent)",
-                boxShadow: "0 0 10px #38bdf8",
+                background: "var(--accent-ink)",
+                opacity: 0.85,
                 animation: "laserSweep 2s ease-in-out infinite"
               }}
             />
@@ -417,25 +419,39 @@ export default function QRScanner({
                 : currentStatus === "error"
                 ? "rgba(239, 68, 68, 0.95)"
                 : isBusy
-                ? "rgba(245, 158, 11, 0.9)"
-                : "rgba(15, 23, 42, 0.85)",
-              backdropFilter: "blur(8px)",
+                ? "rgba(245, 158, 11, 0.92)"
+                : "rgba(15, 23, 42, 0.92)",
               color: "#fff",
-              padding: "7px 18px",
-              borderRadius: "20px",
+              padding: "6px 14px",
+              borderRadius: "8px",
               fontSize: "12px",
-              fontWeight: "bold",
+              fontWeight: 600,
               zIndex: 20,
-              boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
-              border: `1px solid ${currentStatus === "success" ? "#34d399" : currentStatus === "error" ? "#f87171" : "rgba(255,255,255,0.15)"}`,
-              transition: "all 0.2s ease"
+              border: `1px solid ${currentStatus === "success" ? "var(--success-ink)" : currentStatus === "error" ? "var(--error-ink)" : "var(--border-light)"}`,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "background-color 0.2s ease, border-color 0.2s ease"
             }}
           >
-            {isBusy
-              ? "جاري المعالجة والفحص... ⏳"
-              : currentStatusText || (currentStatus === "success"
-                ? "تم الرصد بنجاح! ✅"
-                : "كود غير صالح ❌")}
+            {isBusy ? (
+              <>
+                <Clock size={14} strokeWidth={1.5} />
+                <span>جاري المعالجة والفحص...</span>
+              </>
+            ) : currentStatus === "success" ? (
+              <>
+                <CheckCircle2 size={14} strokeWidth={1.5} />
+                <span>{currentStatusText || "تم الرصد بنجاح"}</span>
+              </>
+            ) : currentStatus === "error" ? (
+              <>
+                <XCircle size={14} strokeWidth={1.5} />
+                <span>{currentStatusText || "كود غير صالح"}</span>
+              </>
+            ) : (
+              <span>{currentStatusText}</span>
+            )}
           </div>
         )}
       </div>
@@ -446,20 +462,20 @@ export default function QRScanner({
           display: "flex",
           gap: "8px",
           alignItems: "center",
-          background: "#0f172a",
-          border: "1px solid rgba(56, 189, 248, 0.4)",
+          background: "var(--surface)",
+          border: "1px solid var(--border-light)",
           borderRadius: "12px",
           padding: "8px 12px",
           direction: "rtl",
           boxSizing: "border-box",
-          width: "100%",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
+          width: "100%"
         }}
       >
         <input
           ref={manualInputRef}
           type="text"
           inputMode="numeric"
+          className="tabular-nums"
           value={manualCode}
           onChange={e => setManualCode(e.target.value)}
           onKeyDown={handleManualKeyDown}
@@ -471,8 +487,8 @@ export default function QRScanner({
             outline: "none",
             background: "transparent",
             fontSize: "14px",
-            fontWeight: "bold",
-            color: "#ffffff",
+            fontWeight: 500,
+            color: "var(--text-primary)",
             direction: "rtl",
             textAlign: "right",
             minWidth: 0
@@ -490,14 +506,14 @@ export default function QRScanner({
             padding: "7px 16px",
             borderRadius: "8px",
             background: isBusy || !manualCode.trim()
-              ? "rgba(148, 163, 184, 0.25)"
-              : "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+              ? "rgba(148, 163, 184, 0.2)"
+              : "var(--primary)",
             border: "none",
             color: isBusy || !manualCode.trim() ? "#64748b" : "#fff",
             fontSize: "13px",
-            fontWeight: "bold",
+            fontWeight: 600,
             cursor: isBusy || !manualCode.trim() ? "not-allowed" : "pointer",
-            transition: "all 0.2s",
+            transition: "background-color 0.2s",
             whiteSpace: "nowrap",
             flexShrink: 0
           }}

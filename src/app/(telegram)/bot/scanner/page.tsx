@@ -47,24 +47,40 @@ function ScannerContent() {
     }
   };
 
-  if (!init) return <div style={{ color: "#fff", textAlign: "center", padding: "50px" }}>جاري تحميل الكاميرا...</div>;
+  if (!init) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--text-secondary)", display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 16px", fontSize: "14px" }}>
+        جاري تحميل الكاميرا...
+      </div>
+    );
+  }
 
   return (
-    <div style={{ background: "#111", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-      <h2 style={{ color: "#fff", marginBottom: "20px" }}>قم بمسح كود الطالب</h2>
-      <div style={{ width: "92%", maxWidth: "380px", borderRadius: "20px", overflow: "hidden" }}>
+    <div style={{ background: "var(--background)", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px", direction: "rtl" }}>
+      <h2 style={{ color: "var(--text)", fontSize: "18px", fontWeight: 600, margin: "0 0 16px 0" }}>قم بمسح كود الطالب</h2>
+      <div style={{ width: "100%", maxWidth: "380px", borderRadius: "16px", overflow: "hidden", border: "1px solid var(--border-light)", background: "var(--surface)" }}>
         <QRScanner 
           onScan={handleScan} 
           height="320px"
         />
       </div>
-      <p style={{ color: "#aaa", marginTop: "20px", fontSize: "14px", textAlign: "center", padding: "0 20px" }}>
+      <p style={{ color: "var(--text-secondary)", marginTop: "16px", fontSize: "13px", textAlign: "center", padding: "0 16px" }}>
         {crs && proj ? `إضافة عمل لمشروع: ${proj}` : 'البحث العام عن طالب'}
       </p>
       {tg && (
         <button 
           onClick={() => tg.close()} 
-          style={{ marginTop: "30px", background: "#f44336", color: "#fff", border: "none", padding: "12px 24px", borderRadius: "10px", fontSize: "16px" }}
+          style={{
+            marginTop: "24px",
+            background: "rgba(239, 68, 68, 0.14)",
+            color: "var(--error-ink)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            padding: "10px 20px",
+            borderRadius: "8px",
+            fontSize: "14px",
+            fontWeight: 500,
+            cursor: "pointer"
+          }}
         >
           إلغاء وإغلاق
         </button>

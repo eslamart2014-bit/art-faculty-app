@@ -1,6 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
+import {
+  Shield,
+  Bot,
+  SlidersHorizontal,
+  Plus,
+  Archive,
+  Lightbulb,
+  LogOut,
+  Tag,
+} from "lucide-react";
 
 interface SettingsMenuProps {
   isOpen: boolean;
@@ -21,23 +31,21 @@ export default function SettingsMenu({
   onClose,
   user,
   onOpenAdminPanel,
-  onOpenRoster,
   onOpenAdvancedSettings,
   onOpenAddCourse,
   onOpenArchive,
   onOpenSuggestions,
   onOpenStudentPortalHub,
-  onOpenIdentityVerification
 }: SettingsMenuProps) {
   useEffect(() => {
     window.history.pushState({ modal: true }, "");
   }, []);
 
-  const [appVersion, setAppVersion] = useState("1.7");
-  
+  const [appVersion, setAppVersion] = useState("4.0.0");
+
   useEffect(() => {
     if (isOpen) {
-      setAppVersion(localStorage.getItem('appVersion') || "1.7");
+      setAppVersion(localStorage.getItem("appVersion") || "4.0.0");
     }
   }, [isOpen]);
 
@@ -64,9 +72,8 @@ export default function SettingsMenu({
           left: 0,
           width: "100%",
           height: "100%",
-          background: "rgba(0,0,0,0.6)",
+          background: "rgba(6, 9, 15, 0.75)",
           zIndex: 100,
-          backdropFilter: "blur(2px)",
         }}
       />
 
@@ -77,14 +84,15 @@ export default function SettingsMenu({
           bottom: 0,
           left: 0,
           width: "100%",
-          background: "#1e1e1e",
-          borderTop: "1px solid #333",
-          borderRadius: "20px 20px 0 0",
-          padding: "20px",
+          background: "var(--surface)",
+          borderTop: "1px solid var(--border-light)",
+          borderRadius: "16px 16px 0 0",
+          padding: "16px",
           boxSizing: "border-box",
-          boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+          boxShadow: "0 -8px 24px rgba(0, 0, 0, 0.35)",
           zIndex: 200,
-          animation: "slideUp 0.3s ease-out",
+          animation: "slideUp 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+          direction: "rtl",
         }}
       >
         <style>{`
@@ -95,54 +103,76 @@ export default function SettingsMenu({
           .settings-item {
             display: flex;
             align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #333;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 500;
-            color: #fff;
+            color: var(--text);
+            border-radius: 8px;
+            transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+          }
+          .settings-item:hover {
+            background: var(--surface-hover);
+          }
+          .settings-item-icon {
+            width: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            flex-shrink: 0;
           }
         `}</style>
 
         {["مدير", "مدير مساعد"].includes(user?.role) && (
           <div className="settings-item" onClick={() => { onClose(); onOpenAdminPanel(); }}>
-            <span style={{ marginLeft: "10px" }}>🛡️</span> إدارة المستخدمين والتراخيص
+            <span className="settings-item-icon"><Shield size={18} strokeWidth={1.5} /></span>
+            <span>إدارة المستخدمين والتراخيص</span>
           </div>
         )}
 
         {user?.role === "مدير" && (
-          <div 
-            className="settings-item" 
+          <div
+            className="settings-item"
             onClick={() => { onClose(); onOpenStudentPortalHub?.(); }}
-            style={{ color: "#38bdf8", fontWeight: "bold" }}
+            style={{ color: "var(--accent-ink)" }}
           >
-            <span style={{ marginLeft: "10px", fontSize: "18px" }}>🤖</span> إدارة بوت الطلاب والتحكم الأكاديمي
+            <span className="settings-item-icon" style={{ color: "var(--accent-ink)" }}><Bot size={18} strokeWidth={1.5} /></span>
+            <span>إدارة بوت الطلاب والتحكم الأكاديمي</span>
           </div>
         )}
 
         {user?.role === "مدير" && (
           <div className="settings-item" onClick={() => { onClose(); onOpenAdvancedSettings(); }}>
-            <span style={{ marginLeft: "10px" }}>🧩</span> إعدادات متقدمة (المقررات، الكشوف، التواريخ)
+            <span className="settings-item-icon"><SlidersHorizontal size={18} strokeWidth={1.5} /></span>
+            <span>إعدادات متقدمة (المقررات، الكشوف، التواريخ)</span>
           </div>
         )}
 
         <div className="settings-item" onClick={() => { onClose(); onOpenAddCourse(); }}>
-          <span style={{ marginLeft: "10px" }}>➕</span> إضافة مقرر
+          <span className="settings-item-icon"><Plus size={18} strokeWidth={1.5} /></span>
+          <span>إضافة مقرر</span>
         </div>
+
         <div className="settings-item" onClick={() => { onClose(); onOpenArchive(); }}>
-          <span style={{ marginLeft: "10px" }}>🗄️</span> الأرشيف
+          <span className="settings-item-icon"><Archive size={18} strokeWidth={1.5} /></span>
+          <span>الأرشيف</span>
         </div>
 
         <div className="settings-item" onClick={() => { onClose(); onOpenSuggestions(); }}>
-          <span style={{ marginLeft: "10px" }}>💡</span> اقتراحات التطوير
+          <span className="settings-item-icon"><Lightbulb size={18} strokeWidth={1.5} /></span>
+          <span>اقتراحات التطوير</span>
         </div>
 
         <div
           className="settings-item"
           onClick={handleLogout}
-          style={{ color: "#d32f2f", borderTop: "5px solid #333", marginTop: "10px" }}
+          style={{ color: "var(--error-ink)", borderBottom: "none", marginTop: "8px" }}
         >
-          <span style={{ marginLeft: "10px" }}>🚪</span> تسجيل خروج
+          <span className="settings-item-icon" style={{ color: "var(--error-ink)" }}><LogOut size={18} strokeWidth={1.5} /></span>
+          <span>تسجيل خروج</span>
         </div>
 
         <div
@@ -150,15 +180,16 @@ export default function SettingsMenu({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "12px 10px",
-            marginTop: "10px",
-            borderTop: "1px dashed #444",
-            background: "rgba(0,0,0,0.3)",
+            padding: "8px 12px",
+            marginTop: "8px",
+            border: "1px solid var(--border)",
+            background: "var(--bg-deep)",
             borderRadius: "8px",
           }}
         >
-          <div style={{ fontSize: "12px", color: "#888", fontWeight: "bold" }}>
-            📌 الإصدار الحالي: <span style={{ color: "#2196F3" }}>v{appVersion}</span>
+          <div className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-muted)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "8px" }}>
+            <Tag size={14} strokeWidth={1.5} />
+            <span>الإصدار الحالي: <span style={{ color: "var(--accent-ink)" }}>v{appVersion}</span></span>
           </div>
         </div>
       </div>

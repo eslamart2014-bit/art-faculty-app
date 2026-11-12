@@ -122,8 +122,7 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
         position: "fixed",
         inset: 0,
         zIndex: 99999,
-        background: "rgba(0, 0, 0, 0.8)",
-        backdropFilter: "blur(8px)",
+        background: "rgba(6, 9, 15, 0.85)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -133,40 +132,40 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
     >
       <div
         style={{
-          background: "#1e293b",
-          border: "1px solid #334155",
+          background: "var(--surface)",
+          border: "1px solid var(--border-light)",
           borderRadius: "16px",
           width: "100%",
-          maxWidth: "420px",
+          maxWidth: "400px",
           padding: "24px",
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
-          color: "#f8fafc",
+          boxShadow: "0 16px 40px rgba(0, 0, 0, 0.5)",
+          color: "var(--text)",
           textAlign: "center",
         }}
       >
         <div
           style={{
-            width: "56px",
-            height: "56px",
-            background: "rgba(59, 130, 246, 0.15)",
-            border: "1px solid rgba(59, 130, 246, 0.3)",
-            borderRadius: "50%",
+            width: "48px",
+            height: "48px",
+            background: "rgba(37, 99, 235, 0.14)",
+            border: "1px solid rgba(56, 189, 248, 0.28)",
+            borderRadius: "12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 16px",
-            color: "#60a5fa",
+            color: "var(--accent-ink)",
           }}
         >
-          <Lock size={28} />
+          <Lock size={22} strokeWidth={1.5} />
         </div>
 
-        <h3 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: "bold" }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: "17px", fontWeight: 600 }}>
           تأكيد جلسة الدخول
         </h3>
-        <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#94a3b8", lineHeight: "1.5" }}>
-          انتهت صلاحية جلسة تسجيل الدخول للأمان. يرجى إدخال كلمة المرور لمتابعة العمل كـ
-          <strong style={{ color: "#38bdf8", display: "block", marginTop: "4px" }}>
+        <p style={{ margin: "0 0 16px", fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+          انتهت صلاحية جلسة تسجيل الدخول. أدخل كلمة المرور لمتابعة العمل كـ
+          <strong style={{ color: "var(--accent-ink)", display: "block", marginTop: "4px", fontWeight: 600 }}>
             {userName || "عضو الكادر المعتمد"}
           </strong>
         </p>
@@ -174,12 +173,12 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
         {error && (
           <div
             style={{
-              background: "rgba(239, 68, 68, 0.15)",
+              background: "rgba(239, 68, 68, 0.14)",
               border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "10px",
-              padding: "10px",
-              marginBottom: "14px",
-              color: "#fca5a5",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              marginBottom: "12px",
+              color: "var(--error-ink)",
               fontSize: "12px",
               display: "flex",
               alignItems: "center",
@@ -187,14 +186,14 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
               textAlign: "right",
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <AlertCircle size={16} strokeWidth={1.5} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleLogin} style={{ textAlign: "right" }}>
           <div style={{ marginBottom: "12px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#cbd5e1", marginBottom: "4px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px" }}>
               البريد الإلكتروني
             </label>
             <input
@@ -206,21 +205,22 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                background: "#0f172a",
-                border: "1px solid #334155",
+                background: "var(--bg-deep)",
+                border: "1px solid var(--border-light)",
                 borderRadius: "8px",
-                color: "#fff",
+                color: "var(--text)",
                 fontSize: "14px",
                 outline: "none",
                 direction: "ltr",
                 textAlign: "left",
                 boxSizing: "border-box",
+                marginBottom: 0,
               }}
             />
           </div>
 
-          <div style={{ marginBottom: "18px" }}>
-            <label style={{ display: "block", fontSize: "12px", color: "#cbd5e1", marginBottom: "4px" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ display: "block", fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px" }}>
               كلمة المرور
             </label>
             <div style={{ position: "relative" }}>
@@ -234,20 +234,22 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
                 style={{
                   width: "100%",
                   padding: "10px 38px 10px 12px",
-                  background: "#0f172a",
-                  border: "1px solid #334155",
+                  background: "var(--bg-deep)",
+                  border: "1px solid var(--border-light)",
                   borderRadius: "8px",
-                  color: "#fff",
+                  color: "var(--text)",
                   fontSize: "14px",
                   outline: "none",
                   direction: "ltr",
                   textAlign: "left",
                   boxSizing: "border-box",
+                  marginBottom: 0,
                 }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                className="icon-btn"
                 style={{
                   position: "absolute",
                   right: "10px",
@@ -255,14 +257,14 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
                   transform: "translateY(-50%)",
                   background: "transparent",
                   border: "none",
-                  color: "#64748b",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   padding: 0,
                 }}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
               </button>
             </div>
           </div>
@@ -272,45 +274,45 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
             disabled={loading}
             style={{
               width: "100%",
-              padding: "12px",
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              padding: "12px 16px",
+              background: "var(--primary)",
               border: "none",
-              borderRadius: "10px",
+              borderRadius: "8px",
               color: "#fff",
               fontSize: "14px",
-              fontWeight: "bold",
+              fontWeight: 500,
               cursor: loading ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
-              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)",
-              marginBottom: "10px",
+              marginBottom: "12px",
             }}
           >
             {loading ? (
               <>
-                <RefreshCw size={16} className="animate-spin" />
-                <span>جاري التحقق والدخول...</span>
+                <RefreshCw size={16} strokeWidth={1.5} className="animate-spin" />
+                <span>جاري التحقق والدخول</span>
               </>
             ) : (
               <>
-                <LogIn size={16} />
+                <LogIn size={16} strokeWidth={1.5} />
                 <span>تأكيد الدخول ومتابعة العمل</span>
               </>
             )}
           </button>
         </form>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
+              className="btn-compact"
               style={{
                 background: "transparent",
                 border: "none",
-                color: "#64748b",
+                color: "var(--text-muted)",
                 fontSize: "12px",
                 cursor: "pointer",
               }}
@@ -321,10 +323,11 @@ export default function StaffReauthModal({ isOpen: controlledIsOpen, onSuccess, 
           <button
             type="button"
             onClick={handleSignOutCompletely}
+            className="btn-compact"
             style={{
               background: "transparent",
               border: "none",
-              color: "#ef4444",
+              color: "var(--error-ink)",
               fontSize: "12px",
               cursor: "pointer",
               textDecoration: "underline",

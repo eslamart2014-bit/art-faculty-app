@@ -26,35 +26,34 @@ export default function StudentQrModal({
     <div style={{
       position: "fixed",
       top: 0, left: 0, right: 0, bottom: 0,
-      background: "rgba(15, 23, 42, 0.9)",
-      backdropFilter: "blur(5px)",
+      background: "rgba(11, 13, 20, 0.85)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       zIndex: 99999,
-      padding: "20px"
+      padding: "16px"
     }}>
       <div className="glass-card animate-fade-in" style={{
-        background: "#1e293b",
-        borderRadius: "20px",
-        padding: "30px",
+        background: "var(--surface)",
+        borderRadius: "16px",
+        padding: "24px",
         width: "100%",
-        maxWidth: "350px",
+        maxWidth: "360px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
-        border: "1px solid rgba(56, 189, 248, 0.3)"
+        boxShadow: "0 16px 40px rgba(0, 0, 0, 0.45)",
+        border: "1px solid var(--border-light)"
       }}>
-        <div style={{ marginBottom: "20px", color: "#fff", fontWeight: "bold", fontSize: "16px", textAlign: "center" }}>
+        <div style={{ marginBottom: "16px", color: "var(--text)", fontWeight: 600, fontSize: "16px", textAlign: "center" }}>
           كارت الـ QR الخاص بك
         </div>
 
         <div style={{ 
-          background: "#fff", 
-          padding: "20px", 
-          borderRadius: "16px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.2)"
+          background: "#ffffff", 
+          padding: "16px", 
+          borderRadius: "12px",
+          border: "1px solid var(--border)"
         }}>
           <QRCode 
             id="student-qr-code"
@@ -64,11 +63,11 @@ export default function StudentQrModal({
           />
         </div>
 
-        <div style={{ marginTop: "15px", color: "#94a3b8", fontSize: "14px", fontWeight: "bold" }}>
+        <div className="tabular-nums" style={{ marginTop: "12px", color: "var(--text-secondary)", fontSize: "14px", fontWeight: 500, letterSpacing: "0.5px" }}>
           {student.student_code}
         </div>
 
-        <div style={{ display: "flex", gap: "10px", marginTop: "25px", width: "100%" }}>
+        <div style={{ display: "flex", gap: "8px", marginTop: "20px", width: "100%" }}>
           <button 
             onClick={onDownloadQr}
             disabled={isSavingQr}
@@ -76,23 +75,21 @@ export default function StudentQrModal({
               flex: 1,
               padding: "12px",
               background: qrSavedSuccess
-                ? "linear-gradient(135deg, #10b981, #059669)"
+                ? "var(--success)"
                 : isSavingQr
-                ? "#64748b"
-                : "linear-gradient(135deg, #0ea5e9, #0284c7)",
-              color: "#fff",
+                ? "var(--secondary)"
+                : "var(--primary)",
+              color: "#ffffff",
               border: "none",
-              borderRadius: "12px",
-              fontWeight: "bold",
+              borderRadius: "8px",
+              fontWeight: 500,
+              fontSize: "13px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: "8px",
               cursor: isSavingQr ? "wait" : "pointer",
-              boxShadow: qrSavedSuccess
-                ? "0 4px 14px rgba(16, 185, 129, 0.4)"
-                : "0 4px 14px rgba(14, 165, 233, 0.3)",
-              transition: "all 0.2s ease"
+              transition: "background-color 0.2s var(--ease-out)"
             }}
           >
             {isSavingQr ? (
@@ -100,7 +97,7 @@ export default function StudentQrModal({
                 <div style={{
                   width: "16px",
                   height: "16px",
-                  border: "2px solid #fff",
+                  border: "2px solid #ffffff",
                   borderTopColor: "transparent",
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite"
@@ -109,12 +106,12 @@ export default function StudentQrModal({
               </>
             ) : qrSavedSuccess ? (
               <>
-                <Check size={18} />
-                <span>تم حفظ الكارت بنجاح ✓</span>
+                <Check size={16} strokeWidth={1.5} />
+                <span>تم حفظ الكارت بنجاح</span>
               </>
             ) : (
               <>
-                <Download size={18} />
+                <Download size={16} strokeWidth={1.5} />
                 <span>حفظ كارت الـ QR</span>
               </>
             )}
@@ -125,11 +122,12 @@ export default function StudentQrModal({
             style={{
               flex: 1,
               padding: "12px",
-              background: "rgba(239, 68, 68, 0.15)",
-              color: "#f87171",
+              background: "rgba(239, 68, 68, 0.14)",
+              color: "var(--error-ink)",
               border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "12px",
-              fontWeight: "bold",
+              borderRadius: "8px",
+              fontWeight: 500,
+              fontSize: "13px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -137,7 +135,7 @@ export default function StudentQrModal({
               cursor: "pointer"
             }}
           >
-            <X size={16} />
+            <X size={16} strokeWidth={1.5} />
             <span>إغلاق</span>
           </button>
         </div>

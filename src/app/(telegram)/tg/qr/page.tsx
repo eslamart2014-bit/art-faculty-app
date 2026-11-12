@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import QRCode from "react-qr-code";
-import { Search, Download, CheckCircle2, RotateCcw } from "lucide-react";
+import { Search, Download, CheckCircle2, RotateCcw, GraduationCap, QrCode } from "lucide-react";
 import { formatStudentCode } from "@/lib/students/codeHelper";
 
 const LEVELS = [
@@ -227,335 +227,344 @@ export default function TelegramQrLookupPage() {
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       <div
         dir="rtl"
-      style={{
-        minHeight: "100vh",
-        background: "radial-gradient(ellipse at top, #0d1527 0%, #060a12 100%)",
-        color: "#f8fafc",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "16px",
-        boxSizing: "border-box"
-      }}
-    >
-      <div style={{ maxWidth: "460px", margin: "0 auto" }}>
-        {/* Academic Header */}
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            background: "rgba(56, 189, 248, 0.1)",
-            border: "1px solid rgba(56, 189, 248, 0.25)",
-            padding: "6px 14px",
-            borderRadius: "999px",
-            fontSize: "12.5px",
-            color: "#38bdf8",
-            fontWeight: "bold",
-            marginBottom: "8px"
-          }}>
-            <span>🎓</span>
-            <span>جامعة قنا • كلية التربية النوعية</span>
-          </div>
-          <h1 style={{
-            fontSize: "20px",
-            fontWeight: "900",
-            color: "#ffffff",
-            margin: "0 0 4px 0"
-          }}>
-            قسم التربية الفنية
-          </h1>
-          <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
-            المنظومة الرقمية الذكية • استخراج بطاقة الحضور (QR)
-          </p>
-        </div>
-
-        {!selectedStudent ? (
-          /* Search & Filter View */
-          <div>
-            {/* Level Filter Pills */}
+        style={{
+          minHeight: "100vh",
+          background: "var(--background)",
+          color: "var(--text)",
+          fontFamily: "inherit",
+          padding: "16px",
+          boxSizing: "border-box"
+        }}
+      >
+        <div style={{ maxWidth: "460px", margin: "0 auto" }}>
+          {/* Academic Header */}
+          <div style={{ textAlign: "center", marginBottom: "20px" }}>
             <div style={{
-              display: "flex",
+              display: "inline-flex",
+              alignItems: "center",
               gap: "6px",
-              overflowX: "auto",
-              paddingBottom: "10px",
-              marginBottom: "12px",
-              scrollbarWidth: "none"
+              background: "var(--surface)",
+              border: "1px solid var(--border-light)",
+              padding: "4px 12px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              color: "var(--accent-ink)",
+              fontWeight: 500,
+              marginBottom: "8px"
             }}>
-              {LEVELS.map((lvl) => {
-                const active = selectedLevel === lvl;
-                return (
-                  <button
-                    key={lvl}
-                    onClick={() => setSelectedLevel(lvl)}
-                    style={{
-                      background: active ? "#38bdf8" : "rgba(255, 255, 255, 0.05)",
-                      color: active ? "#070b14" : "#94a3b8",
-                      border: active ? "1px solid #38bdf8" : "1px solid rgba(255, 255, 255, 0.1)",
-                      borderRadius: "20px",
-                      padding: "6px 12px",
-                      fontSize: "12px",
-                      fontWeight: active ? "bold" : "normal",
-                      whiteSpace: "nowrap",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
-                  >
-                    {lvl}
-                  </button>
-                );
-              })}
+              <GraduationCap size={14} strokeWidth={1.5} />
+              <span>جامعة قنا • كلية التربية النوعية</span>
             </div>
-
-            {/* Search Input Box */}
-            <div style={{ position: "relative", marginBottom: "16px" }}>
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="🔍 اكتب اسمك للبحث عن بطاقتك..."
-                style={{
-                  width: "100%",
-                  background: "#0e1626",
-                  border: "2px solid #1e293b",
-                  borderRadius: "14px",
-                  padding: "14px 44px 14px 16px",
-                  fontSize: "14px",
-                  color: "#ffffff",
-                  boxSizing: "border-box",
-                  outline: "none",
-                  transition: "border-color 0.2s ease"
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "#38bdf8")}
-                onBlur={(e) => (e.target.style.borderColor = "#1e293b")}
-                autoFocus
-              />
-              <Search
-                size={18}
-                style={{
-                  position: "absolute",
-                  right: "14px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#64748b",
-                  pointerEvents: "none"
-                }}
-              />
-            </div>
-
-            {/* Results or Helper Guide */}
-            {loading ? (
-              <div style={{ textAlign: "center", padding: "28px 0", color: "#38bdf8" }}>
-                <div style={{
-                  width: "28px",
-                  height: "28px",
-                  border: "3px solid rgba(56, 189, 248, 0.2)",
-                  borderTopColor: "#38bdf8",
-                  borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite",
-                  margin: "0 auto 10px"
-                }} />
-                <div style={{ fontSize: "13px" }}>جاري البحث في قاعدة البيانات...</div>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              </div>
-            ) : results.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div style={{ fontSize: "12px", color: "#64748b", marginBottom: "4px" }}>
-                  اضغط على اسمك لعرض بطاقتك الجامعية:
-                </div>
-                {results.map((st) => (
-                  <div
-                    key={st.student_code}
-                    onClick={() => setSelectedStudent(st)}
-                    style={{
-                      background: "rgba(15, 23, 42, 0.85)",
-                      border: "1px solid rgba(56, 189, 248, 0.2)",
-                      borderRadius: "12px",
-                      padding: "12px 14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      transition: "all 0.2s ease"
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "14px", fontWeight: "bold", color: "#f8fafc" }}>
-                        {st.full_name}
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "3px" }}>
-                        {st.academic_year} {st.section ? `• سكشن ${st.section}` : ""}
-                      </div>
-                    </div>
-                    <div style={{
-                      background: "rgba(56, 189, 248, 0.15)",
-                      color: "#38bdf8",
-                      fontSize: "12px",
-                      fontWeight: "bold",
-                      padding: "4px 10px",
-                      borderRadius: "8px"
-                    }}>
-                      عرض الكارت 🪪
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : query.trim().length >= 2 ? (
-              <div style={{
-                textAlign: "center",
-                padding: "36px 16px",
-                background: "rgba(15, 23, 42, 0.5)",
-                borderRadius: "16px",
-                border: "1px dashed rgba(255, 255, 255, 0.1)"
-              }}>
-                <div style={{ fontSize: "28px", marginBottom: "8px" }}>🔍</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#e2e8f0" }}>
-                  لم يتم العثور على طالب بهذا الاسم
-                </div>
-                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px" }}>
-                  تأكد من كتابة الاسم صحيحاً كما هو مسجل في كشوف الكلية
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                textAlign: "center",
-                padding: "36px 16px",
-                background: "rgba(15, 23, 42, 0.5)",
-                borderRadius: "16px",
-                border: "1px dashed rgba(255, 255, 255, 0.1)"
-              }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>🪪</div>
-                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#e2e8f0" }}>
-                  شاشة استخراج بطاقة الحضور الرسمية
-                </div>
-                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px", lineHeight: 1.5 }}>
-                  اكتب اسمك في حقل البحث أعلاه لاستخراج رمز الـ QR الخاص بك بدقة فائقة وحفظه مباشرة على هاتفك.
-                </div>
-              </div>
-            )}
+            <h1 style={{
+              fontSize: "20px",
+              fontWeight: 600,
+              color: "var(--text)",
+              margin: "0 0 4px 0"
+            }}>
+              قسم التربية الفنية
+            </h1>
+            <p style={{ fontSize: "12.5px", color: "var(--text-secondary)", margin: 0 }}>
+              المنظومة الرقمية الذكية • استخراج بطاقة الحضور (QR)
+            </p>
           </div>
-        ) : (
-          /* QR Card Display View */
-          <div>
-            <div style={{
-              background: "linear-gradient(135deg, #0e1626, #152238)",
-              border: "2px solid #3b82f6",
-              borderRadius: "20px",
-              padding: "20px 16px",
-              textAlign: "center",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-              marginBottom: "16px"
-            }}>
-              <div style={{ fontSize: "13px", color: "#93c5fd", fontWeight: "bold", marginBottom: "2px" }}>
-                جامعة قنا • كلية التربية النوعية
-              </div>
-              <div style={{ fontSize: "12px", color: "#38bdf8", marginBottom: "14px" }}>
-                قسم التربية الفنية
+
+          {!selectedStudent ? (
+            /* Search & Filter View */
+            <div>
+              {/* Level Filter Pills */}
+              <div style={{
+                display: "flex",
+                gap: "6px",
+                overflowX: "auto",
+                paddingBottom: "8px",
+                marginBottom: "12px",
+                scrollbarWidth: "none"
+              }}>
+                {LEVELS.map((lvl) => {
+                  const active = selectedLevel === lvl;
+                  return (
+                    <button
+                      key={lvl}
+                      onClick={() => setSelectedLevel(lvl)}
+                      style={{
+                        background: active ? "var(--primary)" : "var(--surface)",
+                        color: active ? "#ffffff" : "var(--text-secondary)",
+                        border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
+                        borderRadius: "6px",
+                        padding: "6px 12px",
+                        fontSize: "12px",
+                        fontWeight: active ? 500 : 400,
+                        whiteSpace: "nowrap",
+                        cursor: "pointer",
+                        transition: "background-color 0.2s var(--ease-out), border-color 0.2s var(--ease-out)"
+                      }}
+                    >
+                      {lvl}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* White Container for High Contrast QR */}
-              <div style={{
-                background: "#ffffff",
-                padding: "16px",
-                borderRadius: "18px",
-                display: "inline-block",
-                marginBottom: "16px",
-                boxShadow: "0 8px 25px rgba(0, 0, 0, 0.45)"
-              }}>
-                <QRCode
-                  id="student-tg-qr-svg"
-                  value={`كود الطالب: ${formatStudentCode(selectedStudent.student_code)}\nاسم الطالب: ${selectedStudent.full_name}`}
-                  size={220}
-                  level="H"
+              {/* Search Input Box */}
+              <div style={{ position: "relative", marginBottom: "16px" }}>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="اكتب اسمك للبحث عن بطاقتك..."
+                  style={{
+                    width: "100%",
+                    background: "var(--bg-deep)",
+                    border: "1.5px solid var(--border-light)",
+                    borderRadius: "10px",
+                    padding: "12px 42px 12px 14px",
+                    fontSize: "14px",
+                    color: "var(--text)",
+                    fontFamily: "inherit",
+                    boxSizing: "border-box",
+                    outline: "none",
+                    transition: "border-color 0.2s var(--ease-out)"
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "var(--accent-ink)")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--border-light)")}
+                  autoFocus
+                />
+                <Search
+                  size={16}
+                  strokeWidth={1.5}
+                  style={{
+                    position: "absolute",
+                    right: "14px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-muted)",
+                    pointerEvents: "none"
+                  }}
                 />
               </div>
 
-              {/* Student Info */}
-              <div style={{ fontSize: "17px", fontWeight: "bold", color: "#ffffff", marginBottom: "4px" }}>
-                {selectedStudent.full_name}
-              </div>
-              <div style={{ fontSize: "13px", color: "#60a5fa", marginBottom: "8px" }}>
-                {selectedStudent.academic_year || "طالب بالكلية"} {selectedStudent.section ? `• سكشن ${selectedStudent.section}` : ""}
-              </div>
+              {/* Results or Helper Guide */}
+              {loading ? (
+                <div style={{ textAlign: "center", padding: "28px 0", color: "var(--accent-ink)" }}>
+                  <div style={{
+                    width: "26px",
+                    height: "26px",
+                    border: "2.5px solid var(--border-light)",
+                    borderTopColor: "var(--accent-ink)",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite",
+                    margin: "0 auto 10px"
+                  }} />
+                  <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>جاري البحث في قاعدة البيانات...</div>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                </div>
+              ) : results.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "4px" }}>
+                    اضغط على اسمك لعرض بطاقتك الجامعية:
+                  </div>
+                  {results.map((st) => (
+                    <div
+                      key={st.student_code}
+                      onClick={() => setSelectedStudent(st)}
+                      style={{
+                        background: "var(--surface)",
+                        border: "1px solid var(--border)",
+                        borderRadius: "10px",
+                        padding: "12px 14px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "8px",
+                        transition: "border-color 0.2s var(--ease-out), background-color 0.2s var(--ease-out)"
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>
+                          {st.full_name}
+                        </div>
+                        <div className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                          {st.academic_year} {st.section ? `• سكشن ${st.section}` : ""}
+                        </div>
+                      </div>
+                      <div style={{
+                        background: "rgba(56, 189, 248, 0.12)",
+                        border: "1px solid rgba(56, 189, 248, 0.25)",
+                        color: "var(--accent-ink)",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        padding: "5px 10px",
+                        borderRadius: "6px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        flexShrink: 0
+                      }}>
+                        <QrCode size={14} strokeWidth={1.5} />
+                        <span>عرض الكارت</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : query.trim().length >= 2 ? (
+                <div style={{
+                  textAlign: "center",
+                  padding: "32px 16px",
+                  background: "var(--surface)",
+                  borderRadius: "12px",
+                  border: "1px dashed var(--border-light)"
+                }}>
+                  <Search size={28} strokeWidth={1.5} color="var(--text-muted)" style={{ margin: "0 auto 10px" }} />
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>
+                    لم يتم العثور على طالب بهذا الاسم
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "4px" }}>
+                    تأكد من كتابة الاسم صحيحاً كما هو مسجل في كشوف الكلية
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  textAlign: "center",
+                  padding: "32px 16px",
+                  background: "var(--surface)",
+                  borderRadius: "12px",
+                  border: "1px dashed var(--border-light)"
+                }}>
+                  <QrCode size={32} strokeWidth={1.5} color="var(--accent-ink)" style={{ margin: "0 auto 10px" }} />
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>
+                    شاشة استخراج بطاقة الحضور الرسمية
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px", lineHeight: 1.55 }}>
+                    اكتب اسمك في حقل البحث أعلاه لاستخراج رمز الـ QR الخاص بك بدقة فائقة وحفظه مباشرة على هاتفك.
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* QR Card Display View */
+            <div>
               <div style={{
-                display: "inline-block",
-                background: "rgba(245, 158, 11, 0.15)",
-                border: "1px solid rgba(245, 158, 11, 0.4)",
-                padding: "4px 14px",
-                borderRadius: "8px",
-                fontSize: "14px",
-                color: "#fbbf24",
-                fontWeight: "bold",
-                fontFamily: "monospace"
+                background: "var(--surface)",
+                border: "1px solid var(--border-light)",
+                borderRadius: "16px",
+                padding: "20px 16px",
+                textAlign: "center",
+                marginBottom: "16px"
               }}>
-                الكود: {formatStudentCode(selectedStudent.student_code)}
+                <div style={{ fontSize: "13px", color: "var(--accent-ink)", fontWeight: 600, marginBottom: "2px" }}>
+                  جامعة قنا • كلية التربية النوعية
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                  قسم التربية الفنية
+                </div>
+
+                {/* White Container for High Contrast QR */}
+                <div style={{
+                  background: "#ffffff",
+                  padding: "16px",
+                  borderRadius: "12px",
+                  display: "inline-block",
+                  marginBottom: "16px",
+                  border: "1px solid var(--border)"
+                }}>
+                  <QRCode
+                    id="student-tg-qr-svg"
+                    value={`كود الطالب: ${formatStudentCode(selectedStudent.student_code)}\nاسم الطالب: ${selectedStudent.full_name}`}
+                    size={220}
+                    level="H"
+                  />
+                </div>
+
+                {/* Student Info */}
+                <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>
+                  {selectedStudent.full_name}
+                </div>
+                <div className="tabular-nums" style={{ fontSize: "13px", color: "var(--accent-ink)", marginBottom: "10px" }}>
+                  {selectedStudent.academic_year || "طالب بالكلية"} {selectedStudent.section ? `• سكشن ${selectedStudent.section}` : ""}
+                </div>
+                <div className="tabular-nums" style={{
+                  display: "inline-block",
+                  background: "rgba(245, 158, 11, 0.12)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  padding: "4px 12px",
+                  borderRadius: "6px",
+                  fontSize: "13.5px",
+                  color: "var(--warning-ink)",
+                  fontWeight: 600
+                }}>
+                  الكود: {formatStudentCode(selectedStudent.student_code)}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={downloadCardAsImage}
+                  disabled={downloading}
+                  style={{
+                    width: "100%",
+                    background: downloadSuccess ? "var(--success)" : "var(--primary)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    fontSize: "14px",
+                    fontWeight: 500,
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    cursor: downloading ? "not-allowed" : "pointer",
+                    transition: "background-color 0.2s var(--ease-out)"
+                  }}
+                >
+                  {downloadSuccess ? (
+                    <>
+                      <CheckCircle2 size={18} strokeWidth={1.5} />
+                      <span>تم حفظ البطاقة بنجاح</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} strokeWidth={1.5} />
+                      <span>{downloading ? "جاري تحضير البطاقة..." : "تحميل البطاقة كصورة على الهاتف"}</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedStudent(null);
+                    setQuery("");
+                  }}
+                  style={{
+                    width: "100%",
+                    background: "var(--surface)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border-light)",
+                    borderRadius: "8px",
+                    padding: "12px",
+                    fontSize: "13.5px",
+                    fontWeight: 500,
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    cursor: "pointer"
+                  }}
+                >
+                  <RotateCcw size={16} strokeWidth={1.5} />
+                  <span>بحث عن طالب آخر</span>
+                </button>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button
-                type="button"
-                onClick={downloadCardAsImage}
-                disabled={downloading}
-                style={{
-                  width: "100%",
-                  background: downloadSuccess ? "#10b981" : "linear-gradient(135deg, #0284c7, #2563eb)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "14px",
-                  padding: "14px",
-                  fontSize: "15px",
-                  fontWeight: "bold",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  cursor: downloading ? "not-allowed" : "pointer",
-                  boxShadow: "0 4px 15px rgba(37, 99, 235, 0.35)",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                {downloadSuccess ? (
-                  <>
-                    <CheckCircle2 size={20} />
-                    <span>تم حفظ البطاقة بنجاح! 🎉</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={20} />
-                    <span>{downloading ? "جاري تحضير البطاقة..." : "تحميل البطاقة كصورة على الهاتف 📥"}</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedStudent(null);
-                  setQuery("");
-                }}
-                style={{
-                  width: "100%",
-                  background: "rgba(255, 255, 255, 0.05)",
-                  color: "#94a3b8",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "14px",
-                  padding: "12px",
-                  fontSize: "14px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  cursor: "pointer"
-                }}
-              >
-                <RotateCcw size={16} />
-                <span>بحث عن طالب آخر 🔍</span>
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 }

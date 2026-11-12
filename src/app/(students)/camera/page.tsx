@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Head from "next/head";
+import { AlertTriangle, Camera, CheckCircle2, Info, RefreshCw, UploadCloud } from "lucide-react";
 
 // Create Supabase client
 const supabase = createClient(
@@ -45,7 +46,7 @@ function CameraApp() {
   // Orientation states
   const [isLeveled, setIsLeveled] = useState(true); // Default true so user is not blocked if gyro unavailable
   const [hasGyro, setHasGyro] = useState(false);
-  const [tiltStatus, setTiltStatus] = useState("قم بوزن الهاتف أفقياً فوق المشروع 📱");
+  const [tiltStatus, setTiltStatus] = useState("قم بوزن الهاتف أفقياً فوق المشروع");
   
   // Filter warnings
   const [filterWarnings, setFilterWarnings] = useState<string[]>([]);
@@ -82,9 +83,9 @@ function CameraApp() {
       setIsLeveled(isCorrect);
       
       if (isCorrect) {
-        setTiltStatus("الوضع ممتاز! يمكنك التصوير الآن ✅");
+        setTiltStatus("الوضع ممتاز — يمكنك التصوير الآن");
       } else {
-        setTiltStatus(projectData?.camera_mode === '3d' ? "يرجى مسك الهاتف بشكل عمودي ثابت أمام المجسم 📱" : "يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق المشروع 📱");
+        setTiltStatus(projectData?.camera_mode === '3d' ? "يرجى مسك الهاتف بشكل عمودي ثابت أمام المجسم" : "يرجى وضع الهاتف بشكل أفقي وموزون تماماً فوق المشروع");
       }
     };
 
@@ -252,9 +253,9 @@ function CameraApp() {
       variance = variance / (sampleCount * 3);
       
       const warnings = [];
-      if (avgBrightness < 35) warnings.push("⚠️ الإضاءة ضعيفة جداً.");
-      if (avgBrightness > 245) warnings.push("⚠️ الإضاءة ساطعة جداً (تجنب تصوير ورقة بيضاء فقط).");
-      if (variance < 80) warnings.push("⚠️ يبدو أن المشروع فارغ أو ذو لون مسطح.");
+      if (avgBrightness < 35) warnings.push("الإضاءة ضعيفة جداً.");
+      if (avgBrightness > 245) warnings.push("الإضاءة ساطعة جداً (تجنب تصوير ورقة بيضاء فقط).");
+      if (variance < 80) warnings.push("يبدو أن المشروع فارغ أو ذو لون مسطح.");
       
       setFilterWarnings(warnings);
     } catch (e) {
@@ -335,10 +336,12 @@ function CameraApp() {
 
   if (uploadSuccess) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#121212', color: 'white', fontFamily: 'system-ui', padding: '20px', textAlign: 'center' }}>
-        <h1 style={{ color: '#4caf50', fontSize: '3.5rem', marginBottom: '10px' }}>✅</h1>
-        <h2>تم رفع المشروع بنجاح!</h2>
-        <p style={{ color: '#aaa', marginTop: '10px' }}>يمكنك الآن إغلاق هذه النافذة والعودة للتليجرام.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: 'var(--background)', color: 'var(--text)', fontFamily: 'inherit', padding: '24px', textAlign: 'center', direction: 'rtl' }}>
+        <div style={{ marginBottom: '12px', color: 'var(--success)' }}>
+          <CheckCircle2 size={48} strokeWidth={1.5} />
+        </div>
+        <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>تم رفع المشروع بنجاح</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '13.5px' }}>يمكنك الآن إغلاق هذه النافذة والعودة للتليجرام.</p>
         <button 
           onClick={() => {
              if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
@@ -347,7 +350,7 @@ function CameraApp() {
                window.close();
              }
           }}
-          style={{ marginTop: '30px', padding: '15px 40px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer' }}
+          style={{ marginTop: '24px', padding: '12px 32px', backgroundColor: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 500, cursor: 'pointer' }}
         >
           إغلاق النافذة
         </button>
@@ -357,8 +360,8 @@ function CameraApp() {
 
   if (!stuId || !crsId || !projId) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#121212', color: 'white', padding: '20px', textAlign: 'center' }}>
-        <p style={{ color: '#ff5252', fontSize: '1.2rem' }}>رابط غير صالح. يرجى الدخول من تليجرام مرة أخرى.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: 'var(--background)', color: 'var(--text)', padding: '24px', textAlign: 'center', direction: 'rtl' }}>
+        <p style={{ color: 'var(--error-ink)', fontSize: '15px', fontWeight: 500 }}>رابط غير صالح. يرجى الدخول من تليجرام مرة أخرى.</p>
       </div>
     );
   }
@@ -368,23 +371,26 @@ function CameraApp() {
       <Head>
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </Head>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#000', overflow: 'hidden', fontFamily: 'system-ui' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#000000', overflow: 'hidden', fontFamily: 'inherit' }}>
         
         {/* Intro Screen when camera is not started yet */}
         {!isCameraStarted ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#121212', color: 'white', padding: '24px', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '3.5rem', margin: '0 0 16px 0' }}>📷</h1>
-            <h2 style={{ margin: '0 0 12px 0' }}>مستعد لتصوير المشروع؟</h2>
-            <p style={{ color: '#bbb', marginBottom: '20px', lineHeight: '1.6', maxWidth: '360px' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--background)', color: 'var(--text)', padding: '24px', textAlign: 'center', direction: 'rtl' }}>
+            <div style={{ margin: '0 0 16px 0', color: 'var(--accent-ink)' }}>
+              <Camera size={48} strokeWidth={1.5} />
+            </div>
+            <h2 style={{ margin: '0 0 10px 0', fontSize: '19px', fontWeight: 600 }}>مستعد لتصوير المشروع؟</h2>
+            <p style={{ color: 'var(--text-secondary)', margin: '0 0 20px 0', lineHeight: 1.6, maxWidth: '360px', fontSize: '13.5px' }}>
               ضع المشروع على سطح مستوٍ (طاولة أو أرضية)، وسنساعدك في التقاطه بشكل موزون لتجنب تشوه المنظور.
             </p>
             
-            <div style={{ backgroundColor: 'rgba(33, 150, 243, 0.1)', border: '1px solid #2196F3', borderRadius: '10px', padding: '14px', marginBottom: '28px', textAlign: 'right', direction: 'rtl', fontSize: '0.85rem', color: '#90caf9', maxWidth: '360px', lineHeight: '1.5' }}>
-              ℹ️ <strong>ملاحظة أمنية:</strong> عند الضغط بالأسفل، سيطلب منك تليجرام السماح بالوصول للكاميرا. هذه الصلاحية تستخدم حصراً في هذه اللحظة لالتقاط صورة مشروعك فقط ولا يتم مشاركتها.
+            <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '10px', padding: '12px 14px', marginBottom: '24px', textAlign: 'right', direction: 'rtl', fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '360px', lineHeight: 1.55, display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <Info size={16} strokeWidth={1.5} color="var(--accent-ink)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span><strong style={{ fontWeight: 600, color: 'var(--accent-ink)' }}>ملاحظة أمنية:</strong> عند الضغط بالأسفل، سيطلب منك تليجرام السماح بالوصول للكاميرا. هذه الصلاحية تستخدم حصراً في هذه اللحظة لالتقاط صورة مشروعك فقط ولا يتم مشاركتها.</span>
             </div>
 
             {hasError && (
-              <div style={{ backgroundColor: 'rgba(244, 67, 54, 0.15)', border: '1px solid #f44336', borderRadius: '8px', padding: '12px', marginBottom: '20px', color: '#ff8a80', fontSize: '0.9rem', maxWidth: '360px' }}>
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', borderRadius: '8px', padding: '12px', marginBottom: '20px', color: 'var(--error-ink)', fontSize: '13px', maxWidth: '360px' }}>
                 {hasError}
               </div>
             )}
@@ -392,9 +398,10 @@ function CameraApp() {
             <button 
               onClick={startCamera}
               disabled={isLoadingCamera}
-              style={{ padding: '16px 48px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '14px', fontSize: '1.25rem', fontWeight: 'bold', cursor: isLoadingCamera ? 'wait' : 'pointer', boxShadow: '0 4px 14px rgba(76, 175, 80, 0.4)' }}
+              style={{ padding: '14px 36px', backgroundColor: 'var(--success)', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 500, cursor: isLoadingCamera ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             >
-              {isLoadingCamera ? 'جاري تشغيل الكاميرا...' : 'تشغيل الكاميرا 📸'}
+              <Camera size={18} strokeWidth={1.5} />
+              <span>{isLoadingCamera ? 'جاري تشغيل الكاميرا...' : 'تشغيل الكاميرا'}</span>
             </button>
           </div>
         ) : (
@@ -423,26 +430,25 @@ function CameraApp() {
               
               {/* Leveling Indicator Overlay (only in live mode) */}
               {photos.length < (projectData?.required_photos || 1) && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ 
-                    width: '90px', 
-                    height: '90px', 
-                    border: `3px solid ${isLeveled ? '#4caf50' : '#ff9800'}`, 
+                    width: '88px', 
+                    height: '88px', 
+                    border: `2.5px solid ${isLeveled ? 'var(--success)' : 'var(--warning)'}`, 
                     borderRadius: '50%',
                     position: 'relative',
-                    boxShadow: isLeveled ? '0 0 20px rgba(76, 175, 80, 0.6)' : 'none',
-                    transition: 'all 0.3s ease'
+                    transition: 'border-color 0.25s var(--ease-out)'
                   }}>
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '16px', height: '16px', backgroundColor: isLeveled ? '#4caf50' : '#ff9800', borderRadius: '50%', transition: 'background-color 0.3s ease' }} />
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '14px', height: '14px', backgroundColor: isLeveled ? 'var(--success)' : 'var(--warning)', borderRadius: '50%', transition: 'background-color 0.25s var(--ease-out)' }} />
                     
                     {/* Crosshairs */}
-                    <div style={{ position: 'absolute', top: '-8px', left: '50%', width: '2px', height: '8px', backgroundColor: isLeveled ? '#4caf50' : '#ff9800', transform: 'translateX(-50%)' }} />
-                    <div style={{ position: 'absolute', bottom: '-8px', left: '50%', width: '2px', height: '8px', backgroundColor: isLeveled ? '#4caf50' : '#ff9800', transform: 'translateX(-50%)' }} />
-                    <div style={{ position: 'absolute', left: '-8px', top: '50%', width: '8px', height: '2px', backgroundColor: isLeveled ? '#4caf50' : '#ff9800', transform: 'translateY(-50%)' }} />
-                    <div style={{ position: 'absolute', right: '-8px', top: '50%', width: '8px', height: '2px', backgroundColor: isLeveled ? '#4caf50' : '#ff9800', transform: 'translateY(-50%)' }} />
+                    <div style={{ position: 'absolute', top: '-8px', left: '50%', width: '2px', height: '8px', backgroundColor: isLeveled ? 'var(--success)' : 'var(--warning)', transform: 'translateX(-50%)' }} />
+                    <div style={{ position: 'absolute', bottom: '-8px', left: '50%', width: '2px', height: '8px', backgroundColor: isLeveled ? 'var(--success)' : 'var(--warning)', transform: 'translateX(-50%)' }} />
+                    <div style={{ position: 'absolute', left: '-8px', top: '50%', width: '8px', height: '2px', backgroundColor: isLeveled ? 'var(--success)' : 'var(--warning)', transform: 'translateY(-50%)' }} />
+                    <div style={{ position: 'absolute', right: '-8px', top: '50%', width: '8px', height: '2px', backgroundColor: isLeveled ? 'var(--success)' : 'var(--warning)', transform: 'translateY(-50%)' }} />
                   </div>
 
-                  <div style={{ marginTop: '16px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', padding: '8px 18px', borderRadius: '20px', color: isLeveled ? '#4caf50' : '#fff', fontWeight: 'bold', fontSize: '0.9rem', direction: 'rtl' }}>
+                  <div style={{ marginTop: '16px', backgroundColor: 'rgba(11, 13, 20, 0.85)', border: '1px solid var(--border-light)', padding: '8px 16px', borderRadius: '8px', color: isLeveled ? 'var(--success-ink)' : 'var(--text)', fontWeight: 500, fontSize: '13px', direction: 'rtl' }}>
                     {tiltStatus}
                   </div>
                 </div>
@@ -450,9 +456,14 @@ function CameraApp() {
               
               {/* AI Warnings Overlay */}
               {filterWarnings.length > 0 && photos.length > 0 && (
-                <div style={{ position: 'absolute', top: '12px', left: '12px', right: '12px', backgroundColor: 'rgba(255, 82, 82, 0.92)', color: 'white', padding: '12px', borderRadius: '10px', zIndex: 10, textAlign: 'right', direction: 'rtl', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
-                  {filterWarnings.map((w, i) => <div key={i} style={{ fontWeight: 'bold' }}>{w}</div>)}
-                  <div style={{ fontSize: '0.8rem', marginTop: '4px', opacity: 0.9 }}>يمكنك إعادة الالتقاط للحصول على صورة أفضل وأوضح.</div>
+                <div style={{ position: 'absolute', top: '12px', left: '12px', right: '12px', backgroundColor: 'rgba(220, 38, 38, 0.92)', color: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid var(--error)', zIndex: 10, textAlign: 'right', direction: 'rtl' }}>
+                  {filterWarnings.map((w, i) => (
+                    <div key={i} style={{ fontWeight: 600, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertTriangle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                      <span>{w}</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.9 }}>يمكنك إعادة الالتقاط للحصول على صورة أفضل وأوضح.</div>
                 </div>
               )}
               
@@ -461,35 +472,34 @@ function CameraApp() {
             </div>
 
             {/* Bottom Controls */}
-            <div style={{ padding: "10px", background: "#222", display: "flex", gap: "10px", overflowX: "auto" }}>
+            <div style={{ padding: "10px 12px", background: "var(--surface)", borderTop: "1px solid var(--border)", display: "flex", gap: "8px", overflowX: "auto" }}>
               {photos.map((p, i) => (
-                <div key={i} style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0, border: "2px solid #4CAF50", borderRadius: "8px", overflow: "hidden" }}>
+                <div key={i} style={{ position: "relative", width: "56px", height: "56px", flexShrink: 0, border: "1.5px solid var(--success)", borderRadius: "8px", overflow: "hidden" }}>
                   <img src={p} alt={`Photo ${i+1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
               ))}
               {projectData?.required_photos > 1 && photos.length < projectData.required_photos && (
-                <div style={{ width: "60px", height: "60px", flexShrink: 0, border: "2px dashed #666", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>
+                <div className="tabular-nums" style={{ width: "56px", height: "56px", flexShrink: 0, border: "1.5px dashed var(--border-light)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", fontSize: "12px" }}>
                   {photos.length} / {projectData.required_photos}
                 </div>
               )}
             </div>
 
-            <div style={{ height: '110px', backgroundColor: '#111', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 20px' }}>
+            <div style={{ height: '104px', backgroundColor: 'var(--bg-deep)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 20px', direction: 'rtl' }}>
               {photos.length < (projectData?.required_photos || 1) ? (
                 <button 
                   onClick={capturePhoto}
                   disabled={!isLeveled}
                   style={{ 
-                    width: '74px', 
-                    height: '74px', 
+                    width: '68px', 
+                    height: '68px', 
                     borderRadius: '50%', 
-                    backgroundColor: isLeveled ? '#4caf50' : '#444', 
-                    border: `5px solid ${isLeveled ? '#fff' : '#222'}`, 
+                    backgroundColor: isLeveled ? 'var(--success)' : 'var(--secondary)', 
+                    border: `4px solid ${isLeveled ? '#ffffff' : 'var(--border-light)'}`, 
                     cursor: isLeveled ? 'pointer' : 'not-allowed', 
                     outline: 'none',
-                    opacity: isLeveled ? 1 : 0.4,
-                    boxShadow: isLeveled ? '0 0 16px rgba(76, 175, 80, 0.6)' : 'none',
-                    transition: 'all 0.25s ease'
+                    opacity: isLeveled ? 1 : 0.45,
+                    transition: 'background-color 0.2s var(--ease-out), border-color 0.2s var(--ease-out)'
                   }}
                   aria-label="Capture"
                 />
@@ -498,17 +508,19 @@ function CameraApp() {
                   <button 
                     onClick={retakePhoto}
                     disabled={isUploading}
-                    style={{ padding: '14px 24px', backgroundColor: '#2c2c2c', color: 'white', border: '1px solid #444', borderRadius: '10px', fontSize: '1.05rem', fontWeight: 'bold', cursor: isUploading ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '12px 20px', backgroundColor: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border-light)', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: isUploading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                   >
-                    إعادة الالتقاط 🔄
+                    <RefreshCw size={15} strokeWidth={1.5} />
+                    <span>إعادة الالتقاط</span>
                   </button>
                   
                   <button 
                     onClick={uploadPhoto}
                     disabled={isUploading}
-                    style={{ padding: '14px 32px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.15rem', fontWeight: 'bold', cursor: isUploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)' }}
+                    style={{ padding: '12px 24px', backgroundColor: 'var(--success)', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: isUploading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                   >
-                    {isUploading ? 'جاري الرفع...' : 'اعتماد ورفع 🚀'}
+                    <UploadCloud size={16} strokeWidth={1.5} />
+                    <span>{isUploading ? 'جاري الرفع...' : 'اعتماد ورفع'}</span>
                   </button>
                 </>
               )}
@@ -522,7 +534,7 @@ function CameraApp() {
 
 export default function CameraPage() {
   return (
-    <Suspense fallback={<div style={{ backgroundColor: '#000', height: '100vh' }}></div>}>
+    <Suspense fallback={<div style={{ backgroundColor: 'var(--background)', minHeight: '100vh' }}></div>}>
       <CameraApp />
     </Suspense>
   );

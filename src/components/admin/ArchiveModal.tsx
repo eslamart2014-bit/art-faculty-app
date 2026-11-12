@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/core/supabase";
 import PasswordConfirmModal from "@/components/auth/PasswordConfirmModal";
+import { Archive, Download, GraduationCap, Inbox, RotateCcw, Search, Trash2, X } from "lucide-react";
 
 interface ArchiveModalProps {
   isOpen: boolean;
@@ -161,7 +162,7 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
     <>
       <div style={{
         position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-        background: "rgba(0,0,0,0.85)", zIndex: 1000,
+        background: "var(--background)", zIndex: 1000,
         display: "flex", flexDirection: "column"
       }}>
         {/* Header */}
@@ -170,16 +171,17 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
           justifyContent: "space-between", 
           alignItems: "center", 
           padding: "12px 18px", 
-          background: "#181f2c", 
-          borderBottom: "1px solid #2a374f", 
+          background: "var(--bg-deep)", 
+          borderBottom: "1px solid var(--border)", 
           direction: "rtl",
           minHeight: "56px"
         }}>
           <div>
-            <h3 style={{ margin: 0, color: "#fff", fontSize: "16px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>🗄️</span> الأرشيف الشامل
+            <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Archive size={18} strokeWidth={1.5} color="var(--accent-ink)" />
+              <span>الأرشيف الشامل</span>
             </h3>
-            <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+            <div style={{ color: "var(--text-muted)", fontSize: "11px", marginTop: "2px" }}>
               جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
             </div>
           </div>
@@ -187,24 +189,46 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
             onClick={onClose} 
             className="modal-close-btn"
             title="إغلاق"
+            aria-label="إغلاق"
           >
-            ✕
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", background: "#111", borderBottom: "1px solid #333", direction: "rtl" }}>
+        <div style={{ display: "flex", background: "var(--bg-deep)", borderBottom: "1px solid var(--border)", direction: "rtl" }}>
           <button 
             onClick={() => setActiveTab("general")}
-            style={{ flex: 1, padding: "12px", background: activeTab === "general" ? "#222" : "transparent", color: activeTab === "general" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "general" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+            style={{
+              flex: 1, padding: "12px",
+              background: activeTab === "general" ? "var(--surface)" : "transparent",
+              color: activeTab === "general" ? "var(--text-primary)" : "var(--text-muted)",
+              border: "none",
+              borderBottom: activeTab === "general" ? "2px solid var(--primary)" : "2px solid transparent",
+              fontWeight: activeTab === "general" ? 600 : 500,
+              cursor: "pointer", fontSize: "14px",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+            }}
           >
-            الأرشيف العام (المحذوفات)
+            <Archive size={16} strokeWidth={1.5} />
+            <span>الأرشيف العام (المحذوفات)</span>
           </button>
           <button 
+            className="tabular-nums"
             onClick={() => setActiveTab("graduates")}
-            style={{ flex: 1, padding: "12px", background: activeTab === "graduates" ? "#222" : "transparent", color: activeTab === "graduates" ? "#fff" : "#888", border: "none", borderBottom: activeTab === "graduates" ? "2px solid #2196F3" : "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}
+            style={{
+              flex: 1, padding: "12px",
+              background: activeTab === "graduates" ? "var(--surface)" : "transparent",
+              color: activeTab === "graduates" ? "var(--text-primary)" : "var(--text-muted)",
+              border: "none",
+              borderBottom: activeTab === "graduates" ? "2px solid var(--primary)" : "2px solid transparent",
+              fontWeight: activeTab === "graduates" ? 600 : 500,
+              cursor: "pointer", fontSize: "14px",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+            }}
           >
-            أرشيف الخريجين 🎓 {graduates.length > 0 && `(${graduates.length})`}
+            <GraduationCap size={16} strokeWidth={1.5} />
+            <span>أرشيف الخريجين {graduates.length > 0 ? `(${graduates.length})` : ""}</span>
           </button>
         </div>
 
@@ -212,39 +236,41 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
         <div style={{ padding: "20px", flexGrow: 1, overflowY: "auto", direction: "rtl" }}>
           {activeTab === "general" && (
             <>
-              <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "20px" }}>
+              <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "20px" }}>
                 هنا تجد جميع العناصر (مقررات، غياب، درجات) التي قمت بحذفها. يمكنك استعادتها أو حذفها نهائياً.
               </p>
 
               {loading ? (
-                <div style={{ textAlign: "center", color: "#888", marginTop: "50px" }}>جاري التحميل...</div>
+                <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "50px" }}>جاري التحميل...</div>
               ) : archives.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#555", marginTop: "50px", fontSize: "18px" }}>
-                  <div>📭</div>
-                  الأرشيف العام فارغ
+                <div style={{ textAlign: "center", color: "var(--text-dim)", marginTop: "50px", fontSize: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                  <Inbox size={36} strokeWidth={1.5} style={{ opacity: 0.45 }} />
+                  <span>الأرشيف العام فارغ</span>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {archives.map(item => (
-                    <div key={item.id} style={{ background: "#222", border: "1px solid #444", borderRadius: "10px", padding: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
+                    <div key={item.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px" }}>
                       <div>
-                        <h4 style={{ margin: "0 0 5px 0", color: "#fff", fontSize: "15px" }}>{item.description}</h4>
-                        <span style={{ fontSize: "11px", color: "#777", background: "#111", padding: "3px 8px", borderRadius: "4px" }}>
+                        <h4 style={{ margin: "0 0 6px 0", color: "var(--text-primary)", fontSize: "15px", fontWeight: 600 }}>{item.description}</h4>
+                        <span className="tabular-nums" style={{ fontSize: "11px", color: "var(--text-muted)", background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "3px 8px", borderRadius: "6px", display: "inline-block" }}>
                           {new Date(item.created_at).toLocaleString('ar-EG')}
                         </span>
                       </div>
-                      <div style={{ display: "flex", gap: "10px" }}>
+                      <div style={{ display: "flex", gap: "8px" }}>
                         <button 
                           onClick={() => handleRestore(item)}
-                          style={{ background: "#4CAF50", color: "#fff", border: "none", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
+                          style={{ background: "var(--success)", color: "#fff", border: "none", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                         >
-                          🔄 استعادة
+                          <RotateCcw size={14} strokeWidth={1.5} />
+                          <span>استعادة</span>
                         </button>
                         <button 
                           onClick={() => handlePermanentDeleteClick(item.id)}
-                          style={{ background: "transparent", color: "#f44336", border: "1px solid #f44336", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
+                          style={{ background: "transparent", color: "var(--error-ink)", border: "1px solid var(--error)", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                         >
-                          🗑️ حذف نهائي
+                          <Trash2 size={14} strokeWidth={1.5} />
+                          <span>حذف نهائي</span>
                         </button>
                       </div>
                     </div>
@@ -257,43 +283,46 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
           {activeTab === "graduates" && (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", marginBottom: "15px" }}>
-                <p style={{ color: "#aaa", fontSize: "13px", margin: 0 }}>
+                <p style={{ color: "var(--text-muted)", fontSize: "13px", margin: 0 }}>
                   الطلاب الذين اختفوا من شيت المزامنة وتم تحويلهم لخريجين/منقولين للحفاظ على أكوادهم القديمة وبياناتهم.
                 </p>
                 <button 
                   onClick={handleExportGraduatesCSV}
                   disabled={graduates.length === 0}
-                  style={{ background: "#2196F3", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "13px" }}
+                  style={{ background: "var(--primary)", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", cursor: graduates.length === 0 ? "not-allowed" : "pointer", opacity: graduates.length === 0 ? 0.5 : 1, fontWeight: 600, fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                 >
-                  📥 تحميل أرشيف الخريجين CSV
+                  <Download size={14} strokeWidth={1.5} />
+                  <span>تحميل أرشيف الخريجين CSV</span>
                 </button>
               </div>
 
               {/* Search input for graduates */}
-              <div style={{ marginBottom: "15px" }}>
+              <div style={{ marginBottom: "15px", position: "relative" }}>
+                <Search size={15} strokeWidth={1.5} color="var(--text-dim)" style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
                 <input
                   type="text"
-                  placeholder="🔍 بحث في الخريجين بالاسم أو الكود..."
+                  placeholder="بحث في الخريجين بالاسم أو الكود..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
-                    background: "#111827",
-                    border: "1px solid #374151",
+                    padding: "10px 36px 10px 14px",
+                    background: "var(--bg-deep)",
+                    border: "1px solid var(--border-light)",
                     borderRadius: "8px",
-                    color: "#fff",
-                    fontSize: "13px"
+                    color: "var(--text-primary)",
+                    fontSize: "13px",
+                    boxSizing: "border-box"
                   }}
                 />
               </div>
 
               {loading ? (
-                <div style={{ textAlign: "center", color: "#888", marginTop: "50px" }}>جاري التحميل...</div>
+                <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "50px" }}>جاري التحميل...</div>
               ) : graduates.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#555", marginTop: "50px", fontSize: "18px" }}>
-                  <div>📭</div>
-                  لا يوجد خريجين في الأرشيف
+                <div style={{ textAlign: "center", color: "var(--text-dim)", marginTop: "50px", fontSize: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                  <Inbox size={36} strokeWidth={1.5} style={{ opacity: 0.45 }} />
+                  <span>لا يوجد خريجين في الأرشيف</span>
                 </div>
               ) : (
                 (() => {
@@ -309,7 +338,7 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
 
                   if (filtered.length === 0) {
                     return (
-                      <div style={{ textAlign: "center", color: "#888", marginTop: "30px", fontSize: "14px" }}>
+                      <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "30px", fontSize: "14px" }}>
                         لم يتم العثور على نتائج مطابقة للبحث &quot;{searchQuery}&quot;
                       </div>
                     );
@@ -318,17 +347,18 @@ export default function ArchiveModal({ isOpen, onClose, user, onItemRestored }: 
                   return (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
                       {filtered.map(g => (
-                        <div key={g.id} style={{ background: "#1f2937", border: "1px solid #374151", borderRadius: "8px", padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 8px 0", color: "#fff", fontSize: "14px", lineHeight: "1.4" }}>{g.full_name}</h4>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#9ca3af", marginBottom: "12px" }}>
-                            <span>الكود: <strong style={{ color: "#38bdf8", letterSpacing: "1px" }}>{g.student_code}</strong></span>
+                        <div key={g.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "14px" }}>
+                          <h4 style={{ margin: "0 0 8px 0", color: "var(--text-primary)", fontSize: "14px", fontWeight: 600, lineHeight: "1.4" }}>{g.full_name}</h4>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>
+                            <span>الكود: <strong className="tabular-nums" style={{ color: "var(--accent-ink)", fontWeight: 600, letterSpacing: "0.5px" }}>{g.student_code}</strong></span>
                             <span>الفرقة: {g.academic_year}</span>
                           </div>
                           <button 
                             onClick={() => handleRestoreGraduate(g.id)}
-                            style={{ width: "100%", background: "transparent", color: "#4ade80", border: "1px solid #4ade80", padding: "6px 10px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}
+                            style={{ width: "100%", background: "rgba(16, 185, 129, 0.08)", color: "var(--success-ink)", border: "1px solid var(--success)", padding: "7px 10px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "12px", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                           >
-                            🔄 تنشيط وإعادة للنظام
+                            <RotateCcw size={13} strokeWidth={1.5} />
+                            <span>تنشيط وإعادة للنظام</span>
                           </button>
                         </div>
                       ))}

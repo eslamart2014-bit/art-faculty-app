@@ -2,17 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/core/supabase";
-import { 
-  MessageSquare, 
-  Inbox, 
-  Send, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  Filter, 
+import {
+  MessageSquare,
+  Inbox,
+  Send,
+  CheckCircle2,
+  Clock,
   RefreshCw,
   User,
-  GraduationCap
+  ArrowRight,
+  X
 } from "lucide-react";
 
 interface SuggestionsChatModalProps {
@@ -214,49 +213,51 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-      background: "rgba(0,0,0,0.85)", zIndex: 1000,
+      background: "rgba(0,0,0,0.8)", zIndex: 1000,
       display: "flex", justifyContent: "center", alignItems: "center",
       padding: "16px"
     }} onClick={onClose}>
       
       <div style={{
-        background: "#141b29", borderRadius: "16px", width: "100%", maxWidth: "680px", height: "88vh",
-        display: "flex", flexDirection: "column", direction: "rtl", border: "1px solid #2a374f", overflow: "hidden",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
+        background: "var(--surface)", borderRadius: "16px", width: "100%", maxWidth: "680px", height: "88vh",
+        display: "flex", flexDirection: "column", direction: "rtl", border: "1px solid var(--border)", overflow: "hidden"
       }} onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div style={{ padding: "12px 18px", background: "#0d131f", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "12px 18px", background: "var(--bg-deep)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {isAdmin && selectedUserId && activeMainTab === "suggestions" && (
               <button 
                 onClick={() => setSelectedUserId(null)} 
-                style={{ background: "#1e293b", border: "1px solid #334155", color: "#38bdf8", borderRadius: "8px", padding: "4px 8px", cursor: "pointer", fontSize: "14px" }}
+                style={{ background: "var(--surface)", border: "1px solid var(--border-light)", color: "var(--accent-ink)", borderRadius: "8px", padding: "5px 10px", cursor: "pointer", fontSize: "13px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "5px" }}
               >
-                🡲 العودة
+                <ArrowRight size={15} strokeWidth={1.5} />
+                <span>العودة</span>
               </button>
             )}
-            <h3 style={{ margin: 0, color: "#fff", fontSize: "15px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>💬</span>
+            <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <MessageSquare size={17} strokeWidth={1.5} color="var(--accent-ink)" />
               <span>مركز الرسائل والشكاوى</span>
             </h3>
           </div>
-          <button onClick={onClose} className="modal-close-btn" title="إغلاق">✕</button>
+          <button onClick={onClose} className="modal-close-btn" title="إغلاق" aria-label="إغلاق">
+            <X size={18} strokeWidth={1.5} />
+          </button>
         </div>
 
         {/* Tab Navigation for Admins (المقترحات vs الشكاوى الطلابية) */}
         {isAdmin && (
-          <div style={{ display: "flex", background: "#0d131f", borderBottom: "1px solid #1e293b", padding: "6px 14px", gap: "8px" }}>
+          <div style={{ display: "flex", background: "var(--bg-deep)", borderBottom: "1px solid var(--border)", padding: "8px 14px", gap: "8px" }}>
             <button
               onClick={() => { setActiveMainTab("suggestions"); setSelectedUserId(null); }}
               style={{
                 flex: 1,
                 padding: "9px",
-                borderRadius: "10px",
-                border: activeMainTab === "suggestions" ? "1px solid #3b82f6" : "1px solid transparent",
-                background: activeMainTab === "suggestions" ? "rgba(59, 130, 246, 0.15)" : "transparent",
-                color: activeMainTab === "suggestions" ? "#60a5fa" : "#94a3b8",
-                fontWeight: "bold",
+                borderRadius: "8px",
+                border: activeMainTab === "suggestions" ? "1px solid var(--primary)" : "1px solid transparent",
+                background: activeMainTab === "suggestions" ? "rgba(37, 99, 235, 0.14)" : "transparent",
+                color: activeMainTab === "suggestions" ? "var(--accent-ink)" : "var(--text-muted)",
+                fontWeight: activeMainTab === "suggestions" ? 600 : 500,
                 fontSize: "13px",
                 cursor: "pointer",
                 display: "flex",
@@ -265,10 +266,10 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                 gap: "6px"
               }}
             >
-              <MessageSquare size={16} />
+              <MessageSquare size={16} strokeWidth={1.5} />
               <span>مقترحات الزملاء والمحادثات</span>
               {unreadChatsCount > 0 && (
-                <span style={{ background: "#ef4444", color: "#fff", borderRadius: "999px", padding: "1px 6px", fontSize: "10px" }}>
+                <span className="tabular-nums" style={{ background: "var(--error)", color: "#fff", borderRadius: "6px", padding: "1px 6px", fontSize: "10px", fontWeight: 600 }}>
                   {unreadChatsCount}
                 </span>
               )}
@@ -279,11 +280,11 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
               style={{
                 flex: 1,
                 padding: "9px",
-                borderRadius: "10px",
-                border: activeMainTab === "complaints" ? "1px solid #ec4899" : "1px solid transparent",
-                background: activeMainTab === "complaints" ? "rgba(236, 72, 153, 0.15)" : "transparent",
-                color: activeMainTab === "complaints" ? "#f472b6" : "#94a3b8",
-                fontWeight: "bold",
+                borderRadius: "8px",
+                border: activeMainTab === "complaints" ? "1px solid var(--primary)" : "1px solid transparent",
+                background: activeMainTab === "complaints" ? "rgba(37, 99, 235, 0.14)" : "transparent",
+                color: activeMainTab === "complaints" ? "var(--accent-ink)" : "var(--text-muted)",
+                fontWeight: activeMainTab === "complaints" ? 600 : 500,
                 fontSize: "13px",
                 cursor: "pointer",
                 display: "flex",
@@ -292,10 +293,10 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                 gap: "6px"
               }}
             >
-              <Inbox size={16} />
+              <Inbox size={16} strokeWidth={1.5} />
               <span>صندوق الشكاوى الطلابية</span>
               {unreadComplaintsCount > 0 && (
-                <span style={{ background: "#ef4444", color: "#fff", borderRadius: "999px", padding: "1px 6px", fontSize: "10px", fontWeight: "bold" }}>
+                <span className="tabular-nums" style={{ background: "var(--error)", color: "#fff", borderRadius: "6px", padding: "1px 6px", fontSize: "10px", fontWeight: 600 }}>
                   {unreadComplaintsCount}
                 </span>
               )}
@@ -312,9 +313,9 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
             {isAdmin && !selectedUserId ? (
               // قائمة محادثات الزملاء للمدير
               <div style={{ flexGrow: 1, overflowY: "auto", padding: "16px" }}>
-                {loading ? <div style={{ textAlign: "center", color: "#94a3b8", marginTop: "30px" }}>جاري التحميل...</div> : null}
+                {loading ? <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "30px" }}>جاري التحميل...</div> : null}
                 {!loading && allChats.length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#64748b", marginTop: "40px", fontSize: "13px" }}>
+                  <div style={{ textAlign: "center", color: "var(--text-dim)", marginTop: "40px", fontSize: "13px" }}>
                     لا توجد رسائل أو مقترحات جديدة من الزملاء بعد
                   </div>
                 ) : null}
@@ -324,7 +325,7 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                     key={c.id} 
                     onClick={() => handleSelectUser(c.id)}
                     style={{ 
-                      background: "#0d131f", 
+                      background: "var(--bg-deep)", 
                       padding: "14px", 
                       borderRadius: "12px", 
                       marginBottom: "10px", 
@@ -332,18 +333,18 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                       display: "flex", 
                       justifyContent: "space-between", 
                       alignItems: "center", 
-                      border: "1px solid #1e293b",
-                      transition: "all 0.2s"
+                      border: "1px solid var(--border)",
+                      transition: "border-color 0.2s"
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(59, 130, 246, 0.15)", color: "#38bdf8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <User size={18} />
+                      <div style={{ width: "36px", height: "36px", borderRadius: "8px", background: "rgba(56, 189, 248, 0.12)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <User size={18} strokeWidth={1.5} />
                       </div>
-                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{c.name}</div>
+                      <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{c.name}</div>
                     </div>
                     {c.unread > 0 && (
-                      <div style={{ background: "#ef4444", color: "#fff", padding: "3px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold" }}>
+                      <div className="tabular-nums" style={{ background: "var(--error)", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                         {c.unread} جديدة
                       </div>
                     )}
@@ -353,11 +354,11 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
             ) : (
               // شاشة المحادثة الفعلية
               <>
-                <div style={{ flexGrow: 1, overflowY: "auto", padding: "16px", background: "#0d131f", display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {loading ? <div style={{ textAlign: "center", color: "#94a3b8", marginTop: "20px" }}>جاري تحميل الرسائل...</div> : null}
+                <div style={{ flexGrow: 1, overflowY: "auto", padding: "16px", background: "var(--bg-deep)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {loading ? <div style={{ textAlign: "center", color: "var(--text-muted)", marginTop: "20px" }}>جاري تحميل الرسائل...</div> : null}
                   {!loading && messages.length === 0 ? (
-                    <div style={{ textAlign: "center", color: "#64748b", marginTop: "40px", fontSize: "13px", lineHeight: "1.6" }}>
-                      أهلاً بك! 👋<br/>يمكنك كتابة أي مقترح لتطوير المنظومة أو ملاحظة للإدارة.
+                    <div style={{ textAlign: "center", color: "var(--text-dim)", marginTop: "40px", fontSize: "13px", lineHeight: "1.6" }}>
+                      أهلاً بك.<br/>يمكنك كتابة أي مقترح لتطوير المنظومة أو ملاحظة للإدارة.
                     </div>
                   ) : null}
 
@@ -366,17 +367,17 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                     return (
                       <div key={idx} style={{ alignSelf: isMe ? "flex-start" : "flex-end", maxWidth: "80%" }}>
                         <div style={{
-                          background: isMe ? "#1d4ed8" : "#1e293b",
+                          background: isMe ? "var(--primary)" : "var(--surface)",
                           color: "#fff",
                           padding: "10px 14px",
-                          borderRadius: isMe ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
+                          borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                          border: isMe ? "none" : "1px solid var(--border)",
                           fontSize: "13px",
-                          lineHeight: "1.6",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
+                          lineHeight: "1.6"
                         }}>
                           {m.message}
                         </div>
-                        <div style={{ fontSize: "10px", color: "#64748b", marginTop: "3px", textAlign: isMe ? "left" : "right", padding: "0 4px" }}>
+                        <div className="tabular-nums" style={{ fontSize: "10px", color: "var(--text-dim)", marginTop: "3px", textAlign: isMe ? "left" : "right", padding: "0 4px" }}>
                           {new Date(m.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
@@ -386,21 +387,21 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                 </div>
 
                 {/* حقل الإدخال */}
-                <div style={{ padding: "12px 16px", background: "#141b29", borderTop: "1px solid #1e293b", display: "flex", gap: "8px", alignItems: "center" }}>
+                <div style={{ padding: "12px 16px", background: "var(--surface)", borderTop: "1px solid var(--border)", display: "flex", gap: "8px", alignItems: "center" }}>
                   <input 
                     type="text" 
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
                     placeholder="اكتب رسالتك أو مقترحك هنا..."
-                    style={{ flexGrow: 1, padding: "11px 16px", borderRadius: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", outline: "none", fontSize: "13px" }}
+                    style={{ flexGrow: 1, padding: "10px 14px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text-primary)", outline: "none", fontSize: "13px" }}
                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                   />
                   <button 
                     onClick={handleSendMessage}
                     disabled={sending || !inputText.trim()}
-                    style={{ background: "#2563eb", color: "#fff", border: "none", width: "42px", height: "42px", borderRadius: "10px", display: "flex", justifyContent: "center", alignItems: "center", cursor: (sending || !inputText.trim()) ? "not-allowed" : "pointer" }}
+                    style={{ background: "var(--primary)", color: "#fff", border: "none", width: "40px", height: "40px", borderRadius: "8px", display: "flex", justifyContent: "center", alignItems: "center", cursor: (sending || !inputText.trim()) ? "not-allowed" : "pointer" }}
                   >
-                    <Send size={16} />
+                    <Send size={16} strokeWidth={1.5} />
                   </button>
                 </div>
               </>
@@ -422,16 +423,17 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                 ].map(f => (
                   <button
                     key={f.id}
+                    className="tabular-nums"
                     onClick={() => setComplaintFilter(f.id as any)}
                     style={{
-                      padding: "5px 12px",
+                      padding: "6px 12px",
                       borderRadius: "8px",
-                      border: complaintFilter === f.id ? "1px solid #ec4899" : "1px solid #1e293b",
-                      background: complaintFilter === f.id ? "rgba(236, 72, 153, 0.2)" : "#0d131f",
-                      color: complaintFilter === f.id ? "#fff" : "#94a3b8",
+                      border: complaintFilter === f.id ? "1px solid var(--primary)" : "1px solid var(--border)",
+                      background: complaintFilter === f.id ? "rgba(37, 99, 235, 0.16)" : "var(--bg-deep)",
+                      color: complaintFilter === f.id ? "var(--accent-ink)" : "var(--text-muted)",
                       fontSize: "12px",
                       cursor: "pointer",
-                      fontWeight: complaintFilter === f.id ? "bold" : "normal"
+                      fontWeight: complaintFilter === f.id ? 600 : 400
                     }}
                   >
                     {f.label}
@@ -442,25 +444,25 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
               <button
                 onClick={fetchComplaints}
                 disabled={loadingComplaints}
-                style={{ background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", padding: "5px 10px", borderRadius: "8px", fontSize: "11px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                style={{ background: "var(--surface-hover)", border: "1px solid var(--border-light)", color: "var(--text-muted)", padding: "6px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
               >
-                <RefreshCw size={12} className={loadingComplaints ? "spin" : ""} />
+                <RefreshCw size={12} strokeWidth={1.5} className={loadingComplaints ? "spin" : ""} />
                 <span>تحديث</span>
               </button>
             </div>
 
             {replySuccessMsg && (
-              <div style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid #10b981", color: "#34d399", padding: "10px", borderRadius: "10px", marginBottom: "12px", fontSize: "12px", textAlign: "center" }}>
+              <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid var(--success)", color: "var(--success-ink)", padding: "10px", borderRadius: "8px", marginBottom: "12px", fontSize: "12px", textAlign: "center", fontWeight: 500 }}>
                 {replySuccessMsg}
               </div>
             )}
 
             {/* قائمة الشكاوى */}
             {loadingComplaints ? (
-              <div style={{ textAlign: "center", color: "#94a3b8", padding: "40px" }}>جاري تحميل الشكاوى الطلابية...</div>
+              <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>جاري تحميل الشكاوى الطلابية...</div>
             ) : filteredComplaints.length === 0 ? (
-              <div style={{ textAlign: "center", color: "#64748b", padding: "50px 0" }}>
-                <Inbox size={36} style={{ margin: "0 auto 10px auto", opacity: 0.4 }} />
+              <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "50px 0" }}>
+                <Inbox size={36} strokeWidth={1.5} style={{ margin: "0 auto 10px auto", opacity: 0.45 }} />
                 <div style={{ fontSize: "13px" }}>لا توجد شكاوى في هذا القسم</div>
               </div>
             ) : (
@@ -471,43 +473,47 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                     <div 
                       key={c.id} 
                       style={{ 
-                        background: "#0d131f", 
-                        border: "1px solid #1e293b", 
+                        background: "var(--bg-deep)", 
+                        border: "1px solid var(--border)", 
                         borderRadius: "12px", 
                         padding: "14px",
-                        borderRight: isReplied ? "4px solid #10b981" : "4px solid #f59e0b"
+                        borderRight: isReplied ? "3px solid var(--success)" : "3px solid var(--warning)"
                       }}
                     >
                       {/* معلومات الشاكي */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
                         <div>
-                          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px" }}>{c.student_name}</div>
-                          <div style={{ color: "#38bdf8", fontSize: "11px" }}>
-                            كود: {c.student_code} • {c.academic_year || 'الفرقة الدراسية'} • موجهة إلى: <b>{c.target_entity}</b>
+                          <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "14px" }}>{c.student_name}</div>
+                          <div className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "11px" }}>
+                            كود: {c.student_code} • {c.academic_year || 'الفرقة الدراسية'} • موجهة إلى: <strong style={{ fontWeight: 600 }}>{c.target_entity}</strong>
                           </div>
                         </div>
 
                         <span style={{ 
                           fontSize: "11px", 
                           padding: "3px 8px", 
-                          borderRadius: "8px", 
-                          fontWeight: "bold",
-                          background: isReplied ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                          color: isReplied ? "#34d399" : "#fbbf24"
+                          borderRadius: "6px", 
+                          fontWeight: 600,
+                          background: isReplied ? "rgba(16, 185, 129, 0.14)" : "rgba(245, 158, 11, 0.14)",
+                          color: isReplied ? "var(--success-ink)" : "var(--warning-ink)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px"
                         }}>
-                          {isReplied ? "✓ تم الرد" : "⏳ جديدة"}
+                          {isReplied ? <CheckCircle2 size={12} strokeWidth={1.5} /> : <Clock size={12} strokeWidth={1.5} />}
+                          <span>{isReplied ? "تم الرد" : "جديدة"}</span>
                         </span>
                       </div>
 
                       {/* موضوع ونص الشكوى */}
-                      <div style={{ background: "#141b29", padding: "10px", borderRadius: "8px", border: "1px solid #1a2336", color: "#e2e8f0", fontSize: "12px", lineHeight: "1.6", marginBottom: "10px" }}>
+                      <div style={{ background: "var(--surface)", padding: "10px", borderRadius: "8px", border: "1px solid var(--border)", color: "var(--text-primary)", fontSize: "12px", lineHeight: "1.6", marginBottom: "10px" }}>
                         {c.content}
                       </div>
 
                       {/* الرد الرسمي إن وجد */}
                       {c.officialReply && (
-                        <div style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "10px", borderRadius: "8px", color: "#a7f3d0", fontSize: "12px", marginBottom: "8px" }}>
-                          <div style={{ fontWeight: "bold", color: "#34d399", marginBottom: "3px", fontSize: "11px" }}>
+                        <div style={{ background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)", padding: "10px", borderRadius: "8px", color: "var(--success-ink)", fontSize: "12px", marginBottom: "8px" }}>
+                          <div style={{ fontWeight: 600, color: "var(--success-ink)", marginBottom: "3px", fontSize: "11px" }}>
                             رد الإدارة الرسمي ({c.officialReply.repliedBy || "الإدارة"}):
                           </div>
                           <div>{c.officialReply.text}</div>
@@ -522,14 +528,14 @@ export default function SuggestionsChatModal({ isOpen, onClose, user }: Suggesti
                           value={replyTextMap[c.id] || ""}
                           onChange={(e) => setReplyTextMap({ ...replyTextMap, [c.id]: e.target.value })}
                           onKeyDown={(e) => { if (e.key === 'Enter') handleSendComplaintReply(c.id); }}
-                          style={{ flex: 1, padding: "8px 12px", background: "#141b29", border: "1px solid #2a374f", borderRadius: "8px", color: "#fff", fontSize: "12px" }}
+                          style={{ flex: 1, padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "12px" }}
                         />
                         <button
                           onClick={() => handleSendComplaintReply(c.id)}
                           disabled={sendingReplyId === c.id || !replyTextMap[c.id]?.trim()}
-                          style={{ background: "#10b981", color: "#fff", border: "none", padding: "0 14px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                          style={{ background: "var(--success)", color: "#fff", border: "none", padding: "0 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
                         >
-                          <Send size={13} />
+                          <Send size={13} strokeWidth={1.5} />
                           <span>{sendingReplyId === c.id ? "جاري..." : "رد"}</span>
                         </button>
                       </div>

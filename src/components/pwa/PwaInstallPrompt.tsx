@@ -80,36 +80,35 @@ export default function PwaInstallPrompt() {
         bottom: 0,
         left: 0,
         right: 0,
-        background: "rgba(18, 24, 38, 0.96)",
-        backdropFilter: "blur(12px)",
-        borderTop: "2px solid #2563eb",
+        background: "var(--surface)",
+        borderTop: "1px solid var(--border-light)",
         zIndex: 999999,
-        padding: "12px 18px",
+        padding: "12px 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         gap: "12px",
         direction: "rtl",
-        boxShadow: "0 -6px 25px rgba(0,0,0,0.6)",
+        boxShadow: "0 -6px 20px rgba(0,0,0,0.4)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
         <img
           src="/icon-192.png"
-          style={{ width: "46px", height: "46px", borderRadius: "12px", flexShrink: 0, border: "1px solid rgba(255,255,255,0.15)" }}
-          alt="icon"
+          style={{ width: "44px", height: "44px", borderRadius: "10px", flexShrink: 0, border: "1px solid var(--border-light)" }}
+          alt="شعار النظام"
         />
         <div>
-          <div style={{ color: "#fff", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>تثبيت تطبيق المنظومة على جهازك</span>
-            <span style={{ fontSize: "10px", background: "rgba(37,99,235,0.3)", color: "#60a5fa", padding: "2px 6px", borderRadius: "4px" }}>
-              لوحة هيئة التدريس (PWA)
+          <div style={{ color: "var(--text)", fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <span>تثبيت تطبيق المنظومة</span>
+            <span style={{ fontSize: "11px", fontWeight: 500, background: "rgba(37,99,235,0.14)", border: "1px solid rgba(56,189,248,0.22)", color: "var(--accent-ink)", padding: "2px 8px", borderRadius: "4px" }}>
+              لوحة هيئة التدريس
             </span>
           </div>
-          <div style={{ color: "#94a3b8", fontSize: "11px", marginTop: "2px" }}>
+          <div style={{ color: "var(--text-secondary)", fontSize: "12px", marginTop: "2px" }}>
             {isIOS
               ? 'اضغط على زر المشاركة (Share) في المتصفح ثم اختر "إضافة إلى الصفحة الرئيسية"'
-              : "للوصول المباشر السريع للوحة المقر والتقييمات بدون تشتت"}
+              : "للوصول المباشر للوحة المقررات والتقييمات"}
           </div>
         </div>
       </div>
@@ -118,38 +117,31 @@ export default function PwaInstallPrompt() {
         {!isIOS && deferredPrompt && (
           <button
             onClick={handleInstall}
+            className="btn-compact"
             style={{
-              background: "#2563eb",
+              background: "var(--primary)",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
-              padding: "8px 14px",
-              fontWeight: "bold",
-              fontSize: "12.5px",
+              padding: "8px 16px",
+              fontWeight: 500,
+              fontSize: "13px",
               cursor: "pointer",
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               gap: "6px",
             }}
           >
-            <Download size={14} />
-            تثبيت الآن
+            <Download size={16} strokeWidth={1.5} />
+            <span>تثبيت الآن</span>
           </button>
         )}
         <button
           onClick={handleDismiss}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#64748b",
-            cursor: "pointer",
-            padding: "6px",
-            display: "flex",
-            alignItems: "center",
-          }}
+          className="modal-close-btn"
           title="إغلاق"
         >
-          <X size={18} />
+          <X size={16} strokeWidth={1.5} />
         </button>
       </div>
     </div>

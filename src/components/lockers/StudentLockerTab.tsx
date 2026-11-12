@@ -220,10 +220,10 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       
       {/* رأس التبويب */}
       <div style={{ 
-        background: "linear-gradient(135deg, #1e293b, #0f172a)", 
-        padding: "12px 14px", 
-        borderRadius: "14px", 
-        border: "1px solid #334155",
+        background: "var(--surface)", 
+        padding: "12px 16px", 
+        borderRadius: "12px", 
+        border: "1px solid var(--border)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -231,27 +231,27 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
         gap: "10px"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ background: "rgba(56, 189, 248, 0.15)", padding: "8px", borderRadius: "10px" }}>
-            <Archive size={20} color="#38bdf8" />
+          <div style={{ background: "rgba(56, 189, 248, 0.14)", padding: "8px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Archive size={20} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
           </div>
           <div>
-            <h3 style={{ margin: 0, color: "#fff", fontSize: "14px", fontWeight: "bold" }}>
+            <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "14px", fontWeight: 600 }}>
               منظومة دواليب الطلاب
             </h3>
-            <p style={{ margin: "2px 0 0 0", color: "#94a3b8", fontSize: "11px" }}>
+            <p style={{ margin: "2px 0 0 0", color: "var(--text-muted)", fontSize: "11px" }}>
               قسم التربية الفنية - كلية التربية النوعية - جامعة قنا
             </p>
           </div>
         </div>
 
-        <div style={{ fontSize: "11px", background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "20px", color: "#cbd5e1" }}>
-          منسق الدواليب: <span style={{ color: "#38bdf8", fontWeight: "bold" }}>م/ إسلام عبداللطيف</span>
+        <div style={{ fontSize: "11px", background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "4px 10px", borderRadius: "6px", color: "var(--text-muted)" }}>
+          منسق الدواليب: <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>م/ إسلام عبداللطيف</span>
         </div>
       </div>
 
       {errorMsg && (
-        <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid #ef4444", color: "#fca5a5", padding: "12px 16px", borderRadius: "12px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-          <AlertCircle size={18} />
+        <div style={{ background: "rgba(239, 68, 68, 0.12)", border: "1px solid var(--error)", color: "var(--error-ink)", padding: "12px 16px", borderRadius: "12px", fontSize: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <AlertCircle size={18} strokeWidth={1.5} />
           <span>{errorMsg}</span>
         </div>
       )}
@@ -259,56 +259,56 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       {/* الحالة 1: حجز معتمد ومؤكد رسمياً */}
       {status === 'confirmed' && booking && (
         <div style={{
-          background: "#16222f",
-          border: "2px solid #10b981",
-          borderRadius: "16px",
-          padding: "24px 20px",
-          boxShadow: "0 10px 25px rgba(16, 185, 129, 0.15)"
+          background: "var(--surface)",
+          border: "1px solid var(--success)",
+          borderRadius: "12px",
+          padding: "24px 20px"
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <span style={{ 
-              background: "rgba(16, 185, 129, 0.2)", 
-              color: "#34d399", 
-              padding: "6px 14px", 
-              borderRadius: "20px", 
+              background: "rgba(16, 185, 129, 0.14)", 
+              color: "var(--success-ink)", 
+              border: "1px solid rgba(16, 185, 129, 0.35)",
+              padding: "5px 12px", 
+              borderRadius: "6px", 
               fontSize: "13px", 
-              fontWeight: "bold",
+              fontWeight: 600,
               display: "flex",
               alignItems: "center",
               gap: "6px"
             }}>
-              <CheckCircle2 size={16} />
+              <CheckCircle2 size={15} strokeWidth={1.5} />
               <span>تم التسكين والتأكيد رسمياً</span>
             </span>
 
-            <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+            <span className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
               تاريخ الاعتماد: {new Date(booking.confirmed_at || booking.created_at).toLocaleDateString('ar-EG')}
             </span>
           </div>
 
           <div style={{ textAlign: "center", margin: "20px 0" }}>
-            <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "6px" }}>رقم الدولاب المخصص لك</div>
-            <div style={{ 
-              fontSize: "46px", 
-              fontWeight: "900", 
-              color: "#38bdf8", 
+            <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "6px" }}>رقم الدولاب المخصص لك</div>
+            <div className="tabular-nums" style={{ 
+              fontSize: "44px", 
+              fontWeight: 600, 
+              color: "var(--accent-ink)", 
               letterSpacing: "2px",
               display: "inline-block",
               background: "rgba(56, 189, 248, 0.1)",
-              border: "2px dashed #38bdf8",
-              padding: "6px 36px",
-              borderRadius: "16px"
+              border: "1px dashed var(--accent-ink)",
+              padding: "8px 36px",
+              borderRadius: "12px"
             }}>
               {booking.locker_code}
             </div>
-            <div style={{ fontSize: "13px", color: "#cbd5e1", marginTop: "8px" }}>
-              الفرقة الدراسية: <strong>{booking.cohort}</strong>
+            <div style={{ fontSize: "13px", color: "var(--text-primary)", marginTop: "8px" }}>
+              الفرقة الدراسية: <strong style={{ fontWeight: 600 }}>{booking.cohort}</strong>
             </div>
           </div>
 
-          <div style={{ background: "#0f172a", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "bold", color: "#fff", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Users size={16} color="#38bdf8" />
+          <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Users size={16} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
               <span>الزملاء المشتركون في الدولاب:</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
@@ -317,24 +317,25 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   display: "flex", 
                   justifyContent: "space-between", 
                   alignItems: "center", 
-                  background: "#1e293b", 
+                  background: "var(--surface)", 
+                  border: "1px solid var(--border)",
                   padding: "10px 14px", 
                   borderRadius: "8px",
                   fontSize: "14px"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f1f5f9" }}>
-                    <span style={{ background: "#334155", width: "22px", height: "22px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#94a3b8" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)" }}>
+                    <span className="tabular-nums" style={{ background: "var(--surface-hover)", width: "22px", height: "22px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "var(--text-muted)" }}>
                       {i + 1}
                     </span>
                     <span>{name}</span>
                     {name === student.full_name && (
-                      <span style={{ fontSize: "11px", background: "rgba(56, 189, 248, 0.2)", color: "#38bdf8", padding: "2px 6px", borderRadius: "4px" }}>
+                      <span style={{ fontSize: "11px", background: "rgba(56, 189, 248, 0.16)", color: "var(--accent-ink)", padding: "2px 6px", borderRadius: "6px", fontWeight: 600 }}>
                         (أنت)
                       </span>
                     )}
                   </div>
                   {booking.student_codes && booking.student_codes[i] && (
-                    <span style={{ fontSize: "12px", color: "#94a3b8", direction: "ltr" }}>
+                    <span className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-muted)", direction: "ltr" }}>
                       #{booking.student_codes[i]}
                     </span>
                   )}
@@ -348,21 +349,20 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
               onClick={() => handlePrint(booking)}
               disabled={downloadingPdf}
               style={{
-                background: downloadingPdf ? "#1e293b" : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                background: downloadingPdf ? "var(--surface-hover)" : "var(--primary)",
                 color: "#fff",
-                border: downloadingPdf ? "1px solid #38bdf8" : "none",
+                border: downloadingPdf ? "1px solid var(--accent-ink)" : "none",
                 padding: "10px 20px",
-                borderRadius: "10px",
-                fontWeight: "bold",
+                borderRadius: "8px",
+                fontWeight: 600,
                 fontSize: "13px",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                cursor: downloadingPdf ? "wait" : "pointer",
-                boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)"
+                cursor: downloadingPdf ? "wait" : "pointer"
               }}
             >
-              <Printer size={16} />
+              <Printer size={16} strokeWidth={1.5} />
               <span>{downloadingPdf ? (pdfStatusMsg || "جاري تنزيل ملف الـ PDF...") : "تحميل الاستمارة الرسمية (PDF)"}</span>
             </button>
           </div>
@@ -372,45 +372,45 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       {/* الحالة 2: حجز معلق - بانتظار الاستلام */}
       {status === 'pending' && booking && (
         <div style={{
-          background: "#1c1d24",
-          border: "2px solid #f59e0b",
-          borderRadius: "16px",
-          padding: "24px 20px",
-          boxShadow: "0 10px 25px rgba(245, 158, 11, 0.15)"
+          background: "var(--surface)",
+          border: "1px solid var(--warning)",
+          borderRadius: "12px",
+          padding: "24px 20px"
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <span style={{ 
-              background: "rgba(245, 158, 11, 0.2)", 
-              color: "#fbbf24", 
-              padding: "6px 14px", 
-              borderRadius: "20px", 
+              background: "rgba(245, 158, 11, 0.15)", 
+              color: "var(--warning-ink)", 
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              padding: "5px 12px", 
+              borderRadius: "6px", 
               fontSize: "13px", 
-              fontWeight: "bold",
+              fontWeight: 600,
               display: "flex",
               alignItems: "center",
               gap: "6px"
             }}>
-              <Clock size={16} />
+              <Clock size={15} strokeWidth={1.5} />
               <span>الحجز قيد المراجعة والاستلام</span>
             </span>
 
-            <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+            <span className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
               تاريخ التسجيل: {new Date(booking.created_at).toLocaleDateString('ar-EG')}
             </span>
           </div>
 
           <div style={{ textAlign: "center", margin: "16px 0" }}>
-            <div style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "4px" }}>رقم الدولاب المحجوز مبدئياً</div>
-            <div style={{ 
-              fontSize: "42px", 
-              fontWeight: "900", 
-              color: "#fbbf24", 
+            <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "6px" }}>رقم الدولاب المحجوز مبدئياً</div>
+            <div className="tabular-nums" style={{ 
+              fontSize: "40px", 
+              fontWeight: 600, 
+              color: "var(--warning-ink)", 
               letterSpacing: "2px",
               display: "inline-block",
               background: "rgba(245, 158, 11, 0.1)",
-              border: "2px dashed #f59e0b",
-              padding: "4px 30px",
-              borderRadius: "14px"
+              border: "1px dashed var(--warning)",
+              padding: "6px 30px",
+              borderRadius: "12px"
             }}>
               {booking.locker_code}
             </div>
@@ -419,24 +419,24 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           {/* التنبيه المطلوب نصاً بالخطة */}
           <div style={{
             background: "rgba(245, 158, 11, 0.12)",
-            border: "1px solid rgba(245, 158, 11, 0.4)",
+            border: "1px solid rgba(245, 158, 11, 0.35)",
             borderRadius: "12px",
             padding: "16px",
             marginBottom: "20px",
             lineHeight: "1.7"
           }}>
-            <div style={{ color: "#fbbf24", fontWeight: "bold", fontSize: "15px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <AlertCircle size={18} />
+            <div style={{ color: "var(--warning-ink)", fontWeight: 600, fontSize: "15px", marginBottom: "6px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <AlertCircle size={18} strokeWidth={1.5} />
               <span>تنبيه هام ومطلوب لتأكيد الحجز والاستلام:</span>
             </div>
-            <p style={{ margin: 0, color: "#fef3c7", fontSize: "14px", fontWeight: "600" }}>
-              يجب طباعة الاستمارة أولاً، ويشترط تواجد جميع الطلاب المشتركين في الدولاب معاً لدى منسق الدواليب <span style={{ color: "#fbbf24", textDecoration: "underline" }}>م/ إسلام</span> لتأكيد الحجز النهائي واستلام الدولاب.
+            <p style={{ margin: 0, color: "#fef3c7", fontSize: "14px", fontWeight: 500 }}>
+              يجب طباعة الاستمارة أولاً، ويشترط تواجد جميع الطلاب المشتركين في الدولاب معاً لدى منسق الدواليب <span style={{ color: "var(--warning-ink)", textDecoration: "underline", fontWeight: 600 }}>م/ إسلام</span> لتأكيد الحجز النهائي واستلام الدولاب.
             </p>
           </div>
 
-          <div style={{ background: "#0f172a", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "bold", color: "#fff", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Users size={16} color="#fbbf24" />
+          <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Users size={16} strokeWidth={1.5} style={{ color: "var(--warning-ink)" }} />
               <span>الطلاب المسجلون في هذا الطلب:</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "8px" }}>
@@ -445,24 +445,25 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   display: "flex", 
                   justifyContent: "space-between", 
                   alignItems: "center", 
-                  background: "#1e293b", 
+                  background: "var(--surface)", 
+                  border: "1px solid var(--border)",
                   padding: "10px 14px", 
                   borderRadius: "8px",
                   fontSize: "14px"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#f1f5f9" }}>
-                    <span style={{ background: "#334155", width: "22px", height: "22px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#94a3b8" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-primary)" }}>
+                    <span className="tabular-nums" style={{ background: "var(--surface-hover)", width: "22px", height: "22px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "var(--text-muted)" }}>
                       {i + 1}
                     </span>
                     <span>{name}</span>
                     {name === student.full_name && (
-                      <span style={{ fontSize: "11px", background: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", padding: "2px 6px", borderRadius: "4px" }}>
+                      <span style={{ fontSize: "11px", background: "rgba(245, 158, 11, 0.16)", color: "var(--warning-ink)", padding: "2px 6px", borderRadius: "6px", fontWeight: 600 }}>
                         (أنت)
                       </span>
                     )}
                   </div>
                   {booking.student_codes && booking.student_codes[i] && (
-                    <span style={{ fontSize: "12px", color: "#94a3b8", direction: "ltr" }}>
+                    <span className="tabular-nums" style={{ fontSize: "12px", color: "var(--text-muted)", direction: "ltr" }}>
                       #{booking.student_codes[i]}
                     </span>
                   )}
@@ -475,21 +476,20 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
             <button
               onClick={() => handlePrint(booking)}
               style={{
-                background: "linear-gradient(135deg, #d97706, #b45309)",
+                background: "#b45309",
                 color: "#fff",
                 border: "none",
                 padding: "10px 20px",
-                borderRadius: "10px",
-                fontWeight: "bold",
+                borderRadius: "8px",
+                fontWeight: 600,
                 fontSize: "13px",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                cursor: "pointer",
-                boxShadow: "0 4px 14px rgba(217, 119, 6, 0.35)"
+                cursor: "pointer"
               }}
             >
-              <Printer size={20} />
+              <Printer size={17} strokeWidth={1.5} />
               <span>طباعة استمارة الحجز للتوجه للمنسق</span>
             </button>
           </div>
@@ -499,47 +499,47 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       {/* الحالة 3: قائمة الانتظار */}
       {status === 'waitlist' && waitlist && (
         <div style={{
-          background: "#161e2e",
-          border: "2px solid #3b82f6",
-          borderRadius: "16px",
-          padding: "24px 20px",
-          boxShadow: "0 10px 25px rgba(59, 130, 246, 0.15)"
+          background: "var(--surface)",
+          border: "1px solid var(--primary)",
+          borderRadius: "12px",
+          padding: "24px 20px"
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
             <span style={{ 
-              background: "rgba(59, 130, 246, 0.2)", 
-              color: "#60a5fa", 
-              padding: "6px 14px", 
-              borderRadius: "20px", 
+              background: "rgba(37, 99, 235, 0.16)", 
+              color: "var(--accent-ink)", 
+              border: "1px solid rgba(56, 189, 248, 0.3)",
+              padding: "5px 12px", 
+              borderRadius: "6px", 
               fontSize: "13px", 
-              fontWeight: "bold",
+              fontWeight: 600,
               display: "flex",
               alignItems: "center",
               gap: "6px"
             }}>
-              <Clock size={16} />
+              <Clock size={15} strokeWidth={1.5} />
               <span>طلبكم مدرج في قائمة الانتظار</span>
             </span>
 
-            <span style={{ color: "#94a3b8", fontSize: "12px" }}>
+            <span className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>
               تاريخ الطلب: {new Date(waitlist.created_at).toLocaleDateString('ar-EG')}
             </span>
           </div>
 
-          <div style={{ background: "rgba(59, 130, 246, 0.1)", border: "1px solid #3b82f6", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
-            <h4 style={{ color: "#93c5fd", margin: "0 0 6px 0", fontSize: "15px" }}>
+          <div style={{ background: "rgba(37, 99, 235, 0.1)", border: "1px solid var(--primary)", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
+            <h4 style={{ color: "var(--accent-ink)", margin: "0 0 6px 0", fontSize: "15px", fontWeight: 600 }}>
               لا توجد دواليب شاغرة حالياً
             </h4>
-            <p style={{ margin: 0, color: "#cbd5e1", fontSize: "14px", lineHeight: "1.6" }}>
+            <p style={{ margin: 0, color: "var(--text-primary)", fontSize: "14px", lineHeight: "1.6" }}>
               نظراً لاكتمال حجز كافة الدواليب، تم حفظ طلبكم وتحديد أولوية الحجز لكم تلقائياً فور قيام الإدارة بإخلاء أي دولاب أو إضافة دواليب جديدة.
             </p>
           </div>
 
-          <div style={{ background: "#0f172a", borderRadius: "12px", padding: "16px" }}>
-            <div style={{ fontSize: "14px", fontWeight: "bold", color: "#fff", marginBottom: "8px" }}>
+          <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", borderRadius: "12px", padding: "16px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
               الطلاب في طلب الانتظار:
             </div>
-            <div style={{ color: "#cbd5e1", fontSize: "14px", lineHeight: "1.8" }}>
+            <div style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.8" }}>
               {waitlist.student_names.join(' • ')}
             </div>
           </div>
@@ -549,29 +549,30 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
       {/* الحالة 4: غير مسكن في أي دولاب */}
       {status === 'none' && (
         <div style={{
-          background: "#181e2b",
-          border: "1px dashed #334155",
-          borderRadius: "16px",
+          background: "var(--surface)",
+          border: "1px dashed var(--border-light)",
+          borderRadius: "12px",
           padding: "36px 20px",
           textAlign: "center"
         }}>
           <div style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "50%",
-            background: "rgba(56, 189, 248, 0.1)",
+            width: "56px",
+            height: "56px",
+            borderRadius: "12px",
+            background: "rgba(56, 189, 248, 0.12)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 16px auto"
           }}>
-            <Archive size={32} color="#38bdf8" />
+            <Archive size={28} strokeWidth={1.5} style={{ color: "var(--accent-ink)" }} />
           </div>
 
-          <h3 style={{ color: "#fff", fontSize: "18px", margin: "0 0 8px 0" }}>
+          <h3 style={{ color: "var(--text-primary)", fontSize: "18px", fontWeight: 600, margin: "0 0 8px 0" }}>
             أنت غير مسكن في أي دولاب حالياً
           </h3>
-          <p style={{ color: "#94a3b8", fontSize: "14px", maxWidth: "460px", margin: "0 auto 24px auto", lineHeight: "1.6" }}>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px", maxWidth: "460px", margin: "0 auto 24px auto", lineHeight: "1.6" }}>
             يمكنك التقدم بطلب حجز دولاب جديد مع زملائك من نفس الفرقة الدراسية ({student.academic_year}).
           </p>
 
@@ -583,21 +584,20 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
               setPartners([]);
             }}
             style={{
-              background: "linear-gradient(135deg, #0284c7, #0369a1)",
+              background: "var(--primary)",
               color: "#fff",
               border: "none",
-              padding: "14px 28px",
-              borderRadius: "14px",
-              fontWeight: "bold",
-              fontSize: "15px",
+              padding: "12px 24px",
+              borderRadius: "8px",
+              fontWeight: 600,
+              fontSize: "14px",
               display: "inline-flex",
               alignItems: "center",
               gap: "8px",
-              cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(2, 132, 199, 0.4)"
+              cursor: "pointer"
             }}
           >
-            <Plus size={20} />
+            <Plus size={18} strokeWidth={1.5} />
             <span>طلب التسكين في دولاب</span>
           </button>
         </div>
@@ -613,7 +613,6 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           right: 0,
           bottom: 0,
           background: "rgba(0,0,0,0.75)",
-          backdropFilter: "blur(6px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -621,53 +620,52 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
           padding: "16px"
         }}>
           <div style={{
-            background: "#18202f",
-            border: "1px solid #334155",
-            borderRadius: "20px",
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "16px",
             width: "100%",
             maxWidth: "540px",
             maxHeight: "90vh",
             overflowY: "auto",
-            padding: "24px",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.6)"
+            padding: "24px"
           }}>
             
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ background: "rgba(56, 189, 248, 0.2)", padding: "8px", borderRadius: "10px" }}>
-                  <Archive size={22} color="#38bdf8" />
+                <div style={{ background: "rgba(56, 189, 248, 0.12)", padding: "8px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Archive size={20} strokeWidth={1.5} color="var(--accent-ink)" />
                 </div>
-                <h3 style={{ margin: 0, color: "#fff", fontSize: "18px", fontWeight: "bold" }}>
+                <h3 style={{ margin: 0, color: "var(--text-primary)", fontSize: "17px", fontWeight: "600" }}>
                   طلب تسكين دولاب جديد
                 </h3>
               </div>
-              <button 
+              <button
                 onClick={() => setShowModal(false)}
                 className="modal-close-btn"
                 title="إغلاق"
               >
-                <X size={18} />
+                <X size={18} strokeWidth={1.5} />
               </button>
             </div>
 
             {/* تم الحجز بنجاح من داخل المودال */}
             {successBooking ? (
               <div style={{ textAlign: "center", padding: "20px 0" }}>
-                <div style={{ width: "60px", height: "60px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
-                  <CheckCircle2 size={36} color="#10b981" />
+                <div style={{ width: "56px", height: "56px", borderRadius: "12px", background: "rgba(16, 185, 129, 0.14)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
+                  <CheckCircle2 size={32} strokeWidth={1.5} color="var(--success)" />
                 </div>
-                <h3 style={{ color: "#fff", margin: "0 0 8px 0" }}>
+                <h3 style={{ color: "var(--text-primary)", margin: "0 0 8px 0", fontWeight: "600" }}>
                   {successBooking.isWaitlist ? "تم تسجيلكم في قائمة الانتظار!" : "تم تسجيل طلب الحجز بنجاح!"}
                 </h3>
-                <p style={{ color: "#94a3b8", fontSize: "14px", lineHeight: "1.6", marginBottom: "20px" }}>
+                <p style={{ color: "var(--text-muted)", fontSize: "14px", lineHeight: "1.6", marginBottom: "20px" }}>
                   {successBooking.message}
                 </p>
 
                 {!successBooking.isWaitlist && successBooking.booking && (
                   <div style={{ margin: "20px 0" }}>
-                    <div style={{ fontSize: "13px", color: "#94a3b8" }}>كود الدولاب المحجوز:</div>
-                    <div style={{ fontSize: "36px", fontWeight: "900", color: "#38bdf8", marginTop: "4px" }}>
+                    <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>كود الدولاب المحجوز:</div>
+                    <div className="tabular-nums" style={{ fontSize: "34px", fontWeight: "600", color: "var(--accent-ink)", marginTop: "4px" }}>
                       {successBooking.booking.locker_code}
                     </div>
 
@@ -676,12 +674,12 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                         onClick={() => handlePrint(successBooking.booking)}
                         disabled={downloadingPdf}
                         style={{
-                          background: downloadingPdf ? "#1e293b" : "#2563eb",
+                          background: downloadingPdf ? "var(--surface-hover)" : "var(--primary)",
                           color: "#fff",
-                          border: downloadingPdf ? "1px solid #38bdf8" : "none",
+                          border: downloadingPdf ? "1px solid var(--accent-ink)" : "1px solid transparent",
                           padding: "10px 20px",
-                          borderRadius: "10px",
-                          fontWeight: "bold",
+                          borderRadius: "8px",
+                          fontWeight: "600",
                           fontSize: "13px",
                           display: "inline-flex",
                           alignItems: "center",
@@ -689,7 +687,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                           cursor: downloadingPdf ? "wait" : "pointer"
                         }}
                       >
-                        <Printer size={18} />
+                        <Printer size={18} strokeWidth={1.5} />
                         <span>{downloadingPdf ? (pdfStatusMsg || "جاري التنزيل...") : "تحميل الاستمارة فوراً (PDF)"}</span>
                       </button>
                     </div>
@@ -700,12 +698,13 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   onClick={() => setShowModal(false)}
                   style={{
                     marginTop: "16px",
-                    background: "#334155",
-                    color: "#cbd5e1",
-                    border: "none",
+                    background: "var(--surface-hover)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border)",
                     padding: "10px 20px",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     fontSize: "14px",
+                    fontWeight: "500",
                     cursor: "pointer"
                   }}
                 >
@@ -714,71 +713,78 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
               </div>
             ) : (
               <form onSubmit={handleSubmitBooking} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                
+
                 {/* تنبيه الفرقة */}
-                <div style={{ background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "10px", padding: "12px", fontSize: "13px", color: "#93c5fd", display: "flex", gap: "8px" }}>
-                  <Info size={18} style={{ flexShrink: 0 }} />
+                <div style={{ background: "rgba(37, 99, 235, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "var(--accent-ink)", display: "flex", gap: "8px" }}>
+                  <Info size={17} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "2px" }} />
                   <span>
-                    الفرقة الدراسية المحددة: <strong>{student.academic_year}</strong>. يشترط أن يكون جميع الزملاء من نفس الفرقة وغير مسكنين في دواليب أخرى.
+                    الفرقة الدراسية المحددة: <strong style={{ fontWeight: 600 }}>{student.academic_year}</strong>. يشترط أن يكون جميع الزملاء من نفس الفرقة وغير مسكنين في دواليب أخرى.
                   </span>
                 </div>
 
                 {modalError && (
-                  <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#fca5a5", padding: "10px 14px", borderRadius: "10px", fontSize: "13px" }}>
+                  <div style={{ background: "rgba(239, 68, 68, 0.14)", border: "1px solid var(--error)", color: "var(--error-ink)", padding: "10px 14px", borderRadius: "8px", fontSize: "13px" }}>
                     {modalError}
                   </div>
                 )}
 
                 {/* الطالب الأول (أنت) */}
                 <div>
-                  <label style={{ display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "6px", fontWeight: "bold" }}>
+                  <label style={{ display: "block", color: "var(--text-primary)", fontSize: "13px", marginBottom: "6px", fontWeight: 500 }}>
                     طالب 1 (مقدم الطلب):
                   </label>
-                  <div style={{ background: "#0f172a", border: "1px solid #334155", padding: "10px 14px", borderRadius: "10px", color: "#94a3b8", fontSize: "14px", display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#fff", fontWeight: "bold" }}>{student.full_name}</span>
-                    <span style={{ direction: "ltr" }}>#{student.student_code}</span>
+                  <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "10px 14px", borderRadius: "8px", color: "var(--text-muted)", fontSize: "14px", display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{student.full_name}</span>
+                    <span className="tabular-nums" style={{ direction: "ltr" }}>#{student.student_code}</span>
                   </div>
                 </div>
 
                 {/* قائمة الزملاء المضافين */}
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <label style={{ color: "#cbd5e1", fontSize: "13px", fontWeight: "bold" }}>
+                    <label className="tabular-nums" style={{ color: "var(--text-primary)", fontSize: "13px", fontWeight: 500 }}>
                       الزملاء المشتركون ({partners.length + 1} من 4 طلاب):
                     </label>
-                    <span style={{ fontSize: "12px", color: partners.length === 3 ? "#34d399" : "#f59e0b", fontWeight: "bold" }}>
-                      {partners.length === 3 ? "✅ العدد مكتمل (4 طلاب)" : `متبقي ${3 - partners.length} زملاء`}
+                    <span className="tabular-nums" style={{ fontSize: "12px", color: partners.length === 3 ? "var(--success-ink)" : "var(--warning-ink)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      {partners.length === 3 ? (
+                        <>
+                          <CheckCircle2 size={13} strokeWidth={1.5} />
+                          <span>العدد مكتمل (4 طلاب)</span>
+                        </>
+                      ) : `متبقي ${3 - partners.length} زملاء`}
                     </span>
                   </div>
 
                   {partners.length < 3 && (
-                    <div style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid #f59e0b", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "#fbbf24", marginBottom: "8px" }}>
-                      ⚠️ يشترط حجز الدولاب لـ <strong>4 طلاب</strong> بالتمام والكمال. يرجى إضافة <strong>{3 - partners.length}</strong> زملاء بالبحث أدناه لتفعيل زر التسكين.
+                    <div className="tabular-nums" style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid var(--warning)", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "var(--warning-ink)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <AlertCircle size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                      <span>يشترط حجز الدولاب لـ <strong style={{ fontWeight: 600 }}>4 طلاب</strong> بالتمام والكمال. يرجى إضافة <strong style={{ fontWeight: 600 }}>{3 - partners.length}</strong> زملاء بالبحث أدناه لتفعيل زر التسكين.</span>
                     </div>
                   )}
 
                   {partners.length === 3 && (
-                    <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid #10b981", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "#34d399", marginBottom: "8px" }}>
-                      ✅ اكتمل عدد المجموعة بالكامل (4 طلاب). أدخل رقم الهاتف للتأكيد.
+                    <div style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid var(--success)", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", color: "var(--success-ink)", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <CheckCircle2 size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                      <span>اكتمل عدد المجموعة بالكامل (4 طلاب). أدخل رقم الهاتف للتأكيد.</span>
                     </div>
                   )}
 
                   {partners.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "10px" }}>
                       {partners.map((p, idx) => (
-                        <div key={p.code} style={{ background: "#0f172a", border: "1px solid #334155", padding: "8px 12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                        <div key={p.code} style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "8px 12px", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ background: "#2563eb", width: "18px", height: "18px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#fff" }}>
+                            <span className="tabular-nums" style={{ background: "var(--primary)", width: "20px", height: "20px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#fff", fontWeight: 600 }}>
                               {idx + 2}
                             </span>
-                            <span style={{ color: "#f1f5f9" }}>{p.name}</span>
+                            <span style={{ color: "var(--text-primary)" }}>{p.name}</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => removePartner(p.code)}
-                            style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center" }}
+                            style={{ background: "transparent", border: "none", color: "var(--error-ink)", cursor: "pointer", display: "flex", alignItems: "center" }}
                           >
-                            <X size={16} />
+                            <X size={16} strokeWidth={1.5} />
                           </button>
                         </div>
                       ))}
@@ -788,8 +794,8 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   {/* البحث الذكي عن زميل لإضافته */}
                   {partners.length < 3 && (
                     <div style={{ position: "relative" }}>
-                      <div style={{ display: "flex", alignItems: "center", background: "#0f172a", border: "1px solid #334155", borderRadius: "10px", padding: "2px 10px" }}>
-                        <Search size={16} color="#94a3b8" />
+                      <div style={{ display: "flex", alignItems: "center", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", padding: "2px 10px" }}>
+                        <Search size={16} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
                         <input
                           type="text"
                           placeholder="ابحث باسم الزميل أو كوده لإضافته..."
@@ -800,13 +806,13 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                             background: "transparent",
                             border: "none",
                             padding: "8px 10px",
-                            color: "#fff",
+                            color: "var(--text-primary)",
                             fontSize: "13px",
                             outline: "none"
                           }}
                         />
                         {isSearching && (
-                          <div className="spinner" style={{ width: "16px", height: "16px", border: "2px solid #334155", borderTopColor: "#38bdf8", borderRadius: "50%" }}></div>
+                          <div className="spinner" style={{ width: "16px", height: "16px", border: "2px solid var(--border-light)", borderTopColor: "var(--accent-ink)", borderRadius: "50%" }}></div>
                         )}
                       </div>
 
@@ -817,13 +823,12 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                           top: "105%",
                           left: 0,
                           right: 0,
-                          background: "#0f172a",
-                          border: "1px solid #3b82f6",
-                          borderRadius: "10px",
+                          background: "var(--bg-deep)",
+                          border: "1px solid var(--primary)",
+                          borderRadius: "8px",
                           zIndex: 100,
                           maxHeight: "180px",
-                          overflowY: "auto",
-                          boxShadow: "0 10px 20px rgba(0,0,0,0.5)"
+                          overflowY: "auto"
                         }}>
                           {searchResults.map((peer) => (
                             <div
@@ -831,18 +836,18 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                               onClick={() => addPartner(peer)}
                               style={{
                                 padding: "10px 14px",
-                                borderBottom: "1px solid #1e293b",
+                                borderBottom: "1px solid var(--border)",
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 cursor: "pointer",
                                 fontSize: "13px"
                               }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = "#1e293b")}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-hover)")}
                               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                             >
-                              <span style={{ color: "#fff" }}>{peer.full_name}</span>
-                              <span style={{ color: "#38bdf8", fontSize: "12px", direction: "ltr" }}>#{peer.student_code}</span>
+                              <span style={{ color: "var(--text-primary)" }}>{peer.full_name}</span>
+                              <span className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "12px", direction: "ltr" }}>#{peer.student_code}</span>
                             </div>
                           ))}
                         </div>
@@ -853,13 +858,14 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
 
                 {/* رقم هاتف ممثل الدولاب */}
                 <div>
-                  <label style={{ display: "block", color: "#cbd5e1", fontSize: "13px", marginBottom: "6px", fontWeight: "bold" }}>
+                  <label style={{ display: "block", color: "var(--text-primary)", fontSize: "13px", marginBottom: "6px", fontWeight: 500 }}>
                     رقم موبايل ممثل الدولاب للتواصل (إجباري):
                   </label>
-                  <div style={{ display: "flex", alignItems: "center", background: "#0f172a", border: `1px solid ${phone.length > 0 && phone.trim().replace(/\D/g, '').length < 10 ? '#ef4444' : '#334155'}`, borderRadius: "10px", padding: "2px 10px" }}>
-                    <Phone size={16} color={phone.trim().replace(/\D/g, '').length >= 10 ? "#10b981" : "#94a3b8"} />
+                  <div style={{ display: "flex", alignItems: "center", background: "var(--bg-deep)", border: `1px solid ${phone.length > 0 && phone.trim().replace(/\D/g, '').length < 10 ? 'var(--error)' : 'var(--border-light)'}`, borderRadius: "8px", padding: "2px 10px" }}>
+                    <Phone size={16} strokeWidth={1.5} style={{ color: phone.trim().replace(/\D/g, '').length >= 10 ? "var(--success-ink)" : "var(--text-muted)" }} />
                     <input
                       type="tel"
+                      className="tabular-nums"
                       required
                       placeholder="مثال: 01012345678"
                       value={phone}
@@ -869,7 +875,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                         background: "transparent",
                         border: "none",
                         padding: "8px 10px",
-                        color: "#fff",
+                        color: "var(--text-primary)",
                         fontSize: "14px",
                         outline: "none",
                         direction: "ltr",
@@ -878,7 +884,7 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                     />
                   </div>
                   {phone.length > 0 && phone.trim().replace(/\D/g, '').length < 10 && (
-                    <span style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", display: "block" }}>
+                    <span style={{ fontSize: "11px", color: "var(--error-ink)", marginTop: "4px", display: "block" }}>
                       * يرجى إدخال رقم هاتف صحيح (11 رقماً) للتواصل والتنسيق
                     </span>
                   )}
@@ -891,11 +897,11 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                   const isPartnersComplete = partners.length === 3;
                   const isFormComplete = isPartnersComplete && isPhoneValid;
 
-                  let buttonText = "تأكيد طلب التسكين (4 طلاب مكتملين) ✅";
+                  let buttonText = "تأكيد طلب التسكين (4 طلاب مكتملين)";
                   if (!isPartnersComplete) {
                     buttonText = `يلزم 4 طلاب للدولاب (متبقي ${3 - partners.length} زملاء)`;
                   } else if (!isPhoneValid) {
-                    buttonText = "يرجى إدخال رقم هاتف للتواصل 📱";
+                    buttonText = "يرجى إدخال رقم هاتف للتواصل";
                   }
 
                   return (
@@ -905,12 +911,12 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                         disabled={submitting || !isFormComplete}
                         style={{
                           flex: 1,
-                          background: isFormComplete ? "linear-gradient(135deg, #10b981, #059669)" : "#1e293b",
-                          color: isFormComplete ? "#fff" : "#64748b",
-                          border: isFormComplete ? "none" : "1px dashed #334155",
-                          padding: "14px",
-                          borderRadius: "12px",
-                          fontWeight: "bold",
+                          background: isFormComplete ? "var(--success)" : "var(--bg-deep)",
+                          color: isFormComplete ? "#fff" : "var(--text-dim)",
+                          border: isFormComplete ? "none" : "1px dashed var(--border-light)",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          fontWeight: 600,
                           fontSize: "14px",
                           cursor: (submitting || !isFormComplete) ? "not-allowed" : "pointer",
                           opacity: (submitting || !isFormComplete) ? 0.75 : 1,
@@ -918,14 +924,14 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                           alignItems: "center",
                           justifyContent: "center",
                           gap: "8px",
-                          transition: "all 0.2s ease"
+                          transition: "background-color 0.15s ease, opacity 0.15s ease"
                         }}
                       >
                         {submitting ? (
                           <span>جاري إتمام الحجز...</span>
                         ) : (
                           <>
-                            <CheckCircle2 size={18} color={isFormComplete ? "#fff" : "#64748b"} />
+                            <CheckCircle2 size={17} strokeWidth={1.5} style={{ color: isFormComplete ? "#fff" : "var(--text-dim)" }} />
                             <span>{buttonText}</span>
                           </>
                         )}
@@ -935,12 +941,12 @@ export default function StudentLockerTab({ student }: StudentLockerTabProps) {
                         type="button"
                         onClick={() => setShowModal(false)}
                         style={{
-                          background: "#334155",
-                          color: "#cbd5e1",
-                          border: "none",
-                          padding: "14px 20px",
-                          borderRadius: "12px",
-                          fontWeight: "bold",
+                          background: "var(--surface-hover)",
+                          color: "var(--text-primary)",
+                          border: "1px solid var(--border)",
+                          padding: "12px 20px",
+                          borderRadius: "8px",
+                          fontWeight: 500,
                           fontSize: "14px",
                           cursor: "pointer"
                         }}

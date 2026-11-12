@@ -43,47 +43,46 @@ export default function StudentMigrationNotice(_props: StudentMigrationNoticePro
       style={{
         minHeight: "100vh",
         width: "100%",
-        background: "radial-gradient(circle at 50% 30%, #0f172a 0%, #070b14 100%)",
+        background: "var(--background)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: "24px",
         boxSizing: "border-box",
-        fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif",
+        fontFamily: "inherit",
       }}
     >
       <div
         style={{
           width: "100%",
           maxWidth: "400px",
-          background: "rgba(15, 23, 42, 0.9)",
-          border: "1.5px solid rgba(56, 189, 248, 0.3)",
-          borderRadius: "24px",
-          padding: "40px 28px",
+          background: "var(--surface)",
+          border: "1px solid var(--border-light)",
+          borderRadius: "16px",
+          padding: "32px 24px",
           textAlign: "center",
-          boxShadow: "0 20px 50px rgba(0, 0, 0, 0.65)",
+          boxShadow: "0 16px 40px rgba(0, 0, 0, 0.45)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "28px",
+          gap: "24px",
         }}
       >
         {/* أيقونة تليجرام */}
         <div
           style={{
-            width: "76px",
-            height: "76px",
+            width: "64px",
+            height: "64px",
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)",
+            background: "#229ED9",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 10px 28px rgba(34, 158, 217, 0.45)",
           }}
         >
           <svg
-            width="40"
-            height="40"
+            width="32"
+            height="32"
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -99,10 +98,10 @@ export default function StudentMigrationNotice(_props: StudentMigrationNoticePro
         <h1
           style={{
             margin: 0,
-            color: "#ffffff",
-            fontSize: "22px",
-            fontWeight: "900",
-            lineHeight: "1.6",
+            color: "var(--text)",
+            fontSize: "20px",
+            fontWeight: 600,
+            lineHeight: 1.5,
           }}
         >
           تم نقل البوابة بالكامل إلى تليجرام
@@ -117,20 +116,19 @@ export default function StudentMigrationNotice(_props: StudentMigrationNoticePro
           }}
           style={{
             width: "100%",
-            background: "linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)",
+            background: "#229ED9",
             color: "#ffffff",
             border: "none",
-            borderRadius: "16px",
-            padding: "16px 24px",
-            fontSize: "17px",
-            fontWeight: "bold",
+            borderRadius: "8px",
+            padding: "14px 20px",
+            fontSize: "15px",
+            fontWeight: 500,
             cursor: "pointer",
             textDecoration: "none",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "10px",
-            boxShadow: "0 8px 24px rgba(34, 158, 217, 0.4)",
+            gap: "8px",
             boxSizing: "border-box",
           }}
         >

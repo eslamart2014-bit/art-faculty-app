@@ -20,7 +20,8 @@ import {
   Unlock,
   Layers,
   Fingerprint,
-  LogOut
+  LogOut,
+  X
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/students/codeHelper";
 
@@ -111,29 +112,30 @@ export default function AdminPortalPage() {
       
       {/* هيدر الصفحة */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-        <Link href="/" style={{ color: "#94a3b8", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px" }}>
-          <ChevronLeft size={16} />
+        <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "13px", fontWeight: 500 }}>
+          <ChevronLeft size={16} strokeWidth={1.5} />
           <span>الرئيسية</span>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#38bdf8", fontWeight: "bold", fontSize: "13px" }}>
-          <ShieldCheck size={18} />
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--accent-ink)", fontWeight: 600, fontSize: "13px" }}>
+          <ShieldCheck size={18} strokeWidth={1.5} />
           <span>بوابة الطلاب المتقدمة (لوحة الإدارة والتحكم)</span>
         </div>
       </div>
 
       {/* بوكس البحث عن الطالب */}
       <div className="glass-card" style={{ padding: "20px", marginBottom: "20px" }}>
-        <label style={{ display: "block", color: "#94a3b8", fontSize: "13px", fontWeight: "bold", marginBottom: "8px" }}>
+        <label style={{ display: "block", color: "var(--text-muted)", fontSize: "13px", fontWeight: 500, marginBottom: "8px" }}>
           البحث بكود الطالب للتحكم الكامل والفحص الأمني والفني:
         </label>
         <div style={{ display: "flex", gap: "8px" }}>
           <input 
             type="text"
+            className="tabular-nums"
             value={searchCode}
             onChange={(e) => setSearchCode(e.target.value)}
             placeholder="أدخل كود الطالب (مثل: 0001)..."
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            style={{ fontWeight: "bold" }}
+            style={{ fontWeight: 600 }}
           />
           <button 
             onClick={() => handleSearch()}
@@ -141,13 +143,13 @@ export default function AdminPortalPage() {
             className="btn-primary"
             style={{ width: "90px" }}
           >
-            <Search size={18} />
+            <Search size={17} strokeWidth={1.5} />
             <span>فحص</span>
           </button>
         </div>
 
         {errorMsg && (
-          <div style={{ marginTop: "12px", color: "#f87171", fontSize: "13px", textAlign: "center" }}>
+          <div style={{ marginTop: "12px", color: "var(--error-ink)", fontSize: "13px", textAlign: "center" }}>
             {errorMsg}
           </div>
         )}
@@ -158,13 +160,13 @@ export default function AdminPortalPage() {
         <div className="animate-fade-in">
           
           {/* كارت ملخص الطالب والحالة */}
-          <div className="glass-card" style={{ padding: "18px", marginBottom: "16px", borderRight: studentData.isRegistered ? (studentData.account?.status === 'suspended' ? '5px solid #ef4444' : '5px solid #10b981') : '5px solid #64748b' }}>
+          <div className="glass-card" style={{ padding: "18px", marginBottom: "16px", borderRight: studentData.isRegistered ? (studentData.account?.status === 'suspended' ? '4px solid var(--error)' : '4px solid var(--success)') : '4px solid var(--border-light)' }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <h2 style={{ fontSize: "18px", fontWeight: "bold", color: "#fff", marginBottom: "3px" }}>
+                <h2 style={{ fontSize: "18px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>
                   {studentData.student?.full_name}
                 </h2>
-                <div style={{ color: "#38bdf8", fontSize: "12px" }}>
+                <div className="tabular-nums" style={{ color: "var(--accent-ink)", fontSize: "12px" }}>
                   كود: {formatStudentCode(studentData.student?.student_code)} • {studentData.student?.academic_year} (سكشن {studentData.student?.section || 'عام'})
                 </div>
               </div>
@@ -172,17 +174,17 @@ export default function AdminPortalPage() {
               {/* شارة حالة التسجيل */}
               <div>
                 {!studentData.isRegistered ? (
-                  <span style={{ fontSize: "12px", background: "rgba(255,255,255,0.1)", color: "#94a3b8", padding: "4px 10px", borderRadius: "10px", fontWeight: "bold" }}>
+                  <span style={{ fontSize: "12px", background: "rgba(255,255,255,0.08)", color: "var(--text-muted)", padding: "4px 10px", borderRadius: "6px", fontWeight: 600 }}>
                     غير مسجل بالبوابة
                   </span>
                 ) : (
                   <span style={{ 
                     fontSize: "12px", 
                     padding: "4px 10px", 
-                    borderRadius: "10px", 
-                    fontWeight: "bold",
-                    background: studentData.account?.status === 'suspended' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                    color: studentData.account?.status === 'suspended' ? '#f87171' : '#34d399'
+                    borderRadius: "6px", 
+                    fontWeight: 600,
+                    background: studentData.account?.status === 'suspended' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(16, 185, 129, 0.16)',
+                    color: studentData.account?.status === 'suspended' ? 'var(--error-ink)' : 'var(--success-ink)'
                   }}>
                     {studentData.account?.status === 'suspended' ? 'حساب معلق' : 'حساب نشط ومفعل'}
                   </span>
@@ -192,33 +194,33 @@ export default function AdminPortalPage() {
 
             {/* أزرار سريعة للأدمن: تصفح كطالب وتغيير الحالة */}
             {studentData.isRegistered && (
-              <div style={{ display: "flex", gap: "8px", marginTop: "14px", borderTop: "1px solid #1e293b", paddingTop: "12px" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "14px", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
                 <button 
                   onClick={() => window.open(`/system?impersonate=${encodeURIComponent(studentData.student.student_code)}`, '_blank')}
                   className="btn-secondary"
-                  style={{ flex: 1, fontSize: "12px", padding: "8px", background: "rgba(56, 189, 248, 0.15)", borderColor: "#0284c7", color: "#38bdf8", fontWeight: "bold" }}
+                  style={{ flex: 1, fontSize: "12px", padding: "8px", background: "rgba(56, 189, 248, 0.14)", borderColor: "var(--primary)", color: "var(--accent-ink)", fontWeight: 600 }}
                   title="الدخول الفعلي لحساب الطالب بوضع الإدارة الكامل"
                 >
-                  <Eye size={15} color="#38bdf8" />
-                  <span>👑 دخول لحساب الطالب</span>
+                  <Eye size={15} strokeWidth={1.5} color="var(--accent-ink)" />
+                  <span>دخول لحساب الطالب</span>
                 </button>
 
                 {studentData.account?.status === 'suspended' ? (
                   <button 
                     onClick={() => handleAdminAction('toggle_status', { status: 'active' })}
                     className="btn-secondary"
-                    style={{ flex: 1, fontSize: "12px", padding: "8px", color: "#34d399", borderColor: "#059669" }}
+                    style={{ flex: 1, fontSize: "12px", padding: "8px", color: "var(--success-ink)", borderColor: "var(--success)", fontWeight: 600 }}
                   >
-                    <Unlock size={15} />
+                    <Unlock size={15} strokeWidth={1.5} />
                     <span>إلغاء تعليق الحساب</span>
                   </button>
                 ) : (
                   <button 
                     onClick={() => handleAdminAction('toggle_status', { status: 'suspended' })}
                     className="btn-secondary"
-                    style={{ flex: 1, fontSize: "12px", padding: "8px", color: "#f87171", borderColor: "#dc2626" }}
+                    style={{ flex: 1, fontSize: "12px", padding: "8px", color: "var(--error-ink)", borderColor: "var(--error)", fontWeight: 600 }}
                   >
-                    <Lock size={15} />
+                    <Lock size={15} strokeWidth={1.5} />
                     <span>تعليق وقفل الحساب</span>
                   </button>
                 )}
@@ -230,79 +232,68 @@ export default function AdminPortalPage() {
           {studentData.isRegistered && (
             <div>
               <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "10px", marginBottom: "14px" }}>
-                
-                <button 
-                  onClick={() => setActiveTab("info")}
-                  style={{ padding: "8px 14px", borderRadius: "10px", border: "none", background: activeTab === "info" ? "#2563eb" : "#141b29", color: "#fff", fontWeight: "bold", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  بيانات الحساب والبطاقة
-                </button>
-
-                <button 
-                  onClick={() => setActiveTab("security")}
-                  style={{ padding: "8px 14px", borderRadius: "10px", border: "none", background: activeTab === "security" ? "#2563eb" : "#141b29", color: "#fff", fontWeight: "bold", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  التحقق الأمني والأجهزة
-                </button>
-
-                <button 
-                  onClick={() => setActiveTab("plagiarism")}
-                  style={{ padding: "8px 14px", borderRadius: "10px", border: "none", background: activeTab === "plagiarism" ? "#2563eb" : "#141b29", color: "#fff", fontWeight: "bold", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  كشف تشابه اللوحات (AI)
-                </button>
-
-                <button 
-                  onClick={() => setActiveTab("audit")}
-                  style={{ padding: "8px 14px", borderRadius: "10px", border: "none", background: activeTab === "audit" ? "#2563eb" : "#141b29", color: "#fff", fontWeight: "bold", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  سجل النشاط (Audit)
-                </button>
-
-                <button 
-                  onClick={() => setActiveTab("actions")}
-                  style={{ padding: "8px 14px", borderRadius: "10px", border: "none", background: activeTab === "actions" ? "#2563eb" : "#141b29", color: "#fff", fontWeight: "bold", fontSize: "12px", cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  العمليات الإدارية
-                </button>
-
+                {[
+                  { id: "info", label: "بيانات الحساب والبطاقة" },
+                  { id: "security", label: "التحقق الأمني والأجهزة" },
+                  { id: "plagiarism", label: "كشف تشابه اللوحات (AI)" },
+                  { id: "audit", label: "سجل النشاط (Audit)" },
+                  { id: "actions", label: "العمليات الإدارية" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      border: activeTab === tab.id ? "1px solid var(--primary)" : "1px solid var(--border)",
+                      background: activeTab === tab.id ? "rgba(37, 99, 235, 0.16)" : "var(--bg-deep)",
+                      color: activeTab === tab.id ? "var(--accent-ink)" : "var(--text-muted)",
+                      fontWeight: activeTab === tab.id ? 600 : 500,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
               {/* 1. تبويب البيانات والبطاقة */}
               {activeTab === "info" && (
                 <div className="glass-card animate-fade-in" style={{ padding: "18px" }}>
-                  <h3 style={{ color: "#fff", fontSize: "15px", marginBottom: "14px" }}>بيانات تسجيل الطالب:</h3>
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, marginBottom: "14px" }}>بيانات تسجيل الطالب:</h3>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px", background: "#0d131f", padding: "14px", borderRadius: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px", background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "14px", borderRadius: "12px" }}>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>رقم الموبايل:</div>
-                      <div style={{ color: "#fff", fontWeight: "bold", direction: "ltr", textAlign: "right" }}>{studentData.account?.mobile || "غير مسجل"}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>رقم الموبايل:</div>
+                      <div className="tabular-nums" style={{ color: "var(--text-primary)", fontWeight: 600, direction: "ltr", textAlign: "right" }}>{studentData.account?.mobile || "غير مسجل"}</div>
                     </div>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>الرقم السري (PIN):</div>
-                      <div style={{ color: "#f59e0b", fontFamily: "monospace", fontWeight: "bold", fontSize: "16px" }}>{studentData.account?.pin_code}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>الرقم السري (PIN):</div>
+                      <div className="tabular-nums" style={{ color: "var(--warning-ink)", fontFamily: "monospace", fontWeight: 600, fontSize: "16px" }}>{studentData.account?.pin_code}</div>
                     </div>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>المنسق المعتمد للحساب:</div>
-                      <div style={{ color: "#34d399", fontWeight: "bold" }}>{studentData.account?.activated_by || studentData.account?.pin_issued_by || "لم يتم الاعتماد بعد"}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>المنسق المعتمد للحساب:</div>
+                      <div style={{ color: "var(--success-ink)", fontWeight: 600 }}>{studentData.account?.activated_by || studentData.account?.pin_issued_by || "لم يتم الاعتماد بعد"}</div>
                     </div>
                     <div>
-                      <div style={{ color: "#94a3b8", fontSize: "11px" }}>تاريخ الاعتماد والتفعيل:</div>
-                      <div style={{ color: "#cbd5e1" }}>{studentData.account?.activated_at || studentData.account?.pin_issued_at ? new Date(studentData.account.activated_at || studentData.account.pin_issued_at).toLocaleString("ar-EG") : "غير محدد"}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>تاريخ الاعتماد والتفعيل:</div>
+                      <div className="tabular-nums" style={{ color: "var(--text-primary)", fontSize: "12px" }}>{studentData.account?.activated_at || studentData.account?.pin_issued_at ? new Date(studentData.account.activated_at || studentData.account.pin_issued_at).toLocaleString("ar-EG") : "غير محدد"}</div>
                     </div>
                   </div>
 
                   {/* صورة بطاقة الهوية */}
                   <div>
-                    <label style={{ display: "block", color: "#94a3b8", fontSize: "12px", fontWeight: "bold", marginBottom: "6px" }}>
+                    <label style={{ display: "block", color: "var(--text-muted)", fontSize: "12px", fontWeight: 500, marginBottom: "6px" }}>
                       صورة بطاقة الهوية المعتمدة:
                     </label>
                     {studentData.account?.id_card_url ? (
-                      <div style={{ borderRadius: "12px", overflow: "hidden", border: "2px solid #334155", maxHeight: "240px", background: "#000" }}>
+                      <div style={{ borderRadius: "12px", overflow: "hidden", border: "1px solid var(--border-light)", maxHeight: "240px", background: "#000" }}>
                         <img src={studentData.account.id_card_url} alt="بطاقة الطالب" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                       </div>
                     ) : (
-                      <div style={{ padding: "14px", textAlign: "center", color: "#64748b", background: "#0d131f", borderRadius: "10px" }}>
+                      <div style={{ padding: "14px", textAlign: "center", color: "var(--text-dim)", background: "var(--bg-deep)", border: "1px solid var(--border)", borderRadius: "8px" }}>
                         لا توجد صورة بطاقة مرفوعة
                       </div>
                     )}
@@ -313,54 +304,54 @@ export default function AdminPortalPage() {
               {/* 2. تبويب التحقق الأمني وكشف مشاركة الهواتف */}
               {activeTab === "security" && (
                 <div className="glass-card animate-fade-in" style={{ padding: "18px" }}>
-                  <h3 style={{ color: "#fff", fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Fingerprint size={18} color="#38bdf8" />
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Fingerprint size={18} strokeWidth={1.5} color="var(--accent-ink)" />
                     <span>تقرير التحقق الأمني للبصمة الرقمية والأجهزة:</span>
                   </h3>
 
                   {/* كشف مشاركة الهواتف */}
                   {studentData.deviceSecurity?.sharedPhonesWithStudents?.length > 0 ? (
-                    <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "12px", padding: "14px", marginBottom: "16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#f87171", fontWeight: "bold", fontSize: "14px", marginBottom: "6px" }}>
-                        <AlertTriangle size={18} />
-                        <span>تحذير: تم رصد مشاركة الهاتف مع زملاء آخرين!</span>
+                    <div style={{ background: "rgba(239, 68, 68, 0.14)", border: "1px solid var(--error)", borderRadius: "12px", padding: "14px", marginBottom: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--error-ink)", fontWeight: 600, fontSize: "14px", marginBottom: "6px" }}>
+                        <AlertTriangle size={17} strokeWidth={1.5} />
+                        <span>تحذير: تم رصد مشاركة الهاتف مع زملاء آخرين</span>
                       </div>
-                      <p style={{ color: "#fca5a5", fontSize: "12px", margin: "0 0 10px 0" }}>
-                        هذا الحساب تم فتحه من نفس الهاتف الذي استخدمه الطلاب التاليين:
+                      <p style={{ color: "var(--error-ink)", fontSize: "12px", margin: "0 0 10px 0" }}>
+                        هذا الحساب تم فتحه من نفس الهاتف الذي استخدمه الطلاب التاليون:
                       </p>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {studentData.deviceSecurity.sharedPhonesWithStudents.map((s: any, idx: number) => (
-                          <span key={idx} style={{ background: "#7f1d1d", color: "#fff", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "bold" }}>
+                          <span key={idx} className="tabular-nums" style={{ background: "rgba(127, 29, 29, 0.9)", color: "#fff", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}>
                             {s.full_name} (كود {s.student_code})
                           </span>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981", borderRadius: "12px", padding: "14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <CheckCircle2 size={24} color="#10b981" />
+                    <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid var(--success)", borderRadius: "12px", padding: "14px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <CheckCircle2 size={22} strokeWidth={1.5} color="var(--success-ink)" />
                       <div>
-                        <div style={{ color: "#34d399", fontWeight: "bold", fontSize: "13px" }}>الهاتف آمن وغير مشترك</div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>لم يتم رصد استخدام نفس الموبايل مع أي طالب آخر.</div>
+                        <div style={{ color: "var(--success-ink)", fontWeight: 600, fontSize: "13px" }}>الهاتف آمن وغير مشترك</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>لم يتم رصد استخدام نفس الموبايل مع أي طالب آخر.</div>
                       </div>
                     </div>
                   )}
 
                   {/* كشف تعدد الأجهزة للمستخدم */}
                   <div style={{ marginBottom: "14px" }}>
-                    <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "6px" }}>
-                      عدد الأجهزة المسجلة للطالب: <b style={{ color: studentData.deviceSecurity?.totalDevices > 1 ? "#f59e0b" : "#fff" }}>{studentData.deviceSecurity?.totalDevices}</b>
+                    <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "6px" }}>
+                      عدد الأجهزة المسجلة للطالب: <strong style={{ fontWeight: 600, color: studentData.deviceSecurity?.totalDevices > 1 ? "var(--warning-ink)" : "var(--text-primary)" }}>{studentData.deviceSecurity?.totalDevices}</strong>
                     </div>
                     
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {studentData.deviceSecurity?.devices?.map((d: any, idx: number) => (
-                        <div key={idx} style={{ background: "#0d131f", padding: "10px 14px", borderRadius: "8px", border: "1px solid #1e293b", fontSize: "12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", color: "#38bdf8", fontWeight: "bold", marginBottom: "2px" }}>
+                        <div key={idx} style={{ background: "var(--bg-deep)", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--border)", fontSize: "12px" }}>
+                          <div className="tabular-nums" style={{ display: "flex", justifyContent: "space-between", color: "var(--accent-ink)", fontWeight: 600, marginBottom: "2px" }}>
                             <span>جهاز #{idx + 1}</span>
-                            <span style={{ fontSize: "11px", color: "#64748b" }}>آخر ظهور: {new Date(d.lastSeen).toLocaleString("ar-EG")}</span>
+                            <span style={{ fontSize: "11px", color: "var(--text-dim)", fontWeight: 400 }}>آخر ظهور: {new Date(d.lastSeen).toLocaleString("ar-EG")}</span>
                           </div>
-                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>{d.userAgent}</div>
-                          <div style={{ color: "#64748b", fontSize: "10px" }}>الشاشة: {d.screen} • المعرف: {d.deviceId}</div>
+                          <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>{d.userAgent}</div>
+                          <div className="tabular-nums" style={{ color: "var(--text-dim)", fontSize: "10px" }}>الشاشة: {d.screen} • المعرف: {d.deviceId}</div>
                         </div>
                       ))}
                     </div>
@@ -371,32 +362,32 @@ export default function AdminPortalPage() {
               {/* 3. تبويب فحص تشابه اللوحات الفنية (AI Art Plagiarism) */}
               {activeTab === "plagiarism" && (
                 <div className="glass-card animate-fade-in" style={{ padding: "18px" }}>
-                  <h3 style={{ color: "#fff", fontSize: "15px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Sparkles size={18} color="#f59e0b" />
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Sparkles size={18} strokeWidth={1.5} color="var(--warning-ink)" />
                     <span>محرك الذكاء الاصطناعي لفحص السرقات الفنية وتطابق اللوحات:</span>
                   </h3>
 
                   {studentData.plagiarismMatches?.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                       {studentData.plagiarismMatches.map((m: any, idx: number) => (
-                        <div key={idx} style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid #ef4444", borderRadius: "12px", padding: "14px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                            <span style={{ color: "#ef4444", fontWeight: "bold", fontSize: "14px" }}>
-                              تطابق مشبوه بنسبة {m.similarityPercent}%!
+                        <div key={idx} style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--error)", borderRadius: "12px", padding: "14px" }}>
+                          <div className="tabular-nums" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                            <span style={{ color: "var(--error-ink)", fontWeight: 600, fontSize: "14px" }}>
+                              تطابق مشبوه بنسبة {m.similarityPercent}%
                             </span>
-                            <span style={{ fontSize: "11px", background: "#ef4444", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontWeight: "bold" }}>
+                            <span style={{ fontSize: "11px", background: "var(--error)", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontWeight: 600 }}>
                               مسافة هامد: {m.hammingDistance}
                             </span>
                           </div>
 
                           {/* مقارنة اللوحتين جنباً إلى جنب مع إمكانية التكبير */}
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", textAlign: "center" }}>
-                            <div style={{ background: "#0f172a", borderRadius: "10px", padding: "8px", border: "1px solid #1e293b" }}>
-                              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>لوحة هذا الطالب ({m.myProject})</div>
+                            <div style={{ background: "var(--bg-deep)", borderRadius: "10px", padding: "8px", border: "1px solid var(--border)" }}>
+                              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>لوحة هذا الطالب ({m.myProject})</div>
                               <div 
                                 onClick={() => m.myImageUrl && setZoomedImage(m.myImageUrl)}
                                 title="انقر لتكبير اللوحة"
-                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000", cursor: m.myImageUrl ? "zoom-in" : "default" }}
+                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--error)", background: "#000", cursor: m.myImageUrl ? "zoom-in" : "default" }}
                               >
                                 {m.myImageUrl ? (
                                   <img 
@@ -410,24 +401,26 @@ export default function AdminPortalPage() {
                                     }}
                                   />
                                 ) : null}
-                                <div className="admin-img-fallback" style={{ display: m.myImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: "11px", gap: "4px" }}>
-                                  <span>🖼️ تعذر تحميل الصورة</span>
-                                  {m.myImageUrl && <a href={m.myImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8" }}>فتح الرابط</a>}
+                                <div className="admin-img-fallback" style={{ display: m.myImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", fontSize: "11px", gap: "4px" }}>
+                                  <ImageIcon size={18} strokeWidth={1.5} />
+                                  <span>تعذر تحميل الصورة</span>
+                                  {m.myImageUrl && <a href={m.myImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "var(--accent-ink)" }}>فتح الرابط</a>}
                                 </div>
                                 {m.myImageUrl && (
-                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", pointerEvents: "none" }}>
-                                    🔍 تكبير
+                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "6px", pointerEvents: "none", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                    <Search size={10} strokeWidth={1.5} />
+                                    <span>تكبير</span>
                                   </div>
                                 )}
                               </div>
                             </div>
 
-                            <div style={{ background: "#0f172a", borderRadius: "10px", padding: "8px", border: "1px solid #1e293b" }}>
-                              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>لوحة الطالب: {m.matchedStudentName}</div>
+                            <div style={{ background: "var(--bg-deep)", borderRadius: "10px", padding: "8px", border: "1px solid var(--border)" }}>
+                              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px" }}>لوحة الطالب: {m.matchedStudentName}</div>
                               <div 
                                 onClick={() => m.matchedImageUrl && setZoomedImage(m.matchedImageUrl)}
                                 title="انقر لتكبير اللوحة"
-                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid #ef4444", background: "#000", cursor: m.matchedImageUrl ? "zoom-in" : "default" }}
+                                style={{ position: "relative", height: "140px", borderRadius: "8px", overflow: "hidden", border: "2px solid var(--error)", background: "#000", cursor: m.matchedImageUrl ? "zoom-in" : "default" }}
                               >
                                 {m.matchedImageUrl ? (
                                   <img 
@@ -441,32 +434,34 @@ export default function AdminPortalPage() {
                                     }}
                                   />
                                 ) : null}
-                                <div className="admin-img-fallback" style={{ display: m.matchedImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#94a3b8", fontSize: "11px", gap: "4px" }}>
-                                  <span>🖼️ تعذر تحميل الصورة</span>
-                                  {m.matchedImageUrl && <a href={m.matchedImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "#38bdf8" }}>فتح الرابط</a>}
+                                <div className="admin-img-fallback" style={{ display: m.matchedImageUrl ? "none" : "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", fontSize: "11px", gap: "4px" }}>
+                                  <ImageIcon size={18} strokeWidth={1.5} />
+                                  <span>تعذر تحميل الصورة</span>
+                                  {m.matchedImageUrl && <a href={m.matchedImageUrl} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()} style={{ color: "var(--accent-ink)" }}>فتح الرابط</a>}
                                 </div>
                                 {m.matchedImageUrl && (
-                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", pointerEvents: "none" }}>
-                                    🔍 تكبير
+                                  <div style={{ position: "absolute", bottom: "4px", left: "4px", background: "rgba(0,0,0,0.75)", color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "6px", pointerEvents: "none", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                    <Search size={10} strokeWidth={1.5} />
+                                    <span>تكبير</span>
                                   </div>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          <div style={{ marginTop: "10px", fontSize: "11px", color: "#fca5a5" }}>
-                            كود الطالب الآخر: <b>{m.matchedStudentCode}</b> • المشروع: <b>{m.matchedProject}</b>
+                          <div className="tabular-nums" style={{ marginTop: "10px", fontSize: "11px", color: "var(--error-ink)" }}>
+                            كود الطالب الآخر: <strong style={{ fontWeight: 600 }}>{m.matchedStudentCode}</strong> • المشروع: <strong style={{ fontWeight: 600 }}>{m.matchedProject}</strong>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981", borderRadius: "12px", padding: "24px", textAlign: "center" }}>
-                      <CheckCircle2 size={36} color="#10b981" style={{ margin: "0 auto 10px auto" }} />
-                      <div style={{ color: "#fff", fontWeight: "bold", fontSize: "15px", marginBottom: "4px" }}>
+                    <div style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid var(--success)", borderRadius: "12px", padding: "24px", textAlign: "center" }}>
+                      <CheckCircle2 size={32} strokeWidth={1.5} color="var(--success-ink)" style={{ margin: "0 auto 10px auto" }} />
+                      <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "15px", marginBottom: "4px" }}>
                         الأعمال الفنية أصلية 100%
                       </div>
-                      <div style={{ color: "#94a3b8", fontSize: "12px" }}>
+                      <div style={{ color: "var(--text-muted)", fontSize: "12px" }}>
                         لم يعثر محرك الذكاء الاصطناعي على أي تطابق أو تشابه في بصمات اللوحات مع أي طالب آخر في المنظومة.
                       </div>
                     </div>
@@ -477,24 +472,24 @@ export default function AdminPortalPage() {
               {/* 4. تبويب سجل التدقيق والنشاط (Audit Log) */}
               {activeTab === "audit" && (
                 <div className="glass-card animate-fade-in" style={{ padding: "18px" }}>
-                  <h3 style={{ color: "#fff", fontSize: "15px", marginBottom: "14px" }}>سجل النشاط والتدقيق الأمني:</h3>
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, marginBottom: "14px" }}>سجل النشاط والتدقيق الأمني:</h3>
                   
                   {studentData.auditLogs?.length > 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {studentData.auditLogs.map((log: any) => (
-                        <div key={log.id} style={{ background: "#0d131f", padding: "10px 14px", borderRadius: "8px", border: "1px solid #1e293b", fontSize: "12px" }}>
+                        <div key={log.id} style={{ background: "var(--bg-deep)", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--border)", fontSize: "12px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                            <span style={{ color: "#38bdf8", fontWeight: "bold" }}>{log.action}</span>
-                            <span style={{ color: "#64748b", fontSize: "11px" }}>{new Date(log.created_at).toLocaleString("ar-EG")}</span>
+                            <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>{log.action}</span>
+                            <span className="tabular-nums" style={{ color: "var(--text-dim)", fontSize: "11px" }}>{new Date(log.created_at).toLocaleString("ar-EG")}</span>
                           </div>
-                          <div style={{ color: "#94a3b8", fontSize: "11px" }}>
+                          <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "11px" }}>
                             الجهاز: {log.device_id || "غير معروف"}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: "center", color: "#64748b", padding: "14px" }}>
+                    <div style={{ textAlign: "center", color: "var(--text-dim)", padding: "14px" }}>
                       لا يوجد نشاط مسجل بعد
                     </div>
                   )}
@@ -504,51 +499,51 @@ export default function AdminPortalPage() {
               {/* 5. تبويب العمليات الإدارية */}
               {activeTab === "actions" && (
                 <div className="glass-card animate-fade-in" style={{ padding: "18px" }}>
-                  <h3 style={{ color: "#fff", fontSize: "15px", marginBottom: "14px" }}>عمليات الإدارة على الحساب:</h3>
+                  <h3 style={{ color: "var(--text-primary)", fontSize: "15px", fontWeight: 600, marginBottom: "14px" }}>عمليات الإدارة على الحساب:</h3>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     {/* إعادة تعيين الـ PIN */}
-                    <div style={{ background: "#0d131f", padding: "14px", borderRadius: "10px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ background: "var(--bg-deep)", padding: "14px", borderRadius: "12px", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <div>
-                        <div style={{ color: "#fff", fontWeight: "bold", fontSize: "13px" }}>إعادة توليد رقم سري جديد</div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>في حال نسيان الطالب للرقم أو الشك في تسريبه</div>
+                        <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "13px" }}>إعادة توليد رقم سري جديد</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>في حال نسيان الطالب للرقم أو الشك في تسريبه</div>
                       </div>
                       <button 
                         onClick={() => handleAdminAction('reset_pin')}
                         className="btn-secondary"
                         style={{ fontSize: "12px", padding: "8px 14px" }}
                       >
-                        <RotateCcw size={14} />
+                        <RotateCcw size={14} strokeWidth={1.5} />
                         <span>توليد جديد</span>
                       </button>
                     </div>
 
                     {/* تسجيل الخروج من جميع الأجهزة (فك القيد) */}
-                    <div style={{ background: "#0d131f", padding: "14px", borderRadius: "10px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ background: "var(--bg-deep)", padding: "14px", borderRadius: "12px", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <div>
-                        <div style={{ color: "#f59e0b", fontWeight: "bold", fontSize: "13px" }}>تسجيل الخروج من جميع الأجهزة</div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>يفك ارتباط الجهاز الحالي ويلغي القفل الزمني ليتمكن الطالب من الدخول فوراً</div>
+                        <div style={{ color: "var(--warning-ink)", fontWeight: 600, fontSize: "13px" }}>تسجيل الخروج من جميع الأجهزة</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>يفك ارتباط الجهاز الحالي ويلغي القفل الزمني ليتمكن الطالب من الدخول فوراً</div>
                       </div>
                       <button 
                         onClick={() => handleAdminAction('logout_all_devices')}
                         className="btn-secondary"
-                        style={{ fontSize: "12px", padding: "8px 14px", color: "#f59e0b", borderColor: "#f59e0b" }}
+                        style={{ fontSize: "12px", padding: "8px 14px", color: "var(--warning-ink)", borderColor: "var(--warning)", fontWeight: 600 }}
                       >
-                        <LogOut size={14} />
+                        <LogOut size={14} strokeWidth={1.5} />
                         <span>تسجيل الخروج</span>
                       </button>
                     </div>
 
                     {/* تصفير مشاريع الطالب */}
-                    <div style={{ background: "#0d131f", padding: "14px", borderRadius: "10px", border: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ background: "var(--bg-deep)", padding: "14px", borderRadius: "12px", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
                       <div>
-                        <div style={{ color: "#ef4444", fontWeight: "bold", fontSize: "13px" }}>فورمات وحذف المشاريع المرفوعة</div>
-                        <div style={{ color: "#94a3b8", fontSize: "11px" }}>يتيح للطالب إعادة تصوير أعماله ورفعها مجدداً من الصفر</div>
+                        <div style={{ color: "var(--error-ink)", fontWeight: 600, fontSize: "13px" }}>فورمات وحذف المشاريع المرفوعة</div>
+                        <div style={{ color: "var(--text-muted)", fontSize: "11px" }}>يتيح للطالب إعادة تصوير أعماله ورفعها مجدداً من الصفر</div>
                       </div>
                       <button 
                         onClick={() => handleAdminAction('reset_submissions')}
                         className="btn-secondary"
-                        style={{ fontSize: "12px", padding: "8px 14px", color: "#f87171", borderColor: "#ef4444" }}
+                        style={{ fontSize: "12px", padding: "8px 14px", color: "var(--error-ink)", borderColor: "var(--error)", fontWeight: 600 }}
                       >
                         تصفير الأعمال
                       </button>
@@ -566,30 +561,32 @@ export default function AdminPortalPage() {
 
       {/* نافذة المحاكاة: تصفح الحساب كطالب (Impersonate) */}
       {impersonateModal && studentData && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-          <div className="glass-card" style={{ width: "100%", maxWidth: "460px", maxHeight: "90vh", overflowY: "auto", padding: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #2a374f", paddingBottom: "12px", marginBottom: "14px" }}>
-              <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "14px" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div className="glass-card" style={{ width: "100%", maxWidth: "460px", maxHeight: "90vh", overflowY: "auto", padding: "20px", borderRadius: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border)", paddingBottom: "12px", marginBottom: "14px" }}>
+              <div style={{ color: "var(--accent-ink)", fontWeight: 600, fontSize: "14px" }}>
                 محاكاة واجهة الطالب: {studentData.student?.full_name}
               </div>
-              <button onClick={() => setImpersonateModal(false)} style={{ background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontSize: "16px" }}>✕</button>
+              <button onClick={() => setImpersonateModal(false)} style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", display: "flex", alignItems: "center" }} aria-label="إغلاق">
+                <X size={18} strokeWidth={1.5} />
+              </button>
             </div>
 
             <div style={{ textAlign: "center", padding: "10px 0" }}>
-              <div style={{ color: "#fff", fontWeight: "bold", fontSize: "16px" }}>{studentData.student?.full_name}</div>
-              <div style={{ color: "#94a3b8", fontSize: "12px", marginBottom: "16px" }}>كود: {studentData.student?.student_code} • {studentData.student?.academic_year}</div>
+              <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "16px" }}>{studentData.student?.full_name}</div>
+              <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "16px" }}>كود: {studentData.student?.student_code} • {studentData.student?.academic_year}</div>
 
-              <div style={{ textAlign: "right", background: "#0d131f", padding: "14px", borderRadius: "10px", marginBottom: "12px" }}>
-                <div style={{ color: "#38bdf8", fontWeight: "bold", fontSize: "13px", marginBottom: "8px" }}>المشاريع المرفوعة للتقييم:</div>
+              <div style={{ textAlign: "right", background: "var(--bg-deep)", border: "1px solid var(--border)", padding: "14px", borderRadius: "12px", marginBottom: "12px" }}>
+                <div style={{ color: "var(--accent-ink)", fontWeight: 600, fontSize: "13px", marginBottom: "8px" }}>المشاريع المرفوعة للتقييم:</div>
                 {studentData.submissions?.length > 0 ? (
                   studentData.submissions.map((sub: any) => (
-                    <div key={sub.id} style={{ borderBottom: "1px solid #1a2336", padding: "6px 0" }}>
-                      <div style={{ color: "#fff", fontSize: "12px", fontWeight: "bold" }}>{sub.project_name} ({sub.course_name})</div>
-                      <div style={{ color: "#f59e0b", fontSize: "11px" }}>الحالة: {sub.score !== null ? `الدرجة: ${sub.score}` : "في انتظار التقييم"}</div>
+                    <div key={sub.id} style={{ borderBottom: "1px solid var(--border)", padding: "6px 0" }}>
+                      <div style={{ color: "var(--text-primary)", fontSize: "12px", fontWeight: 600 }}>{sub.project_name} ({sub.course_name})</div>
+                      <div className="tabular-nums" style={{ color: "var(--warning-ink)", fontSize: "11px" }}>الحالة: {sub.score !== null ? `الدرجة: ${sub.score}` : "في انتظار التقييم"}</div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ color: "#64748b", fontSize: "12px" }}>لم يرفع أي أعمال بعد.</div>
+                  <div style={{ color: "var(--text-dim)", fontSize: "12px" }}>لم يرفع أي أعمال بعد.</div>
                 )}
               </div>
 
@@ -618,13 +615,14 @@ export default function AdminPortalPage() {
             cursor: "zoom-out"
           }}
         >
-          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "#ef4444", padding: "4px 12px", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: "pointer" }}>
-            ✕ إغلاق المعاينة
+          <div style={{ position: "absolute", top: "16px", right: "20px", color: "#fff", background: "var(--error)", padding: "6px 12px", borderRadius: "8px", fontWeight: 600, fontSize: "13px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+            <X size={14} strokeWidth={1.5} />
+            <span>إغلاق المعاينة</span>
           </div>
           <img 
             src={zoomedImage} 
             alt="لوحة فنية مكبرة" 
-            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "2px solid #ef4444", objectFit: "contain", boxShadow: "0 10px 40px rgba(0,0,0,0.8)" }} 
+            style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: "12px", border: "1px solid var(--border-light)", objectFit: "contain" }} 
           />
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/core/supabase";
+import { Wrench, KeyRound, ShieldAlert, Check, AlertTriangle } from "lucide-react";
 
 export default function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -163,8 +164,8 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "#0a0e17",
-          color: "#fff",
+          backgroundColor: "var(--background)",
+          color: "var(--text)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -177,18 +178,20 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
       >
         <div
           style={{
-            maxWidth: "480px",
+            maxWidth: "460px",
             width: "100%",
-            background: "#141b29",
-            border: "1px solid #2a374f",
-            borderRadius: "20px",
+            background: "var(--surface)",
+            border: "1px solid var(--border-light)",
+            borderRadius: "16px",
             padding: "32px 24px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
+            boxShadow: "0 12px 32px rgba(0,0,0,0.45)"
           }}
         >
-          <div style={{ fontSize: "56px", marginBottom: "16px", animation: "pulse 2s infinite" }}>🚧</div>
+          <div style={{ width: "52px", height: "52px", borderRadius: "12px", background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "var(--accent-ink)" }}>
+            <Wrench size={24} strokeWidth={1.5} />
+          </div>
           
-          <h1 style={{ color: "#38bdf8", fontSize: "22px", fontWeight: "bold", margin: "0 0 10px 0" }}>
+          <h1 style={{ color: "var(--text)", fontSize: "20px", fontWeight: 600, margin: "0 0 8px 0" }}>
             {isStudentRoute ? "بوابة الطلاب قيد الصيانة المؤقتة" : "وضع الصيانة والتحديث"}
           </h1>
 
@@ -196,10 +199,10 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             style={{
               background: "rgba(56, 189, 248, 0.08)",
               border: "1px solid rgba(56, 189, 248, 0.2)",
-              borderRadius: "10px",
-              padding: "8px 14px",
+              borderRadius: "6px",
+              padding: "6px 12px",
               display: "inline-block",
-              color: "#94a3b8",
+              color: "var(--accent-ink)",
               fontSize: "12px",
               marginBottom: "16px"
             }}
@@ -209,66 +212,69 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             {maintenanceScope === "all" && "تحديث شامل لكافة خدمات النظام"}
           </div>
 
-          <p style={{ fontSize: "15px", color: "#e2e8f0", lineHeight: 1.7, margin: "0 0 20px 0" }}>
+          <p style={{ fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.7, margin: "0 0 16px 0" }}>
             {message}
           </p>
 
-          <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>
+          <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: 0 }}>
             ستختفي هذه الشاشة تلقائياً ويعود النظام للعمل فور اكتمال التحديثات.
           </p>
 
           {!isStudentRoute && (
-            <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: "1px solid #2a374f" }}>
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border)" }}>
               {!showAdminLogin ? (
                 <button
                   onClick={() => setShowAdminLogin(true)}
+                  className="btn-compact"
                   style={{
-                    background: "transparent",
-                    border: "1px solid #3b82f6",
-                    color: "#38bdf8",
+                    background: "var(--surface-hover)",
+                    border: "1px solid var(--border-light)",
+                    color: "var(--accent-ink)",
                     padding: "8px 16px",
                     borderRadius: "8px",
                     fontSize: "13px",
-                    fontWeight: "bold",
+                    fontWeight: 500,
                     cursor: "pointer",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "6px"
+                    gap: "8px"
                   }}
                 >
-                  <span>🔑</span> تسجيل دخول كمسؤول النظام (Admin Bypass)
+                  <KeyRound size={16} strokeWidth={1.5} />
+                  <span>تسجيل دخول كمسؤول النظام</span>
                 </button>
               ) : (
-                <form onSubmit={handleAdminLogin} style={{ textAlign: "right", marginTop: "10px" }}>
-                  <div style={{ fontSize: "13px", fontWeight: "bold", color: "#38bdf8", marginBottom: "12px", textAlign: "center" }}>
-                    دخول الطوارئ لمديري النظام 🛡️
+                <form onSubmit={handleAdminLogin} style={{ textAlign: "right", marginTop: "8px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-ink)", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                    <ShieldAlert size={16} strokeWidth={1.5} />
+                    <span>دخول الطوارئ لمديري النظام</span>
                   </div>
 
                   {loginError && (
-                    <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid #ef4444", color: "#fca5a5", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "12px" }}>
+                    <div style={{ background: "rgba(239, 68, 68, 0.14)", border: "1px solid rgba(239, 68, 68, 0.35)", color: "var(--error-ink)", padding: "8px 12px", borderRadius: "8px", fontSize: "12px", marginBottom: "12px" }}>
                       {loginError}
                     </div>
                   )}
 
-                  <div style={{ marginBottom: "10px" }}>
-                    <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>البريد الإلكتروني للادمن:</label>
+                  <div style={{ marginBottom: "12px" }}>
+                    <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", marginBottom: "4px" }}>البريد الإلكتروني</label>
                     <input
                       type="email"
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
                       placeholder="admin@faculty.edu"
-                      style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
+                      style={{ width: "100%", padding: "10px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left", marginBottom: 0 }}
                     />
                   </div>
 
-                  <div style={{ marginBottom: "14px" }}>
-                    <label style={{ display: "block", color: "#94a3b8", fontSize: "11px", marginBottom: "4px" }}>كلمة المرور:</label>
+                  <div style={{ marginBottom: "16px" }}>
+                    <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "12px", marginBottom: "4px" }}>كلمة المرور</label>
                     <input
                       type="password"
                       value={adminPassword}
                       onChange={(e) => setAdminPassword(e.target.value)}
                       placeholder="••••••••"
-                      style={{ width: "100%", padding: "10px", background: "#0d131f", border: "1px solid #2a374f", color: "#fff", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left" }}
+                      style={{ width: "100%", padding: "10px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", borderRadius: "8px", fontSize: "13px", direction: "ltr", textAlign: "left", marginBottom: 0 }}
                     />
                   </div>
 
@@ -276,14 +282,16 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
                     <button
                       type="submit"
                       disabled={loggingIn}
-                      style={{ flex: 1, padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "13px", cursor: loggingIn ? "not-allowed" : "pointer" }}
+                      style={{ flex: 1, padding: "10px 16px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: loggingIn ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
                     >
-                      {loggingIn ? "جاري التحقق..." : "تأكيد الدخول وفك الحجب ✅"}
+                      <Check size={16} strokeWidth={1.5} />
+                      <span>{loggingIn ? "جاري التحقق" : "تأكيد الدخول وفك الحجب"}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowAdminLogin(false)}
-                      style={{ padding: "10px 14px", background: "#334155", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
+                      className="btn-compact"
+                      style={{ padding: "10px 16px", background: "var(--surface-hover)", color: "var(--text-secondary)", border: "1px solid var(--border-light)", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
                     >
                       إلغاء
                     </button>
@@ -293,14 +301,6 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             </div>
           )}
         </div>
-
-        <style>{`
-          @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -310,23 +310,24 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
       {isMaintenance && isAdmin && (
         <div
           style={{
-            background: "linear-gradient(90deg, #b45309, #d97706)",
+            background: "#b45309",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.14)",
             color: "#fff",
             textAlign: "center",
-            padding: "8px 14px",
+            padding: "8px 16px",
             fontSize: "12px",
-            fontWeight: "bold",
+            fontWeight: 500,
             zIndex: 10000,
             position: "relative",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
             gap: "8px",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
           }}
         >
+          <AlertTriangle size={15} strokeWidth={1.5} />
           <span>
-            ⚠️ وضع الصيانة مفعّل حالياً للمستخدمين ({maintenanceScope === "portal" ? "بوابة الطلاب فقط" : maintenanceScope === "all" ? "النظام بالكامل" : "نظام أعضاء هيئة التدريس فقط"}) - أنت تتصفح بصلاحية استثناء المدير
+            وضع الصيانة مفعّل حالياً للمستخدمين ({maintenanceScope === "portal" ? "بوابة الطلاب فقط" : maintenanceScope === "all" ? "النظام بالكامل" : "نظام أعضاء هيئة التدريس فقط"}) — تتصفح بصلاحية استثناء المدير
           </span>
         </div>
       )}

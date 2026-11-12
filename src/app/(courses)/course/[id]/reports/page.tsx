@@ -18,6 +18,21 @@ async function fetchAllSupabaseRows(fetchPage: (from: number, to: number) => any
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  Check,
+  ClipboardList,
+  FileText,
+  FolderKanban,
+  Layers,
+  Leaf,
+  Printer,
+  Settings,
+  X
+} from "lucide-react";
 import { supabase } from "@/lib/core/supabase";
 import { generatePrintableHtml } from "@/lib/courses/pdfHelper";
 import { downloadPdf } from "@/lib/courses/downloadPdf";
@@ -1092,79 +1107,99 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
 
   // UI Tabs Definition
   const tabs = [
-    { id: "attendance", label: "الحضور التفصيلي", icon: "📅" },
-    { id: "single_project", label: "تقييم مشروع", icon: "📊" },
-    { id: "all_projects", label: "الشامل للمشاريع", icon: "📑" },
-    { id: "raw", label: "التقرير الخام", icon: "📋" },
-    { id: "grading", label: "التجميع (الكنترول)", icon: "⚙️" },
+    { id: "attendance", label: "الحضور التفصيلي", icon: <Calendar size={14} strokeWidth={1.5} /> },
+    { id: "single_project", label: "تقييم مشروع", icon: <BarChart3 size={14} strokeWidth={1.5} /> },
+    { id: "all_projects", label: "الشامل للمشاريع", icon: <Layers size={14} strokeWidth={1.5} /> },
+    { id: "raw", label: "التقرير الخام", icon: <ClipboardList size={14} strokeWidth={1.5} /> },
+    { id: "grading", label: "التجميع (الكنترول)", icon: <Settings size={14} strokeWidth={1.5} /> },
   ];
 
   if (loading && !course) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column", background: "var(--background)" }}>
         <div className="loader-circle"></div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "0", maxWidth: "900px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", direction: "rtl", background: "#121212", color: "#fff" }}>
-      
+    <div style={{ padding: "0", maxWidth: "900px", margin: "0 auto", height: "100vh", display: "flex", flexDirection: "column", direction: "rtl", background: "var(--background)", color: "var(--text)" }}>
+
       {/* Header */}
-      <div style={{ padding: "15px 20px", background: "var(--surface)", borderBottom: "1px solid #333", display: "flex", alignItems: "center", gap: "15px" }}>
-        <button className="hide-on-mobile" onClick={() => router.back()} style={{ background: "transparent", border: "1px solid #555", color: "#fff", padding: "5px 15px", borderRadius: "10px", cursor: "pointer" }}>🡲 عودة</button>
-        <h2 style={{ margin: 0, fontSize: "18px", color: "var(--primary)" }}>التقارير - {course?.name}</h2>
+      <div style={{ padding: "14px 20px", background: "var(--surface)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "12px" }}>
+        <button
+          type="button"
+          className="hide-on-mobile btn-compact"
+          onClick={() => router.back()}
+          style={{ background: "var(--surface-hover)", border: "1px solid var(--border-light)", color: "var(--text)", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px", margin: 0 }}
+        >
+          <ArrowRight size={15} strokeWidth={1.5} />
+          <span>عودة</span>
+        </button>
+        <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--accent-ink)" }}>التقارير - {course?.name}</h2>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", overflowX: "auto", padding: "10px", gap: "10px", background: "#1a1a1a", borderBottom: "1px solid #333" }}>
-        {tabs.map(t => (
-          <button 
-            key={t.id} 
-            onClick={() => setActiveTab(t.id as any)}
-            style={{
-              padding: "10px 15px",
-              background: activeTab === t.id ? "var(--primary)" : "transparent",
-              border: activeTab === t.id ? "none" : "1px solid #444",
-              color: "#fff",
-              borderRadius: "10px",
-              whiteSpace: "nowrap",
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              fontWeight: activeTab === t.id ? "bold" : "normal"
-            }}
-          >
-            <span>{t.icon}</span> {t.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", overflowX: "auto", padding: "10px 16px", gap: "8px", background: "var(--bg-deep)", borderBottom: "1px solid var(--border)" }}>
+        {tabs.map(t => {
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              type="button"
+              key={t.id}
+              onClick={() => setActiveTab(t.id as any)}
+              style={{
+                padding: "8px 14px",
+                background: isActive ? "var(--primary)" : "var(--surface)",
+                border: isActive ? "1px solid var(--primary)" : "1px solid var(--border-light)",
+                color: isActive ? "#ffffff" : "var(--text-secondary)",
+                borderRadius: "8px",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "13px",
+                fontWeight: isActive ? 600 : 500,
+                cursor: "pointer",
+                margin: 0
+              }}
+            >
+              {t.icon}
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Content Area */}
       <div style={{ flexGrow: 1, overflowY: "auto", padding: "20px" }}>
-        
+
         {/* --- Tab 1: Detailed Attendance --- */}
         {activeTab === "attendance" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px", flexWrap: "wrap", gap: "10px" }}>
-              <h3 style={{ color: "#4CAF50", margin: 0 }}>📅 كشف الحضور والغياب التفصيلي (بالعرض - مقسم بالسكاشن)</h3>
-              <span style={{ fontSize: "12px", background: "rgba(76, 175, 80, 0.15)", color: "#4CAF50", padding: "4px 12px", borderRadius: "20px", fontWeight: "bold", border: "1px solid rgba(76, 175, 80, 0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "8px" }}>
+              <h3 style={{ color: "var(--success-ink)", margin: 0, fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Calendar size={18} strokeWidth={1.5} />
+                <span>كشف الحضور والغياب التفصيلي (بالعرض - مقسم بالسكاشن)</span>
+              </h3>
+              <span style={{ fontSize: "11px", background: "rgba(16, 185, 129, 0.12)", color: "var(--success-ink)", padding: "3px 10px", borderRadius: "6px", fontWeight: 500, border: "1px solid rgba(16, 185, 129, 0.3)" }}>
                 صفحة بالعرض (Landscape)
               </span>
             </div>
 
-            <p style={{ color: "#aaa", fontSize: "14px", lineHeight: "1.6" }}>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", lineHeight: "1.6", margin: "0 0 16px 0" }}>
               يُنشئ هذا الكشف جدولاً أفقياً بالعرض (Landscape)، ويقسم كل سكشن تلقائياً في ورقة أو ورقتين مع كتابة اسم ورقم السكشن والترويسة الرسمية في أعلى كل ورقة. يتم تظليل خانات الحضور بالكامل باللون الأخضر مع التاريخ الفعلي للتسجيل، بينما تُظلل خانات الأعذار باللون الأحمر مع كتابة سبب العذر.
             </p>
 
             {/* Multi-Section Selection Box */}
-            <div style={{ background: "#1e1e1e", padding: "18px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
+            <div style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
                 <div>
-                  <label style={{ display: "block", color: "#e2e8f0", fontSize: "14px", fontWeight: "bold" }}>
-                    🗂️ تحديد السكاشن للطباعة (تحديد متعدد):
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text)", fontSize: "14px", fontWeight: 600 }}>
+                    <FolderKanban size={15} strokeWidth={1.5} color="var(--accent-ink)" />
+                    <span>تحديد السكاشن للطباعة (تحديد متعدد):</span>
                   </label>
-                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                     انقر على أي سكشن لاختياره أو استبعاده من التقرير (يمكنك تحديد سكشنين أو أكثر)
                   </span>
                 </div>
@@ -1172,42 +1207,51 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
                   <button
                     type="button"
                     onClick={() => setSelectedSections([...availableSections])}
+                    className="tabular-nums"
                     style={{
-                      background: "#334155",
-                      color: "#38bdf8",
-                      border: "1px solid #475569",
-                      padding: "6px 14px",
+                      background: "rgba(56, 189, 248, 0.12)",
+                      color: "var(--accent-ink)",
+                      border: "1px solid rgba(56, 189, 248, 0.35)",
+                      padding: "6px 12px",
                       borderRadius: "8px",
                       fontSize: "12px",
                       cursor: "pointer",
-                      fontWeight: "bold",
-                      transition: "all 0.2s"
+                      fontWeight: 500,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      margin: 0
                     }}
                   >
-                    ✓ تحديد الكل ({availableSections.length})
+                    <Check size={13} strokeWidth={1.5} />
+                    <span>تحديد الكل ({availableSections.length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedSections([])}
                     style={{
-                      background: "#334155",
-                      color: "#f87171",
-                      border: "1px solid #475569",
-                      padding: "6px 14px",
+                      background: "rgba(239, 68, 68, 0.12)",
+                      color: "var(--error-ink)",
+                      border: "1px solid rgba(239, 68, 68, 0.35)",
+                      padding: "6px 12px",
                       borderRadius: "8px",
                       fontSize: "12px",
                       cursor: "pointer",
-                      fontWeight: "bold",
-                      transition: "all 0.2s"
+                      fontWeight: 500,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      margin: 0
                     }}
                   >
-                    ✕ إلغاء التحديد
+                    <X size={13} strokeWidth={1.5} />
+                    <span>إلغاء التحديد</span>
                   </button>
                 </div>
               </div>
 
               {/* Sections Grid Selection */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "10px", marginTop: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px", marginTop: "12px" }}>
                 {availableSections.map(sec => {
                   const secCount = students.filter(s => (s.section ? String(s.section).trim() : 'تخلفات') === sec).length;
                   const isChecked = selectedSections.includes(sec);
@@ -1226,25 +1270,25 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
                         alignItems: "center",
                         gap: "10px",
                         padding: "10px 12px",
-                        borderRadius: "10px",
-                        background: isChecked ? "rgba(76, 175, 80, 0.16)" : "#262626",
-                        border: isChecked ? "2px solid #4CAF50" : "1px solid #444",
+                        borderRadius: "8px",
+                        background: isChecked ? "rgba(16, 185, 129, 0.14)" : "var(--bg-deep)",
+                        border: isChecked ? "1px solid var(--success)" : "1px solid var(--border-light)",
                         cursor: "pointer",
                         userSelect: "none",
-                        transition: "all 0.15s ease"
+                        transition: "background 0.15s var(--ease-out), border-color 0.15s var(--ease-out)"
                       }}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => {}} // handled by parent onClick
-                        style={{ width: "17px", height: "17px", accentColor: "#4CAF50", cursor: "pointer" }}
+                        onChange={() => {}}
+                        style={{ width: "16px", height: "16px", accentColor: "var(--success)", cursor: "pointer" }}
                       />
-                      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                        <span style={{ fontSize: "13px", fontWeight: "bold", color: isChecked ? "#4CAF50" : "#eee", whiteSpace: "nowrap" }}>
+                      <div className="tabular-nums" style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: isChecked ? "var(--success-ink)" : "var(--text)", whiteSpace: "nowrap" }}>
                           {sec === 'تخلفات' ? 'تخلفات' : `سكشن ${sec}`}
                         </span>
-                        <span style={{ fontSize: "11px", color: isChecked ? "#a5d6a7" : "#888" }}>
+                        <span style={{ fontSize: "11px", color: isChecked ? "var(--success-ink)" : "var(--text-muted)" }}>
                           {secCount} طالب
                         </span>
                       </div>
@@ -1254,132 +1298,139 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               </div>
 
               {/* Status Message */}
-              <div style={{ marginTop: "14px", padding: "8px 12px", background: "rgba(255,255,255,0.03)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", flexWrap: "wrap", gap: "6px" }}>
-                <span style={{ color: "#aaa" }}>
-                  السكاشن المحددة: <b style={{ color: selectedSections.length > 0 ? "#4CAF50" : "#f87171" }}>{selectedSections.length} من أصل {availableSections.length}</b>
+              <div className="tabular-nums" style={{ marginTop: "12px", padding: "10px 12px", background: "var(--bg-deep)", borderRadius: "8px", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", flexWrap: "wrap", gap: "8px" }}>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  السكاشن المحددة: <span style={{ color: selectedSections.length > 0 ? "var(--success-ink)" : "var(--error-ink)", fontWeight: 600 }}>{selectedSections.length} من أصل {availableSections.length}</span>
                 </span>
-                <span style={{ color: "#aaa" }}>
-                  إجمالي طلاب السكاشن المحددة: <b style={{ color: "#38bdf8" }}>{students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب</b>
+                <span style={{ color: "var(--text-secondary)" }}>
+                  إجمالي طلاب السكاشن المحددة: <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>{students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب</span>
                 </span>
               </div>
             </div>
 
             {/* Paper Saving & Print Mode Options */}
-            <div style={{ background: "#1e1e1e", padding: "16px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
+            <div style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
                 <div>
-                  <label style={{ display: "block", color: "#e2e8f0", fontSize: "14px", fontWeight: "bold" }}>
-                    📄 خيارات توفير الورق وتخطيط الطباعة:
+                  <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text)", fontSize: "14px", fontWeight: 600 }}>
+                    <FileText size={15} strokeWidth={1.5} color="var(--accent-ink)" />
+                    <span>خيارات توفير الورق وتخطيط الطباعة:</span>
                   </label>
-                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                     اختر النمط المناسب لتقليل عدد الأوراق المطبوعة وضمان عدم تقطيع الجداول
                   </span>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     type="button"
                     onClick={() => setPaperSavingMode(true)}
                     style={{
-                      background: paperSavingMode ? "#059669" : "#262626",
-                      color: paperSavingMode ? "#fff" : "#94a3b8",
-                      border: paperSavingMode ? "2px solid #10b981" : "1px solid #444",
-                      padding: "7px 14px",
+                      background: paperSavingMode ? "var(--success)" : "var(--bg-deep)",
+                      color: paperSavingMode ? "#ffffff" : "var(--text-secondary)",
+                      border: paperSavingMode ? "1px solid var(--success)" : "1px solid var(--border-light)",
+                      padding: "7px 12px",
                       borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 500,
                       cursor: "pointer",
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
                       gap: "6px",
-                      transition: "all 0.2s"
+                      transition: "background 0.15s var(--ease-out)",
+                      margin: 0
                     }}
                   >
-                    <span>🌱</span> توفير الورق الذكي (مُوصى به)
+                    <Leaf size={13} strokeWidth={1.5} />
+                    <span>توفير الورق الذكي (مُوصى به)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPaperSavingMode(false)}
                     style={{
-                      background: !paperSavingMode ? "#2563eb" : "#262626",
-                      color: !paperSavingMode ? "#fff" : "#94a3b8",
-                      border: !paperSavingMode ? "2px solid #3b82f6" : "1px solid #444",
-                      padding: "7px 14px",
+                      background: !paperSavingMode ? "var(--primary)" : "var(--bg-deep)",
+                      color: !paperSavingMode ? "#ffffff" : "var(--text-secondary)",
+                      border: !paperSavingMode ? "1px solid var(--primary)" : "1px solid var(--border-light)",
+                      padding: "7px 12px",
                       borderRadius: "8px",
                       fontSize: "12px",
-                      fontWeight: "bold",
+                      fontWeight: 500,
                       cursor: "pointer",
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
                       gap: "6px",
-                      transition: "all 0.2s"
+                      transition: "background 0.15s var(--ease-out)",
+                      margin: 0
                     }}
                   >
-                    <span>📑</span> سكشن منفصل لكل ورقة
+                    <Layers size={13} strokeWidth={1.5} />
+                    <span>سكشن منفصل لكل ورقة</span>
                   </button>
                 </div>
               </div>
 
-              <div style={{ padding: "10px 14px", background: paperSavingMode ? "rgba(16, 185, 129, 0.1)" : "rgba(59, 130, 246, 0.1)", borderRadius: "8px", borderRight: paperSavingMode ? "3px solid #10b981" : "3px solid #3b82f6" }}>
-                <p style={{ margin: 0, fontSize: "12.5px", color: paperSavingMode ? "#6ee7b7" : "#93c5fd", lineHeight: "1.5" }}>
+              <div style={{ padding: "10px 12px", background: paperSavingMode ? "rgba(16, 185, 129, 0.1)" : "rgba(56, 189, 248, 0.1)", borderRadius: "8px", borderRight: paperSavingMode ? "3px solid var(--success)" : "3px solid var(--primary)" }}>
+                <p style={{ margin: 0, fontSize: "12.5px", color: paperSavingMode ? "var(--success-ink)" : "var(--accent-ink)", lineHeight: "1.55" }}>
                   {paperSavingMode
-                    ? "✓ وضع توفير الورق الذكي نشط: يدمج السكاشن المحددة في تدفق مستمر ويضغط المسافات وحجم الخطوط بحيث تتسع الورقة الواحدة حتى 30-35 طالباً، مما يخفض عدد الأوراق المطبوعة لأكثر من النصف ويمنع وجود أوراق شبه فارغة."
-                    : "• وضع الفصل نشط: يطبع كل سكشن في صفحة منفصلة خاصة به مع ترويسته وتوقيعاته المستقلة، مع المحافظة على التنسيق المضغوط لمنع انشطار السكشن الواحد."}
+                    ? "وضع توفير الورق الذكي نشط: يدمج السكاشن المحددة في تدفق مستمر ويضغط المسافات وحجم الخطوط بحيث تتسع الورقة الواحدة حتى 30-35 طالباً، مما يخفض عدد الأوراق المطبوعة لأكثر من النصف ويمنع وجود أوراق شبه فارغة."
+                    : "وضع الفصل نشط: يطبع كل سكشن في صفحة منفصلة خاصة به مع ترويسته وتوقيعاته المستقلة، مع المحافظة على التنسيق المضغوط لمنع انشطار السكشن الواحد."}
                 </p>
               </div>
             </div>
 
             {/* Quick Stats Box */}
-            <div style={{ background: "#1e1e1e", padding: "16px 20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
+            <div className="tabular-nums" style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px", fontSize: "13px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>إجمالي الأسابيع المدرجة:</span>
-                <span style={{ color: "#fff", fontWeight: "bold" }}>{weeks.length} أسابيع</span>
+                <span style={{ color: "var(--text-secondary)" }}>إجمالي الأسابيع المدرجة:</span>
+                <span style={{ color: "var(--text)", fontWeight: 600 }}>{weeks.length} أسابيع</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>إجمالي طلاب الكشف الحالي:</span>
-                <span style={{ color: selectedSections.length > 0 ? "#4CAF50" : "#f87171", fontWeight: "bold" }}>
+                <span style={{ color: "var(--text-secondary)" }}>إجمالي طلاب الكشف الحالي:</span>
+                <span style={{ color: selectedSections.length > 0 ? "var(--success-ink)" : "var(--error-ink)", fontWeight: 600 }}>
                   {students.filter(s => selectedSections.includes(s.section ? String(s.section).trim() : 'تخلفات')).length} طالب
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ color: "#aaa" }}>تخطيط الصفحة:</span>
-                <span style={{ color: "#38bdf8", fontWeight: "bold" }}>أفقي بالعرض (Landscape) - A4</span>
+                <span style={{ color: "var(--text-secondary)" }}>تخطيط الصفحة:</span>
+                <span style={{ color: "var(--accent-ink)", fontWeight: 600 }}>أفقي بالعرض (Landscape) - A4</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#aaa" }}>نمط استهلاك الورق:</span>
-                <span style={{ color: paperSavingMode ? "#34d399" : "#60a5fa", fontWeight: "bold" }}>
-                  {paperSavingMode ? "🌱 توفير الورق الذكي (مدمج ومكثف)" : "📑 سكشن مستقل لكل ورقة"}
+                <span style={{ color: "var(--text-secondary)" }}>نمط استهلاك الورق:</span>
+                <span style={{ color: paperSavingMode ? "var(--success-ink)" : "var(--accent-ink)", fontWeight: 600 }}>
+                  {paperSavingMode ? "توفير الورق الذكي (مدمج ومكثف)" : "سكشن مستقل لكل ورقة"}
                 </span>
               </div>
             </div>
 
             {selectedSections.length === 0 && (
-              <div style={{ background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "10px", padding: "12px", color: "#fca5a5", fontSize: "14px", marginBottom: "15px", textAlign: "center", fontWeight: "bold" }}>
-                ⚠️ يرجى تحديد سكشن واحد على الأقل من القائمة أعلاه لتتمكن من إنشاء التقرير.
+              <div style={{ background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "10px", padding: "12px", color: "var(--error-ink)", fontSize: "13px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontWeight: 500 }}>
+                <AlertTriangle size={16} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                <span>يرجى تحديد سكشن واحد على الأقل من القائمة أعلاه لتتمكن من إنشاء التقرير.</span>
               </div>
             )}
 
-            <button 
-              onClick={printDetailedAttendance} 
+            <button
+              type="button"
+              onClick={printDetailedAttendance}
               disabled={selectedSections.length === 0}
-              style={{ 
-                width: "100%", 
-                background: selectedSections.length > 0 ? "#4CAF50" : "#555", 
-                color: "#fff", 
-                border: "none", 
-                padding: "16px", 
-                borderRadius: "12px", 
-                fontSize: "17px", 
-                fontWeight: "bold", 
-                display: "flex", 
-                justifyContent: "center", 
-                alignItems: "center", 
-                gap: "10px",
+              style={{
+                width: "100%",
+                background: selectedSections.length > 0 ? "var(--success)" : "var(--surface)",
+                color: selectedSections.length > 0 ? "#ffffff" : "var(--text-muted)",
+                border: selectedSections.length > 0 ? "1px solid var(--success)" : "1px solid var(--border-light)",
+                padding: "14px",
+                borderRadius: "10px",
+                fontSize: "15px",
+                fontWeight: 500,
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "8px",
                 cursor: selectedSections.length > 0 ? "pointer" : "not-allowed",
-                boxShadow: selectedSections.length > 0 ? "0 4px 15px rgba(76, 175, 80, 0.3)" : "none",
-                opacity: selectedSections.length > 0 ? 1 : 0.6
+                margin: 0
               }}
             >
-              <span style={{ fontSize: "20px" }}>🖨️</span> طباعة وتحميل كشف الحضور التفصيلي (بالعرض)
+              <Printer size={18} strokeWidth={1.5} />
+              <span>طباعة وتحميل كشف الحضور التفصيلي (بالعرض)</span>
             </button>
           </div>
         )}
@@ -1387,12 +1438,15 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         {/* --- Tab 2: Single Project --- */}
         {activeTab === "single_project" && (
           <div>
-            <h3 style={{ color: "#2196F3", marginTop: 0 }}>📊 كشف تقييم مشروع محدد</h3>
-            
-            <select 
+            <h3 style={{ color: "var(--accent-ink)", margin: "0 0 14px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <BarChart3 size={18} strokeWidth={1.5} />
+              <span>كشف تقييم مشروع محدد</span>
+            </h3>
+
+            <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              style={{ width: "100%", padding: "12px", background: "#1e1e1e", border: "1px solid #444", borderRadius: "10px", color: "#fff", marginBottom: "20px", fontSize: "16px", outline: "none" }}
+              style={{ width: "100%", padding: "11px 12px", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", marginBottom: "16px", fontSize: "14px", outline: "none", margin: "0 0 16px 0" }}
             >
               <option value="">-- اختر المشروع --</option>
               {projects.map(p => (
@@ -1403,27 +1457,27 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
             {selectedProjectId && (() => {
               const { evaluated, unevaluated, isSectionFiltered } = getSingleProjectStats();
               return (
-                <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-                    <span style={{ color: "#aaa" }}>
+                <div className="tabular-nums" style={{ background: "var(--surface)", padding: "18px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: "1px solid var(--border)", paddingBottom: "10px", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>
                       {isSectionFiltered ? `طلاب السكاشن المحددة (${selectedSections.join(' ، ')}):` : "إجمالي طلاب المقرر:"}
                     </span>
-                    <span style={{ color: "#fff", fontWeight: "bold" }}>{evaluated.length + unevaluated.length} طالب</span>
+                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{evaluated.length + unevaluated.length} طالب</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
-                    <span style={{ color: "#aaa" }}>من تم تقييمه:</span>
-                    <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{evaluated.length} طالب</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>من تم تقييمه:</span>
+                    <span style={{ color: "var(--success-ink)", fontWeight: 600 }}>{evaluated.length} طالب</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-                    <span style={{ color: "#aaa" }}>من لم يُقيَّم:</span>
-                    <span style={{ color: "#F44336", fontWeight: "bold" }}>{unevaluated.length} طالب</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "18px", fontSize: "13px" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>من لم يُقيَّم:</span>
+                    <span style={{ color: "var(--error-ink)", fontWeight: 600 }}>{unevaluated.length} طالب</span>
                   </div>
 
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={printSingleProjectEvaluated} style={{ flex: 1, background: "#4CAF50", color: "#fff", border: "none", padding: "12px", borderRadius: "10px", fontWeight: "bold" }}>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button type="button" onClick={printSingleProjectEvaluated} style={{ flex: 1, background: "var(--success)", color: "#ffffff", border: "1px solid var(--success)", padding: "11px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer", margin: 0 }}>
                       طباعة المقيمين
                     </button>
-                    <button onClick={printSingleProjectUnevaluated} style={{ flex: 1, background: "#F44336", color: "#fff", border: "none", padding: "12px", borderRadius: "10px", fontWeight: "bold" }}>
+                    <button type="button" onClick={printSingleProjectUnevaluated} style={{ flex: 1, background: "var(--error)", color: "#ffffff", border: "1px solid var(--error)", padding: "11px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer", margin: 0 }}>
                       طباعة من لم يُقيَّم
                     </button>
                   </div>
@@ -1438,29 +1492,32 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
           const { evaluatedSomehow, completelyUnevaluated, isSectionFiltered } = getAllProjectsStats();
           return (
             <div>
-              <h3 style={{ color: "#9C27B0", marginTop: 0 }}>📑 كشف التقييمات الشامل (إحصاء المشاريع)</h3>
-              
-              <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px", borderBottom: "1px solid #333", paddingBottom: "10px" }}>
-                  <span style={{ color: "#aaa" }}>
+              <h3 style={{ color: "var(--accent-ink)", margin: "0 0 14px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Layers size={18} strokeWidth={1.5} />
+                <span>كشف التقييمات الشامل (إحصاء المشاريع)</span>
+              </h3>
+
+              <div className="tabular-nums" style={{ background: "var(--surface)", padding: "18px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", borderBottom: "1px solid var(--border)", paddingBottom: "10px", fontSize: "13px" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>
                     {isSectionFiltered ? `طلاب السكاشن المحددة (${selectedSections.join(' ، ')}):` : "إجمالي طلاب المقرر:"}
                   </span>
-                  <span style={{ color: "#fff", fontWeight: "bold" }}>{evaluatedSomehow.length + completelyUnevaluated.length} طالب</span>
+                  <span style={{ color: "var(--text)", fontWeight: 600 }}>{evaluatedSomehow.length + completelyUnevaluated.length} طالب</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "15px" }}>
-                  <span style={{ color: "#aaa" }}>قام بتقييم مشروع واحد على الأقل:</span>
-                  <span style={{ color: "#4CAF50", fontWeight: "bold" }}>{evaluatedSomehow.length} طالب</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px", fontSize: "13px" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>قام بتقييم مشروع واحد على الأقل:</span>
+                  <span style={{ color: "var(--success-ink)", fontWeight: 600 }}>{evaluatedSomehow.length} طالب</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-                  <span style={{ color: "#aaa" }}>لم يقم بأي مشروع إطلاقاً (محرومين):</span>
-                  <span style={{ color: "#F44336", fontWeight: "bold" }}>{completelyUnevaluated.length} طالب</span>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "18px", fontSize: "13px" }}>
+                  <span style={{ color: "var(--text-secondary)" }}>لم يقم بأي مشروع إطلاقاً (محرومين):</span>
+                  <span style={{ color: "var(--error-ink)", fontWeight: 600 }}>{completelyUnevaluated.length} طالب</span>
                 </div>
 
-                <div style={{ display: "flex", gap: "10px" }}>
-                  <button onClick={printAllProjectsEvaluated} style={{ flex: 1, background: "#9C27B0", color: "#fff", border: "none", padding: "12px", borderRadius: "10px", fontWeight: "bold" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button type="button" onClick={printAllProjectsEvaluated} style={{ flex: 1, background: "var(--primary)", color: "#ffffff", border: "1px solid var(--primary)", padding: "11px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer", margin: 0 }}>
                     طباعة إحصاء التقييمات
                   </button>
-                  <button onClick={printAllProjectsUnevaluated} style={{ flex: 1, background: "#F44336", color: "#fff", border: "none", padding: "12px", borderRadius: "10px", fontWeight: "bold" }}>
+                  <button type="button" onClick={printAllProjectsUnevaluated} style={{ flex: 1, background: "var(--error)", color: "#ffffff", border: "1px solid var(--error)", padding: "11px", borderRadius: "8px", fontWeight: 500, fontSize: "13px", cursor: "pointer", margin: 0 }}>
                     طباعة المحرومين
                   </button>
                 </div>
@@ -1472,18 +1529,22 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         {/* --- Tab 4: Raw Report --- */}
         {activeTab === "raw" && (
           <div>
-            <h3 style={{ color: "#FF9800", marginTop: 0 }}>📋 التقرير الشامل الخام</h3>
-            <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "20px" }}>
-              هذا التقرير يقوم بتجميع البيانات الأولية كما هي بدون أي معالجة. يعرض إجمالي عدد مرات الحضور لكل طالب، ودرجاته في كل مشروع، والمجموع الخام للدرجات. 
+            <h3 style={{ color: "var(--warning-ink)", margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <ClipboardList size={18} strokeWidth={1.5} />
+              <span>التقرير الشامل الخام</span>
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", lineHeight: 1.6, margin: "0 0 16px 0" }}>
+              هذا التقرير يقوم بتجميع البيانات الأولية كما هي بدون أي معالجة. يعرض إجمالي عدد مرات الحضور لكل طالب، ودرجاته في كل مشروع، والمجموع الخام للدرجات.
             </p>
-            
-            <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px", textAlign: "center" }}>
-              <div style={{ fontSize: "24px", marginBottom: "10px" }}>{students.length} طالب</div>
-              <div style={{ color: "#888", fontSize: "13px" }}>جاهز للطباعة والاستخراج في كشف مجمع</div>
+
+            <div className="tabular-nums" style={{ background: "var(--surface)", padding: "20px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px", textAlign: "center" }}>
+              <div style={{ fontSize: "24px", fontWeight: 600, color: "var(--text)", marginBottom: "6px" }}>{students.length} طالب</div>
+              <div style={{ color: "var(--text-muted)", fontSize: "13px" }}>جاهز للطباعة والاستخراج في كشف مجمع</div>
             </div>
 
-            <button onClick={printRawReport} style={{ width: "100%", background: "#FF9800", color: "#fff", border: "none", padding: "15px", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", display: "flex", justifyContent: "center", gap: "10px" }}>
-              <span>🖨️</span> طباعة التقرير الخام PDF
+            <button type="button" onClick={printRawReport} style={{ width: "100%", background: "var(--warning)", color: "#ffffff", border: "1px solid var(--warning)", padding: "13px", borderRadius: "10px", fontSize: "15px", fontWeight: 500, display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: "pointer", margin: 0 }}>
+              <Printer size={18} strokeWidth={1.5} />
+              <span>طباعة التقرير الخام PDF</span>
             </button>
           </div>
         )}
@@ -1491,33 +1552,37 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         {/* --- Tab 5: Grading Engine --- */}
         {activeTab === "grading" && (
           <div>
-            <h3 style={{ color: "#E91E63", marginTop: 0 }}>⚙️ التجميع والكنترول (محرك الدرجات)</h3>
-            <p style={{ color: "#aaa", fontSize: "14px", marginBottom: "20px" }}>
+            <h3 style={{ color: "var(--error-ink)", margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600, display: "flex", alignItems: "center", gap: "8px" }}>
+              <Settings size={18} strokeWidth={1.5} />
+              <span>التجميع والكنترول (محرك الدرجات)</span>
+            </h3>
+            <p style={{ color: "var(--text-secondary)", fontSize: "13px", lineHeight: 1.6, margin: "0 0 16px 0" }}>
               هذا المحرك يتيح لك وضع "الدرجة الحقيقية" لكل مشروع. سيقوم النظام تلقائياً بمعادلة الدرجات الكبيرة (مثلاً 30) وتحجيمها لتناسب الدرجة الحقيقية (مثلاً 15).
             </p>
-            
-            <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-              <h4 style={{ margin: "0 0 15px 0", color: "#fff", borderBottom: "1px solid #333", paddingBottom: "10px" }}>إعدادات الحضور</h4>
-              
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
+
+            <div style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
+              <h4 style={{ margin: "0 0 14px 0", color: "var(--text)", fontSize: "14px", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>إعدادات الحضور</h4>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
                 <div style={{ flex: 1, minWidth: "200px" }}>
-                  <label style={{ display: "block", color: "#aaa", fontSize: "14px", marginBottom: "8px" }}>قيمة كل مرة حضور (درجات):</label>
-                  <input 
-                    type="number" 
+                  <label style={{ display: "block", color: "var(--text-secondary)", fontSize: "13px", marginBottom: "6px" }}>قيمة كل مرة حضور (درجات):</label>
+                  <input
+                    type="number"
                     step="0.25"
                     value={attendancePoints}
                     onChange={(e) => setAttendancePoints(parseFloat(e.target.value) || 0)}
-                    style={{ width: "100%", padding: "12px", background: "#121212", border: "1px solid #444", borderRadius: "10px", color: "#fff", fontSize: "16px", outline: "none" }}
+                    className="tabular-nums"
+                    style={{ width: "100%", padding: "10px 12px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--text)", fontSize: "15px", outline: "none", boxSizing: "border-box", margin: 0 }}
                   />
                 </div>
-                
+
                 <div style={{ flex: 1, minWidth: "200px", display: "flex", alignItems: "center" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", color: "#fff" }}>
-                    <input 
-                      type="checkbox" 
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "var(--text)", fontSize: "13px" }}>
+                    <input
+                      type="checkbox"
                       checked={mergeAttendance}
                       onChange={(e) => setMergeAttendance(e.target.checked)}
-                      style={{ width: "20px", height: "20px", accentColor: "#E91E63" }}
+                      style={{ width: "18px", height: "18px", accentColor: "var(--primary)" }}
                     />
                     <span>دمج الحضور مع أعمال السنة</span>
                   </label>
@@ -1525,27 +1590,28 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               </div>
             </div>
 
-            <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-              <h4 style={{ margin: "0 0 15px 0", color: "#fff", borderBottom: "1px solid #333", paddingBottom: "10px" }}>إعدادات أوزان المشاريع</h4>
-              
+            <div style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
+              <h4 style={{ margin: "0 0 14px 0", color: "var(--text)", fontSize: "14px", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>إعدادات أوزان المشاريع</h4>
+
               {projects.length === 0 ? (
-                <div style={{ color: "#888", textAlign: "center", padding: "10px" }}>لا يوجد مشاريع حتى الآن</div>
+                <div style={{ color: "var(--text-muted)", textAlign: "center", padding: "12px", fontSize: "13px" }}>لا يوجد مشاريع حتى الآن</div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {projects.map(p => (
-                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#121212", padding: "10px 15px", borderRadius: "10px", border: "1px solid #2a2a2a" }}>
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-deep)", padding: "10px 14px", borderRadius: "8px", border: "1px solid var(--border)" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ color: "#fff", fontWeight: "bold" }}>{p.name}</div>
-                        <div style={{ color: "#888", fontSize: "12px" }}>المسجلة حالياً من: {p.max_score}</div>
+                        <div style={{ color: "var(--text)", fontWeight: 600, fontSize: "14px" }}>{p.name}</div>
+                        <div className="tabular-nums" style={{ color: "var(--text-muted)", fontSize: "12px" }}>المسجلة حالياً من: {p.max_score}</div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ color: "#aaa", fontSize: "13px" }}>الدرجة الحقيقية:</span>
-                        <input 
-                          type="number" 
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ color: "var(--text-secondary)", fontSize: "12px" }}>الدرجة الحقيقية:</span>
+                        <input
+                          type="number"
                           step="0.5"
                           value={projectWeights[p.id] !== undefined ? projectWeights[p.id] : p.max_score}
                           onChange={(e) => setProjectWeights(prev => ({ ...prev, [p.id]: parseFloat(e.target.value) || 0 }))}
-                          style={{ width: "80px", padding: "8px", background: "#222", border: "1px solid #444", borderRadius: "8px", color: "#E91E63", fontWeight: "bold", textAlign: "center", outline: "none" }}
+                          className="tabular-nums"
+                          style={{ width: "80px", padding: "7px 8px", background: "var(--surface)", border: "1px solid var(--border-light)", borderRadius: "8px", color: "var(--accent-ink)", fontWeight: 600, fontSize: "14px", textAlign: "center", outline: "none", margin: 0 }}
                         />
                       </div>
                     </div>
@@ -1554,26 +1620,27 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
               )}
             </div>
 
-            <div style={{ background: "#1e1e1e", padding: "20px", borderRadius: "15px", border: "1px solid #333", marginBottom: "20px" }}>
-              <h4 style={{ margin: "0 0 15px 0", color: "#fff", borderBottom: "1px solid #333", paddingBottom: "10px" }}>إعدادات التقريب النهائي</h4>
-              <div style={{ display: "flex", gap: "15px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "5px", color: "#fff", cursor: "pointer" }}>
-                  <input type="radio" name="rounding" checked={roundingMethod === 'integer'} onChange={() => setRoundingMethod('integer')} style={{ accentColor: "#E91E63" }} />
-                  لأقرب عدد صحيح (مثال: 15)
+            <div style={{ background: "var(--surface)", padding: "16px", borderRadius: "12px", border: "1px solid var(--border)", marginBottom: "16px" }}>
+              <h4 style={{ margin: "0 0 14px 0", color: "var(--text)", fontSize: "14px", fontWeight: 600, borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>إعدادات التقريب النهائي</h4>
+              <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", fontSize: "13px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text)", cursor: "pointer" }}>
+                  <input type="radio" name="rounding" checked={roundingMethod === 'integer'} onChange={() => setRoundingMethod('integer')} style={{ accentColor: "var(--primary)" }} />
+                  <span>لأقرب عدد صحيح (مثال: 15)</span>
                 </label>
-                <label style={{ display: "flex", alignItems: "center", gap: "5px", color: "#fff", cursor: "pointer" }}>
-                  <input type="radio" name="rounding" checked={roundingMethod === 'decimal'} onChange={() => setRoundingMethod('decimal')} style={{ accentColor: "#E91E63" }} />
-                  علامة عشرية (مثال: 14.5)
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text)", cursor: "pointer" }}>
+                  <input type="radio" name="rounding" checked={roundingMethod === 'decimal'} onChange={() => setRoundingMethod('decimal')} style={{ accentColor: "var(--primary)" }} />
+                  <span>علامة عشرية (مثال: 14.5)</span>
                 </label>
-                <label style={{ display: "flex", alignItems: "center", gap: "5px", color: "#fff", cursor: "pointer" }}>
-                  <input type="radio" name="rounding" checked={roundingMethod === 'none'} onChange={() => setRoundingMethod('none')} style={{ accentColor: "#E91E63" }} />
-                  بدون تقريب
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--text)", cursor: "pointer" }}>
+                  <input type="radio" name="rounding" checked={roundingMethod === 'none'} onChange={() => setRoundingMethod('none')} style={{ accentColor: "var(--primary)" }} />
+                  <span>بدون تقريب</span>
                 </label>
               </div>
             </div>
 
-            <button onClick={printGradingReport} style={{ width: "100%", background: "#E91E63", color: "#fff", border: "none", padding: "18px", borderRadius: "10px", fontSize: "18px", fontWeight: "bold", display: "flex", justifyContent: "center", gap: "10px", boxShadow: "0 4px 15px rgba(233, 30, 99, 0.4)" }}>
-              <span>🚀</span> معالجة واستخراج تقرير الكنترول
+            <button type="button" onClick={printGradingReport} style={{ width: "100%", background: "var(--primary)", color: "#ffffff", border: "1px solid var(--primary)", padding: "14px", borderRadius: "10px", fontSize: "15px", fontWeight: 500, display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: "pointer", margin: 0 }}>
+              <Printer size={18} strokeWidth={1.5} />
+              <span>معالجة واستخراج تقرير الكنترول</span>
             </button>
           </div>
         )}

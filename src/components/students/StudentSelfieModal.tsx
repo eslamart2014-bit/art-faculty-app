@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, RotateCw, X } from "lucide-react";
+import { Camera, Check, CheckCircle2, RefreshCw, RotateCw, Save, User, X } from "lucide-react";
 
 interface StudentSelfieModalProps {
   selfieVideoRef: React.RefObject<HTMLVideoElement | null>;
@@ -39,7 +39,7 @@ export default function StudentSelfieModal({
       width: "100vw",
       height: "100dvh",
       maxHeight: "100dvh",
-      background: "#000",
+      background: "#000000",
       zIndex: 999999,
       display: "flex",
       flexDirection: "column",
@@ -50,17 +50,16 @@ export default function StudentSelfieModal({
       <div style={{
         flexShrink: 0,
         padding: "10px 14px",
-        background: "rgba(0, 0, 0, 0.85)",
-        backdropFilter: "blur(8px)",
+        background: "var(--surface)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+        borderBottom: "1px solid var(--border)",
         zIndex: 10
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "16px" }}>🤳</span>
-          <span style={{ color: "#fff", fontSize: "13px", fontWeight: "bold" }}>التقاط صورة شخصية للحساب</span>
+          <Camera size={16} strokeWidth={1.5} color="var(--accent-ink)" />
+          <span style={{ color: "var(--text)", fontSize: "13px", fontWeight: 600 }}>التقاط صورة شخصية للحساب</span>
         </div>
         <button
           type="button"
@@ -69,9 +68,9 @@ export default function StudentSelfieModal({
             width: "28px",
             height: "28px",
             borderRadius: "50%",
-            background: "rgba(255, 255, 255, 0.12)",
-            color: "#ffffff",
-            border: "1px solid rgba(255, 255, 255, 0.25)",
+            background: "var(--surface-hover)",
+            color: "var(--text)",
+            border: "1px solid var(--border-light)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -80,7 +79,7 @@ export default function StudentSelfieModal({
           }}
           title="إغلاق"
         >
-          <X size={15} />
+          <X size={15} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -93,7 +92,7 @@ export default function StudentSelfieModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#05070f"
+        background: "var(--bg-deep)"
       }}>
         {!selfiePhoto ? (
           <>
@@ -115,29 +114,37 @@ export default function StudentSelfieModal({
               width: "230px",
               height: "230px",
               borderRadius: "50%",
-              border: faceDetected ? "3.5px solid #10b981" : "2.5px dashed rgba(56, 189, 248, 0.75)",
-              boxShadow: faceDetected 
-                ? "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 30px rgba(16, 185, 129, 0.75)"
-                : "0 0 0 9999px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.3)",
+              border: faceDetected ? "3px solid var(--success)" : "2px dashed var(--accent-ink)",
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.55)",
               pointerEvents: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              transition: "all 0.25s ease"
+              transition: "border-color 0.25s var(--ease-out)"
             }}>
               <span style={{
-                color: faceDetected ? "#34d399" : "#38bdf8",
+                color: faceDetected ? "var(--success-ink)" : "var(--accent-ink)",
                 fontSize: "11px",
-                fontWeight: "bold",
-                background: "rgba(0, 0, 0, 0.75)",
-                border: faceDetected ? "1px solid #10b981" : "1px solid rgba(56, 189, 248, 0.3)",
+                fontWeight: 500,
+                background: "rgba(11, 13, 20, 0.8)",
+                border: faceDetected ? "1px solid var(--success)" : "1px solid rgba(56, 189, 248, 0.35)",
                 padding: "4px 10px",
                 borderRadius: "6px",
                 display: "flex",
                 alignItems: "center",
                 gap: "5px"
               }}>
-                {faceDetected ? "🟢 تم التعرف على الوجه بنجاح ✅" : "👤 اضبط وجهك داخل الدائرة"}
+                {faceDetected ? (
+                  <>
+                    <Check size={13} strokeWidth={1.5} />
+                    <span>تم التعرف على الوجه بنجاح</span>
+                  </>
+                ) : (
+                  <>
+                    <User size={13} strokeWidth={1.5} />
+                    <span>اضبط وجهك داخل الدائرة</span>
+                  </>
+                )}
               </span>
             </div>
           </>
@@ -154,14 +161,14 @@ export default function StudentSelfieModal({
               height: "200px",
               borderRadius: "50%",
               overflow: "hidden",
-              border: "3px solid #10b981",
-              boxShadow: "0 0 25px rgba(16, 185, 129, 0.5)",
+              border: "2.5px solid var(--success)",
               marginBottom: "12px"
             }}>
               <img src={selfiePhoto} alt="معاينة الصورة الشخصية" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
-            <div style={{ color: "#34d399", fontSize: "12px", fontWeight: "bold" }}>
-              تم التقاط صورتك بنجاح! جاهزة للحفظ ✅
+            <div style={{ color: "var(--success-ink)", fontSize: "12.5px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <CheckCircle2 size={15} strokeWidth={1.5} />
+              <span>تم التقاط صورتك بنجاح وجاهزة للحفظ</span>
             </div>
           </div>
         )}
@@ -171,11 +178,11 @@ export default function StudentSelfieModal({
       {selfieMsg && (
         <div style={{
           padding: "8px 12px",
-          background: "rgba(16, 185, 129, 0.15)",
-          color: "#34d399",
-          fontSize: "11px",
+          background: "rgba(16, 185, 129, 0.14)",
+          color: "var(--success-ink)",
+          fontSize: "12px",
           textAlign: "center",
-          fontWeight: "bold",
+          fontWeight: 500,
           borderTop: "1px solid rgba(16, 185, 129, 0.3)"
         }}>
           {selfieMsg}
@@ -187,8 +194,8 @@ export default function StudentSelfieModal({
         flexShrink: 0,
         padding: "12px 16px",
         paddingBottom: "max(18px, env(safe-area-inset-bottom, 18px))",
-        background: "linear-gradient(180deg, rgba(15, 23, 42, 0.95), #070a12)",
-        borderTop: "1px solid rgba(16, 185, 129, 0.25)",
+        background: "var(--bg-deep)",
+        borderTop: "1px solid var(--border)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -208,14 +215,13 @@ export default function StudentSelfieModal({
                 height: "64px",
                 borderRadius: "50%",
                 background: "#ffffff",
-                border: faceDetected ? "4px solid #10b981" : "4px solid #38bdf8",
-                boxShadow: faceDetected ? "0 0 25px rgba(16, 185, 129, 0.9)" : "0 0 15px rgba(56, 189, 248, 0.5)",
+                border: faceDetected ? "4px solid var(--success)" : "4px solid var(--accent-ink)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 outline: "none",
-                transition: "all 0.2s ease"
+                transition: "border-color 0.2s var(--ease-out)"
               }}
               title="التقاط الصورة الشخصية"
             >
@@ -223,12 +229,13 @@ export default function StudentSelfieModal({
                 width: "46px",
                 height: "46px",
                 borderRadius: "50%",
-                background: faceDetected ? "#059669" : "#0284c7",
-                transition: "all 0.2s ease"
+                background: faceDetected ? "var(--success)" : "var(--primary)",
+                transition: "background-color 0.2s var(--ease-out)"
               }} />
             </button>
-            <span style={{ color: faceDetected ? "#34d399" : "#38bdf8", fontSize: "11px", fontWeight: "bold" }}>
-              {faceDetected ? "الوجه جاهز! اضغط للالتقاط 📸" : "التقاط الصورة الشخصية 📸"}
+            <span style={{ color: faceDetected ? "var(--success-ink)" : "var(--accent-ink)", fontSize: "11.5px", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+              <Camera size={13} strokeWidth={1.5} />
+              <span>{faceDetected ? "الوجه جاهز، اضغط للالتقاط" : "التقاط الصورة الشخصية"}</span>
             </span>
           </div>
         ) : (
@@ -244,16 +251,21 @@ export default function StudentSelfieModal({
               style={{
                 flex: 1,
                 padding: "10px",
-                background: "rgba(255, 255, 255, 0.1)",
-                color: "#fff",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "var(--surface)",
+                color: "var(--text)",
+                border: "1px solid var(--border-light)",
                 borderRadius: "8px",
-                fontSize: "12px",
-                fontWeight: "bold",
-                cursor: "pointer"
+                fontSize: "12.5px",
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px"
               }}
             >
-              إعادة التقاط 🔄
+              <RefreshCw size={14} strokeWidth={1.5} />
+              <span>إعادة التقاط</span>
             </button>
 
             <button
@@ -263,14 +275,13 @@ export default function StudentSelfieModal({
               style={{
                 flex: 1.4,
                 padding: "10px",
-                background: "linear-gradient(135deg, #10b981, #059669)",
-                color: "#fff",
+                background: "var(--success)",
+                color: "#ffffff",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: "12px",
-                fontWeight: "bold",
+                fontSize: "12.5px",
+                fontWeight: 500,
                 cursor: isSavingSelfie ? "wait" : "pointer",
-                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -279,13 +290,13 @@ export default function StudentSelfieModal({
             >
               {isSavingSelfie ? (
                 <>
-                  <RotateCw size={14} className="animate-spin" />
+                  <RotateCw size={14} strokeWidth={1.5} className="animate-spin" />
                   <span>جاري الحفظ...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={15} />
-                  <span>حفظ الصورة 💾</span>
+                  <Save size={14} strokeWidth={1.5} />
+                  <span>حفظ الصورة</span>
                 </>
               )}
             </button>

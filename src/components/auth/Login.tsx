@@ -8,13 +8,17 @@ import {
   EyeOff, 
   Search, 
   Download, 
-  Sparkles, 
-  CheckCircle2, 
   GraduationCap, 
   ArrowRight,
   LogIn,
-  RotateCw,
-  AlertCircle
+  Smartphone,
+  BookUser,
+  Info,
+  QrCode,
+  KeyRound,
+  UserPlus,
+  RefreshCw,
+  Lightbulb
 } from "lucide-react";
 import { formatStudentCode } from "@/lib/students/codeHelper";
 import { getOrCreateDeviceInfo, isAndroidAppClient, isInstalledPWA } from "@/lib/auth/deviceFingerprint";
@@ -308,8 +312,8 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
       ctx.fill();
 
       ctx.fillStyle = "#34d399";
-      ctx.font = "bold 22px Cairo, sans-serif";
-      ctx.fillText("📸 احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1262);
+      ctx.font = "600 22px Cairo, sans-serif";
+      ctx.fillText("احتفظ بهذه البطاقة في معرض الصور لتسجيل حضورك وتقييمك يومياً", 500, 1262);
 
       // ذيل البطاقة
       ctx.fillStyle = "#64748b";
@@ -544,59 +548,65 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         className="card" 
         style={{ 
           width: "100%", 
-          maxWidth: roleMode === "student" ? "480px" : "400px",
-          transition: "max-width 0.25s ease" 
+          maxWidth: roleMode === "student" ? "480px" : "420px",
+          padding: "24px",
+          borderRadius: "16px",
+          transition: "max-width 200ms cubic-bezier(0.22, 1, 0.36, 1)",
+          marginBottom: 0
         }}
       >
         {/* App Logo & Header */}
         <div style={{ textAlign: "center", marginBottom: "12px" }}>
           <img
             src="/app-logo.png"
-            alt="شعار فنية"
+            alt="شعار قسم التربية الفنية"
             style={{
-              width: "90px",
-              height: "90px",
-              borderRadius: "22px",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.5)",
-              border: "2px solid rgba(255,255,255,0.15)",
+              width: "76px",
+              height: "76px",
+              borderRadius: "16px",
+              border: "1px solid var(--border-light)",
               display: "inline-block",
-              backgroundColor: "#222"
+              backgroundColor: "var(--bg-deep)"
             }}
           />
-          <div style={{ fontSize: "13px", color: "#4CAF50", fontWeight: "bold", marginTop: "8px" }}>
-            تحديث {appVersion}
+          <div className="tabular-nums" style={{ fontSize: "12px", color: "var(--success-ink)", fontWeight: 500, marginTop: "8px" }}>
+            الإصدار {appVersion}
           </div>
         </div>
 
-        <h2 style={{ textAlign: "center", marginTop: "2px", marginBottom: "4px", color: "var(--primary)" }}>
+        <h2 style={{ textAlign: "center", marginTop: "0", marginBottom: "4px", color: "var(--text)", fontSize: "20px", fontWeight: 600 }}>
           نظام التربية الفنية
         </h2>
-        <div style={{ textAlign: "center", fontSize: "11px", color: "#94a3b8", marginBottom: "16px", fontWeight: "bold" }}>
+        <div style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", marginBottom: "20px", fontWeight: 400 }}>
           جامعة قنا • كلية التربية النوعية • قسم التربية الفنية
         </div>
 
         {/* If in Android APK, show return to app login */}
         {isAndroidApp && (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", padding: "8px 12px", background: "rgba(56, 189, 248, 0.1)", borderRadius: "10px", border: "1px solid rgba(56, 189, 248, 0.25)" }}>
-            <span style={{ fontSize: "12px", color: "#38bdf8", fontWeight: "bold" }}>📱 تطبيق الأندرويد • بوابة الطلاب</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", padding: "8px 12px", background: "rgba(56, 189, 248, 0.08)", borderRadius: "8px", border: "1px solid rgba(56, 189, 248, 0.2)" }}>
+            <span style={{ fontSize: "12px", color: "var(--accent-ink)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <Smartphone size={15} strokeWidth={1.5} />
+              <span>تطبيق الأندرويد • بوابة الطلاب</span>
+            </span>
             <a 
               href="/system" 
-              style={{ fontSize: "12px", color: "#fff", textDecoration: "none", background: "rgba(255, 255, 255, 0.15)", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}
+              style={{ fontSize: "12px", color: "var(--text)", textDecoration: "none", background: "var(--surface-hover)", border: "1px solid var(--border-light)", padding: "4px 10px", borderRadius: "6px", fontWeight: 500 }}
             >
-              العودة لتسجيل دخول التطبيق ↩
+              العودة لدخول التطبيق
             </a>
           </div>
         )}
 
-        {/* Top Segmented Role Switcher: Student vs Faculty (Students First) - HIDDEN IN ANDROID APK & PWA */}
+        {/* Top Segmented Role Switcher: Student vs Faculty - HIDDEN IN ANDROID APK & PWA */}
         {!isAndroidApp && !isPwaClient && (
           <div style={{
           display: "flex",
-          background: "rgba(255, 255, 255, 0.08)",
-          borderRadius: "14px",
+          gap: "4px",
+          background: "var(--bg-deep)",
+          borderRadius: "12px",
           padding: "4px",
-          marginBottom: "18px",
-          border: "1px solid rgba(255, 255, 255, 0.12)"
+          marginBottom: "20px",
+          border: "1px solid var(--border)"
         }}>
           <button
             type="button"
@@ -604,22 +614,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             style={{
               flex: 1,
               padding: "10px 8px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              background: roleMode === "student" ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "transparent",
-              color: roleMode === "student" ? "#ffffff" : "#94a3b8",
+              fontSize: "13px",
+              fontWeight: 500,
+              background: roleMode === "student" ? "var(--primary)" : "transparent",
+              color: roleMode === "student" ? "#ffffff" : "var(--text-secondary)",
               border: "none",
-              borderRadius: "10px",
+              borderRadius: "8px",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "6px",
-              boxShadow: roleMode === "student" ? "0 4px 12px rgba(37, 99, 235, 0.3)" : "none",
-              transition: "all 0.2s ease"
+              gap: "8px",
+              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
             }}
           >
-            <span>🎓</span>
+            <GraduationCap size={16} strokeWidth={1.5} />
             <span>بوابة الطلاب</span>
           </button>
           <button
@@ -628,22 +637,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             style={{
               flex: 1,
               padding: "10px 8px",
-              fontSize: "14px",
-              fontWeight: "bold",
-              background: roleMode === "faculty" ? "linear-gradient(135deg, #10b981, #059669)" : "transparent",
-              color: roleMode === "faculty" ? "#ffffff" : "#94a3b8",
+              fontSize: "13px",
+              fontWeight: 500,
+              background: roleMode === "faculty" ? "var(--success)" : "transparent",
+              color: roleMode === "faculty" ? "#0b0d14" : "var(--text-secondary)",
               border: "none",
-              borderRadius: "10px",
+              borderRadius: "8px",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "6px",
-              boxShadow: roleMode === "faculty" ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
-              transition: "all 0.2s ease"
+              gap: "8px",
+              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
             }}
           >
-            <span>👨‍🏫</span>
+            <BookUser size={16} strokeWidth={1.5} />
             <span>أعضاء هيئة التدريس</span>
           </button>
         </div>
@@ -654,10 +662,10 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
         {/* ========================================================= */}
         {roleMode === "faculty" && (
           <div>
-            <div style={{ marginBottom: "14px" }}>
+            <div>
               <input
                 type="email"
-                placeholder="البريد الإلكتروني للزميل (Gmail)"
+                placeholder="البريد الإلكتروني"
                 style={{ textAlign: "left", direction: "ltr", marginBottom: "12px" }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -670,19 +678,20 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  style={{ width: "100%", paddingLeft: "42px", boxSizing: "border-box", margin: 0 }}
+                  style={{ width: "100%", paddingLeft: "40px", boxSizing: "border-box", margin: 0 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  className="icon-btn"
                   style={{
                     position: "absolute",
-                    left: "10px",
+                    left: "8px",
                     top: "50%",
                     transform: "translateY(-50%)",
                     background: "transparent",
                     border: "none",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                     padding: "4px",
                     display: "flex",
@@ -693,11 +702,11 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   }}
                   title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                 </button>
               </div>
 
-              <div style={{ textAlign: "right", marginBottom: "15px", display: "flex", justifyContent: "space-between" }}>
+              <div style={{ textAlign: "right", marginBottom: "16px", display: "flex", justifyContent: "space-between" }}>
                 <span 
                   onClick={async () => {
                     if (!email) { alert("أدخل بريدك الإلكتروني أولاً"); return; }
@@ -705,7 +714,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                     if (error) alert("خطأ: " + error.message);
                     else alert("تم إرسال رابط استعادة كلمة المرور لبريدك (إذا كان مسجلاً).");
                   }} 
-                  style={{ color: "var(--primary)", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}
+                  style={{ color: "var(--accent-ink)", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}
                 >
                   نسيت كلمة المرور؟
                 </span>
@@ -716,34 +725,44 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                 disabled={loading || isLocked} 
                 style={{ 
                   width: "100%",
-                  background: isLocked ? "#555" : "linear-gradient(135deg, #10b981, #059669)",
-                  padding: "12px",
-                  fontSize: "15px",
-                  fontWeight: "bold",
-                  borderRadius: "10px",
-                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)"
+                  background: isLocked ? "var(--surface-hover)" : "var(--success)",
+                  color: isLocked ? "var(--text-muted)" : "#0b0d14",
+                  padding: "12px 16px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  marginTop: 0
                 }}
               >
-                {loading ? "جاري التحقق والدخول..." : (isLocked ? "مغلق مؤقتاً" : "دخول النظام")}
+                <LogIn size={16} strokeWidth={1.5} />
+                <span>{loading ? "جاري التحقق والدخول" : (isLocked ? "مغلق مؤقتاً" : "دخول النظام")}</span>
               </button>
             </div>
 
             {error && (
-              <div style={{ color: "var(--error)", marginTop: "10px", textAlign: "center", fontWeight: "bold", fontSize: "13px" }}>
+              <div style={{ color: "var(--error-ink)", marginTop: "12px", textAlign: "center", fontWeight: 500, fontSize: "13px" }}>
                 {error}
               </div>
             )}
 
             <div style={{
-              marginTop: "18px",
+              marginTop: "16px",
               padding: "12px",
-              borderRadius: "10px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px dashed rgba(255, 255, 255, 0.15)",
-              textAlign: "center"
+              borderRadius: "8px",
+              background: "var(--bg-deep)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px",
+              textAlign: "right"
             }}>
-              <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8", lineHeight: "1.5" }}>
-                ℹ️ يتم تفعيل حسابات السادة أعضاء هيئة التدريس مباشرة من قِبل إدارة القسم. إذا لم تستلم بيانات حسابك بعد، يرجى التواصل مع الإدارة.
+              <Info size={16} strokeWidth={1.5} style={{ color: "var(--text-muted)", flexShrink: 0, marginTop: "2px" }} />
+              <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                يتم تفعيل حسابات أعضاء هيئة التدريس مباشرة من قِبل إدارة القسم. إذا لم تستلم بيانات حسابك بعد، يرجى التواصل مع الإدارة.
               </p>
             </div>
           </div>
@@ -757,11 +776,12 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
             {/* Student Sub-Tabs */}
             <div style={{
               display: "flex",
-              background: "rgba(37, 99, 235, 0.12)",
+              gap: "4px",
+              background: "var(--bg-deep)",
               borderRadius: "10px",
               padding: "4px",
               marginBottom: "16px",
-              border: "1px solid rgba(59, 130, 246, 0.25)"
+              border: "1px solid var(--border)"
             }}>
               <button
                 type="button"
@@ -770,16 +790,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   flex: 1,
                   padding: "8px 4px",
                   fontSize: "12px",
-                  fontWeight: "bold",
-                  background: studentTab === "qr" ? "#2563eb" : "transparent",
-                  color: studentTab === "qr" ? "#ffffff" : "#94a3b8",
+                  fontWeight: 500,
+                  background: studentTab === "qr" ? "var(--primary)" : "transparent",
+                  color: studentTab === "qr" ? "#ffffff" : "var(--text-secondary)",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   cursor: "pointer",
-                  transition: "all 0.15s ease"
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
                 }}
               >
-                🪪 استخراج الـ QR
+                <QrCode size={14} strokeWidth={1.5} />
+                <span>بطاقة QR</span>
               </button>
               <button
                 type="button"
@@ -788,16 +813,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   flex: 1,
                   padding: "8px 4px",
                   fontSize: "12px",
-                  fontWeight: "bold",
-                  background: studentTab === "login" ? "#2563eb" : "transparent",
-                  color: studentTab === "login" ? "#ffffff" : "#94a3b8",
+                  fontWeight: 500,
+                  background: studentTab === "login" ? "var(--primary)" : "transparent",
+                  color: studentTab === "login" ? "#ffffff" : "var(--text-secondary)",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   cursor: "pointer",
-                  transition: "all 0.15s ease"
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
                 }}
               >
-                🔑 تسجيل الدخول
+                <KeyRound size={14} strokeWidth={1.5} />
+                <span>تسجيل الدخول</span>
               </button>
               <button
                 type="button"
@@ -806,16 +836,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   flex: 1,
                   padding: "8px 4px",
                   fontSize: "12px",
-                  fontWeight: "bold",
-                  background: studentTab === "first_time" ? "#2563eb" : "transparent",
-                  color: studentTab === "first_time" ? "#ffffff" : "#94a3b8",
+                  fontWeight: 500,
+                  background: studentTab === "first_time" ? "var(--primary)" : "transparent",
+                  color: studentTab === "first_time" ? "#ffffff" : "var(--text-secondary)",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   cursor: "pointer",
-                  transition: "all 0.15s ease"
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
                 }}
               >
-                ✨ تفعيل أول مرة
+                <UserPlus size={14} strokeWidth={1.5} />
+                <span>تفعيل أول مرة</span>
               </button>
             </div>
 
@@ -824,13 +859,13 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
               <div>
                 {!selectedStudent ? (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                       <div>
-                        <label style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>تصفية بالفرقة:</label>
+                        <label style={{ fontSize: "12px", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>الفرقة</label>
                         <select 
                           value={level} 
                           onChange={(e) => setLevel(e.target.value)}
-                          style={{ width: "100%", padding: "8px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#fff", fontSize: "13px" }}
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", fontSize: "13px", marginBottom: 0 }}
                         >
                           {LEVELS.map(l => (
                             <option key={l} value={l}>{l}</option>
@@ -839,31 +874,31 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                       </div>
 
                       <div>
-                        <label style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginBottom: "4px" }}>بحث بالاسم أو الكود:</label>
+                        <label style={{ fontSize: "12px", color: "var(--text-secondary)", display: "block", marginBottom: "4px" }}>الاسم أو الكود</label>
                         <input
                           type="text"
-                          placeholder="اكتب اسمك..."
+                          placeholder="بحث"
                           value={query}
                           onChange={(e) => setQuery(e.target.value)}
-                          style={{ width: "100%", padding: "8px", borderRadius: "8px", background: "#111", border: "1px solid #333", color: "#fff", fontSize: "13px", boxSizing: "border-box" }}
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", color: "var(--text)", fontSize: "13px", boxSizing: "border-box", marginBottom: 0 }}
                         />
                       </div>
                     </div>
 
                     {searchLoading && (
-                      <div style={{ textAlign: "center", color: "#60a5fa", padding: "12px", fontSize: "13px" }}>
-                        جاري البحث...
+                      <div style={{ textAlign: "center", color: "var(--accent-ink)", padding: "12px", fontSize: "13px" }}>
+                        جاري البحث
                       </div>
                     )}
 
                     {query.trim().length >= 2 && !searchLoading && students.length === 0 && (
-                      <div style={{ textAlign: "center", color: "#f87171", padding: "14px", fontSize: "13px", background: "rgba(239, 68, 68, 0.1)", borderRadius: "8px" }}>
+                      <div style={{ textAlign: "center", color: "var(--error-ink)", padding: "12px", fontSize: "13px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.25)", borderRadius: "8px" }}>
                         لم يتم العثور على طالب يطابق البحث
                       </div>
                     )}
 
                     {students.length > 0 && (
-                      <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "6px", marginBottom: "14px" }}>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
                         {students.map((st) => (
                           <div
                             key={st.id || st.student_code}
@@ -871,20 +906,20 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                             style={{
                               padding: "10px 12px",
                               borderRadius: "8px",
-                              background: "rgba(255, 255, 255, 0.05)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                              background: "var(--bg-deep)",
+                              border: "1px solid var(--border)",
                               cursor: "pointer",
                               display: "flex",
                               justifyContent: "space-between",
                               alignItems: "center",
-                              transition: "background 0.15s ease"
+                              transition: "background-color 150ms cubic-bezier(0.22, 1, 0.36, 1), border-color 150ms cubic-bezier(0.22, 1, 0.36, 1)"
                             }}
                           >
                             <div>
-                              <div style={{ fontSize: "13px", fontWeight: "bold", color: "#fff" }}>{st.full_name}</div>
-                              <div style={{ fontSize: "11px", color: "#94a3b8" }}>{st.academic_year} • سكشن {st.section || 'عام'}</div>
+                              <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text)" }}>{st.full_name}</div>
+                              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{st.academic_year} • سكشن {st.section || 'عام'}</div>
                             </div>
-                            <span style={{ fontSize: "12px", color: "#38bdf8", fontFamily: "monospace", fontWeight: "bold" }}>
+                            <span className="tabular-nums" style={{ fontSize: "12px", color: "var(--accent-ink)", fontFamily: "monospace", fontWeight: 600 }}>
                               {formatStudentCode(st.student_code)}
                             </span>
                           </div>
@@ -893,8 +928,9 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                     )}
 
                     {query.trim().length < 2 && (
-                      <div style={{ textAlign: "center", padding: "16px 8px", color: "#64748b", fontSize: "12px" }}>
-                        🔍 اكتب أول حرفين من اسمك أو كودك للبحث عن بطاقتك واستخراجها
+                      <div style={{ textAlign: "center", padding: "16px 8px", color: "var(--text-muted)", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+                        <Search size={14} strokeWidth={1.5} />
+                        <span>اكتب أول حرفين من اسمك أو كودك للبحث عن بطاقتك</span>
                       </div>
                     )}
                   </>
@@ -902,42 +938,41 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   <div style={{ textAlign: "center" }}>
                     {/* QR Card Preview */}
                     <div style={{
-                      background: "linear-gradient(135deg, #0e1626, #152238)",
-                      border: "2px solid #3b82f6",
-                      borderRadius: "16px",
+                      background: "var(--bg-deep)",
+                      border: "1px solid rgba(56, 189, 248, 0.3)",
+                      borderRadius: "12px",
                       padding: "16px",
-                      marginBottom: "14px"
+                      marginBottom: "12px"
                     }}>
-                      <div style={{ fontSize: "12px", color: "#93c5fd", fontWeight: "bold", marginBottom: "4px" }}>
+                      <div style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 500, marginBottom: "4px" }}>
                         جامعة قنا • كلية التربية النوعية
                       </div>
-                      <div style={{ fontSize: "11px", color: "#38bdf8", marginBottom: "12px" }}>
+                      <div style={{ fontSize: "11px", color: "var(--accent-ink)", marginBottom: "12px" }}>
                         قسم التربية الفنية
                       </div>
 
                       <div style={{
                         background: "#fff",
-                        padding: "14px",
-                        borderRadius: "16px",
+                        padding: "12px",
+                        borderRadius: "12px",
                         display: "inline-block",
-                        marginBottom: "14px",
-                        boxShadow: "0 8px 25px rgba(0, 0, 0, 0.45)"
+                        marginBottom: "12px",
                       }}>
                         <QRCode
                           id="student-login-qr-svg"
                           value={`كود الطالب: ${formatStudentCode(selectedStudent.student_code)}\nاسم الطالب: ${selectedStudent.full_name}`}
-                          size={230}
+                          size={220}
                           level="H"
                         />
                       </div>
 
-                      <div style={{ fontSize: "15px", fontWeight: "bold", color: "#fff", marginBottom: "4px" }}>
+                      <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>
                         {selectedStudent.full_name}
                       </div>
-                      <div style={{ fontSize: "12px", color: "#60a5fa", marginBottom: "4px" }}>
+                      <div style={{ fontSize: "12px", color: "var(--accent-ink)", marginBottom: "4px" }}>
                         {selectedStudent.academic_year} • سكشن {selectedStudent.section || 'عام'}
                       </div>
-                      <div style={{ fontSize: "14px", color: "#f59e0b", fontFamily: "monospace", fontWeight: "bold" }}>
+                      <div className="tabular-nums" style={{ fontSize: "14px", color: "var(--warning-ink)", fontFamily: "monospace", fontWeight: 600 }}>
                         الكود: {formatStudentCode(selectedStudent.student_code)}
                       </div>
                     </div>
@@ -948,24 +983,23 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                       disabled={downloading}
                       style={{
                         width: "100%",
-                        padding: "12px",
-                        background: "linear-gradient(135deg, #10b981, #059669)",
-                        color: "#fff",
+                        padding: "12px 16px",
+                        background: "var(--success)",
+                        color: "#0b0d14",
                         border: "none",
-                        borderRadius: "10px",
+                        borderRadius: "8px",
                         fontSize: "14px",
-                        fontWeight: "bold",
+                        fontWeight: 600,
                         cursor: downloading ? "not-allowed" : "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         gap: "8px",
                         marginBottom: "8px",
-                        boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)"
                       }}
                     >
-                      <Download size={18} />
-                      <span>{downloading ? "جاري تحميل البطاقة..." : "تحميل بطاقة الـ QR (PNG)"}</span>
+                      <Download size={16} strokeWidth={1.5} />
+                      <span>{downloading ? "جاري تحميل البطاقة" : "تحميل بطاقة الـ QR (PNG)"}</span>
                     </button>
 
                     <button
@@ -973,16 +1007,21 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                       onClick={() => setSelectedStudent(null)}
                       style={{
                         width: "100%",
-                        padding: "8px",
+                        padding: "8px 12px",
                         background: "transparent",
-                        color: "#94a3b8",
-                        border: "1px solid #334155",
+                        color: "var(--text-secondary)",
+                        border: "1px solid var(--border-light)",
                         borderRadius: "8px",
                         fontSize: "12px",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px"
                       }}
                     >
-                      🔄 اختيار طالب آخر
+                      <RefreshCw size={14} strokeWidth={1.5} />
+                      <span>اختيار طالب آخر</span>
                     </button>
                   </div>
                 )}
@@ -994,33 +1033,35 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
               <div>
                 <input
                   type="text"
-                  placeholder="كود الطالب الجامعي (مثال: 0045)"
+                  placeholder="كود الطالب الجامعي"
                   value={studentCode}
                   onChange={(e) => setStudentCode(e.target.value)}
+                  className="tabular-nums"
                   style={{ textAlign: "center", fontSize: "14px", marginBottom: "12px" }}
                   onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
                 />
 
-                <div style={{ position: "relative", width: "100%", marginBottom: "14px" }}>
+                <div style={{ position: "relative", width: "100%", marginBottom: "12px" }}>
                   <input
                     type={showStudentPin ? "text" : "password"}
                     placeholder="الرقم السري (PIN)"
                     value={studentPin}
                     onChange={(e) => setStudentPin(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleStudentLogin()}
-                    style={{ width: "100%", paddingLeft: "42px", boxSizing: "border-box", textAlign: "center", fontSize: "14px", margin: 0 }}
+                    style={{ width: "100%", paddingLeft: "40px", boxSizing: "border-box", textAlign: "center", fontSize: "14px", margin: 0 }}
                   />
                   <button
                     type="button"
                     onClick={() => setShowStudentPin(!showStudentPin)}
+                    className="icon-btn"
                     style={{
                       position: "absolute",
-                      left: "10px",
+                      left: "8px",
                       top: "50%",
                       transform: "translateY(-50%)",
                       background: "transparent",
                       border: "none",
-                      color: "#94a3b8",
+                      color: "var(--text-muted)",
                       cursor: "pointer",
                       padding: "4px",
                       display: "flex",
@@ -1031,13 +1072,14 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                     }}
                     title={showStudentPin ? "إخفاء الرقم السري" : "إظهار الرقم السري"}
                   >
-                    {showStudentPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showStudentPin ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                   </button>
                 </div>
 
-                <div style={{ textAlign: "center", marginBottom: "12px", marginTop: "-4px" }}>
-                  <span style={{ color: "#38bdf8", fontSize: "11px", lineHeight: "1.4" }}>
-                    💡 الدخول يتطلب كود الطالب والرقم السري المعتمد. إذا لم يكن لديك رقم سري، راجع منسق المنظومة.
+                <div style={{ textAlign: "center", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  <Lightbulb size={14} strokeWidth={1.5} style={{ color: "var(--accent-ink)", flexShrink: 0 }} />
+                  <span style={{ color: "var(--text-secondary)", fontSize: "12px", lineHeight: 1.4 }}>
+                    الدخول يتطلب كود الطالب والرقم السري المعتمد من منسق المنظومة
                   </span>
                 </div>
 
@@ -1047,37 +1089,36 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   disabled={studentLoginLoading}
                   style={{
                     width: "100%",
-                    padding: "12px",
-                    background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+                    padding: "12px 16px",
+                    background: "var(--primary)",
                     color: "#fff",
                     border: "none",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     fontSize: "14px",
-                    fontWeight: "bold",
+                    fontWeight: 500,
                     cursor: studentLoginLoading ? "not-allowed" : "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)"
                   }}
                 >
-                  <LogIn size={18} />
-                  <span>{studentLoginLoading ? "جاري التحقق والدخول..." : "دخول إلى بوابة الطالب"}</span>
+                  <LogIn size={16} strokeWidth={1.5} />
+                  <span>{studentLoginLoading ? "جاري التحقق والدخول" : "دخول إلى بوابة الطالب"}</span>
                 </button>
 
                 {studentError && (
-                  <div style={{ color: "var(--error)", marginTop: "10px", textAlign: "center", fontWeight: "bold", fontSize: "13px" }}>
+                  <div style={{ color: "var(--error-ink)", marginTop: "12px", textAlign: "center", fontWeight: 500, fontSize: "13px" }}>
                     {studentError}
                   </div>
                 )}
 
-                <div style={{ textAlign: "center", marginTop: "14px" }}>
+                <div style={{ textAlign: "center", marginTop: "16px" }}>
                   <span
                     onClick={() => { setStudentTab("first_time"); setStudentError(""); }}
-                    style={{ color: "#60a5fa", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
+                    style={{ color: "var(--accent-ink)", fontSize: "12px", cursor: "pointer", textDecoration: "underline" }}
                   >
-                    طالب جديد؟ اضغط هنا لتفعيل حسابك لأول مرة
+                    طالب جديد؟ تفعيل الحساب لأول مرة
                   </span>
                 </div>
               </div>
@@ -1088,57 +1129,58 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
               <div>
                 <div style={{
                   padding: "12px",
-                  borderRadius: "10px",
-                  background: "rgba(16, 185, 129, 0.1)",
-                  border: "1px solid rgba(16, 185, 129, 0.25)",
-                  marginBottom: "14px",
+                  borderRadius: "8px",
+                  background: "rgba(16, 185, 129, 0.08)",
+                  border: "1px solid rgba(16, 185, 129, 0.22)",
+                  marginBottom: "12px",
                   fontSize: "12px",
-                  color: "#34d399",
-                  lineHeight: "1.5",
+                  color: "var(--success-ink)",
+                  lineHeight: 1.5,
                   textAlign: "center"
                 }}>
-                  ✨ أدخل كودك الجامعي للتحقق من بياناتك والبدء في تفعيل الحساب الطلابي.
+                  أدخل كودك الجامعي للتحقق من بياناتك والبدء في تفعيل الحساب الطلابي
                 </div>
 
                 <div style={{ marginBottom: "12px" }}>
                   <input
                     type="text"
-                    placeholder="أدخل كود الطالب الجامعي"
+                    placeholder="كود الطالب الجامعي"
                     value={firstTimeCode}
                     onChange={(e) => {
                       setFirstTimeCode(e.target.value);
                       handleLookupStudentCode(e.target.value);
                     }}
-                    style={{ textAlign: "center", fontSize: "14px" }}
+                    className="tabular-nums"
+                    style={{ textAlign: "center", fontSize: "14px", marginBottom: 0 }}
                   />
                 </div>
 
                 {firstTimeLookupLoading && (
-                  <div style={{ textAlign: "center", color: "#60a5fa", fontSize: "12px", marginBottom: "10px" }}>
-                    جاري فحص الكود...
+                  <div style={{ textAlign: "center", color: "var(--accent-ink)", fontSize: "12px", marginBottom: "12px" }}>
+                    جاري فحص الكود
                   </div>
                 )}
 
                 {lookedUpStudent && (
                   <div style={{
                     padding: "12px",
-                    borderRadius: "10px",
-                    background: "rgba(59, 130, 246, 0.15)",
-                    border: "1px solid rgba(59, 130, 246, 0.3)",
-                    marginBottom: "14px",
+                    borderRadius: "8px",
+                    background: "rgba(37, 99, 235, 0.1)",
+                    border: "1px solid rgba(56, 189, 248, 0.25)",
+                    marginBottom: "12px",
                     textAlign: "right"
                   }}>
-                    <div style={{ fontSize: "13px", fontWeight: "bold", color: "#fff", marginBottom: "4px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>
                       الطالب: {lookedUpStudent.full_name}
                     </div>
-                    <div style={{ fontSize: "12px", color: "#93c5fd" }}>
+                    <div style={{ fontSize: "12px", color: "var(--accent-ink)" }}>
                       الفرقة: {lookedUpStudent.academic_year} • سكشن {lookedUpStudent.section || 'عام'}
                     </div>
                   </div>
                 )}
 
                 {firstTimeLookupError && (
-                  <div style={{ color: "var(--error)", marginBottom: "12px", textAlign: "center", fontSize: "12px" }}>
+                  <div style={{ color: "var(--error-ink)", marginBottom: "12px", textAlign: "center", fontSize: "12px" }}>
                     {firstTimeLookupError}
                   </div>
                 )}
@@ -1165,26 +1207,27 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
                   }}
                   style={{
                     width: "100%",
-                    padding: "12px",
+                    padding: "12px 16px",
                     background: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading)
-                      ? "#334155"
-                      : "linear-gradient(135deg, #10b981, #059669)",
-                    color: "#fff",
+                      ? "var(--surface-hover)"
+                      : "var(--success)",
+                    color: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading)
+                      ? "var(--text-muted)"
+                      : "#0b0d14",
                     border: "none",
-                    borderRadius: "10px",
+                    borderRadius: "8px",
                     fontSize: "14px",
-                    fontWeight: "bold",
+                    fontWeight: 600,
                     cursor: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading) ? "not-allowed" : "pointer",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: "8px",
-                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
                     opacity: (!firstTimeCode.trim() || !!firstTimeLookupError || firstTimeLookupLoading) ? 0.6 : 1
                   }}
                 >
                   <span>استكمال التفعيل ورفع الهوية في البوابة</span>
-                  <ArrowRight size={16} />
+                  <ArrowRight size={16} strokeWidth={1.5} />
                 </button>
               </div>
             )}
