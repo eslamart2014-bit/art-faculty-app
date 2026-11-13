@@ -100,8 +100,10 @@ type Project = {
   camera_mode?: '2d' | '3d';
   required_photos?: number;
   multi_stage_enabled?: boolean;
+  stage1_enabled?: boolean;
   stage1_title?: string;
   stage1_deadline?: string;
+  stage2_enabled?: boolean;
   stage2_title?: string;
   stage2_deadline?: string;
 };
@@ -204,8 +206,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [newProjectRequiredPhotos, setNewProjectRequiredPhotos] = useState<number>(1);
   const [newProjectDeadline, setNewProjectDeadline] = useState("");
   const [newProjectMultiStage, setNewProjectMultiStage] = useState(false);
+  const [newProjectStage1Enabled, setNewProjectStage1Enabled] = useState(true);
   const [newProjectStage1Title, setNewProjectStage1Title] = useState("مرحلة التجهيز والتحضير");
   const [newProjectStage1Deadline, setNewProjectStage1Deadline] = useState("");
+  const [newProjectStage2Enabled, setNewProjectStage2Enabled] = useState(true);
   const [newProjectStage2Title, setNewProjectStage2Title] = useState("العمل النهائي المكتمل");
   const [newProjectStage2Deadline, setNewProjectStage2Deadline] = useState("");
 
@@ -217,8 +221,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
   const [editProjectCameraMode, setEditProjectCameraMode] = useState<'2d'|'3d'>('2d');
   const [editProjectRequiredPhotos, setEditProjectRequiredPhotos] = useState<number>(1);
   const [editProjectMultiStage, setEditProjectMultiStage] = useState(false);
+  const [editProjectStage1Enabled, setEditProjectStage1Enabled] = useState(true);
   const [editProjectStage1Title, setEditProjectStage1Title] = useState("مرحلة التجهيز والتحضير");
   const [editProjectStage1Deadline, setEditProjectStage1Deadline] = useState("");
+  const [editProjectStage2Enabled, setEditProjectStage2Enabled] = useState(true);
   const [editProjectStage2Title, setEditProjectStage2Title] = useState("العمل النهائي المكتمل");
   const [editProjectStage2Deadline, setEditProjectStage2Deadline] = useState("");
   const [showTelegramSettings, setShowTelegramSettings] = useState(true);
@@ -447,8 +453,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       camera_mode: newProjectCameraMode,
       required_photos: newProjectRequiredPhotos,
       multi_stage_enabled: newProjectMultiStage,
+      stage1_enabled: newProjectMultiStage ? newProjectStage1Enabled : undefined,
       stage1_title: newProjectMultiStage ? (newProjectStage1Title || "مرحلة التجهيز والتحضير") : undefined,
       stage1_deadline: newProjectMultiStage ? (newProjectStage1Deadline || undefined) : undefined,
+      stage2_enabled: newProjectMultiStage ? newProjectStage2Enabled : undefined,
       stage2_title: newProjectMultiStage ? (newProjectStage2Title || "العمل النهائي المكتمل") : undefined,
       stage2_deadline: newProjectMultiStage ? (newProjectStage2Deadline || undefined) : undefined,
     };
@@ -487,8 +495,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     setNewProjectRequiredPhotos(1);
     setNewProjectDeadline("");
     setNewProjectMultiStage(false);
+    setNewProjectStage1Enabled(true);
     setNewProjectStage1Title("مرحلة التجهيز والتحضير");
     setNewProjectStage1Deadline("");
+    setNewProjectStage2Enabled(true);
     setNewProjectStage2Title("العمل النهائي المكتمل");
     setNewProjectStage2Deadline("");
   };
@@ -505,8 +515,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       setEditProjectCameraMode(proj.camera_mode ?? '2d');
       setEditProjectRequiredPhotos(proj.required_photos ?? 1);
       setEditProjectMultiStage(proj.multi_stage_enabled ?? false);
+      setEditProjectStage1Enabled(proj.stage1_enabled ?? true);
       setEditProjectStage1Title(proj.stage1_title || "مرحلة التجهيز والتحضير");
       setEditProjectStage1Deadline(proj.stage1_deadline || "");
+      setEditProjectStage2Enabled(proj.stage2_enabled ?? true);
       setEditProjectStage2Title(proj.stage2_title || "العمل النهائي المكتمل");
       setEditProjectStage2Deadline(proj.stage2_deadline || "");
       setShowTelegramSettings(true);
@@ -535,8 +547,10 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         camera_mode: editProjectCameraMode,
         required_photos: editProjectRequiredPhotos,
         multi_stage_enabled: editProjectMultiStage,
+        stage1_enabled: editProjectMultiStage ? editProjectStage1Enabled : undefined,
         stage1_title: editProjectMultiStage ? (editProjectStage1Title || "مرحلة التجهيز والتحضير") : undefined,
         stage1_deadline: editProjectMultiStage ? (editProjectStage1Deadline || undefined) : undefined,
+        stage2_enabled: editProjectMultiStage ? editProjectStage2Enabled : undefined,
         stage2_title: editProjectMultiStage ? (editProjectStage2Title || "العمل النهائي المكتمل") : undefined,
         stage2_deadline: editProjectMultiStage ? (editProjectStage2Deadline || undefined) : undefined,
       } : p
@@ -1110,6 +1124,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
           },
           body: JSON.stringify({
             studentId: student.id,
+            courseId: course.id,
             projectName: selectedProject.name,
             score: scoreNum,
             projectShowScore: selectedProject.show_score
@@ -1331,6 +1346,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         },
         body: JSON.stringify({
           studentId: targetStudent.id,
+          courseId: course.id,
           projectName: selectedProject.name,
           score: scoreNum,
           projectShowScore: selectedProject.show_score
@@ -1758,7 +1774,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             {imgs.map((imgItem: any, imgIdx: number) => {
                               const u = typeof imgItem === 'string' ? imgItem : (imgItem?.url || '');
                               if (!u) return null;
-                              const isStage2 = imgItem?.stage === 'stage2' || (selectedProject?.multi_stage_enabled && imgIdx === 1);
+                              const isStage2 = imgItem?.stage === 'stage2';
                               const stageTitle = selectedProject?.multi_stage_enabled
                                 ? (isStage2 ? (selectedProject.stage2_title || 'العمل النهائي') : (selectedProject.stage1_title || 'مرحلة التحضير'))
                                 : (imgs.length > 1 ? `صورة #${imgIdx + 1}` : 'معاينة العمل');
@@ -2038,7 +2054,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             {imgs.map((imgItem: any, imgIdx: number) => {
                               const u = typeof imgItem === 'string' ? imgItem : (imgItem?.url || '');
                               if (!u) return null;
-                              const isStage2 = imgItem?.stage === 'stage2' || (selectedProject?.multi_stage_enabled && imgIdx === 1);
+                              const isStage2 = imgItem?.stage === 'stage2';
                               const stageTitle = selectedProject?.multi_stage_enabled
                                 ? (isStage2 ? (selectedProject.stage2_title || 'العمل النهائي') : (selectedProject.stage1_title || 'مرحلة التحضير'))
                                 : (imgs.length > 1 ? `صورة #${imgIdx + 1}` : 'معاينة');
@@ -2647,13 +2663,27 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
                     {newProjectMultiStage && (
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
-                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                          <span style={{ color: "var(--accent-ink)", fontSize: "11px", fontWeight: 600 }}>المرحلة 1 (التحضير والتجهيز):</span>
+                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: newProjectStage1Enabled ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid var(--border)", opacity: newProjectStage1Enabled ? 1 : 0.7 }}>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", cursor: "pointer", marginBottom: "4px" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--accent-ink)", fontSize: "11.5px", fontWeight: 600 }}>
+                              <input
+                                type="checkbox"
+                                checked={newProjectStage1Enabled}
+                                onChange={e => setNewProjectStage1Enabled(e.target.checked)}
+                                style={{ width: "15px", height: "15px", accentColor: "var(--accent-ink)" }}
+                              />
+                              <span>تفعيل المرحلة 1 (التحضير والتجهيز)</span>
+                            </span>
+                            <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: newProjectStage1Enabled ? "rgba(56, 189, 248, 0.14)" : "rgba(239, 68, 68, 0.12)", color: newProjectStage1Enabled ? "var(--accent-ink)" : "var(--error-ink)", fontWeight: 500 }}>
+                              {newProjectStage1Enabled ? "مفعّلة للطلاب" : "غير مفعّلة"}
+                            </span>
+                          </label>
                           <input
                             type="text"
                             placeholder="عنوان المرحلة 1"
                             value={newProjectStage1Title}
                             onChange={e => setNewProjectStage1Title(e.target.value)}
+                            disabled={!newProjectStage1Enabled}
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
                           />
                           <label style={{ display: "block", color: "var(--text-muted)", fontSize: "10px" }}>آخر موعد للمرحلة 1:</label>
@@ -2661,18 +2691,33 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             type="datetime-local"
                             value={newProjectStage1Deadline}
                             onChange={e => setNewProjectStage1Deadline(e.target.value)}
+                            disabled={!newProjectStage1Enabled}
                             className="tabular-nums"
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", margin: 0 }}
                           />
                         </div>
 
-                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                          <span style={{ color: "var(--success-ink)", fontSize: "11px", fontWeight: 600 }}>المرحلة 2 (الإنهاء والعمل المكتمل):</span>
+                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: newProjectStage2Enabled ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid var(--border)", opacity: newProjectStage2Enabled ? 1 : 0.7 }}>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", cursor: "pointer", marginBottom: "4px" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--success-ink)", fontSize: "11.5px", fontWeight: 600 }}>
+                              <input
+                                type="checkbox"
+                                checked={newProjectStage2Enabled}
+                                onChange={e => setNewProjectStage2Enabled(e.target.checked)}
+                                style={{ width: "15px", height: "15px", accentColor: "var(--success)" }}
+                              />
+                              <span>تفعيل المرحلة 2 (الإنهاء والعمل المكتمل)</span>
+                            </span>
+                            <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: newProjectStage2Enabled ? "rgba(16, 185, 129, 0.14)" : "rgba(239, 68, 68, 0.12)", color: newProjectStage2Enabled ? "var(--success-ink)" : "var(--error-ink)", fontWeight: 500 }}>
+                              {newProjectStage2Enabled ? "مفعّلة للطلاب" : "غير مفعّلة"}
+                            </span>
+                          </label>
                           <input
                             type="text"
                             placeholder="عنوان المرحلة 2"
                             value={newProjectStage2Title}
                             onChange={e => setNewProjectStage2Title(e.target.value)}
+                            disabled={!newProjectStage2Enabled}
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
                           />
                           <label style={{ display: "block", color: "var(--text-muted)", fontSize: "10px" }}>آخر موعد للمرحلة 2:</label>
@@ -2680,6 +2725,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             type="datetime-local"
                             value={newProjectStage2Deadline}
                             onChange={e => setNewProjectStage2Deadline(e.target.value)}
+                            disabled={!newProjectStage2Enabled}
                             className="tabular-nums"
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", margin: 0 }}
                           />
@@ -2840,13 +2886,27 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
 
                     {editProjectMultiStage && (
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
-                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                          <span style={{ color: "var(--accent-ink)", fontSize: "11px", fontWeight: 600 }}>المرحلة 1 (التحضير والتجهيز):</span>
+                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: editProjectStage1Enabled ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid var(--border)", opacity: editProjectStage1Enabled ? 1 : 0.7 }}>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", cursor: "pointer", marginBottom: "4px" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--accent-ink)", fontSize: "11.5px", fontWeight: 600 }}>
+                              <input
+                                type="checkbox"
+                                checked={editProjectStage1Enabled}
+                                onChange={e => setEditProjectStage1Enabled(e.target.checked)}
+                                style={{ width: "15px", height: "15px", accentColor: "var(--accent-ink)" }}
+                              />
+                              <span>تفعيل المرحلة 1 (التحضير والتجهيز)</span>
+                            </span>
+                            <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: editProjectStage1Enabled ? "rgba(56, 189, 248, 0.14)" : "rgba(239, 68, 68, 0.12)", color: editProjectStage1Enabled ? "var(--accent-ink)" : "var(--error-ink)", fontWeight: 500 }}>
+                              {editProjectStage1Enabled ? "مفعّلة للطلاب" : "غير مفعّلة"}
+                            </span>
+                          </label>
                           <input
                             type="text"
                             placeholder="عنوان المرحلة 1"
                             value={editProjectStage1Title}
                             onChange={e => setEditProjectStage1Title(e.target.value)}
+                            disabled={!editProjectStage1Enabled}
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
                           />
                           <label style={{ display: "block", color: "var(--text-muted)", fontSize: "10px" }}>آخر موعد للمرحلة 1:</label>
@@ -2854,18 +2914,33 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             type="datetime-local"
                             value={editProjectStage1Deadline}
                             onChange={e => setEditProjectStage1Deadline(e.target.value)}
+                            disabled={!editProjectStage1Enabled}
                             className="tabular-nums"
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", margin: 0 }}
                           />
                         </div>
 
-                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: "1px solid var(--border)" }}>
-                          <span style={{ color: "var(--success-ink)", fontSize: "11px", fontWeight: 600 }}>المرحلة 2 (الإنهاء والعمل المكتمل):</span>
+                        <div style={{ background: "var(--surface)", padding: "8px", borderRadius: "6px", border: editProjectStage2Enabled ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid var(--border)", opacity: editProjectStage2Enabled ? 1 : 0.7 }}>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", cursor: "pointer", marginBottom: "4px" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--success-ink)", fontSize: "11.5px", fontWeight: 600 }}>
+                              <input
+                                type="checkbox"
+                                checked={editProjectStage2Enabled}
+                                onChange={e => setEditProjectStage2Enabled(e.target.checked)}
+                                style={{ width: "15px", height: "15px", accentColor: "var(--success)" }}
+                              />
+                              <span>تفعيل المرحلة 2 (الإنهاء والعمل المكتمل)</span>
+                            </span>
+                            <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: editProjectStage2Enabled ? "rgba(16, 185, 129, 0.14)" : "rgba(239, 68, 68, 0.12)", color: editProjectStage2Enabled ? "var(--success-ink)" : "var(--error-ink)", fontWeight: 500 }}>
+                              {editProjectStage2Enabled ? "مفعّلة للطلاب" : "غير مفعّلة"}
+                            </span>
+                          </label>
                           <input
                             type="text"
                             placeholder="عنوان المرحلة 2"
                             value={editProjectStage2Title}
                             onChange={e => setEditProjectStage2Title(e.target.value)}
+                            disabled={!editProjectStage2Enabled}
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", marginTop: "4px", marginBottom: "4px" }}
                           />
                           <label style={{ display: "block", color: "var(--text-muted)", fontSize: "10px" }}>آخر موعد للمرحلة 2:</label>
@@ -2873,6 +2948,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
                             type="datetime-local"
                             value={editProjectStage2Deadline}
                             onChange={e => setEditProjectStage2Deadline(e.target.value)}
+                            disabled={!editProjectStage2Enabled}
                             className="tabular-nums"
                             style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "4px", color: "var(--text)", fontSize: "11px", margin: 0 }}
                           />

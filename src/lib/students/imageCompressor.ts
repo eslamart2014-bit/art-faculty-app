@@ -1,6 +1,7 @@
 /**
- * محرك ضغط الصور الفائق وتحويلها إلى WebP وحساب بصمة الصورة الذكية (dHash) لكشف التشابه
+ * محرك ضغط الصور الفائق وتحويلها إلى WebP وحساب بصمة الصورة الذكية (dHash + Art Vision) لكشف التشابه
  */
+import { extractArtSigFromCanvas } from '@/lib/art-vision/clientExtract';
 
 export interface CompressionResult {
   blob: Blob;
@@ -9,6 +10,8 @@ export interface CompressionResult {
   width: number;
   height: number;
   dhash: string;
+  /** بصمة الرؤية الحاسوبية المتقدمة (ORB + RANSAC) — نص base64 مضغوط */
+  artSig: string;
   isGoodLighting: boolean;
   brightnessScore: number;
 }
@@ -57,6 +60,10 @@ export async function compressImageToWebP(
       // حساب بصمة الصورة (dHash) للذكاء الاصطناعي
       const dhash = computeDHashFromCanvas(canvas);
 
+      // استخراج البصمة البصرية المتقدمة (ORB + RANSAC) لكشف التشابه حتى مع اختلاف الزوايا
+      let artSig = '';
+      try { artSig = extractArtSigFromCanvas(canvas); } catch (_) {}
+
       // التحويل إلى صيغة WebP فائقة الصغر
       canvas.toBlob(
         (blob) => {
@@ -75,6 +82,7 @@ export async function compressImageToWebP(
               width,
               height,
               dhash,
+              artSig,
               isGoodLighting: lighting.isGoodLighting,
               brightnessScore: lighting.brightnessScore,
             });

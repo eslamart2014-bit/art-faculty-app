@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Camera, Check, Lock, Palette, RotateCw, ShieldCheck, Smartphone, Sun, X } from "lucide-react";
+import { AlertTriangle, Camera, Check, Lock, Palette, RotateCw, ShieldCheck, Smartphone, Sun, X } from "lucide-react";
 
 interface StudentArtworkCameraModalProps {
   showArtworkCamera: boolean;
@@ -308,8 +308,26 @@ export default function StudentArtworkCameraModal({
               <Palette size={17} strokeWidth={1.5} color="var(--accent-ink)" />
               <span>معاينة الصور قبل الرفع للأستاذ</span>
             </h3>
-            <div className="tabular-nums" style={{ color: "var(--text-secondary)", fontSize: "12.5px", marginBottom: "14px" }}>
+            <div className="tabular-nums" style={{ color: "var(--text-secondary)", fontSize: "12.5px", marginBottom: "10px" }}>
               مشروع: <strong style={{ fontWeight: 600, color: "var(--text)" }}>{activeProjectForUpload?.title}</strong> ({capturedPhotos.length} صور تم التقاطها)
+            </div>
+
+            <div style={{
+              background: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.35)",
+              borderRadius: "8px",
+              padding: "9px 12px",
+              marginBottom: "14px",
+              color: "var(--error-ink)",
+              fontSize: "11.5px",
+              fontWeight: 500,
+              lineHeight: 1.5,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px"
+            }}>
+              <AlertTriangle size={15} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span>تحذير هام: الصورة التي ستقوم برفعها لن تستطيع حذفها أو استبدالها بعد الاعتماد نهائياً، وتأكد من أنها تخص هذا المشروع قبل الرفع.</span>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>

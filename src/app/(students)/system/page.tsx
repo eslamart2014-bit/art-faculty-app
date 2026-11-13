@@ -351,13 +351,29 @@ export default function SystemPage() {
       (course.assignedProjects || []).forEach((proj: any) => {
         const sub = proj.submission || (course.submissions || []).find((s: any) => (s.project_name || '').trim() === (proj.title || '').trim());
         const ev = proj.evaluation;
-        const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
-        const score = isGraded ? (ev?.score ?? proj.score) : null;
-        const isSubmitted = isGraded || proj.status === 'submitted' || proj.status === 'evaluated' || !!sub || !!(ev?.photo_url);
         const subImgList = Array.isArray(sub?.images) ? sub.images : [];
-        const hasStage1Image = proj.hasStage1Image ?? (isSubmitted && (subImgList.some((i: any) => i.stage === 'stage1' || !i.stage) || !!ev?.photo_url));
-        const hasStage2Image = proj.hasStage2Image ?? (isSubmitted && subImgList.some((i: any) => i.stage === 'stage2'));
-        const isFullySubmitted = proj.multiStageEnabled ? (hasStage1Image && hasStage2Image) : isSubmitted;
+        const hasValidImage = subImgList.some((img: any) => {
+          const u = typeof img === 'string' ? img : img?.url;
+          return !!u && !u.includes('undefined') && !u.includes('null') && !u.startsWith('/api/media/undefined');
+        }) || (!!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null'));
+
+        const stage1Enabled = proj.stage1Enabled !== false;
+        const stage2Enabled = proj.stage2Enabled !== false;
+        const hasStage1Image = proj.hasStage1Image ?? (hasValidImage && (subImgList.some((i: any) => typeof i === 'string' || i?.stage === 'stage1' || !i?.stage) || (!!ev?.photo_url && subImgList.length === 0)));
+        const hasStage2Image = proj.hasStage2Image ?? (hasValidImage && subImgList.some((i: any) => typeof i === 'object' && i?.stage === 'stage2'));
+
+        const uploadSatisfiedForGrade = proj.multiStageEnabled
+          ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
+          : hasValidImage;
+
+        const rawHasScore = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
+        const isGraded = rawHasScore && uploadSatisfiedForGrade;
+        const isScoreLockedByUpload = !!(proj.isScoreLockedByUpload || (rawHasScore && !uploadSatisfiedForGrade));
+        const score = isGraded ? (ev?.score ?? proj.score) : null;
+        const isSubmitted = hasValidImage;
+        const isFullySubmitted = proj.multiStageEnabled
+          ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
+          : isSubmitted;
 
         list.push({
           ...proj,
@@ -367,8 +383,11 @@ export default function SystemPage() {
           instructorTitle: course.instructorTitle || "أستاذ المقرر",
           instructorName: course.instructorName,
           submission: sub,
-          evaluation: ev,
+          evaluation: isGraded ? ev : null,
+          stage1Enabled,
+          stage2Enabled,
           isGraded,
+          isScoreLockedByUpload,
           isSubmitted,
           hasStage1Image,
           hasStage2Image,
@@ -388,7 +407,7 @@ export default function SystemPage() {
 
   const { requiredProjects, submittedProjects } = useMemo(() => {
     const req = courseFilteredProjects.filter((p: any) => !p.isFullySubmitted);
-    const sub = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted || p.isGraded);
+    const sub = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted);
     return { requiredProjects: req, submittedProjects: sub };
   }, [courseFilteredProjects]);
 
@@ -1314,9 +1333,29 @@ export default function SystemPage() {
           if (found) {
             const sub = found.submission || (c.submissions || []).find((s: any) => (s.project_name || '').trim() === (found.title || '').trim());
             const ev = found.evaluation;
-            const isGraded = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (found.score !== null && found.score !== undefined && !isNaN(Number(found.score)) && Number(found.score) > 0 && found.status === 'evaluated'));
+            const subImgList = Array.isArray(sub?.images) ? sub.images : [];
+            const hasValidImage = subImgList.some((img: any) => {
+              const u = typeof img === 'string' ? img : img?.url;
+              return !!u && !u.includes('undefined') && !u.includes('null') && !u.startsWith('/api/media/undefined');
+            }) || (!!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null'));
+
+            const stage1Enabled = found.stage1Enabled !== false;
+            const stage2Enabled = found.stage2Enabled !== false;
+            const hasStage1Image = found.hasStage1Image ?? (hasValidImage && (subImgList.some((i: any) => typeof i === 'string' || i?.stage === 'stage1' || !i?.stage) || (!!ev?.photo_url && subImgList.length === 0)));
+            const hasStage2Image = found.hasStage2Image ?? (hasValidImage && subImgList.some((i: any) => typeof i === 'object' && i?.stage === 'stage2'));
+
+            const uploadSatisfiedForGrade = found.multiStageEnabled
+              ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
+              : hasValidImage;
+
+            const rawHasScore = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (found.score !== null && found.score !== undefined && !isNaN(Number(found.score)) && Number(found.score) > 0 && found.status === 'evaluated'));
+            const isGraded = rawHasScore && uploadSatisfiedForGrade;
+            const isScoreLockedByUpload = !!(found.isScoreLockedByUpload || (rawHasScore && !uploadSatisfiedForGrade));
             const score = isGraded ? (ev?.score ?? found.score) : null;
-            const isSubmitted = isGraded || found.status === 'submitted' || found.status === 'evaluated' || !!sub || !!(ev?.photo_url);
+            const isSubmitted = hasValidImage;
+            const isFullySubmitted = found.multiStageEnabled
+              ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
+              : isSubmitted;
 
             setSelectedProjectForView({
               ...found,
@@ -1326,7 +1365,13 @@ export default function SystemPage() {
               instructorTitle: c.instructorTitle || "أستاذ المقرر",
               instructorName: c.instructorName,
               submission: sub,
-              evaluation: ev,
+              evaluation: isGraded ? ev : null,
+              stage1Enabled,
+              stage2Enabled,
+              hasStage1Image,
+              hasStage2Image,
+              isFullySubmitted,
+              isScoreLockedByUpload,
               isGraded,
               isSubmitted,
               score
@@ -1604,6 +1649,7 @@ export default function SystemPage() {
       const newPhoto = {
         url: compressed.dataUrl,
         dhash: compressed.dhash,
+        art_sig: compressed.artSig || '',
         width: compressed.width,
         height: compressed.height,
         orientation: orientationFrame,
@@ -1671,6 +1717,7 @@ export default function SystemPage() {
       } else {
         // كائن التسليم الجديد للتحديث اللحظي المباشر في الواجهة
         const isStage2 = isMulti && activeUploadStage === 'stage2';
+        const revealedScore = data.revealed_score !== undefined && data.revealed_score !== null ? Number(data.revealed_score) : null;
         const newSubObj = data.submission || {
           id: "sub_" + Date.now(),
           student_code: currentStudent.student_code,
@@ -1679,8 +1726,8 @@ export default function SystemPage() {
           course_name: courseName,
           project_name: projTitle,
           images: capturedPhotos.map((p: any) => ({ url: p.url || p.dataUrl || p, stage: activeUploadStage, stage_title: stageTitle })),
-          status: "pending_evaluation",
-          score: null,
+          status: revealedScore !== null ? "evaluated" : "pending_evaluation",
+          score: revealedScore,
           created_at: new Date().toISOString()
         };
 
@@ -1688,16 +1735,23 @@ export default function SystemPage() {
         setSelectedProjectForView((prev: any) => {
           if (!prev) return prev;
           if ((prev.title || '').trim() === projTitle) {
-            const isFullyDone = isMulti ? isStage2 : true;
+            const nextHasS1 = isMulti ? (activeUploadStage === 'stage1' ? true : !!prev.hasStage1Image) : true;
+            const nextHasS2 = isMulti ? (activeUploadStage === 'stage2' ? true : !!prev.hasStage2Image) : false;
+            const s1En = prev.stage1Enabled !== false;
+            const s2En = prev.stage2Enabled !== false;
+            const isFullyDone = isMulti
+              ? ((s1En ? nextHasS1 : true) && (s2En ? nextHasS2 : true))
+              : true;
             return {
               ...prev,
-              status: isFullyDone ? "submitted" : "partially_submitted",
+              status: revealedScore !== null ? "evaluated" : (isFullyDone ? "submitted" : "partially_submitted"),
               isSubmitted: true,
-              hasStage1Image: true,
-              hasStage2Image: isStage2,
+              hasStage1Image: nextHasS1,
+              hasStage2Image: nextHasS2,
               isFullySubmitted: isFullyDone,
-              isGraded: false,
-              score: null,
+              isScoreLockedByUpload: revealedScore !== null ? false : prev.isScoreLockedByUpload,
+              isGraded: revealedScore !== null ? true : false,
+              score: revealedScore !== null ? revealedScore : null,
               submission: newSubObj
             };
           }
@@ -1711,7 +1765,14 @@ export default function SystemPage() {
           const updatedSubs = [newSubObj, ...oldSubs];
           const updatedAssigned = (prev.assignedProjects || []).map((p: any) => {
             if ((p.title || '').trim() === projTitle) {
-              return { ...p, status: "submitted", submission: newSubObj };
+              return {
+                ...p,
+                status: revealedScore !== null ? "evaluated" : "submitted",
+                isGraded: revealedScore !== null ? true : p.isGraded,
+                score: revealedScore !== null ? revealedScore : p.score,
+                isScoreLockedByUpload: revealedScore !== null ? false : p.isScoreLockedByUpload,
+                submission: newSubObj
+              };
             }
             return p;
           });
@@ -1733,7 +1794,14 @@ export default function SystemPage() {
                 const updatedSubs = [newSubObj, ...oldSubs];
                 const updatedAssigned = (c.assignedProjects || []).map((p: any) => {
                   if ((p.title || '').trim() === projTitle) {
-                    return { ...p, status: "submitted", submission: newSubObj };
+                    return {
+                      ...p,
+                      status: revealedScore !== null ? "evaluated" : "submitted",
+                      isGraded: revealedScore !== null ? true : p.isGraded,
+                      score: revealedScore !== null ? revealedScore : p.score,
+                      isScoreLockedByUpload: revealedScore !== null ? false : p.isScoreLockedByUpload,
+                      submission: newSubObj
+                    };
                   }
                   return p;
                 });
@@ -1756,7 +1824,11 @@ export default function SystemPage() {
         setCurrentPhotoStep(1);
         setActiveProjectForUpload(null);
 
-        alert("✓ تم تسليم العمل الفني بنجاح!\nالعمل الآن محفوظ في تبويب المشروع وبانتظار رصد الدرجة من أستاذ المقرر.");
+        if (revealedScore !== null) {
+          alert(`تم تسليم العمل الفني بنجاح!\nتم فتح وإظهار درجتك المرصودة في المشروع: (${revealedScore})`);
+        } else {
+          alert("تم تسليم العمل الفني بنجاح!\nالعمل الآن محفوظ في تبويب المشروع وبانتظار رصد الدرجة من أستاذ المقرر.");
+        }
 
         // 5. مزامنة البيانات في الخلفية
         loadDashboard(currentStudent.student_code);
@@ -1771,7 +1843,22 @@ export default function SystemPage() {
   // Open Smart Camera for a specific Assigned Project (Strict Live Camera)
   const handleOpenSmartCameraForProject = (proj: any, targetStage?: 'stage1' | 'stage2') => {
     setActiveProjectForUpload(proj);
-    const stageToUpload = targetStage || (proj.multiStageEnabled && proj.hasStage1Image ? 'stage2' : 'stage1');
+    let stageToUpload: 'stage1' | 'stage2' = 'stage1';
+    if (targetStage) {
+      stageToUpload = targetStage;
+    } else if (proj.multiStageEnabled) {
+      const s1En = proj.stage1Enabled !== false;
+      const s2En = proj.stage2Enabled !== false;
+      if (s1En && !proj.hasStage1Image) {
+        stageToUpload = 'stage1';
+      } else if (s2En && !proj.hasStage2Image) {
+        stageToUpload = 'stage2';
+      } else if (s2En) {
+        stageToUpload = 'stage2';
+      } else {
+        stageToUpload = 'stage1';
+      }
+    }
     setActiveUploadStage(stageToUpload);
     const mode: "2d" | "3d" = (proj.cameraMode || proj.camera_mode) === "3d" ? "3d" : "2d";
     setCameraMode(mode);

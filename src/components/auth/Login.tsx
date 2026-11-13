@@ -36,7 +36,7 @@ export default function Login({ onLogin }: { onLogin: (user: any) => void }) {
   const [appVersion, setAppVersion] = useState("");
 
   useEffect(() => {
-    setAppVersion(localStorage.getItem('appVersion') || "1.7");
+    setAppVersion(localStorage.getItem('appVersion') || "4.0.1");
   }, []);
 
   // Main role mode switcher: Student vs Faculty (Students first)

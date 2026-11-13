@@ -1098,7 +1098,7 @@ export default function StudentPortalHubModal({
                   <span>كاشف تشابه وتطابق اللوحات الفنية بالذكاء الاصطناعي</span>
                 </h3>
                 <div style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
-                  فحص دقيق لبصمات الصور (dHash) لكشف أي محاولات رفع لنفس اللوحة أو نسخها بين الطلاب.
+                  محرك الرؤية الحاسوبية الذكي (Art Vision): فحص هندسي دقيق بالذكاء الاصطناعي يكشف تطابق اللوحات حتى مع اختلاف زاوية التصوير أو الإمالة أو الإضاءة.
                 </div>
               </div>
 
@@ -1176,9 +1176,15 @@ export default function StudentPortalHubModal({
                           </span>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span className="tabular-nums" style={{ background: "var(--error)", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
-                            مسافة هامد: {hamming}
-                          </span>
+                          {m.method === 'Art Vision' ? (
+                            <span className="tabular-nums" style={{ background: "rgba(99, 102, 241, 0.18)", color: "var(--primary-ink, #818cf8)", border: "1px solid rgba(99, 102, 241, 0.35)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
+                              🎯 فحص هندسي (Art Vision)
+                            </span>
+                          ) : (
+                            <span className="tabular-nums" style={{ background: "var(--error)", color: "#fff", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
+                              مسافة هامد: {hamming}
+                            </span>
+                          )}
                           <span className="tabular-nums" style={{ background: "var(--bg-deep)", border: "1px solid var(--border)", color: "var(--accent-ink)", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600 }}>
                             تشابه {m.similarityPercent}%
                           </span>

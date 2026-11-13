@@ -53,6 +53,7 @@ export async function GET(request: Request) {
                 ...img,
                 url: normalizeImgUrl(img.url),
                 dhash: (img.dhash || '').replace(/^hash:/i, '').trim(),
+                art_sig: (img.art_sig || '').trim(),
               }))
             : [],
         }));
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
                   ...img,
                   url: normalizeImgUrl(img.url),
                   dhash: (img.dhash || '').replace(/^hash:/i, '').trim(),
+                  art_sig: (img.art_sig || '').trim(),
                 }))
               : [],
           });

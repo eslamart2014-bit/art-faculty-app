@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Award,
   Ban,
@@ -298,8 +299,10 @@ export default function StudentProjectsTab({
                 const hasNewGrade = proj.isGraded && (seenRec?.seenScore === undefined || seenRec?.seenScore === null || Number(seenRec?.seenScore) !== Number(proj.score));
                 const isCardUnread = isNewProject || hasNewGrade;
 
+                const s1En = proj.stage1Enabled !== false;
+                const s2En = proj.stage2Enabled !== false;
                 const activeDeadline = proj.multiStageEnabled
-                  ? (!proj.hasStage1Image ? (proj.stage1Deadline || proj.submissionDeadline) : (!proj.hasStage2Image ? (proj.stage2Deadline || proj.submissionDeadline) : null))
+                  ? ((s1En && !proj.hasStage1Image) ? (proj.stage1Deadline || proj.submissionDeadline) : ((s2En && !proj.hasStage2Image) ? (proj.stage2Deadline || proj.submissionDeadline) : null))
                   : (!proj.isSubmitted ? proj.submissionDeadline : null);
 
                 const countdown = formatRemainingTime(activeDeadline);
@@ -312,7 +315,7 @@ export default function StudentProjectsTab({
                       background: "var(--surface)",
                       border: isCardUnread 
                         ? "1.5px solid var(--error)" 
-                        : (proj.isGraded ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid var(--border-light)"),
+                        : (proj.isGraded ? "1px solid rgba(16, 185, 129, 0.4)" : proj.isScoreLockedByUpload ? "1.5px solid var(--warning)" : "1px solid var(--border-light)"),
                       borderRadius: "12px",
                       padding: "14px",
                       cursor: "pointer",
@@ -327,7 +330,7 @@ export default function StudentProjectsTab({
                       e.currentTarget.style.transform = "translateY(-1px)";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = isCardUnread ? "var(--error)" : (proj.isGraded ? "rgba(16, 185, 129, 0.4)" : "var(--border-light)");
+                      e.currentTarget.style.borderColor = isCardUnread ? "var(--error)" : (proj.isGraded ? "rgba(16, 185, 129, 0.4)" : proj.isScoreLockedByUpload ? "var(--warning)" : "var(--border-light)");
                       e.currentTarget.style.transform = "translateY(0)";
                     }}
                   >
@@ -350,7 +353,7 @@ export default function StudentProjectsTab({
                         zIndex: 4
                       }}>
                         <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#ffffff", display: "inline-block" }} />
-                        <span>{hasNewGrade ? `درجة جديدة: ${proj.score}` : "مشروع جديد"}</span>
+                        <span>{hasNewGrade ? `درجة جديدة: ${proj.score}` : proj.isScoreLockedByUpload ? "ارفع المشروع لإظهار درجتك" : "مشروع جديد"}</span>
                       </div>
                     )}
                     {/* رأس الكارت: اسم المشروع وحالة الرفع والمؤقت */}
@@ -370,19 +373,25 @@ export default function StudentProjectsTab({
                           alignItems: "center",
                           gap: "4px",
                           background: proj.multiStageEnabled 
-                            ? (proj.hasStage1Image && proj.hasStage2Image ? "rgba(16, 185, 129, 0.14)" : proj.hasStage1Image ? "rgba(56, 189, 248, 0.14)" : "rgba(245, 158, 11, 0.14)")
+                            ? (proj.isFullySubmitted ? "rgba(16, 185, 129, 0.14)" : (proj.hasStage1Image || proj.hasStage2Image) ? "rgba(56, 189, 248, 0.14)" : "rgba(245, 158, 11, 0.14)")
                             : (proj.isSubmitted ? "rgba(16, 185, 129, 0.14)" : "rgba(245, 158, 11, 0.14)"),
                           color: proj.multiStageEnabled
-                            ? (proj.hasStage1Image && proj.hasStage2Image ? "var(--success-ink)" : proj.hasStage1Image ? "var(--accent-ink)" : "var(--warning-ink)")
+                            ? (proj.isFullySubmitted ? "var(--success-ink)" : (proj.hasStage1Image || proj.hasStage2Image) ? "var(--accent-ink)" : "var(--warning-ink)")
                             : (proj.isSubmitted ? "var(--success-ink)" : "var(--warning-ink)"),
                           border: `1px solid ${
                             proj.multiStageEnabled
-                              ? (proj.hasStage1Image && proj.hasStage2Image ? "rgba(16, 185, 129, 0.35)" : proj.hasStage1Image ? "rgba(56, 189, 248, 0.35)" : "rgba(245, 158, 11, 0.35)")
+                              ? (proj.isFullySubmitted ? "rgba(16, 185, 129, 0.35)" : (proj.hasStage1Image || proj.hasStage2Image) ? "rgba(56, 189, 248, 0.35)" : "rgba(245, 158, 11, 0.35)")
                               : (proj.isSubmitted ? "rgba(16, 185, 129, 0.35)" : "rgba(245, 158, 11, 0.35)")
                           }`
                         }}>
                           {proj.multiStageEnabled
-                            ? (proj.hasStage1Image && proj.hasStage2Image ? <><Check size={12} strokeWidth={1.5} /><span>مرحلتين مكتملتين</span></> : proj.hasStage1Image ? <><Clock size={12} strokeWidth={1.5} /><span>بانتظار المرحلة 2</span></> : <><Clock size={12} strokeWidth={1.5} /><span>بانتظار المرحلة 1</span></>)
+                            ? (proj.isFullySubmitted
+                                ? <><Check size={12} strokeWidth={1.5} /><span>مكتمل التسليم</span></>
+                                : (s2En && !proj.hasStage2Image && (!s1En || proj.hasStage1Image))
+                                ? <><Clock size={12} strokeWidth={1.5} /><span>بانتظار المرحلة 2</span></>
+                                : (s1En && !proj.hasStage1Image && (!s2En || proj.hasStage2Image))
+                                ? <><Clock size={12} strokeWidth={1.5} /><span>بانتظار المرحلة 1</span></>
+                                : <><Clock size={12} strokeWidth={1.5} /><span>بانتظار رفع المراحل</span></>)
                             : (proj.isSubmitted ? <><Check size={12} strokeWidth={1.5} /><span>تم الرفع</span></> : <><Clock size={12} strokeWidth={1.5} /><span>بانتظار الرفع</span></>)}
                         </span>
 
@@ -425,7 +434,7 @@ export default function StudentProjectsTab({
                       </span>
                       <span style={{ color: "var(--text-secondary)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                         {proj.multiStageEnabled ? <Palette size={12} strokeWidth={1.5} /> : proj.cameraMode === "3d" ? <Box size={12} strokeWidth={1.5} /> : <ImageIcon size={12} strokeWidth={1.5} />}
-                        <span>{proj.multiStageEnabled ? "مرحلتين (تجهيز + إنهاء)" : (proj.cameraMode === "3d" ? "مجسم 3D" : "لوحة 2D")}</span>
+                        <span>{proj.multiStageEnabled ? "مرحلتين (كل مرحلة منفصلة)" : (proj.cameraMode === "3d" ? "مجسم 3D" : "لوحة 2D")}</span>
                       </span>
                     </div>
 
@@ -450,6 +459,24 @@ export default function StudentProjectsTab({
                             {proj.score} / {proj.maxScore}
                           </span>
                         </div>
+                      ) : proj.isScoreLockedByUpload ? (
+                        <div style={{
+                          background: "rgba(245, 158, 11, 0.14)",
+                          border: "1px solid rgba(245, 158, 11, 0.45)",
+                          borderRadius: "8px",
+                          padding: "8px 10px",
+                          color: "var(--warning-ink)",
+                          fontSize: "11.5px",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          textAlign: "center"
+                        }}>
+                          <Lock size={13} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                          <span>تم رصد الدرجة — شرط لإظهارها: قم برفع المشروع أولاً</span>
+                        </div>
                       ) : proj.isFullySubmitted ? (
                         <div style={{
                           background: "rgba(56, 189, 248, 0.08)",
@@ -466,13 +493,13 @@ export default function StudentProjectsTab({
                           <Clock size={13} strokeWidth={1.5} />
                           <span>قيد التقييم (بانتظار رصد الدرجة)</span>
                         </div>
-                      ) : proj.multiStageEnabled && proj.hasStage1Image && !proj.hasStage2Image ? (
+                      ) : proj.multiStageEnabled ? (
                         <div style={{
-                          background: countdown.isExpired ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                          border: `1px solid ${countdown.isExpired ? "rgba(239, 68, 68, 0.35)" : "rgba(245, 158, 11, 0.35)"}`,
+                          background: "rgba(56, 189, 248, 0.1)",
+                          border: "1px solid rgba(56, 189, 248, 0.35)",
                           borderRadius: "8px",
                           padding: "7px 10px",
-                          color: countdown.isExpired ? "var(--error-ink)" : "var(--warning-ink)",
+                          color: "var(--accent-ink)",
                           fontSize: "11.5px",
                           fontWeight: 500,
                           display: "flex",
@@ -480,8 +507,8 @@ export default function StudentProjectsTab({
                           justifyContent: "center",
                           gap: "6px"
                         }}>
-                          {countdown.isExpired ? <Ban size={13} strokeWidth={1.5} /> : <Camera size={13} strokeWidth={1.5} />}
-                          <span>{countdown.isExpired ? "انتهى موعد رفع المرحلة 2" : `اضغط لرفع: ${proj.stage2Title || 'العمل النهائي'}`}</span>
+                          <Camera size={13} strokeWidth={1.5} />
+                          <span>اضغط لتصوير ورفع المراحل المتاحة (شرط لظهور الدرجة)</span>
                         </div>
                       ) : countdown.isExpired ? (
                         <div style={{
@@ -514,7 +541,7 @@ export default function StudentProjectsTab({
                           gap: "6px"
                         }}>
                           <Camera size={13} strokeWidth={1.5} />
-                          <span>اضغط للاطلاع على التفاصيل والتصوير</span>
+                          <span>اضغط للتصوير والرفع (شرط لظهور الدرجة)</span>
                         </div>
                       )}
                     </div>
@@ -658,6 +685,8 @@ export default function StudentProjectsTab({
           }}>
             {(() => {
               const isMulti = !!selectedProjectForView.multiStageEnabled;
+              const stage1Enabled = selectedProjectForView.stage1Enabled !== false;
+              const stage2Enabled = selectedProjectForView.stage2Enabled !== false;
               let imageList: any[] = [];
               const sub = selectedProjectForView.submission;
               const ev = selectedProjectForView.evaluation;
@@ -676,31 +705,96 @@ export default function StudentProjectsTab({
 
               const now = Date.now();
 
+              const gradeRequirementBanner = !selectedProjectForView.isGraded && (
+                <div style={{
+                  background: selectedProjectForView.isScoreLockedByUpload ? "rgba(245, 158, 11, 0.14)" : "rgba(56, 189, 248, 0.1)",
+                  border: selectedProjectForView.isScoreLockedByUpload ? "1.5px solid var(--warning)" : "1px solid rgba(56, 189, 248, 0.35)",
+                  borderRadius: "10px",
+                  padding: "12px 14px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  textAlign: "right"
+                }}>
+                  <Lock size={18} strokeWidth={1.5} color={selectedProjectForView.isScoreLockedByUpload ? "var(--warning-ink)" : "var(--accent-ink)"} style={{ flexShrink: 0, marginTop: "2px" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: selectedProjectForView.isScoreLockedByUpload ? "var(--warning-ink)" : "var(--accent-ink)", fontWeight: 600, fontSize: "13px", marginBottom: "3px" }}>
+                      {selectedProjectForView.isScoreLockedByUpload
+                        ? "تم رصد درجتك — شرط أساسي لظهور الدرجة: قم برفع صورة المشروع أولاً"
+                        : "شرط أساسي لظهور درجة المشروع: تصوير ورفع العمل الفني أولاً"}
+                    </div>
+                    <div style={{ color: "var(--text-secondary)", fontSize: "11.5px", lineHeight: 1.55 }}>
+                      {selectedProjectForView.isScoreLockedByUpload
+                        ? "قام أستاذ المقرر بتقييم هذا المشروع، ولن تظهر درجتك المرصودة إلا بعد قيامك بتصوير ورفع العمل الفني المطلوب الآن. بمجرد الرفع ستظهر الدرجة فوراً."
+                        : "يشترط نظام المقرر رفع صورة العمل الفني عبر الكاميرا المباشرة حتى تظهر لك الدرجة فور رصدها من أستاذ المقرر."}
+                    </div>
+                  </div>
+                </div>
+              );
+
+              const nonDeletableWarningBanner = (
+                <div style={{
+                  background: "rgba(239, 68, 68, 0.1)",
+                  border: "1px solid rgba(239, 68, 68, 0.35)",
+                  borderRadius: "10px",
+                  padding: "10px 12px",
+                  color: "var(--error-ink)",
+                  fontSize: "11.5px",
+                  fontWeight: 500,
+                  lineHeight: 1.55,
+                  textAlign: "right",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px"
+                }}>
+                  <AlertTriangle size={16} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: "2px" }} />
+                  <div>
+                    <strong style={{ fontWeight: 600 }}>تنبيه هام قبل التصوير:</strong> الصورة التي ستقوم برفعها لن تستطيع حذفها أو استبدالها نهائياً بعد الاعتماد، وتظهر مباشرة لأستاذ المقرر للمراجعة.
+                  </div>
+                </div>
+              );
+
               if (isMulti) {
-                const stage1Img = imageList.find((i: any) => i.stage === 'stage1') || (imageList.length > 0 ? imageList[0] : null);
-                const stage2Img = imageList.find((i: any) => i.stage === 'stage2') || (imageList.length > 1 ? imageList[1] : null);
+                const stage1Img = imageList.find((i: any) => typeof i === 'string' || i?.stage === 'stage1' || !i?.stage) || null;
+                const stage2Img = imageList.find((i: any) => typeof i === 'object' && i?.stage === 'stage2') || null;
 
                 const s1Dead = selectedProjectForView.stage1Deadline || selectedProjectForView.submissionDeadline;
                 const s2Dead = selectedProjectForView.stage2Deadline || selectedProjectForView.submissionDeadline;
-                const isS1Expired = s1Dead ? new Date(s1Dead).getTime() < now : false;
-                const isS2Expired = s2Dead ? new Date(s2Dead).getTime() < now : false;
+                const isS1Expired = (s1Dead ? new Date(s1Dead).getTime() < now : false) && !selectedProjectForView.isScoreLockedByUpload;
+                const isS2Expired = (s2Dead ? new Date(s2Dead).getTime() < now : false) && !selectedProjectForView.isScoreLockedByUpload;
                 const cd1 = formatRemainingTime(s1Dead);
                 const cd2 = formatRemainingTime(s2Dead);
 
                 const stage1Url = typeof stage1Img === 'string' ? stage1Img : (stage1Img?.url || '');
                 const stage2Url = typeof stage2Img === 'string' ? stage2Img : (stage2Img?.url || '');
 
+                const canUploadAnyStage = (stage1Enabled && !stage1Url && !isS1Expired) || (stage2Enabled && !stage2Url && !isS2Expired);
+
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    {gradeRequirementBanner}
+                    {canUploadAnyStage && nonDeletableWarningBanner}
+
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
-                      <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      {/* المرحلة 1 */}
+                      <div style={{ background: "var(--bg-deep)", border: stage1Enabled ? "1px solid var(--border-light)" : "1px dashed var(--border)", borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px", opacity: (!stage1Enabled && !stage1Url) ? 0.75 : 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px" }}>
                           <span className="tabular-nums" style={{ color: "var(--accent-ink)", fontWeight: 600, fontSize: "13px" }}>
                             1. {selectedProjectForView.stage1Title || 'مرحلة التحضير'}
                           </span>
-                          <span style={{ fontSize: "10.5px", fontWeight: 500, padding: "2px 6px", borderRadius: "6px", background: stage1Url ? "rgba(16, 185, 129, 0.16)" : "rgba(245, 158, 11, 0.16)", color: stage1Url ? "var(--success-ink)" : "var(--warning-ink)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                            {stage1Url ? <Check size={11} strokeWidth={1.5} /> : <Clock size={11} strokeWidth={1.5} />}
-                            <span>{stage1Url ? "تم التسليم" : "مطلوب"}</span>
+                          <span style={{
+                            fontSize: "10.5px",
+                            fontWeight: 500,
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            background: stage1Url ? "rgba(16, 185, 129, 0.16)" : !stage1Enabled ? "var(--surface)" : "rgba(245, 158, 11, 0.16)",
+                            color: stage1Url ? "var(--success-ink)" : !stage1Enabled ? "var(--text-muted)" : "var(--warning-ink)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}>
+                            {stage1Url ? <Check size={11} strokeWidth={1.5} /> : !stage1Enabled ? <Lock size={11} strokeWidth={1.5} /> : <Clock size={11} strokeWidth={1.5} />}
+                            <span>{stage1Url ? "تم التسليم" : !stage1Enabled ? "غير مفعّلة حالياً" : "مطلوب"}</span>
                           </span>
                         </div>
 
@@ -720,6 +814,11 @@ export default function StudentProjectsTab({
                               <Check size={13} strokeWidth={1.5} />
                               <span>تم رفع صورة مرحلة التحضير بنجاح</span>
                             </div>
+                          </div>
+                        ) : !stage1Enabled ? (
+                          <div style={{ background: "var(--surface)", border: "1px dashed var(--border-light)", borderRadius: "8px", padding: "18px 12px", textAlign: "center", color: "var(--text-muted)", fontSize: "11.5px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <Lock size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                            <span>رفع المرحلة الأولى غير مفعل حالياً من أستاذ المقرر</span>
                           </div>
                         ) : isS1Expired ? (
                           <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "8px", padding: "14px", textAlign: "center" }}>
@@ -763,14 +862,25 @@ export default function StudentProjectsTab({
                         )}
                       </div>
 
-                      <div style={{ background: "var(--bg-deep)", border: "1px solid var(--border-light)", borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      {/* المرحلة 2 — منفصلة ومستقلة تماماً عن المرحلة الأولى */}
+                      <div style={{ background: "var(--bg-deep)", border: stage2Enabled ? "1px solid var(--border-light)" : "1px dashed var(--border)", borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px", opacity: (!stage2Enabled && !stage2Url) ? 0.75 : 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "6px" }}>
                           <span className="tabular-nums" style={{ color: "var(--success-ink)", fontWeight: 600, fontSize: "13px" }}>
                             2. {selectedProjectForView.stage2Title || 'العمل النهائي'}
                           </span>
-                          <span style={{ fontSize: "10.5px", fontWeight: 500, padding: "2px 6px", borderRadius: "6px", background: stage2Url ? "rgba(16, 185, 129, 0.16)" : "rgba(245, 158, 11, 0.16)", color: stage2Url ? "var(--success-ink)" : "var(--warning-ink)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                            {stage2Url ? <Check size={11} strokeWidth={1.5} /> : <Clock size={11} strokeWidth={1.5} />}
-                            <span>{stage2Url ? "تم التسليم" : "مطلوب"}</span>
+                          <span style={{
+                            fontSize: "10.5px",
+                            fontWeight: 500,
+                            padding: "2px 6px",
+                            borderRadius: "6px",
+                            background: stage2Url ? "rgba(16, 185, 129, 0.16)" : !stage2Enabled ? "var(--surface)" : "rgba(245, 158, 11, 0.16)",
+                            color: stage2Url ? "var(--success-ink)" : !stage2Enabled ? "var(--text-muted)" : "var(--warning-ink)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}>
+                            {stage2Url ? <Check size={11} strokeWidth={1.5} /> : !stage2Enabled ? <Lock size={11} strokeWidth={1.5} /> : <Clock size={11} strokeWidth={1.5} />}
+                            <span>{stage2Url ? "تم التسليم" : !stage2Enabled ? "غير مفعّلة حالياً" : "مطلوب"}</span>
                           </span>
                         </div>
 
@@ -791,10 +901,10 @@ export default function StudentProjectsTab({
                               <span>تم رفع صورة العمل النهائي المكتمل</span>
                             </div>
                           </div>
-                        ) : !stage1Url ? (
-                          <div style={{ background: "var(--surface)", border: "1px dashed var(--border-light)", borderRadius: "8px", padding: "20px 12px", textAlign: "center", color: "var(--text-secondary)", fontSize: "11.5px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                            <Clock size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
-                            <span>يتطلب تصوير ورفع المرحلة الأولى أولاً لفتح المرحلة الثانية</span>
+                        ) : !stage2Enabled ? (
+                          <div style={{ background: "var(--surface)", border: "1px dashed var(--border-light)", borderRadius: "8px", padding: "18px 12px", textAlign: "center", color: "var(--text-muted)", fontSize: "11.5px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                            <Lock size={14} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                            <span>رفع المرحلة الثانية غير مفعل حالياً من أستاذ المقرر</span>
                           </div>
                         ) : isS2Expired ? (
                           <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "8px", padding: "14px", textAlign: "center" }}>
@@ -832,7 +942,7 @@ export default function StudentProjectsTab({
                               }}
                             >
                               <Camera size={16} strokeWidth={1.5} />
-                              <span>تصوير ورفع المرحلة النهائية</span>
+                              <span>تصوير ورفع المرحلة الثانية</span>
                             </button>
                           </div>
                         )}
@@ -853,19 +963,19 @@ export default function StudentProjectsTab({
                           <span>تم اعتماد تقييم المشروع ومراحله رسمياً</span>
                         </div>
                       </div>
-                    ) : stage1Url && stage2Url ? (
+                    ) : (stage1Url || stage2Url) && !selectedProjectForView.isScoreLockedByUpload ? (
                       <div style={{ background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "12px", padding: "14px", textAlign: "center", display: "flex", flexDirection: "column", gap: "6px" }}>
                         <div style={{ color: "var(--accent-ink)", fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                           <Clock size={15} strokeWidth={1.5} />
-                          <span>قيد التقييم (تم تسليم المرحلتين بنجاح)</span>
+                          <span>قيد التقييم (تم حفظ الصور المرفوعة بنجاح)</span>
                         </div>
                         <div style={{ color: "var(--text-secondary)", fontSize: "12px", lineHeight: 1.55 }}>
-                          تم حفظ مرحلتي عملك الفني بالسحابة، والمشروع الآن بانتظار المراجعة والتقييم ورصد الدرجة من أستاذ المقرر.
+                          تم حفظ صور عملك الفني بالسحابة، والمشروع بانتظار المراجعة والتقييم ورصد الدرجة من أستاذ المقرر.
                         </div>
                       </div>
                     ) : (
                       <div style={{ color: "var(--text-muted)", fontSize: "11.5px", textAlign: "center", borderTop: "1px solid var(--border)", paddingTop: "8px" }}>
-                        يرجى الالتزام بمواعيد تسليم كل مرحلة لضمان احتساب درجات المشروع كاملة.
+                        كل مرحلة منفصلة ومستقلة، ويمكنك رفع المرحلة المفعّلة مباشرة لإظهار درجة المشروع.
                       </div>
                     )}
                   </div>
@@ -873,7 +983,7 @@ export default function StudentProjectsTab({
               }
 
               const singleDead = selectedProjectForView.submissionDeadline;
-              const isSingleExpired = singleDead ? new Date(singleDead).getTime() < now : false;
+              const isSingleExpired = (singleDead ? new Date(singleDead).getTime() < now : false) && !selectedProjectForView.isScoreLockedByUpload;
               const singleCd = formatRemainingTime(singleDead);
 
               if (selectedProjectForView.isSubmitted) {
@@ -980,7 +1090,7 @@ export default function StudentProjectsTab({
 
                     <div style={{ color: "var(--text-muted)", fontSize: "11.5px", textAlign: "center", borderTop: "1px solid var(--border)", paddingTop: "10px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                       <Lock size={13} strokeWidth={1.5} style={{ flexShrink: 0 }} />
-                      <span>تم قفل خيار الرفع لمنع التكرار. في حال الرغبة في إعادة التصوير، يرجى مراجعة أستاذ المقرر لفك القفل.</span>
+                      <span>تم قفل خيار الرفع لمنع التكرار، والصورة المرفوعة لا يمكن حذفها إلا بمراجعة أستاذ المقرر.</span>
                     </div>
                   </div>
                 );
@@ -1005,6 +1115,9 @@ export default function StudentProjectsTab({
 
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px", textAlign: "center", padding: "8px 0" }}>
+                  {gradeRequirementBanner}
+                  {nonDeletableWarningBanner}
+
                   <div style={{ display: "flex", justifyContent: "center", color: "var(--accent-ink)" }}>
                     <Camera size={36} strokeWidth={1.5} />
                   </div>

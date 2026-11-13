@@ -404,8 +404,10 @@ export async function GET(request: Request) {
           const requiredPhotos = proj.required_photos || (cameraMode === '3d' ? 2 : 1);
           const submissionDeadline = proj.submission_deadline || proj.end_date || null;
           const multiStageEnabled = !!proj.multi_stage_enabled;
+          const stage1Enabled = proj.stage1_enabled !== false;
           const stage1Title = proj.stage1_title || 'مرحلة التجهيز والتحضير';
           const stage1Deadline = proj.stage1_deadline || null;
+          const stage2Enabled = proj.stage2_enabled !== false;
           const stage2Title = proj.stage2_title || 'العمل النهائي المكتمل';
           const stage2Deadline = proj.stage2_deadline || null;
 
@@ -422,18 +424,28 @@ export async function GET(request: Request) {
           const hasValidImage = hasSubImages || hasPhotoUrl;
 
           const hasStage1Image = hasValidImage && (
-            subImgList.some((img: any) => img.stage === 'stage1' || !img.stage) ||
-            hasPhotoUrl
+            subImgList.some((img: any) => typeof img === 'string' || img?.stage === 'stage1' || !img?.stage) ||
+            (hasPhotoUrl && subImgList.length === 0)
           );
-          const hasStage2Image = hasValidImage && subImgList.some((img: any) => img.stage === 'stage2');
+          const hasStage2Image = hasValidImage && subImgList.some((img: any) => typeof img === 'object' && img?.stage === 'stage2');
 
-          const isGraded = !!(ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0);
-          const isSubmitted = isGraded || (hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated'));
-          const isFullySubmitted = multiStageEnabled ? (hasStage1Image && hasStage2Image) : isSubmitted;
+          // شرط أساسي لظهور الدرجة: أن يكون الطالب قد رفع الصورة المطلوبة فعلياً
+          const uploadSatisfiedForGrade = multiStageEnabled
+            ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
+            : hasValidImage;
 
-          const safeEval = ev ? {
+          const hasRecordedGrade = !!(ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0);
+          const isScoreLockedByUpload = hasRecordedGrade && !uploadSatisfiedForGrade;
+          const isGraded = hasRecordedGrade && uploadSatisfiedForGrade;
+
+          const isSubmitted = hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated' || hasPhotoUrl);
+          const isFullySubmitted = multiStageEnabled
+            ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
+            : isSubmitted;
+
+          const safeEval = isGraded && ev ? {
             ...ev,
-            score: isGraded ? Number(ev.score) : null
+            score: Number(ev.score)
           } : null;
 
           // تجهيز صور التسليم الموحدة
@@ -450,13 +462,17 @@ export async function GET(request: Request) {
             requiredPhotos,
             submissionDeadline,
             multiStageEnabled,
+            stage1Enabled,
             stage1Title,
             stage1Deadline,
+            stage2Enabled,
             stage2Title,
             stage2Deadline,
             hasStage1Image,
             hasStage2Image,
+            isSubmitted,
             isFullySubmitted,
+            isScoreLockedByUpload,
             submission: submissionObj,
             evaluation: safeEval,
             score: isGraded ? Number(ev.score) : null,

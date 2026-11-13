@@ -61,3 +61,5 @@ android-student/app/build/
 android-student/build/
 android-student/.gradle/
 android-student/local.properties
+
+.agents/

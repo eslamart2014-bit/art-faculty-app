@@ -1,8 +1,10 @@
 import { compareDHashes } from '@/lib/students/imageCompressor';
+import { unpackArtSignature, matchArtSignatures } from '@/lib/art-vision/engine';
 
 export interface ImageItem {
   url: string;
   dhash?: string;
+  art_sig?: string;
   stage?: string;
   stage_title?: string;
   [key: string]: any;
@@ -216,9 +218,10 @@ export async function checkAndNotifyPlagiarism(
       ...img,
       url: normalizeImgUrl(img.url),
       dhash: (img.dhash || '').replace(/^hash:/i, '').trim(),
+      art_sig: (img.art_sig || '').trim(),
     }));
 
-    const hasAnyHashOrUrl = currentImgs.some(img => img.dhash || img.url);
+    const hasAnyHashOrUrl = currentImgs.some(img => img.dhash || img.art_sig || img.url);
     if (!hasAnyHashOrUrl) {
       return { detected: false };
     }
@@ -260,6 +263,7 @@ export async function checkAndNotifyPlagiarism(
               ? ps.images.map((img: any) => ({
                   url: normalizeImgUrl(img.url),
                   dhash: (img.dhash || '').replace(/^hash:/i, '').trim(),
+                  art_sig: (img.art_sig || '').trim(),
                 }))
               : [],
             created_at: ps.created_at,
@@ -320,7 +324,25 @@ export async function checkAndNotifyPlagiarism(
 
       for (const curImg of currentImgs) {
         for (const candImg of cand.images) {
-          // مقارنة dHash
+          // 1. مطابقة Art Vision الهندسية المتقدمة (ORB + RANSAC)
+          if (curImg.art_sig && candImg.art_sig) {
+            const sigA = unpackArtSignature(curImg.art_sig);
+            const sigB = unpackArtSignature(candImg.art_sig);
+            if (sigA && sigB) {
+              const res = matchArtSignatures(sigA, sigB);
+              if (res.similarity > highestSimilarity) {
+                highestSimilarity = res.similarity;
+                bestMatchCandidate = cand;
+                matchedNewImgUrl = curImg.url;
+                matchedCandImgUrl = candImg.url;
+                const viewLabel = res.viewChange === 'strong' ? '(زاوية حادة)' : res.viewChange === 'mild' ? '(زاوية خفيفة)' : '';
+                const rotLabel = res.rotated ? ' + دوران' : '';
+                matchReason = `تطابق هندسي متقدم (Art Vision) بنسبة ${res.similarity}% — ${res.inliers} نقطة متطابقة ${viewLabel}${rotLabel}`;
+              }
+            }
+          }
+
+          // 2. مقارنة dHash الاحتياطية
           if (curImg.dhash && candImg.dhash) {
             const { similarityPercent } = compareDHashes(curImg.dhash, candImg.dhash);
             if (similarityPercent > highestSimilarity) {
@@ -332,7 +354,7 @@ export async function checkAndNotifyPlagiarism(
             }
           }
 
-          // فحص تطابق رابط وملف الصورة بالكامل
+          // 3. فحص تطابق رابط وملف الصورة بالكامل
           if (curImg.url && candImg.url && curImg.url === candImg.url) {
             highestSimilarity = 100;
             bestMatchCandidate = cand;

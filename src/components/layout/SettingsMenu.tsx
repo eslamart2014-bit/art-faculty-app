@@ -41,11 +41,11 @@ export default function SettingsMenu({
     window.history.pushState({ modal: true }, "");
   }, []);
 
-  const [appVersion, setAppVersion] = useState("4.0.0");
+  const [appVersion, setAppVersion] = useState("4.0.1");
 
   useEffect(() => {
     if (isOpen) {
-      setAppVersion(localStorage.getItem("appVersion") || "4.0.0");
+      setAppVersion(localStorage.getItem("appVersion") || "4.0.1");
     }
   }, [isOpen]);
 

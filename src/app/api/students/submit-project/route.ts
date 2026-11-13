@@ -75,6 +75,23 @@ export async function POST(request: Request) {
     const projectsList = courseRecord?.custom_week_names?.__projects__ || [];
     const matchedProj = projectsList.find((p: any) => (p.name || p.title || '').trim() === project_name.trim());
 
+    let existingEval: any = null;
+    try {
+      const { data: evData } = await supabaseAdmin
+        .from('evaluations')
+        .select('score')
+        .eq('course_id', course_id)
+        .eq('student_id', studentRecord.id)
+        .eq('project_name', project_name)
+        .maybeSingle();
+      existingEval = evData;
+    } catch (e) {}
+
+    const existingScore =
+      existingEval && existingEval.score !== null && existingEval.score !== undefined && !isNaN(Number(existingEval.score)) && Number(existingEval.score) > 0
+        ? Number(existingEval.score)
+        : null;
+
     if (matchedProj) {
       if (matchedProj.portal_enabled === false || matchedProj.is_active === false) {
         return noStoreJson(
@@ -86,14 +103,26 @@ export async function POST(request: Request) {
       const now = Date.now();
       if (matchedProj.multi_stage_enabled) {
         if (stage === 'stage2') {
-          if (matchedProj.stage2_deadline && new Date(matchedProj.stage2_deadline).getTime() < now) {
+          if (matchedProj.stage2_enabled === false) {
+            return noStoreJson(
+              { error: 'رفع المرحلة الثانية لهذا المشروع غير مفعل حالياً من قِبل أستاذ المقرر.' },
+              { status: 403 }
+            );
+          }
+          if (matchedProj.stage2_deadline && new Date(matchedProj.stage2_deadline).getTime() < now && existingScore === null) {
             return noStoreJson(
               { error: 'انتهت المهلة المحددة لرفع المرحلة الثانية من هذا العمل الفني.' },
               { status: 403 }
             );
           }
         } else {
-          if (matchedProj.stage1_deadline && new Date(matchedProj.stage1_deadline).getTime() < now) {
+          if (matchedProj.stage1_enabled === false) {
+            return noStoreJson(
+              { error: 'رفع المرحلة الأولى لهذا المشروع غير مفعل حالياً من قِبل أستاذ المقرر.' },
+              { status: 403 }
+            );
+          }
+          if (matchedProj.stage1_deadline && new Date(matchedProj.stage1_deadline).getTime() < now && existingScore === null) {
             return noStoreJson(
               { error: 'انتهت المهلة المحددة لرفع المرحلة الأولى من هذا العمل الفني.' },
               { status: 403 }
@@ -102,7 +131,7 @@ export async function POST(request: Request) {
         }
       } else {
         const deadline = matchedProj.submission_deadline || matchedProj.end_date;
-        if (deadline && new Date(deadline).getTime() < now) {
+        if (deadline && new Date(deadline).getTime() < now && existingScore === null) {
           return noStoreJson(
             { error: 'انتهت المهلة الزمنية المحددة لرفع صور هذا المشروع من أستاذ المقرر.' },
             { status: 403 }
@@ -129,7 +158,7 @@ export async function POST(request: Request) {
     }
 
     const isMultiStage = !!matchedProj?.multi_stage_enabled;
-    const isUploadingStage2 = isMultiStage && stage === 'stage2';
+    const targetStage = isMultiStage ? (stage === 'stage2' ? 'stage2' : 'stage1') : undefined;
 
     if (existingSub) {
       if (!isMultiStage) {
@@ -139,9 +168,9 @@ export async function POST(request: Request) {
         );
       }
 
-      if (isUploadingStage2) {
-        const existingImages = Array.isArray(existingSub.images) ? existingSub.images : [];
-        const alreadyHasStage2 = existingImages.some((img: any) => img.stage === 'stage2');
+      const existingImages = Array.isArray(existingSub.images) ? existingSub.images : [];
+      if (targetStage === 'stage2') {
+        const alreadyHasStage2 = existingImages.some((img: any) => typeof img === 'object' && img?.stage === 'stage2');
         if (alreadyHasStage2) {
           return noStoreJson(
             { error: 'لقد قمت برفع المرحلة الثانية مسبقاً لهذا المشروع! لا يمكن إعادة الرفع.' },
@@ -149,18 +178,21 @@ export async function POST(request: Request) {
           );
         }
       } else {
-        return noStoreJson(
-          { error: 'لقد قمت برفع المرحلة الأولى لهذا المشروع مسبقاً! يمكنك الآن رفع المرحلة الثانية.' },
-          { status: 403 }
-        );
+        const alreadyHasStage1 = existingImages.some((img: any) => typeof img === 'string' || img?.stage === 'stage1' || !img?.stage);
+        if (alreadyHasStage1) {
+          return noStoreJson(
+            { error: 'لقد قمت برفع المرحلة الأولى لهذا المشروع مسبقاً! يمكنك رفع المرحلة الثانية.' },
+            { status: 403 }
+          );
+        }
       }
     }
 
     const studentFullName = studentRecord.full_name || 'طالب';
     const processedImages: any[] = [];
-    const effectiveStage = isMultiStage ? (stage || 'stage1') : undefined;
+    const effectiveStage = targetStage;
     const effectiveStageTitle = isMultiStage
-      ? stage_title || (stage === 'stage2' ? matchedProj?.stage2_title || 'العمل النهائي' : matchedProj?.stage1_title || 'مرحلة التحضير')
+      ? stage_title || (targetStage === 'stage2' ? matchedProj?.stage2_title || 'العمل النهائي' : matchedProj?.stage1_title || 'مرحلة التحضير')
       : undefined;
 
     for (let i = 0; i < images.length; i++) {
@@ -190,6 +222,7 @@ export async function POST(request: Request) {
         stage: effectiveStage,
         stage_title: effectiveStageTitle,
         dhash: img.dhash || '',
+        art_sig: img.art_sig || '',
         width: img.width || 1200,
         height: img.height || 900,
         orientation: img.orientation || 'portrait',
@@ -200,15 +233,29 @@ export async function POST(request: Request) {
     const primaryPhotoUrl = processedImages[0]?.url || '';
     let newSub: any = null;
 
-    if (existingSub && isUploadingStage2) {
-      const oldImgs = Array.isArray(existingSub.images) ? existingSub.images : [];
-      const mergedImages = [...oldImgs, ...processedImages];
+    const mergedAllImages = existingSub
+      ? [...(Array.isArray(existingSub.images) ? existingSub.images : []), ...processedImages]
+      : processedImages;
+
+    const hasS1AfterUpload = mergedAllImages.some((img: any) => typeof img === 'string' || img?.stage === 'stage1' || !img?.stage);
+    const hasS2AfterUpload = mergedAllImages.some((img: any) => typeof img === 'object' && img?.stage === 'stage2');
+    const stage1Enabled = matchedProj?.stage1_enabled !== false;
+    const stage2Enabled = matchedProj?.stage2_enabled !== false;
+    const uploadSatisfiedForGrade = isMultiStage
+      ? (stage2Enabled ? hasS2AfterUpload : (stage1Enabled ? hasS1AfterUpload : true))
+      : true;
+
+    const revealedScore = existingScore !== null && uploadSatisfiedForGrade ? existingScore : null;
+    const effectiveSubStatus = revealedScore !== null ? 'evaluated' : 'pending_evaluation';
+
+    if (existingSub && isMultiStage) {
       try {
         const { data: updatedSub } = await supabaseAdmin
           .from('student_submissions')
           .update({
-            images: mergedImages,
-            status: 'pending_evaluation',
+            images: mergedAllImages,
+            status: effectiveSubStatus,
+            ...(revealedScore !== null ? { score: revealedScore } : {}),
           })
           .eq('id', existingSub.id)
           .select('*')
@@ -217,7 +264,7 @@ export async function POST(request: Request) {
       } catch (e) {}
 
       if (!newSub) {
-        newSub = { ...existingSub, images: mergedImages };
+        newSub = { ...existingSub, images: mergedAllImages, status: effectiveSubStatus, ...(revealedScore !== null ? { score: revealedScore } : {}) };
       }
     } else {
       const subPayload = {
@@ -228,8 +275,8 @@ export async function POST(request: Request) {
         course_name,
         project_name,
         images: processedImages,
-        status: 'pending_evaluation',
-        score: null,
+        status: effectiveSubStatus,
+        score: revealedScore,
         created_at: new Date().toISOString(),
       };
 
@@ -248,19 +295,6 @@ export async function POST(request: Request) {
     }
 
     try {
-      const { data: existingEval } = await supabaseAdmin
-        .from('evaluations')
-        .select('score')
-        .eq('course_id', course_id)
-        .eq('student_id', studentRecord.id)
-        .eq('project_name', project_name)
-        .maybeSingle();
-
-      const existingScore =
-        existingEval && existingEval.score !== null && existingEval.score !== undefined
-          ? existingEval.score
-          : null;
-
       await supabaseAdmin.from('evaluations').upsert(
         {
           course_id,
@@ -313,8 +347,11 @@ export async function POST(request: Request) {
 
     return noStoreJson({
       success: true,
-      message: 'تم رفع العمل الفني بنجاح وهو الآن في انتظار التقييم!',
+      message: revealedScore !== null
+        ? `تم رفع العمل الفني بنجاح! وتم إظهار درجتك المرصودة: (${revealedScore})`
+        : 'تم رفع العمل الفني بنجاح وهو الآن في انتظار التقييم!',
       submission: newSub,
+      revealed_score: revealedScore,
     });
   } catch (err: any) {
     console.error('Submit project error:', err);
