@@ -350,30 +350,35 @@ export default function SystemPage() {
     (dashboardData?.projects || []).forEach((course: any) => {
       (course.assignedProjects || []).forEach((proj: any) => {
         const sub = proj.submission || (course.submissions || []).find((s: any) => (s.project_name || '').trim() === (proj.title || '').trim());
-        const ev = proj.evaluation;
+        const ev = proj.evaluation || (course.evaluations || []).find((e: any) => (e.project_name || '').trim() === (proj.title || '').trim());
         const subImgList = Array.isArray(sub?.images) ? sub.images : [];
         const hasValidImage = subImgList.some((img: any) => {
           const u = typeof img === 'string' ? img : img?.url;
           return !!u && !u.includes('undefined') && !u.includes('null') && !u.startsWith('/api/media/undefined');
         }) || (!!ev?.photo_url && !ev.photo_url.includes('undefined') && !ev.photo_url.includes('null'));
 
+        const portalEnabled = proj.portalEnabled !== false;
         const stage1Enabled = proj.stage1Enabled !== false;
         const stage2Enabled = proj.stage2Enabled !== false;
         const hasStage1Image = proj.hasStage1Image ?? (hasValidImage && (subImgList.some((i: any) => typeof i === 'string' || i?.stage === 'stage1' || !i?.stage) || (!!ev?.photo_url && subImgList.length === 0)));
         const hasStage2Image = proj.hasStage2Image ?? (hasValidImage && subImgList.some((i: any) => typeof i === 'object' && i?.stage === 'stage2'));
 
-        const uploadSatisfiedForGrade = proj.multiStageEnabled
-          ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
-          : hasValidImage;
+        const uploadSatisfiedForGrade = !portalEnabled
+          ? true
+          : (proj.multiStageEnabled
+              ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
+              : hasValidImage);
 
         const rawHasScore = !!((ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0) || (proj.score !== null && proj.score !== undefined && !isNaN(Number(proj.score)) && Number(proj.score) > 0 && proj.status === 'evaluated'));
         const isGraded = rawHasScore && uploadSatisfiedForGrade;
         const isScoreLockedByUpload = !!(proj.isScoreLockedByUpload || (rawHasScore && !uploadSatisfiedForGrade));
         const score = isGraded ? (ev?.score ?? proj.score) : null;
         const isSubmitted = hasValidImage;
-        const isFullySubmitted = proj.multiStageEnabled
-          ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
-          : isSubmitted;
+        const isFullySubmitted = !portalEnabled
+          ? (isSubmitted || isGraded)
+          : (proj.multiStageEnabled
+              ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
+              : isSubmitted);
 
         list.push({
           ...proj,
@@ -382,6 +387,7 @@ export default function SystemPage() {
           academicYear: course.academicYear,
           instructorTitle: course.instructorTitle || "أستاذ المقرر",
           instructorName: course.instructorName,
+          portalEnabled,
           submission: sub,
           evaluation: isGraded ? ev : null,
           stage1Enabled,
@@ -406,12 +412,16 @@ export default function SystemPage() {
   }, [allStudentProjects, projectCourseFilter]);
 
   const { requiredProjects, submittedProjects } = useMemo(() => {
-    const req = courseFilteredProjects.filter((p: any) => !p.isFullySubmitted);
-    const sub = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted);
+    const req = courseFilteredProjects.filter((p: any) => p.portalEnabled !== false && !p.isFullySubmitted);
+    const sub = courseFilteredProjects.filter((p: any) => p.isSubmitted || p.isFullySubmitted || p.isGraded || p.portalEnabled === false);
     return { requiredProjects: req, submittedProjects: sub };
   }, [courseFilteredProjects]);
 
-  const displayedProjects = projectSubTab === "required" ? requiredProjects : submittedProjects;
+  const effectiveProjectSubTab = (projectSubTab === "required" && requiredProjects.length === 0 && submittedProjects.length > 0)
+    ? "submitted"
+    : projectSubTab;
+
+  const displayedProjects = effectiveProjectSubTab === "required" ? requiredProjects : submittedProjects;
 
   // -------------------------------------------------------------
   // محرك الإشعارات الذكي وحساب الشارات الحمراء للتبويبات الـ 5
@@ -2517,7 +2527,7 @@ export default function SystemPage() {
             displayedProjects={displayedProjects}
             projectCourseFilter={projectCourseFilter}
             setProjectCourseFilter={setProjectCourseFilter}
-            projectSubTab={projectSubTab}
+            projectSubTab={effectiveProjectSubTab}
             setProjectSubTab={setProjectSubTab}
             unreadProjectsCount={unreadProjectsCount}
             unreadRequiredCount={unreadRequiredCount}

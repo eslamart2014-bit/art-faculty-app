@@ -258,7 +258,7 @@ export default function StudentProjectsTab({
               }}
             >
               <CheckCircle2 size={14} strokeWidth={1.5} />
-              <span>المشروعات المُسلَّمة</span>
+              <span>المشروعات المُسلَّمة والمُقيَّمة</span>
               <span className="tabular-nums" style={{
                 background: projectSubTab === "submitted" ? "var(--success)" : "var(--surface-hover)",
                 color: projectSubTab === "submitted" ? "#ffffff" : "var(--text-secondary)",
@@ -372,19 +372,29 @@ export default function StudentProjectsTab({
                           display: "inline-flex",
                           alignItems: "center",
                           gap: "4px",
-                          background: proj.multiStageEnabled 
+                          background: proj.portalEnabled === false
+                            ? (proj.isGraded ? "rgba(16, 185, 129, 0.14)" : "rgba(56, 189, 248, 0.12)")
+                            : proj.multiStageEnabled 
                             ? (proj.isFullySubmitted ? "rgba(16, 185, 129, 0.14)" : (proj.hasStage1Image || proj.hasStage2Image) ? "rgba(56, 189, 248, 0.14)" : "rgba(245, 158, 11, 0.14)")
                             : (proj.isSubmitted ? "rgba(16, 185, 129, 0.14)" : "rgba(245, 158, 11, 0.14)"),
-                          color: proj.multiStageEnabled
+                          color: proj.portalEnabled === false
+                            ? (proj.isGraded ? "var(--success-ink)" : "var(--accent-ink)")
+                            : proj.multiStageEnabled
                             ? (proj.isFullySubmitted ? "var(--success-ink)" : (proj.hasStage1Image || proj.hasStage2Image) ? "var(--accent-ink)" : "var(--warning-ink)")
                             : (proj.isSubmitted ? "var(--success-ink)" : "var(--warning-ink)"),
                           border: `1px solid ${
-                            proj.multiStageEnabled
+                            proj.portalEnabled === false
+                              ? (proj.isGraded ? "rgba(16, 185, 129, 0.35)" : "rgba(56, 189, 248, 0.3)")
+                              : proj.multiStageEnabled
                               ? (proj.isFullySubmitted ? "rgba(16, 185, 129, 0.35)" : (proj.hasStage1Image || proj.hasStage2Image) ? "rgba(56, 189, 248, 0.35)" : "rgba(245, 158, 11, 0.35)")
                               : (proj.isSubmitted ? "rgba(16, 185, 129, 0.35)" : "rgba(245, 158, 11, 0.35)")
                           }`
                         }}>
-                          {proj.multiStageEnabled
+                          {proj.portalEnabled === false
+                            ? (proj.isGraded
+                                ? <><Check size={12} strokeWidth={1.5} /><span>تم التقييم</span></>
+                                : <><Award size={12} strokeWidth={1.5} /><span>تقييم حضوري</span></>)
+                            : proj.multiStageEnabled
                             ? (proj.isFullySubmitted
                                 ? <><Check size={12} strokeWidth={1.5} /><span>مكتمل التسليم</span></>
                                 : (s2En && !proj.hasStage2Image && (!s1En || proj.hasStage1Image))
@@ -492,6 +502,22 @@ export default function StudentProjectsTab({
                         }}>
                           <Clock size={13} strokeWidth={1.5} />
                           <span>قيد التقييم (بانتظار رصد الدرجة)</span>
+                        </div>
+                      ) : proj.portalEnabled === false ? (
+                        <div style={{
+                          background: "var(--bg-deep)",
+                          border: "1px dashed var(--border-light)",
+                          borderRadius: "8px",
+                          padding: "7px 10px",
+                          color: "var(--text-secondary)",
+                          fontSize: "11.5px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px"
+                        }}>
+                          <Award size={13} strokeWidth={1.5} />
+                          <span>تقييم حضوري بالسكشن (غير مطلوب رفع صورة)</span>
                         </div>
                       ) : proj.multiStageEnabled ? (
                         <div style={{
@@ -625,12 +651,12 @@ export default function StudentProjectsTab({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "4px",
-                background: selectedProjectForView.isSubmitted ? "rgba(16, 185, 129, 0.14)" : "rgba(245, 158, 11, 0.14)",
-                color: selectedProjectForView.isSubmitted ? "var(--success-ink)" : "var(--warning-ink)",
-                border: selectedProjectForView.isSubmitted ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)"
+                background: (selectedProjectForView.isSubmitted || selectedProjectForView.isGraded) ? "rgba(16, 185, 129, 0.14)" : "rgba(245, 158, 11, 0.14)",
+                color: (selectedProjectForView.isSubmitted || selectedProjectForView.isGraded) ? "var(--success-ink)" : "var(--warning-ink)",
+                border: (selectedProjectForView.isSubmitted || selectedProjectForView.isGraded) ? "1px solid rgba(16, 185, 129, 0.35)" : "1px solid rgba(245, 158, 11, 0.35)"
               }}>
-                {selectedProjectForView.isSubmitted ? <Check size={13} strokeWidth={1.5} /> : <Clock size={13} strokeWidth={1.5} />}
-                <span>{selectedProjectForView.isSubmitted ? "تم الرفع" : "بانتظار الرفع"}</span>
+                {(selectedProjectForView.isSubmitted || selectedProjectForView.isGraded) ? <Check size={13} strokeWidth={1.5} /> : <Clock size={13} strokeWidth={1.5} />}
+                <span>{selectedProjectForView.isSubmitted ? "تم الرفع" : selectedProjectForView.isGraded ? "تم التقييم" : selectedProjectForView.portalEnabled === false ? "تقييم حضوري" : "بانتظار الرفع"}</span>
               </span>
             </div>
 
@@ -1092,6 +1118,56 @@ export default function StudentProjectsTab({
                       <Lock size={13} strokeWidth={1.5} style={{ flexShrink: 0 }} />
                       <span>تم قفل خيار الرفع لمنع التكرار، والصورة المرفوعة لا يمكن حذفها إلا بمراجعة أستاذ المقرر.</span>
                     </div>
+                  </div>
+                );
+              }
+
+              if (selectedProjectForView.portalEnabled === false) {
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    {selectedProjectForView.isGraded ? (
+                      <div style={{
+                        background: "rgba(16, 185, 129, 0.1)",
+                        border: "1.5px solid var(--success)",
+                        borderRadius: "12px",
+                        padding: "18px 16px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px"
+                      }}>
+                        <div style={{ color: "var(--success-ink)", fontWeight: 600, fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <Award size={18} strokeWidth={1.5} />
+                          <span>الدرجة المرصودة:</span>
+                          <span className="tabular-nums" style={{ fontSize: "18px", color: "#ffffff", background: "var(--success)", padding: "2px 12px", borderRadius: "6px", fontWeight: 600 }}>
+                            {selectedProjectForView.score} من {selectedProjectForView.maxScore}
+                          </span>
+                        </div>
+                        <div style={{ color: "var(--success-ink)", fontSize: "12px", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                          <Check size={14} strokeWidth={1.5} />
+                          <span>تم تقييم هذا المشروع حضورياً واعتماده رسمياً من أستاذ المقرر</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        background: "rgba(56, 189, 248, 0.08)",
+                        border: "1px solid rgba(56, 189, 248, 0.3)",
+                        borderRadius: "12px",
+                        padding: "18px 16px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px"
+                      }}>
+                        <div style={{ color: "var(--accent-ink)", fontWeight: 600, fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                          <Award size={16} strokeWidth={1.5} />
+                          <span>تقييم حضوري مباشر بالسكشن</span>
+                        </div>
+                        <div style={{ color: "var(--text-secondary)", fontSize: "12px", lineHeight: 1.6 }}>
+                          يتم تقييم هذا المشروع حضورياً بواسطة أستاذ المقرر عبر مسح الكارنيه (QR) دون الحاجة لرفع صورة عبر البوابة.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               }

@@ -1,5 +1,5 @@
-// Service Worker v4.0.1 - Next.js offline shell (authenticated routes & localhost are network-only)
-const CACHE_VERSION = 'v4.0.1';
+// Service Worker v4.0.2 - Next.js offline shell (authenticated routes & localhost are network-only)
+const CACHE_VERSION = 'v4.0.2';
 const STATIC_CACHE = 'art-edu-static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'art-edu-dynamic-' + CACHE_VERSION;
 

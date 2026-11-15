@@ -844,8 +844,12 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
     const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
-      const updatedMakeup = [...(course.makeup_students || []), globalStudent.id];
+      const updatedMakeup = Array.from(new Set([...(course.makeup_students || []), globalStudent.id]));
       await supabase.from("courses").update({ makeup_students: updatedMakeup }).eq("id", course.id);
+      if (globalStudent.is_active === false) {
+        await supabase.from("students").update({ is_active: true }).eq("id", globalStudent.id);
+        globalStudent.is_active = true;
+      }
       setCourse({ ...course, makeup_students: updatedMakeup });
       vibrateSuccess();
       return globalStudent;
@@ -1092,25 +1096,21 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       // 2. Mark attendance if checked
       if (markAttendanceWithEval) {
         const today = getTodayLocalDateStr();
-        const { data: existingAtt } = await supabase.from("attendance")
-          .select("id, status")
-          .eq("course_id", course.id)
-          .eq("student_id", student.id)
-          .eq("date", today)
-          .maybeSingle();
+        await supabase.from("attendance").upsert({
+          course_id: course.id,
+          student_id: student.id,
+          date: today,
+          status: "حاضر",
+          teacher_id: course.teacher_id
+        }, { onConflict: 'course_id,student_id,date' });
 
-        if (existingAtt) {
-          if (existingAtt.status !== "حاضر") {
-            await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existingAtt.id);
-          }
-        } else {
-          await supabase.from("attendance").insert({
-            course_id: course.id,
-            student_id: student.id,
-            date: today,
-            status: "حاضر",
-            teacher_id: course.teacher_id
-          });
+        const cachedAtt = getLocalCache(`cache_attendance_${course.id}`);
+        if (cachedAtt && Array.isArray(cachedAtt.attendance)) {
+          const existsInCache = cachedAtt.attendance.some((a: any) => String(a.student_id) === String(student.id) && a.date === today);
+          cachedAtt.attendance = existsInCache
+            ? cachedAtt.attendance.map((a: any) => (String(a.student_id) === String(student.id) && a.date === today ? { ...a, status: "حاضر" } : a))
+            : [...cachedAtt.attendance, { id: "temp_" + student.id + "_" + Date.now(), course_id: course.id, student_id: student.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
+          setLocalCache(`cache_attendance_${course.id}`, cachedAtt);
         }
       }
 
@@ -1216,20 +1216,7 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         status: "حاضر",
         teacher_id: course.teacher_id
       }));
-      for (const s of scannedStudents) {
-        const { data: existingAtt } = await supabase.from("attendance").select("id, status").eq("course_id", course.id).eq("student_id", s.student.id).eq("date", today).maybeSingle();
-        if (existingAtt) {
-          if (existingAtt.status !== "حاضر") { await supabase.from("attendance").update({ status: "حاضر", created_at: new Date().toISOString() }).eq("id", existingAtt.id); }
-        } else {
-          await supabase.from("attendance").insert({
-            course_id: course.id,
-            student_id: s.student.id,
-            date: today,
-            status: "حاضر",
-            teacher_id: course.teacher_id
-          });
-        }
-      }
+      await supabase.from("attendance").upsert(attInserts, { onConflict: 'course_id,student_id,date' });
     }
 
     vibrateSuccess();
@@ -1323,6 +1310,26 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       score: scoreNum,
       teacher_id: course.teacher_id
     }, { onConflict: 'course_id,student_id,project_name' });
+
+    if (markAttendanceWithEval) {
+      const today = getTodayLocalDateStr();
+      await supabase.from("attendance").upsert({
+        course_id: course.id,
+        student_id: targetStudent.id,
+        date: today,
+        status: "حاضر",
+        teacher_id: course.teacher_id
+      }, { onConflict: 'course_id,student_id,date' });
+
+      const cachedAtt = getLocalCache(`cache_attendance_${course.id}`);
+      if (cachedAtt && Array.isArray(cachedAtt.attendance)) {
+        const existsInCache = cachedAtt.attendance.some((a: any) => String(a.student_id) === String(targetStudent.id) && a.date === today);
+        cachedAtt.attendance = existsInCache
+          ? cachedAtt.attendance.map((a: any) => (String(a.student_id) === String(targetStudent.id) && a.date === today ? { ...a, status: "حاضر" } : a))
+          : [...cachedAtt.attendance, { id: "temp_" + targetStudent.id + "_" + Date.now(), course_id: course.id, student_id: targetStudent.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
+        setLocalCache(`cache_attendance_${course.id}`, cachedAtt);
+      }
+    }
     try {
       fetch('/api/push/notify-evaluation', {
         method: 'POST',

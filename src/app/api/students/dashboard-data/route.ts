@@ -233,18 +233,6 @@ export async function GET(request: Request) {
     const safeTeacherEvals = (teacherEvals || []).filter((e: any) => activeCourseIds.has(e.course_id));
     const safeStudentSubmissions = studentSubmissions.filter((s: any) => activeCourseIds.has(s.course_id));
 
-    // جلب جميع تواريخ الحضور للمقررات النشطة لحساب إجمالي الأسابيع الفعلية
-    const { data: allCourseAttendance } = await supabaseAdmin
-      .from('attendance')
-      .select('course_id, date')
-      .in('course_id', Array.from(activeCourseIds));
-
-    const courseDatesMap = new Map<string, Set<string>>();
-    (allCourseAttendance || []).forEach((r: any) => {
-      if (!courseDatesMap.has(r.course_id)) courseDatesMap.set(r.course_id, new Set());
-      courseDatesMap.get(r.course_id)!.add(r.date);
-    });
-
     // جلب ملفات الأساتذة والمعيدين للحصول على درجاتهم الأكاديمية الدقيقة (يشمل المدرسين والمشاركين)
     const teacherIds = Array.from(new Set(
       allCourses.flatMap((c: any) => [c.teacher_id, ...(c.shared_with || [])]).filter(Boolean)
@@ -329,6 +317,29 @@ export async function GET(request: Request) {
       return true;
     });
 
+    // جلب جميع تواريخ الحضور للمقررات المطابقة للطالب مع دعم Pagination لتفادي سقف 1000 صف
+    const courseDatesMap = new Map<string, Set<string>>();
+    const matchedCourseIds = matchedCourses.map((c: any) => c.id);
+    if (matchedCourseIds.length > 0) {
+      let fromIdx = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: attPage, error: attPageErr } = await supabaseAdmin
+          .from('attendance')
+          .select('course_id, date')
+          .in('course_id', matchedCourseIds)
+          .order('id', { ascending: true })
+          .range(fromIdx, fromIdx + pageSize - 1);
+        if (attPageErr || !attPage || attPage.length === 0) break;
+        attPage.forEach((r: any) => {
+          if (!courseDatesMap.has(r.course_id)) courseDatesMap.set(r.course_id, new Set());
+          courseDatesMap.get(r.course_id)!.add(r.date);
+        });
+        if (attPage.length < pageSize) break;
+        fromIdx += pageSize;
+      }
+    }
+
     // 6. تجميع الحضور لكل مقرر مع تنسيق التواريخ التفصيلية وبيانات أستاذ المقرر
     const attendanceByCourse = matchedCourses.map((course: any) => {
       const records = safeAttendanceRecords.filter((r: any) => r.course_id === course.id);
@@ -394,12 +405,15 @@ export async function GET(request: Request) {
       const { instructorName, instructorDegree, instructorTitle } = buildCourseInstructorInfo(course);
 
       // استخراج المشاريع المعتمدة التي حددها الأستاذ في custom_week_names.__projects__
+      // تشمل المشاريع المفعّل لها رفع الصور وكذلك التقييمات الحضورية المباشرة (غير المؤرشفة)
       const rawAssigned = course.custom_week_names?.__projects__ || [];
       const assignedProjects = rawAssigned
-        .filter((p: any) => !p.is_archived && p.portal_enabled !== false && p.is_active !== false)
+        .filter((p: any) => !p.is_archived)
         .map((proj: any) => {
           const pTitle = (proj.title || proj.name || 'مشروع فني').trim();
           const pScore = proj.max_score || proj.maxScore || 10;
+          const portalEnabled = proj.portal_enabled !== false && proj.is_active !== false;
+          const showScore = proj.show_score !== false;
           const cameraMode = proj.camera_mode || '2d';
           const requiredPhotos = proj.required_photos || (cameraMode === '3d' ? 2 : 1);
           const submissionDeadline = proj.submission_deadline || proj.end_date || null;
@@ -429,19 +443,25 @@ export async function GET(request: Request) {
           );
           const hasStage2Image = hasValidImage && subImgList.some((img: any) => typeof img === 'object' && img?.stage === 'stage2');
 
-          // شرط أساسي لظهور الدرجة: أن يكون الطالب قد رفع الصورة المطلوبة فعلياً
-          const uploadSatisfiedForGrade = multiStageEnabled
-            ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
-            : hasValidImage;
+          // شرط أساسي لظهور الدرجة عندما يكون استقبال الصور مفعّلاً للمشروع (portalEnabled):
+          // إذا لم يكن استقبال الصور مفعّلاً (تقييم حضوري بالـ QR كما في مقرر التصميم)، تظهر الدرجة مباشرة.
+          // أما إذا فعّل الأستاذ استقبال الصور، فيُشترط رفع الصورة لإظهار الدرجة.
+          const uploadSatisfiedForGrade = !portalEnabled
+            ? true
+            : (multiStageEnabled
+                ? (stage2Enabled ? hasStage2Image : (stage1Enabled ? hasStage1Image : hasValidImage))
+                : hasValidImage);
 
           const hasRecordedGrade = !!(ev && ev.score !== null && ev.score !== undefined && !isNaN(Number(ev.score)) && Number(ev.score) > 0);
           const isScoreLockedByUpload = hasRecordedGrade && !uploadSatisfiedForGrade;
           const isGraded = hasRecordedGrade && uploadSatisfiedForGrade;
 
           const isSubmitted = hasValidImage && (sub?.status === 'submitted' || sub?.status === 'pending_evaluation' || sub?.status === 'evaluated' || hasPhotoUrl);
-          const isFullySubmitted = multiStageEnabled
-            ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
-            : isSubmitted;
+          const isFullySubmitted = !portalEnabled
+            ? (isSubmitted || isGraded)
+            : (multiStageEnabled
+                ? ((stage1Enabled ? hasStage1Image : true) && (stage2Enabled ? hasStage2Image : true) && ((stage1Enabled || stage2Enabled) ? true : hasValidImage))
+                : isSubmitted);
 
           const safeEval = isGraded && ev ? {
             ...ev,
@@ -458,6 +478,8 @@ export async function GET(request: Request) {
             id: proj.id || pTitle,
             title: pTitle,
             maxScore: pScore,
+            portalEnabled,
+            showScore,
             cameraMode,
             requiredPhotos,
             submissionDeadline,

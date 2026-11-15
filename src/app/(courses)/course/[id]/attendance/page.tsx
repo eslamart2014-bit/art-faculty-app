@@ -59,6 +59,22 @@ const getEffectiveSaveDate = (weekKey: string) => {
   return weekKey;
 };
 
+async function fetchAllSupabaseRows<T = any>(
+  queryFactory: (from: number, to: number) => any,
+  pageSize = 1000
+): Promise<T[]> {
+  let all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await queryFactory(from, from + pageSize - 1);
+    if (error || !data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 export default function AttendancePage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -321,13 +337,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     window.addEventListener('refreshData', handleRefresh);
     return () => window.removeEventListener('refreshData', handleRefresh);
   }, [course, selectedWeekKey]);
+  // تتبع الطلاب الذين قام الأستاذ بإلغاء تحديدهم يدوياً في هذه الجلسة فقط لمنع الحذف الخاطئ لتحضير الكاميرا أو الزميل المشارك
+  const manuallyUncheckedIdsRef = useRef<Set<string>>(new Set());
+
   const fetchData = async () => {
     // Silent background fetch — NEVER block screen with a loading spinner if course exists
     if (!course && !currentCourse) setLoading(true);
     
     try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), 2500)
+      const makeTimeout = (ms = 10000) => new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OFFLINE_TIMEOUT")), ms)
       );
 
       const [courseRes, termsData] = await Promise.race([
@@ -337,7 +356,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             .then((r) => (r.ok ? r.json() : null))
             .catch(() => null)
         ]),
-        timeoutPromise
+        makeTimeout(8000)
       ]) as any;
       const courseData = courseRes.data;
       if (termsData) {
@@ -351,31 +370,41 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         const wStartStr = getTodayLocalDateStr(wStart);
         const wEndStr = getTodayLocalDateStr(wEnd);
 
-        const studentsPromise = supabase
-          .from("students")
-          .select("id, full_name, student_code, academic_year, section, is_active")
-          .eq("academic_year", courseData.academic_year)
-          .eq("is_active", true);
+        const studentsPromise = fetchAllSupabaseRows((from, to) =>
+          supabase
+            .from("students")
+            .select("id, full_name, student_code, academic_year, section, is_active")
+            .eq("academic_year", courseData.academic_year)
+            .eq("is_active", true)
+            .range(from, to)
+        );
 
         const makeupPromise = (courseData.makeup_students && courseData.makeup_students.length > 0)
-          ? supabase.from("students").select("id, full_name, student_code, academic_year, section, is_active").in("id", courseData.makeup_students).eq("is_active", true)
+          ? supabase.from("students").select("id, full_name, student_code, academic_year, section, is_active").in("id", courseData.makeup_students)
           : Promise.resolve({ data: [] });
 
-        const allAttPromise = supabase
-          .from("attendance")
-          .select("student_id, date")
-          .eq("course_id", resolvedParams.id);
+        const allAttPromise = fetchAllSupabaseRows((from, to) =>
+          supabase
+            .from("attendance")
+            .select("student_id, date")
+            .eq("course_id", resolvedParams.id)
+            .order("id", { ascending: true })
+            .range(from, to)
+        );
 
-        const currentAttPromise = supabase
-          .from("attendance")
-          .select("id, student_id, date, status, course_id")
-          .eq("course_id", resolvedParams.id)
-          .gte("date", wStartStr)
-          .lte("date", wEndStr);
+        const currentAttPromise = fetchAllSupabaseRows((from, to) =>
+          supabase
+            .from("attendance")
+            .select("id, student_id, date, status, course_id")
+            .eq("course_id", resolvedParams.id)
+            .gte("date", wStartStr)
+            .lte("date", wEndStr)
+            .range(from, to)
+        );
 
         const userPromise = supabase.auth.getUser();
 
-        const [studentsRes, makeupRes, allAttRes, attRes, userRes] = await Promise.race([
+        const [loadedStudentsRaw, makeupRes, loadedAllAtt, loadedAtt, userRes] = await Promise.race([
           Promise.all([
             studentsPromise,
             makeupPromise,
@@ -383,13 +412,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             currentAttPromise,
             userPromise
           ]),
-          timeoutPromise
+          makeTimeout(12000)
         ]) as any;
 
-        const loadedStudents = (studentsRes.data || []).filter((s: any) => s.is_active !== false);
+        const loadedStudents = (loadedStudentsRaw || []).filter((s: any) => s.is_active !== false);
         setStudents(loadedStudents);
 
-        const loadedMakeup = (makeupRes.data || []).filter((s: any) => s.is_active !== false);
+        const loadedMakeup = (makeupRes.data || []);
         if (courseData.makeup_students && courseData.makeup_students.length > 0) {
           setMakeupStudents(loadedMakeup);
         }
@@ -403,11 +432,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           }
         }
 
-        const loadedAllAtt = allAttRes.data || [];
-        setAllAttendances(loadedAllAtt);
+        setAllAttendances(loadedAllAtt || []);
 
         const distinctWeekStarts = new Set();
-        loadedAllAtt.forEach((a: any) => {
+        (loadedAllAtt || []).forEach((a: any) => {
            const d = new Date(a.date);
            const dayOfWeek = d.getDay();
            const daysToSubtract = (dayOfWeek + 1) % 7; 
@@ -418,13 +446,13 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         const countWeeks = distinctWeekStarts.size;
         setTotalWeeksCount(countWeeks);
 
-        const loadedAtt = attRes.data || [];
-        setAttendance(loadedAtt);
+        setAttendance(loadedAtt || []);
         const presentIds = new Set<string>(
-          (loadedAtt as any[])
+          ((loadedAtt || []) as any[])
             .filter((a: any) => a.status === "حاضر")
             .map((a: any) => String(a.student_id))
         );
+        manuallyUncheckedIdsRef.current.clear();
         setSelectedStudentIds(presentIds);
 
         // Update local persistent cache for instant offline access
@@ -434,8 +462,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           students: loadedStudents,
           makeupStudents: loadedMakeup,
           instructorName: instName,
-          allAttendances: loadedAllAtt,
-          attendance: loadedAtt,
+          allAttendances: loadedAllAtt || [],
+          attendance: loadedAtt || [],
           totalWeeksCount: countWeeks
         });
       }
@@ -467,8 +495,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const newSet = new Set(selectedStudentIds);
     if (newSet.has(id)) {
       newSet.delete(id);
+      manuallyUncheckedIdsRef.current.add(id);
     } else {
       newSet.add(id);
+      manuallyUncheckedIdsRef.current.delete(id);
     }
     setSelectedStudentIds(newSet);
   };
@@ -478,8 +508,10 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     try {
       const saveDate = getEffectiveSaveDate(selectedWeekKey);
       const displayIds = getDisplayStudents().map(s => s.id);
+      // لا نحذف إلا الطالب الذي قام الأستاذ بإلغاء تحديده يدوياً في هذه الجلسة، لمنع مسح تحضير الكاميرا أو الزميل المشارك
       const toDeleteIds = displayIds.filter(id => 
         !selectedStudentIds.has(id) && 
+        manuallyUncheckedIdsRef.current.has(id) &&
         attendance.some(a => a.student_id === id && a.status === "حاضر")
       );
       const toInsertIds = displayIds.filter(id => 
@@ -500,6 +532,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
         })));
       
       setAttendance(updatedAttendance);
+      manuallyUncheckedIdsRef.current.clear();
       vibrateSuccess();
 
       // Update local cache immediately
@@ -542,7 +575,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
             status: "حاضر",
             teacher_id: course.teacher_id
           }));
-          await supabase.from("attendance").insert(inserts);
+          await supabase.from("attendance").upsert(inserts, { onConflict: 'course_id,student_id,date' });
           try {
             fetch('/api/push/notify-attendance', {
               method: 'POST',
@@ -606,8 +639,12 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     const confirmAdd = window.confirm(`بيانات الطالب:\n• الاسم: ${globalStudent.full_name}\n• الفرقة: ${globalStudent.academic_year}\n• السكشن: ${globalStudent.section}\n• الكود: ${globalStudent.student_code || code}\n\nالطالب غير مدرج في قوائم هذا المقرر (${course?.name || ''}).\nهل تود ضمه كطالب تخلفات / مستمع الآن؟`);
     
     if (confirmAdd) {
-      const updatedMakeup = [...(course.makeup_students || []), globalStudent.id];
+      const updatedMakeup = Array.from(new Set([...(course.makeup_students || []), globalStudent.id]));
       await supabase.from("courses").update({ makeup_students: updatedMakeup }).eq("id", course.id);
+      if (globalStudent.is_active === false) {
+        await supabase.from("students").update({ is_active: true }).eq("id", globalStudent.id);
+        globalStudent.is_active = true;
+      }
       
       // Update local state without full reload to save time
       setCourse({ ...course, makeup_students: updatedMakeup });
@@ -725,12 +762,75 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
           return;
         }
 
-        // إذا لم يكن مسجلاً، يُضاف لقائمة الحضور فوراً
+        // إذا لم يكن مسجلاً، يُضاف لقائمة الحضور ويُحفظ فوراً في قاعدة البيانات والكاش المحلي
+        const saveDate = getEffectiveSaveDate(selectedWeekKey);
         setScannedStudents(prev => [student, ...prev]);
         setLatestScannedStudentId(student.id);
         setScannerStatus('success');
-        setScannerStatusText(`تم الرصد: ${student.full_name}`);
+        setScannerStatusText(`تم الرصد والحفظ: ${student.full_name}`);
         vibrateSuccess();
+
+        // تحديث الحالة المحلية والكاش فوراً حتى لا يضيع التحضير عند إغلاق الكاميرا
+        manuallyUncheckedIdsRef.current.delete(student.id);
+        setSelectedStudentIds(prev => {
+          const next = new Set(prev);
+          next.add(student.id);
+          return next;
+        });
+        setAttendance(prev => {
+          const exists = prev.some(a => String(a.student_id) === String(student.id) && a.date === saveDate);
+          const next = exists
+            ? prev.map(a => (String(a.student_id) === String(student.id) && a.date === saveDate ? { ...a, status: "حاضر" } : a))
+            : [
+                ...prev,
+                {
+                  id: "temp_" + student.id + "_" + Date.now(),
+                  course_id: course.id,
+                  student_id: student.id,
+                  date: saveDate,
+                  status: "حاضر",
+                  teacher_id: course.teacher_id
+                }
+              ];
+          const cached = getLocalCache(`cache_attendance_${course.id}`);
+          if (cached) {
+            cached.attendance = next;
+            setLocalCache(`cache_attendance_${course.id}`, cached);
+          }
+          return next;
+        });
+
+        // حفظ فوري في الخلفية بقاعدة البيانات مع طابور أوفلاين احتياطي
+        if (!navigator.onLine) {
+          addToQueue('CAMERA_ATTENDANCE', { course_id: course.id, date: saveDate, students: [student], teacher_id: course.teacher_id });
+        } else {
+          supabase
+            .from("attendance")
+            .upsert({
+              course_id: course.id,
+              student_id: student.id,
+              date: saveDate,
+              status: "حاضر",
+              teacher_id: course.teacher_id
+            }, { onConflict: 'course_id,student_id,date' })
+            .then(({ error }) => {
+              if (error) {
+                addToQueue('CAMERA_ATTENDANCE', { course_id: course.id, date: saveDate, students: [student], teacher_id: course.teacher_id });
+              } else {
+                try {
+                  fetch('/api/push/notify-attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      student_ids: [student.id],
+                      course_id: course.id,
+                      date: saveDate
+                    })
+                  }).catch(() => {});
+                } catch (_) {}
+              }
+            });
+        }
 
         // التمرير التلقائي السلس لأعلى القائمة لضمان رؤية الطالب فوراً بدون سكرول
         setTimeout(() => {
