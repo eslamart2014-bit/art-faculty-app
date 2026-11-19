@@ -94,7 +94,7 @@ export async function GET(
 
     const headers = new Headers({
       'Content-Type': safeType,
-      'Cache-Control': 'private, no-store, max-age=0',
+      'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, immutable',
       'X-Content-Type-Options': 'nosniff',
     });
     if (contentLength > 0) headers.set('Content-Length', String(contentLength));
