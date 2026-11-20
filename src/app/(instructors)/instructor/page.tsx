@@ -127,6 +127,7 @@ export default function InstructorPage() {
         student_id: st.id,
         project_name: selectedProjectName,
         score: numScore,
+        teacher_id: currentUser?.id || null,
         updated_at: new Date().toISOString()
       }, { onConflict: "course_id,student_id,project_name" });
 
@@ -134,6 +135,19 @@ export default function InstructorPage() {
         console.error("Evaluation save error:", error);
         alert("تعذر حفظ الدرجة: " + error.message);
       } else {
+        // Also sync status and score to student_submissions
+        try {
+          await supabase.from("student_submissions").update({
+            score: numScore,
+            status: "graded",
+            updated_at: new Date().toISOString()
+          }).eq("course_id", selectedCourseId)
+            .eq("student_code", studentCode)
+            .eq("project_name", selectedProjectName);
+        } catch (subErr) {
+          console.warn("Submissions sync warning:", subErr);
+        }
+
         setSubmissions(prev => prev.map(s => {
           if (s.student_code === studentCode) {
             return { ...s, score: numScore, status: "graded" };
