@@ -34,6 +34,7 @@ import {
   UserCog
 } from "lucide-react";
 import { printLockerReceipt } from "@/lib/lockers/lockerReceipt";
+import { staffFetch } from "@/lib/auth/staffAuthFetch";
 
 export default function LockerAdminTab() {
   const [activeSubTab, setActiveSubTab] = useState<"grid" | "pending" | "allocation" | "search" | "tools">("grid");
@@ -115,7 +116,7 @@ export default function LockerAdminTab() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/lockers?action=grid&letter=${letterFilter}`);
+      const res = await staffFetch(`/api/admin/lockers?action=grid&letter=${letterFilter}`);
       const json = await res.json();
       if (json.success) {
         setLockers(json.lockers || []);
@@ -147,7 +148,7 @@ export default function LockerAdminTab() {
   const handleSaveQuotas = async () => {
     setSavingQuotas(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_quotas', quotas: cohortQuotasInput })
@@ -177,7 +178,7 @@ export default function LockerAdminTab() {
   const handleConfirmBooking = async (bookingId: string) => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'confirm', bookingId })
@@ -202,7 +203,7 @@ export default function LockerAdminTab() {
     if (!confirm("هل أنت متأكد من إلغاء هذا الحجز وإخلاء الدولاب؟")) return;
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject', bookingId })
@@ -227,7 +228,7 @@ export default function LockerAdminTab() {
     if (!confirm(`هل أنت متأكد من تفريغ وإخلاء الدولاب ${lockerCode} بالكامل؟`)) return;
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'vacate', lockerCode })
@@ -252,7 +253,7 @@ export default function LockerAdminTab() {
     if (!confirm(`هل أنت متأكد من إقصاء الطالب (${studentNameOrCode}) من الدولاب؟`)) return;
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'remove_student', bookingId, studentCodeOrName: studentNameOrCode })
@@ -275,7 +276,7 @@ export default function LockerAdminTab() {
   // تبديل إتاحة الدولاب (متاح / محجوب)
   const handleToggleEnabled = async (lockerCode: string) => {
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'toggle_enabled', lockerCode })
@@ -300,7 +301,7 @@ export default function LockerAdminTab() {
   const handleSetAdminReserved = async (lockerCode: string, reserved: boolean) => {
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'set_admin_reserved', lockerCode, reserved })
@@ -329,7 +330,7 @@ export default function LockerAdminTab() {
   const handleSaveRanges = async () => {
     setSavingRanges(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_ranges', ranges: inventoryRanges })
@@ -352,7 +353,7 @@ export default function LockerAdminTab() {
   const handleReconcileStudents = async () => {
     setReconcilingStudents(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -377,7 +378,7 @@ export default function LockerAdminTab() {
   const handleScanDuplicates = async () => {
     setIsScanningDuplicates(true);
     try {
-      const res = await fetch('/api/admin/lockers?action=duplicates');
+      const res = await staffFetch('/api/admin/lockers?action=duplicates');
       const json = await res.json();
       if (json.success) {
         setDuplicateStudents(json.duplicates || []);
@@ -401,7 +402,7 @@ export default function LockerAdminTab() {
     if (!confirm("هل أنت متأكد من تصفية وحذف التكرارات تلقائياً؟ سيتم الإبقاء على الحجز المؤكد أو الأسبق وإزالة الحجز المكرر فوراً.")) return;
     setIsResolvingDuplicates(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'resolve_duplicates' })
@@ -491,7 +492,7 @@ export default function LockerAdminTab() {
     }
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -602,7 +603,7 @@ export default function LockerAdminTab() {
 
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -645,7 +646,7 @@ export default function LockerAdminTab() {
   // تعديل سعة الدولاب
   const handleUpdateCapacity = async (lockerCode: string, capacity: number) => {
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_capacity', lockerCode, capacity })
@@ -671,7 +672,7 @@ export default function LockerAdminTab() {
     if (!confirm(`تحذير شديد! هل أنت متأكد من تفريغ جميع دواليب (${cohortToClear})؟ هذا الإجراء سيخلي كافة الدواليب المسكنة لطلاب هذه الفرقة.`)) return;
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/lockers', {
+      const res = await staffFetch('/api/admin/lockers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear_cohort', cohort: cohortToClear })
@@ -699,7 +700,7 @@ export default function LockerAdminTab() {
     }
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/admin/lockers?action=search&query=${encodeURIComponent(q.trim())}`);
+      const res = await staffFetch(`/api/admin/lockers?action=search&query=${encodeURIComponent(q.trim())}`);
       const json = await res.json();
       if (json.success) {
         setSearchResults(json.results);
