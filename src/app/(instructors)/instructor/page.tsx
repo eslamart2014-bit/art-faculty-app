@@ -351,12 +351,12 @@ export default function InstructorPage() {
               ${sub.score !== null ? `<div style="background: #059669; color: #fff; font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 6px;">درجة: ${sub.score}</div>` : ''}
             </div>
 
-            ${img ? `
+            ${img && img !== "[base64_image_omitted]" ? `
               <div style="width: 100%; border-radius: 8px; overflow: hidden; background: #000; text-align: center; margin-bottom: 10px;">
                 <img src="${img}" crossorigin="anonymous" style="width: 100%; max-height: 480px; object-fit: contain; display: block;" />
               </div>
             ` : `
-              <div style="padding: 40px; text-align: center; color: #64748b; font-size: 13px;">لا توجد صورة للعمل</div>
+              <div style="padding: 30px; text-align: center; color: #94a3b8; font-size: 13px;">${img === "[base64_image_omitted]" ? "تم استلام العمل قبل تحديث السيرفر (صورة مؤرشفة)" : "لا توجد صورة للعمل"}</div>
             `}
 
             <div style="font-size: 10px; color: #64748b; display: flex; justify-content: space-between; padding-top: 6px; border-top: 1px dashed #334155;">
@@ -734,6 +734,7 @@ export default function InstructorPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "14px" }}>
                   {submissions.map((sub: any, idx: number) => {
                     const firstImg = sub.images?.[0]?.url || sub.photo_url || "";
+                    const isArchivedImg = firstImg === "[base64_image_omitted]";
                     const isActionLoading = actionLoading === `${sub.student_code}_${sub.project_name}`;
 
                     return (
@@ -745,6 +746,7 @@ export default function InstructorPage() {
                           {/* Image Preview with Zoom Overlay */}
                           <div
                             onClick={() => {
+                              if (!firstImg || isArchivedImg) return;
                               setPreviewImage({
                                 url: firstImg,
                                 title: `عمل الطالب: ${sub.student_name}`,
@@ -752,24 +754,32 @@ export default function InstructorPage() {
                               });
                               setRotationDegrees(0);
                             }}
-                            style={{ position: "relative", width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", background: "var(--bg-deep)", cursor: "pointer", marginBottom: "12px", border: "1px solid var(--border)" }}
+                            style={{ position: "relative", width: "100%", height: "200px", borderRadius: "8px", overflow: "hidden", background: "var(--bg-deep)", cursor: firstImg && !isArchivedImg ? "pointer" : "default", marginBottom: "12px", border: "1px solid var(--border)" }}
                           >
-                            {firstImg ? (
+                            {firstImg && !isArchivedImg ? (
                               <img
                                 src={firstImg}
                                 alt={sub.student_name}
                                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
                               />
+                            ) : isArchivedImg ? (
+                              <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "14px", textAlign: "center", color: "var(--success-ink)", gap: "6px" }}>
+                                <CheckCircle2 size={28} strokeWidth={1.5} />
+                                <span style={{ fontSize: "12px", fontWeight: 600 }}>عمل مسلّم قبل تحديث السيرفر</span>
+                                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>الصورة مؤرشفة — التسليم مؤكد</span>
+                              </div>
                             ) : (
                               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px" }}>
                                 لا توجد صورة
                               </div>
                             )}
 
-                            <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(0,0,0,0.7)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
-                              <Eye size={12} strokeWidth={1.5} />
-                              <span>تكبير الصورة</span>
-                            </div>
+                            {firstImg && !isArchivedImg && (
+                              <div style={{ position: "absolute", bottom: "8px", left: "8px", background: "rgba(0,0,0,0.7)", color: "#fff", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <Eye size={12} strokeWidth={1.5} />
+                                <span>تكبير الصورة</span>
+                              </div>
+                            )}
 
                             {/* Status Badge */}
                             <div className="tabular-nums" style={{ position: "absolute", top: "8px", right: "8px", background: sub.score !== null ? "rgba(16, 185, 129, 0.9)" : "rgba(245, 158, 11, 0.9)", color: "#fff", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "600" }}>

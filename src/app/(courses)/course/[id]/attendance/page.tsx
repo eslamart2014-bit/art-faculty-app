@@ -34,7 +34,11 @@ import { getStudentTag, setStudentTag } from "@/lib/students/studentTagsHelper";
 import { formatInstructorTitle } from "@/lib/courses/academicHelper";
 
 const getWeekRangeFromKey = (key: string) => {
-  const start = new Date(key);
+  const parts = String(key || '').split('-').map(Number);
+  const start = parts.length === 3 && !parts.some(isNaN)
+    ? new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0)
+    : new Date(key);
+  start.setHours(0, 0, 0, 0);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   end.setHours(23, 59, 59, 999);
@@ -46,6 +50,17 @@ const getTodayLocalDateStr = (d = new Date()) => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+const filterAttendanceForWeek = (records: any[], weekKey: string) => {
+  if (!Array.isArray(records) || records.length === 0) return [];
+  const { start, end } = getWeekRangeFromKey(weekKey);
+  const startStr = getTodayLocalDateStr(start);
+  const endStr = getTodayLocalDateStr(end);
+  return records.filter((a: any) => {
+    const d = String(a?.date || '').slice(0, 10);
+    return d >= startStr && d <= endStr;
+  });
 };
 
 const getEffectiveSaveDate = (weekKey: string) => {
@@ -122,18 +137,25 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     ? initialAttCache.students
     : fallbackStudents;
 
+  const { startOfWeek: initStartOfWeek } = getCurrentWeekRange();
+  const initialWeekKey = getTodayLocalDateStr(initStartOfWeek);
+  const initialWeekAttendance =
+    initialAttCache?.weekKey === initialWeekKey
+      ? filterAttendanceForWeek(initialAttCache?.attendance || [], initialWeekKey)
+      : [];
+
   const [course, setCourse] = useState<any>(() => currentCourse);
   const [systemTerms, setSystemTerms] = useState<any>(() => initialAttCache?.systemTerms || getLocalCache("cached_system_settings") || null);
   const [students, setStudents] = useState<any[]>(() => initialStudents);
   const [makeupStudents, setMakeupStudents] = useState<any[]>(() => initialAttCache?.makeupStudents || []);
-  const [attendance, setAttendance] = useState<any[]>(() => initialAttCache?.attendance || []);
+  const [attendance, setAttendance] = useState<any[]>(() => initialWeekAttendance);
   const [instructorName, setInstructorName] = useState<string>(() => initialAttCache?.instructorName || "........................");
   
   // Selection state
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(() => {
-    if (initialAttCache?.attendance) {
+    if (initialWeekAttendance.length > 0) {
       return new Set<string>(
-        (initialAttCache.attendance as any[])
+        initialWeekAttendance
           .filter((a: any) => a.status === "حاضر")
           .map((a: any) => String(a.student_id))
       );
@@ -165,14 +187,18 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
       if (cached.makeupStudents) setMakeupStudents(cached.makeupStudents);
       if (cached.instructorName) setInstructorName(cached.instructorName);
       if (cached.allAttendances) setAllAttendances(cached.allAttendances);
-      if (cached.attendance) {
-        setAttendance(cached.attendance);
+      if (cached.attendance && cached.weekKey === initialWeekKey) {
+        const weekFiltered = filterAttendanceForWeek(cached.attendance, initialWeekKey);
+        setAttendance(weekFiltered);
         const presentIds = new Set<string>(
-          (cached.attendance as any[])
+          weekFiltered
             .filter((a: any) => a.status === "حاضر")
             .map((a: any) => String(a.student_id))
         );
         setSelectedStudentIds(presentIds);
+      } else {
+        setAttendance([]);
+        setSelectedStudentIds(new Set<string>());
       }
       if (cached.totalWeeksCount) setTotalWeeksCount(cached.totalWeeksCount);
       setLoading(false);
@@ -236,7 +262,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   }, []);
 
   const { startOfWeek, endOfWeek } = getCurrentWeekRange();
-  const currentWeekKey = startOfWeek.toISOString().split('T')[0];
+  const currentWeekKey = getTodayLocalDateStr(startOfWeek);
   const [selectedWeekKey, setSelectedWeekKey] = useState<string>(currentWeekKey);
 
   const [allAttendances, setAllAttendances] = useState<any[]>([]);
@@ -280,7 +306,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     let index = 0;
     
     if (current > currentWeekStart) {
-      const key = current.toISOString().split('T')[0];
+      const key = getTodayLocalDateStr(current);
       const end = new Date(current);
       end.setDate(current.getDate() + 6);
       const startStr = current.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
@@ -294,7 +320,7 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     }
     
     while (current <= currentWeekStart) {
-      const key = current.toISOString().split('T')[0];
+      const key = getTodayLocalDateStr(current);
       
       const end = new Date(current);
       end.setDate(current.getDate() + 6);
@@ -328,6 +354,19 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
   }, [course, systemTerms]);
 
   useEffect(() => {
+    setAttendance(prev => {
+      const validForWeek = filterAttendanceForWeek(prev, selectedWeekKey);
+      if (validForWeek.length !== prev.length) {
+        setSelectedStudentIds(
+          new Set<string>(
+            validForWeek
+              .filter((a: any) => a.status === "حاضر")
+              .map((a: any) => String(a.student_id))
+          )
+        );
+      }
+      return validForWeek;
+    });
     fetchData();
   }, [resolvedParams.id, selectedWeekKey]);
 
@@ -436,34 +475,42 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
         const distinctWeekStarts = new Set();
         (loadedAllAtt || []).forEach((a: any) => {
-           const d = new Date(a.date);
+           const parts = String(a.date || '').split('-').map(Number);
+           const d = parts.length === 3 && !parts.some(isNaN)
+             ? new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0)
+             : new Date(a.date);
            const dayOfWeek = d.getDay();
            const daysToSubtract = (dayOfWeek + 1) % 7; 
            const start = new Date(d);
            start.setDate(d.getDate() - daysToSubtract);
-           distinctWeekStarts.add(start.toISOString().split('T')[0]);
+           distinctWeekStarts.add(getTodayLocalDateStr(start));
         });
         const countWeeks = distinctWeekStarts.size;
         setTotalWeeksCount(countWeeks);
 
-        setAttendance(loadedAtt || []);
+        const cleanLoadedAtt = filterAttendanceForWeek(loadedAtt || [], selectedWeekKey);
+        setAttendance(cleanLoadedAtt);
         const presentIds = new Set<string>(
-          ((loadedAtt || []) as any[])
+          cleanLoadedAtt
             .filter((a: any) => a.status === "حاضر")
             .map((a: any) => String(a.student_id))
         );
         manuallyUncheckedIdsRef.current.clear();
         setSelectedStudentIds(presentIds);
 
-        // Update local persistent cache for instant offline access
+        // Update local persistent cache for instant offline access (tag with weekKey so old weeks never bleed into a new week)
+        const prevCache = getLocalCache(`cache_attendance_${resolvedParams.id}`) || {};
         setLocalCache(`cache_attendance_${resolvedParams.id}`, {
+          ...prevCache,
           course: courseData,
           systemTerms: termsData,
           students: loadedStudents,
           makeupStudents: loadedMakeup,
           instructorName: instName,
           allAttendances: loadedAllAtt || [],
-          attendance: loadedAtt || [],
+          ...(selectedWeekKey === currentWeekKey
+            ? { weekKey: selectedWeekKey, attendance: cleanLoadedAtt }
+            : {}),
           totalWeeksCount: countWeeks
         });
       }
@@ -537,7 +584,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
       // Update local cache immediately
       const cached = getLocalCache(`cache_attendance_${course.id}`);
-      if (cached) {
+      if (cached && selectedWeekKey === currentWeekKey) {
+        cached.weekKey = selectedWeekKey;
         cached.attendance = updatedAttendance;
         setLocalCache(`cache_attendance_${course.id}`, cached);
       }
@@ -745,14 +793,16 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
     try {
       const student = await checkStudentLocalOrGlobal(cleanCode);
       if (student) {
-        // فحص ما إذا كان الطالب تم تحضيره مسبقاً هذا الأسبوع
-        const isAlreadyInDb = attendance.some(a => String(a.student_id) === String(student.id) && a.status === 'حاضر');
-        const isAlreadySelected = selectedStudentIds.has(student.id);
+        // فحص ما إذا كان الطالب تم تحضيره مسبقاً في نطاق الأسبوع المحدد فقط
+        const weekScopedAttendance = filterAttendanceForWeek(attendance, selectedWeekKey);
+        const existingWeekRecord = weekScopedAttendance.find(a => String(a.student_id) === String(student.id) && a.status === 'حاضر');
+        const isAlreadyInDb = !!existingWeekRecord;
         const isAlreadyInSession = scannedStudents.some(s => s.id === student.id || s.student_code === student.student_code);
 
-        if (isAlreadyInDb || isAlreadySelected || isAlreadyInSession) {
+        if (isAlreadyInDb || isAlreadyInSession) {
           setScannerStatus('error');
-          setScannerStatusText(`تم تحضير الطالب هذا الأسبوع مسبقاً (${student.full_name})`);
+          const recordedDateNote = existingWeekRecord?.date ? ` - بتاريخ ${existingWeekRecord.date}` : '';
+          setScannerStatusText(`تم تحضير الطالب هذا الأسبوع مسبقاً (${student.full_name}${recordedDateNote})`);
           vibrateAlreadyAttended();
           setTimeout(() => {
             setScannerStatus('idle');
@@ -793,7 +843,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
                 }
               ];
           const cached = getLocalCache(`cache_attendance_${course.id}`);
-          if (cached) {
+          if (cached && selectedWeekKey === currentWeekKey) {
+            cached.weekKey = selectedWeekKey;
             cached.attendance = next;
             setLocalCache(`cache_attendance_${course.id}`, cached);
           }
@@ -913,7 +964,8 @@ export default function AttendancePage({ params }: { params: Promise<{ id: strin
 
     // Save to local cache
     const cached = getLocalCache(`cache_attendance_${course.id}`);
-    if (cached) {
+    if (cached && selectedWeekKey === currentWeekKey) {
+      cached.weekKey = selectedWeekKey;
       cached.attendance = newAtt;
       setLocalCache(`cache_attendance_${course.id}`, cached);
     }

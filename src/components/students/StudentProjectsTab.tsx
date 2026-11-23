@@ -22,6 +22,10 @@ import {
   ZoomIn,
 } from "lucide-react";
 
+function isArchivedPreMigrationUrl(url?: string | null): boolean {
+  return typeof url === 'string' && url.trim() === '[base64_image_omitted]';
+}
+
 function formatRemainingTime(deadlineStr?: string | null): { text: string; isExpired: boolean; isUrgent: boolean } {
   if (!deadlineStr) return { text: '', isExpired: false, isUrgent: false };
   const target = new Date(deadlineStr).getTime();
@@ -826,16 +830,24 @@ export default function StudentProjectsTab({
 
                         {stage1Url ? (
                           <div>
-                            <div
-                              onClick={() => setPreviewModalImage(stage1Url)}
-                              style={{ width: "100%", height: "160px", background: "#000000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-light)", position: "relative" }}
-                            >
-                              <img src={stage1Url} alt="المرحلة 1" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                              <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(11, 13, 20, 0.8)", color: "#ffffff", fontSize: "10.5px", padding: "3px 8px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                <ZoomIn size={12} strokeWidth={1.5} />
-                                <span>تكبير</span>
+                            {isArchivedPreMigrationUrl(stage1Url) ? (
+                              <div style={{ width: "100%", minHeight: "120px", background: "rgba(16, 185, 129, 0.08)", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", textAlign: "center" }}>
+                                <CheckCircle2 size={26} strokeWidth={1.5} color="var(--success)" />
+                                <div style={{ color: "var(--success-ink)", fontSize: "12px", fontWeight: 600 }}>تم استلام وتسجيل المرحلة الأولى قبل تحديث السيرفر</div>
+                                <div style={{ color: "var(--text-secondary)", fontSize: "11px" }}>تسليمك مؤكد ولا يلزم إعادة الرفع</div>
                               </div>
-                            </div>
+                            ) : (
+                              <div
+                                onClick={() => setPreviewModalImage(stage1Url)}
+                                style={{ width: "100%", height: "160px", background: "#000000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-light)", position: "relative" }}
+                              >
+                                <img src={stage1Url} alt="المرحلة 1" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(11, 13, 20, 0.8)", color: "#ffffff", fontSize: "10.5px", padding: "3px 8px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  <ZoomIn size={12} strokeWidth={1.5} />
+                                  <span>تكبير</span>
+                                </div>
+                              </div>
+                            )}
                             <div style={{ color: "var(--success-ink)", fontSize: "11.5px", fontWeight: 500, marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                               <Check size={13} strokeWidth={1.5} />
                               <span>تم رفع صورة مرحلة التحضير بنجاح</span>
@@ -912,16 +924,24 @@ export default function StudentProjectsTab({
 
                         {stage2Url ? (
                           <div>
-                            <div
-                              onClick={() => setPreviewModalImage(stage2Url)}
-                              style={{ width: "100%", height: "160px", background: "#000000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-light)", position: "relative" }}
-                            >
-                              <img src={stage2Url} alt="المرحلة 2" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                              <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(11, 13, 20, 0.8)", color: "#ffffff", fontSize: "10.5px", padding: "3px 8px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                <ZoomIn size={12} strokeWidth={1.5} />
-                                <span>تكبير</span>
+                            {isArchivedPreMigrationUrl(stage2Url) ? (
+                              <div style={{ width: "100%", minHeight: "120px", background: "rgba(16, 185, 129, 0.08)", borderRadius: "8px", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", textAlign: "center" }}>
+                                <CheckCircle2 size={26} strokeWidth={1.5} color="var(--success)" />
+                                <div style={{ color: "var(--success-ink)", fontSize: "12px", fontWeight: 600 }}>تم استلام وتسجيل المرحلة الثانية قبل تحديث السيرفر</div>
+                                <div style={{ color: "var(--text-secondary)", fontSize: "11px" }}>تسليمك مؤكد ولا يلزم إعادة الرفع</div>
                               </div>
-                            </div>
+                            ) : (
+                              <div
+                                onClick={() => setPreviewModalImage(stage2Url)}
+                                style={{ width: "100%", height: "160px", background: "#000000", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-light)", position: "relative" }}
+                              >
+                                <img src={stage2Url} alt="المرحلة 2" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                <div style={{ position: "absolute", bottom: "6px", right: "6px", background: "rgba(11, 13, 20, 0.8)", color: "#ffffff", fontSize: "10.5px", padding: "3px 8px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                  <ZoomIn size={12} strokeWidth={1.5} />
+                                  <span>تكبير</span>
+                                </div>
+                              </div>
+                            )}
                             <div style={{ color: "var(--success-ink)", fontSize: "11.5px", fontWeight: 500, marginTop: "6px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                               <Check size={13} strokeWidth={1.5} />
                               <span>تم رفع صورة العمل النهائي المكتمل</span>
@@ -1029,6 +1049,34 @@ export default function StudentProjectsTab({
                       {imageList.map((img: any, idx: number) => {
                         const imgUrl = typeof img === 'string' ? img : (img?.url || img?.dataUrl || '');
                         if (!imgUrl) return null;
+                        if (isArchivedPreMigrationUrl(imgUrl)) {
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                minHeight: "140px",
+                                borderRadius: "10px",
+                                border: "1px solid rgba(16, 185, 129, 0.35)",
+                                background: "rgba(16, 185, 129, 0.08)",
+                                padding: "18px 14px",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                textAlign: "center"
+                              }}
+                            >
+                              <CheckCircle2 size={32} strokeWidth={1.5} color="var(--success)" />
+                              <div style={{ color: "var(--success-ink)", fontWeight: 600, fontSize: "13px" }}>
+                                تم استلام وتسجيل عملك الفني قبل تحديث السيرفر
+                              </div>
+                              <div style={{ color: "var(--text-secondary)", fontSize: "11.5px", lineHeight: 1.5 }}>
+                                تسليمك محفوظ ومعتمد في قاعدة البيانات، ولا يلزم إعادة رفع الصورة.
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
                           <div
                             key={idx}

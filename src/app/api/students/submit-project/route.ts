@@ -161,15 +161,20 @@ export async function POST(request: Request) {
     const targetStage = isMultiStage ? (stage === 'stage2' ? 'stage2' : 'stage1') : undefined;
 
     if (existingSub) {
-      if (!isMultiStage) {
-        return noStoreJson(
-          { error: 'لقد قمت برفع هذا المشروع مسبقاً! لا يمكن إعادة الرفع إلا إذا قام أستاذ المقرر بإتاحة الرفع لك مجدداً.' },
-          { status: 403 }
-        );
-      }
-
       const existingImages = Array.isArray(existingSub.images) ? existingSub.images : [];
-      if (targetStage === 'stage2') {
+      const hasExistingValidImages = existingImages.some((img: any) => {
+        const u = typeof img === 'string' ? img : img?.url;
+        return !!u && !u.includes('undefined') && !u.includes('null');
+      });
+
+      if (!isMultiStage) {
+        if (hasExistingValidImages) {
+          return noStoreJson(
+            { error: 'لقد قمت برفع هذا المشروع مسبقاً! لا يمكن إعادة الرفع إلا إذا قام أستاذ المقرر بإتاحة الرفع لك مجدداً.' },
+            { status: 403 }
+          );
+        }
+      } else if (targetStage === 'stage2') {
         const alreadyHasStage2 = existingImages.some((img: any) => typeof img === 'object' && img?.stage === 'stage2');
         if (alreadyHasStage2) {
           return noStoreJson(
@@ -248,7 +253,7 @@ export async function POST(request: Request) {
     const revealedScore = existingScore !== null && uploadSatisfiedForGrade ? existingScore : null;
     const effectiveSubStatus = revealedScore !== null ? 'evaluated' : 'pending_evaluation';
 
-    if (existingSub && isMultiStage) {
+    if (existingSub) {
       try {
         const { data: updatedSub } = await supabaseAdmin
           .from('student_submissions')

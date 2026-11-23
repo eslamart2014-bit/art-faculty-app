@@ -1105,11 +1105,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
         }, { onConflict: 'course_id,student_id,date' });
 
         const cachedAtt = getLocalCache(`cache_attendance_${course.id}`);
-        if (cachedAtt && Array.isArray(cachedAtt.attendance)) {
-          const existsInCache = cachedAtt.attendance.some((a: any) => String(a.student_id) === String(student.id) && a.date === today);
+        if (cachedAtt) {
+          const nowD = new Date();
+          const sat = new Date(nowD);
+          sat.setDate(nowD.getDate() - ((nowD.getDay() + 1) % 7));
+          const wkKey = `${sat.getFullYear()}-${String(sat.getMonth() + 1).padStart(2, '0')}-${String(sat.getDate()).padStart(2, '0')}`;
+          const baseList = cachedAtt.weekKey === wkKey && Array.isArray(cachedAtt.attendance) ? cachedAtt.attendance : [];
+          const existsInCache = baseList.some((a: any) => String(a.student_id) === String(student.id) && a.date === today);
+          cachedAtt.weekKey = wkKey;
           cachedAtt.attendance = existsInCache
-            ? cachedAtt.attendance.map((a: any) => (String(a.student_id) === String(student.id) && a.date === today ? { ...a, status: "حاضر" } : a))
-            : [...cachedAtt.attendance, { id: "temp_" + student.id + "_" + Date.now(), course_id: course.id, student_id: student.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
+            ? baseList.map((a: any) => (String(a.student_id) === String(student.id) && a.date === today ? { ...a, status: "حاضر" } : a))
+            : [...baseList, { id: "temp_" + student.id + "_" + Date.now(), course_id: course.id, student_id: student.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
           setLocalCache(`cache_attendance_${course.id}`, cachedAtt);
         }
       }
@@ -1322,11 +1328,17 @@ export default function EvaluationsPage({ params }: { params: Promise<{ id: stri
       }, { onConflict: 'course_id,student_id,date' });
 
       const cachedAtt = getLocalCache(`cache_attendance_${course.id}`);
-      if (cachedAtt && Array.isArray(cachedAtt.attendance)) {
-        const existsInCache = cachedAtt.attendance.some((a: any) => String(a.student_id) === String(targetStudent.id) && a.date === today);
+      if (cachedAtt) {
+        const nowD = new Date();
+        const sat = new Date(nowD);
+        sat.setDate(nowD.getDate() - ((nowD.getDay() + 1) % 7));
+        const wkKey = `${sat.getFullYear()}-${String(sat.getMonth() + 1).padStart(2, '0')}-${String(sat.getDate()).padStart(2, '0')}`;
+        const baseList = cachedAtt.weekKey === wkKey && Array.isArray(cachedAtt.attendance) ? cachedAtt.attendance : [];
+        const existsInCache = baseList.some((a: any) => String(a.student_id) === String(targetStudent.id) && a.date === today);
+        cachedAtt.weekKey = wkKey;
         cachedAtt.attendance = existsInCache
-          ? cachedAtt.attendance.map((a: any) => (String(a.student_id) === String(targetStudent.id) && a.date === today ? { ...a, status: "حاضر" } : a))
-          : [...cachedAtt.attendance, { id: "temp_" + targetStudent.id + "_" + Date.now(), course_id: course.id, student_id: targetStudent.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
+          ? baseList.map((a: any) => (String(a.student_id) === String(targetStudent.id) && a.date === today ? { ...a, status: "حاضر" } : a))
+          : [...baseList, { id: "temp_" + targetStudent.id + "_" + Date.now(), course_id: course.id, student_id: targetStudent.id, date: today, status: "حاضر", teacher_id: course.teacher_id }];
         setLocalCache(`cache_attendance_${course.id}`, cachedAtt);
       }
     }

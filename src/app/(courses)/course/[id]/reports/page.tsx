@@ -275,8 +275,11 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
           current = new Date(maxAttDate);
         }
 
+        const toLocalKey = (dt: Date) =>
+          `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
         while (current <= maxAttDate) {
-          const key = current.toISOString().split('T')[0];
+          const key = toLocalKey(current);
           const end = new Date(current);
           end.setDate(current.getDate() + 6);
           end.setHours(23, 59, 59, 999);
@@ -305,7 +308,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
         }
 
         if (weeksList.length === 0) {
-          const key = current.toISOString().split('T')[0];
+          const key = toLocalKey(current);
           const end = new Date(current);
           end.setDate(current.getDate() + 6);
           end.setHours(23, 59, 59, 999);
